@@ -53,17 +53,18 @@ type EventState struct {
 }
 
 type Bot struct {
-	token      string
-	ownerID    string
-	client     *http.Client
-	events     []FFEvent
-	eventState map[string]*EventState
-	mu         sync.RWMutex
-	lastFetch  time.Time
-	offset     int
-	alertsOn   bool
-	fetchCount int
-	fetchErrs  int
+	token          string
+	ownerID        string
+	client         *http.Client
+	events         []FFEvent
+	eventState     map[string]*EventState
+	mu             sync.RWMutex
+	lastFetch      time.Time
+	offset         int
+	alertsOn       bool
+	fetchCount     int
+	fetchErrs      int
+	rateLimitUntil time.Time
 }
 
 // ============================================================================
@@ -264,12 +265,22 @@ func (b *Bot) getUpdates() ([]TGUpdate, error) {
 // ============================================================================
 
 func (b *Bot) fetchEvents() error {
+	// Cooldown: skip if we got rate-limited recently
+	b.mu.RLock()
+	cooldownUntil := b.rateLimitUntil
+	b.mu.RUnlock()
+	if time.Now().Before(cooldownUntil) {
+		log.Printf("[FETCH] Rate-limit cooldown until %s, skipping", cooldownUntil.Format("15:04:05"))
+		return nil
+	}
+
 	const maxRetries = 3
+	backoffs := []time.Duration{30 * time.Second, 2 * time.Minute, 5 * time.Minute}
 	var lastErr error
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			wait := time.Duration(attempt*attempt) * 5 * time.Second // 5s, 20s
+			wait := backoffs[attempt-1]
 			log.Printf("[FETCH] Retry %d/%d in %v...", attempt+1, maxRetries, wait)
 			time.Sleep(wait)
 		}
@@ -277,6 +288,7 @@ func (b *Bot) fetchEvents() error {
 		req, _ := http.NewRequest("GET", FF_JSON_URL, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 		resp, err := b.client.Do(req)
 		if err != nil {
 			lastErr = err
@@ -291,8 +303,18 @@ func (b *Bot) fetchEvents() error {
 
 		log.Printf("[FETCH] HTTP %d | %d bytes (attempt %d)", resp.StatusCode, len(data), attempt+1)
 
-		// Retry on rate limit or server error
-		if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+		// Rate limited — set cooldown and stop retrying
+		if resp.StatusCode == 429 {
+			b.mu.Lock()
+			b.rateLimitUntil = time.Now().Add(10 * time.Minute)
+			b.fetchErrs++
+			b.mu.Unlock()
+			log.Printf("[FETCH] Rate limited! Cooling down for 10 minutes")
+			return fmt.Errorf("rate limited (429), cooldown 10min")
+		}
+
+		// Server error — retry
+		if resp.StatusCode >= 500 {
 			lastErr = fmt.Errorf("http %d", resp.StatusCode)
 			continue
 		}
@@ -1189,14 +1211,14 @@ func (b *Bot) run() {
 	// Data refresh goroutine
 	go func() {
 		for {
-			interval := 5 * time.Minute
+			interval := 15 * time.Minute
 			b.mu.RLock()
 			for _, e := range b.events {
 				t, err := parseEventTime(e.Date)
 				if err == nil {
 					diff := time.Until(t)
 					if diff > 0 && diff < 35*time.Minute {
-						interval = 2 * time.Minute
+						interval = 5 * time.Minute
 						break
 					}
 				}
