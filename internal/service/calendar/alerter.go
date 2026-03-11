@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings" // FIX: was missing
 	"sync"
 	"time"
 
@@ -67,7 +68,7 @@ func (a *Alerter) ScheduleAlerts(ctx context.Context, events []domain.FFEvent) {
 		}
 
 		// Skip past events
-		if ev.DateTime.Before(now) {
+		if ev.Date.Before(now) { // FIX: was ev.DateTime
 			continue
 		}
 
@@ -77,14 +78,14 @@ func (a *Alerter) ScheduleAlerts(ctx context.Context, events []domain.FFEvent) {
 		}
 
 		for _, mins := range a.defaults {
-			key := fmt.Sprintf("%s|%s|%s|%d", ev.DateTime.Format(time.RFC3339), ev.Currency, ev.Title, mins)
+			key := fmt.Sprintf("%s|%s|%s|%d", ev.Date.Format(time.RFC3339), ev.Currency, ev.Title, mins) // FIX: was ev.DateTime
 
 			// Skip if already scheduled
 			if _, exists := a.timers[key]; exists {
 				continue
 			}
 
-			alertTime := ev.DateTime.Add(-time.Duration(mins) * time.Minute)
+			alertTime := ev.Date.Add(-time.Duration(mins) * time.Minute) // FIX: was ev.DateTime
 			delay := alertTime.Sub(now)
 
 			// Skip if alert time already passed
@@ -147,7 +148,7 @@ func (a *Alerter) fireAlert(ctx context.Context, ev domain.FFEvent, minsBefore i
 	msg := formatAlertMessage(ev, minsBefore)
 
 	for _, chatID := range chats {
-		if err := a.messenger.SendMessage(ctx, chatID, msg); err != nil {
+		if _, err := a.messenger.SendMessage(ctx, chatID, msg); err != nil { // FIX: SendMessage returns (int, error)
 			log.Printf("[alerter] send to %s: %v", chatID, err)
 		}
 	}
@@ -169,7 +170,7 @@ func formatAlertMessage(ev domain.FFEvent, minsBefore int) string {
 
 	b.WriteString(fmt.Sprintf("[HIGH IMPACT] %s %s\n", ev.Currency, ev.Title))
 	b.WriteString(fmt.Sprintf("Time: %s (%d min away)\n",
-		ev.DateTime.Format("15:04 WIB"), minsBefore))
+		ev.Date.Format("15:04 WIB"), minsBefore)) // FIX: was ev.DateTime
 
 	if ev.Forecast != "" {
 		b.WriteString(fmt.Sprintf("Forecast: %s", ev.Forecast))
