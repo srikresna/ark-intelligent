@@ -14,12 +14,11 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
-# Copy go.mod first (go.sum generated via go mod tidy at build time)
-COPY go.mod ./
-RUN go mod tidy && go mod download
-
-# Copy source code
+# Copy all source code
 COPY . .
+
+# Generate go.sum and download dependencies
+RUN go mod tidy && go mod download
 
 # Build static binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
