@@ -64,7 +64,7 @@ func MustLoad() *Config {
 
 		// AI (optional)
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
-		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-2.0-flash"),
+		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
 
 		// Storage
 		DataDir: getEnv("DATA_DIR", "/app/data"),
