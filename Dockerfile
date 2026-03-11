@@ -61,7 +61,7 @@ HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \
 # Switch to non-root user
 USER botuser
 
-# Data volume for BadgerDB persistence
-VOLUME ["/app/data"]
+# Note: For persistent storage, configure a Railway volume mounted at /app/data
+# See: https://docs.railway.com/reference/volumes
 
 ENTRYPOINT ["/app/ff-calendar-bot"]
