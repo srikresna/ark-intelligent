@@ -65,31 +65,28 @@ func (s *CollyFFScraper) newCollector() *colly.Collector {
 		colly.Async(false),
 	)
 
-	// Anti-detection: random user agent rotation
-	extensions.RandomUserAgent(c)
+	// Use a fixed, highly modern User-Agent instead of a random one
+	// Random UAs often use outdated strings that trigger CF defenses.
+	modernUA := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+	c.UserAgent = modernUA
 
-	// Anti-detection: random delay between requests
-	c.Limit(&colly.LimitRule{
-		DomainGlob:  "*forexfactory.com*",
-		Delay:       1 * time.Second,
-		RandomDelay: 2 * time.Second,
-		Parallelism: 1,
-	})
-
-	// Custom transport with shared cookie jar
-	c.WithTransport(s.transport)
-
-	// Anti-detection: browser-like headers
+	// Anti-detection: browser-like headers tailored for Cloudflare
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.5")
-		r.Headers.Set("Accept-Encoding", "gzip, deflate, br")
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+		// r.Headers.Set("Accept-Encoding", "gzip, deflate, br") // Colly handles this
 		r.Headers.Set("Connection", "keep-alive")
 		r.Headers.Set("Upgrade-Insecure-Requests", "1")
+		
+		// Chrome Sec-Fetch and Sec-Ch-Ua headers
 		r.Headers.Set("Sec-Fetch-Dest", "document")
 		r.Headers.Set("Sec-Fetch-Mode", "navigate")
 		r.Headers.Set("Sec-Fetch-Site", "none")
 		r.Headers.Set("Sec-Fetch-User", "?1")
+		r.Headers.Set("Sec-Ch-Ua", `"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"`)
+		r.Headers.Set("Sec-Ch-Ua-Mobile", "?0")
+		r.Headers.Set("Sec-Ch-Ua-Platform", `"Windows"`)
+		
 		r.Headers.Set("Cache-Control", "max-age=0")
 	})
 
