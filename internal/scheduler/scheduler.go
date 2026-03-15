@@ -41,6 +41,7 @@ type Deps struct {
 	EventRepo        ports.EventRepository
 	COTRepo          ports.COTRepository
 	SurpriseRepo     ports.SurpriseRepository
+	PrefsRepo        ports.PrefsRepository
 	ChatID           string
 }
 
@@ -191,12 +192,48 @@ func (s *Scheduler) runJob(ctx context.Context, name string, fn jobFunc) {
 
 // jobCOTFetch fetches latest COT data from CFTC and runs analysis.
 func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
-	if _, err := s.deps.COTAnalyzer.AnalyzeAll(ctx); err != nil {
+	// 1. Get current latest date before fetch
+	oldLatest, _ := s.deps.COTRepo.GetLatestReportDate(ctx)
+
+	// 2. Fetch and analyze
+	analyses, err := s.deps.COTAnalyzer.AnalyzeAll(ctx)
+	if err != nil {
 		return fmt.Errorf("cot fetch+analyze: %w", err)
+	}
+
+	// 3. Check for new release
+	newLatest, _ := s.deps.COTRepo.GetLatestReportDate(ctx)
+	if !newLatest.IsZero() && newLatest.After(oldLatest) {
+		log.Printf("[SCHED:cot-fetch] NEW DATA DETECTED: %s", newLatest.Format("2006-01-02"))
+		s.broadcastCOTRelease(ctx, newLatest, analyses)
 	}
 
 	log.Println("[SCHED:cot-fetch] COT data fetched and analyzed")
 	return nil
+}
+
+// broadcastCOTRelease sends a notification to all active users when new data is available.
+func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, analyses []domain.COTAnalysis) {
+	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
+	if err != nil {
+		log.Printf("[SCHED:broadcast] Failed to get active users: %v", err)
+		return
+	}
+
+	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nLatest positioning data has been fetched and analyzed. Use /cot to view the new insights.", 
+		date.Format("Monday, 02 Jan 2006"))
+
+	count := 0
+	for userID := range activeUsers {
+		chatID := fmt.Sprintf("%d", userID)
+		if _, err := s.deps.Bot.SendHTML(ctx, chatID, msg); err == nil {
+			count++
+		}
+		// Avoid flooding Telegram API
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	log.Printf("[SCHED:broadcast] Sent COT release alert to %d users", count)
 }
 
 

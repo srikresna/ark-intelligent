@@ -73,6 +73,9 @@ type COTRepository interface {
 
 	// GetAllLatestAnalyses retrieves the most recent analysis for ALL contracts.
 	GetAllLatestAnalyses(ctx context.Context) ([]domain.COTAnalysis, error)
+
+	// GetLatestReportDate retrieves the most recent report date stored in the database.
+	GetLatestReportDate(ctx context.Context) (time.Time, error)
 }
 
 // ---------------------------------------------------------------------------

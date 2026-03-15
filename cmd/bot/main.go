@@ -135,6 +135,7 @@ func main() {
 		EventRepo:        eventRepo,
 		COTRepo:          cotRepo,
 		SurpriseRepo:     surpriseRepo,
+		PrefsRepo:        prefsRepo,
 		ChatID:           cfg.ChatID,
 	})
 

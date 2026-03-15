@@ -55,6 +55,10 @@ func NewHandler(
 	bot.RegisterCommand("/help", h.cmdHelp)
 	bot.RegisterCommand("/settings", h.cmdSettings)
 	bot.RegisterCommand("/status", h.cmdStatus)
+	bot.RegisterCommand("/cot", h.cmdCOT)
+	bot.RegisterCommand("/rank", h.cmdRank)
+	bot.RegisterCommand("/confluence", h.cmdConfluence)
+	bot.RegisterCommand("/outlook", h.cmdOutlook)
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)

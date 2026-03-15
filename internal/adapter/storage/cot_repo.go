@@ -288,3 +288,40 @@ func (r *COTRepo) GetAnalysisHistory(_ context.Context, contractCode string, wee
 	}
 	return analyses, nil
 }
+// GetLatestReportDate finds the most recent report date across all COT records.
+func (r *COTRepo) GetLatestReportDate(_ context.Context) (time.Time, error) {
+	var latest time.Time
+
+	err := r.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = []byte("cot:")
+		opts.Reverse = true
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 1
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Seek to the end of all cot: keys
+		it.Seek([]byte("cot:\xFF"))
+
+		if it.ValidForPrefix([]byte("cot:")) {
+			item := it.Item()
+			err := item.Value(func(val []byte) error {
+				var rec domain.COTRecord
+				if err := json.Unmarshal(val, &rec); err != nil {
+					return err
+				}
+				latest = rec.ReportDate
+				return nil
+			})
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return time.Time{}, fmt.Errorf("get latest report date: %w", err)
+	}
+	return latest, nil
+}
