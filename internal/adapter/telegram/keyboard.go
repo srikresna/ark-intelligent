@@ -177,44 +177,9 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:ai_toggle",
 	}})
 
-	// Row 3: Impact level presets
-	rows = append(rows, []ports.InlineButton{
-		{Text: "High Only", CallbackData: "set:impact_high_only"},
-		{Text: "High+Med", CallbackData: "set:impact_high_med"},
-		{Text: "All", CallbackData: "set:impact_all"},
-	})
-
-	// Row 4: Timing presets
-	rows = append(rows, []ports.InlineButton{
-		{Text: "60/15/5 min", CallbackData: "set:time_60_15_5"},
-		{Text: "15/5 min", CallbackData: "set:time_15_5"},
-		{Text: "5/1 min", CallbackData: "set:time_5_1"},
-	})
-
 	return ports.InlineKeyboard{Rows: rows}
 }
 
-// ---------------------------------------------------------------------------
-// Alert Action Keyboards
-// ---------------------------------------------------------------------------
-
-// AlertActions builds action buttons for an alert notification.
-// Provides quick mute and dismiss options.
-func (kb *KeyboardBuilder) AlertActions() ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "Mute Alerts", CallbackData: "alert:mute_1h"},
-				{Text: "Dismiss", CallbackData: "alert:dismiss"},
-			},
-		},
-	}
-}
-
-// EventDetailLink builds an empty keyboard as ForexFactory links are removed.
-func (kb *KeyboardBuilder) EventDetailLink(event domain.FFEvent) ports.InlineKeyboard {
-	return ports.InlineKeyboard{Rows: [][]ports.InlineButton{}}
-}
 
 // ---------------------------------------------------------------------------
 // Navigation Keyboards
@@ -232,13 +197,8 @@ func (kb *KeyboardBuilder) BackToOverview(section string) ports.InlineKeyboard {
 }
 
 // MainMenu builds a quick-access keyboard for the main bot features.
-func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
-			{
-				{Text: "Today", CallbackData: "nav:today"},
-				{Text: "Week", CallbackData: "nav:week"},
-			},
 			{
 				{Text: "COT", CallbackData: "nav:cot"},
 				{Text: "Rank", CallbackData: "nav:rank"},

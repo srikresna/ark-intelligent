@@ -54,15 +54,6 @@ func NewHandler(
 	// Register all commands
 	bot.RegisterCommand("/start", h.cmdStart)
 	bot.RegisterCommand("/help", h.cmdHelp)
-	bot.RegisterCommand("/today", h.cmdToday)
-	bot.RegisterCommand("/week", h.cmdWeek)
-	bot.RegisterCommand("/nextweek", h.cmdNextWeek)
-	bot.RegisterCommand("/cot", h.cmdCOT)
-	bot.RegisterCommand("/rank", h.cmdRank)
-	bot.RegisterCommand("/confluence", h.cmdConfluence)
-	bot.RegisterCommand("/surprise", h.cmdSurprise)
-	bot.RegisterCommand("/volatility", h.cmdVolatility)
-	bot.RegisterCommand("/outlook", h.cmdOutlook)
 	bot.RegisterCommand("/settings", h.cmdSettings)
 	bot.RegisterCommand("/status", h.cmdStatus)
 
@@ -83,27 +74,18 @@ func NewHandler(
 func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, args string) error {
 	html := `<b>FF Calendar Bot v2</b>
 
-Institutional-grade forex fundamental analysis:
-
-<b>Calendar Commands:</b>
-/today - Today's economic events
-/week - This week's calendar
-/nextweek - Next week's calendar
+Institutional-grade forex fundamental analysis (COT Focus):
 
 <b>Analysis Commands:</b>
 /cot - COT positioning analysis
 /rank - Currency strength ranking
 /confluence - Multi-factor confluence scores
-/surprise - Economic surprise indices
-/volatility - News volatility forecast
 /outlook - AI weekly market outlook
 
 <b>System Commands:</b>
 /settings - Alert preferences
 /status - Bot health status
-/help - Show this menu
-
-Alerts are <b>enabled</b> by default for High+Medium impact events at 60, 15, 5, and 1 minute before release.`
+/help - Show this menu`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
@@ -113,116 +95,6 @@ func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args
 	return h.cmdStart(ctx, chatID, userID, args)
 }
 
-// ---------------------------------------------------------------------------
-// /today — Today's economic events
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdToday(ctx context.Context, chatID string, userID int64, args string) error {
-	now := timeutil.NowWIB()
-	start := timeutil.StartOfDay(now)
-	end := timeutil.EndOfDay(now)
-
-	var events []domain.FFEvent
-	var err error
-
-	// Filter by currency if argument provided
-	if args != "" {
-		currency := strings.ToUpper(strings.TrimSpace(args))
-		events, err = h.eventRepo.GetEventsByCurrency(ctx, currency, start, end)
-	} else {
-		events, err = h.eventRepo.GetEventsByDate(ctx, now)
-	}
-
-	if err != nil {
-		return fmt.Errorf("fetch today events: %w", err)
-	}
-
-	if len(events) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID,
-			fmt.Sprintf("No economic events scheduled for today (%s).", now.Format("Mon, Jan 2")))
-		return err
-	}
-
-	html := h.fmt.FormatDailyCalendar(events, now)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /week — This week's calendar
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdWeek(ctx context.Context, chatID string, userID int64, args string) error {
-	now := timeutil.NowWIB()
-	start := timeutil.StartOfWeek(now)
-	end := start.AddDate(0, 0, 7)
-
-	var events []domain.FFEvent
-	var err error
-
-	if args != "" {
-		// Filter: /week high or /week USD
-		arg := strings.ToUpper(strings.TrimSpace(args))
-		if arg == "HIGH" {
-			events, err = h.eventRepo.GetHighImpactEvents(ctx, start, end)
-		} else {
-			events, err = h.eventRepo.GetEventsByCurrency(ctx, arg, start, end)
-		}
-	} else {
-		events, err = h.eventRepo.GetEventsByDateRange(ctx, start, end)
-	}
-
-	if err != nil {
-		return fmt.Errorf("fetch week events: %w", err)
-	}
-
-	if len(events) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID, "No events found for this week.")
-		return err
-	}
-
-	html := h.fmt.FormatWeeklyCalendar(events, start)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /nextweek — Next week's calendar
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdNextWeek(ctx context.Context, chatID string, userID int64, args string) error {
-	now := timeutil.NowWIB()
-	// Next week start is 7 days after this week start
-	start := timeutil.StartOfWeek(now).AddDate(0, 0, 7)
-	end := start.AddDate(0, 0, 7)
-
-	var events []domain.FFEvent
-	var err error
-
-	if args != "" {
-		arg := strings.ToUpper(strings.TrimSpace(args))
-		if arg == "HIGH" {
-			events, err = h.eventRepo.GetHighImpactEvents(ctx, start, end)
-		} else {
-			events, err = h.eventRepo.GetEventsByCurrency(ctx, arg, start, end)
-		}
-	} else {
-		events, err = h.eventRepo.GetEventsByDateRange(ctx, start, end)
-	}
-
-	if err != nil {
-		return fmt.Errorf("fetch next week events: %w", err)
-	}
-
-	if len(events) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID, "No events found for next week yet.")
-		return err
-	}
-
-	html := h.fmt.FormatWeeklyCalendar(events, start)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
 
 // ---------------------------------------------------------------------------
 // /cot — COT positioning analysis
@@ -375,47 +247,7 @@ func (h *Handler) cbConfluenceDetail(ctx context.Context, chatID string, msgID i
 	return h.bot.EditMessage(ctx, chatID, msgID, html)
 }
 
-// ---------------------------------------------------------------------------
-// /surprise — Economic surprise indices
-// ---------------------------------------------------------------------------
 
-func (h *Handler) cmdSurprise(ctx context.Context, chatID string, userID int64, args string) error {
-	indices, err := h.surpriseRepo.GetAllSurpriseIndices(ctx)
-	if err != nil {
-		return fmt.Errorf("get surprise indices: %w", err)
-	}
-
-	if len(indices) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID,
-			"No surprise index data available yet.")
-		return err
-	}
-
-	html := h.fmt.FormatSurpriseIndices(indices)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /volatility — News volatility forecast
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdVolatility(ctx context.Context, chatID string, userID int64, args string) error {
-	forecast, err := h.surpriseRepo.GetLatestVolatilityForecast(ctx)
-	if err != nil {
-		return fmt.Errorf("get volatility forecast: %w", err)
-	}
-
-	if forecast == nil {
-		_, err = h.bot.SendHTML(ctx, chatID,
-			"No volatility forecast available yet.")
-		return err
-	}
-
-	html := h.fmt.FormatVolatilityForecast(*forecast)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
 
 // ---------------------------------------------------------------------------
 // /outlook — AI weekly market outlook
@@ -549,17 +381,11 @@ func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, u
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// /status — Bot health and data freshness
-// ---------------------------------------------------------------------------
-
 func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, args string) error {
 	now := timeutil.NowWIB()
 
 	// Check data freshness
-	todayEvents, _ := h.eventRepo.GetEventsByDate(ctx, now)
 	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
-	surpriseIndices, _ := h.surpriseRepo.GetAllSurpriseIndices(ctx)
 
 	// AI status
 	aiStatus := "Not configured"
@@ -575,18 +401,14 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 <code>Time:       %s WIB</code>
 
 <b>Data Sources:</b>
-<code>Events:     %d today</code>
 <code>COT:        %d contracts</code>
-<code>Surprise:   %d currencies</code>
 
 <b>Services:</b>
 <code>AI Engine:  %s</code>
 
 <b>Version:</b> v2.0.0`,
 		now.Format("15:04:05"),
-		len(todayEvents),
 		len(cotAnalyses),
-		len(surpriseIndices),
 		aiStatus,
 	)
 

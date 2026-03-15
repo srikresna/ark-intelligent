@@ -16,21 +16,18 @@ import (
 	"runtime"
 	"syscall"
 	"time"
-
 	"github.com/arkcode369/ff-calendar-bot/internal/adapter/storage"
 	tgbot "github.com/arkcode369/ff-calendar-bot/internal/adapter/telegram"
 	"github.com/arkcode369/ff-calendar-bot/internal/config"
 	"github.com/arkcode369/ff-calendar-bot/internal/scheduler"
 	aisvc "github.com/arkcode369/ff-calendar-bot/internal/service/ai"
-	calsvc "github.com/arkcode369/ff-calendar-bot/internal/service/calendar"
 	cotsvc "github.com/arkcode369/ff-calendar-bot/internal/service/cot"
 	quantsvc "github.com/arkcode369/ff-calendar-bot/internal/service/quant"
 )
 
 const banner = `
 ╔══════════════════════════════════════════════════╗
-║     FF CALENDAR BOT v2.0                         ║
-║     Forex Factory • COT • Quant Analysis         ║
+║     Institutional Positioning (COT) • Macro Intel ║
 ║     Built for institutional-grade macro intel     ║
 ╚══════════════════════════════════════════════════╝`
 
@@ -102,13 +99,6 @@ func main() {
 	// 7. Service layer
 	// -----------------------------------------------------------------------
 
-	// Calendar services
-	calService := calsvc.NewService(eventRepo, bot)
-	calParser := calsvc.NewParser()
-	calAlerter := calsvc.NewAlerter(eventRepo, bot)
-	calAlerter.SetChatIDs([]string{cfg.ChatID})
-	calAlerter.SetAlertMinutes(cfg.DefaultAlertMinutes)
-
 	// COT services
 	cotFetcher := cotsvc.NewFetcher()
 	cotAnalyzer := cotsvc.NewAnalyzer(cotRepo, cotFetcher)
@@ -116,17 +106,10 @@ func main() {
 	cotSignals := cotsvc.NewSignalDetector()
 
 	// Quant services
-	surpriseCalc := quantsvc.NewSurpriseCalculator(eventRepo, surpriseRepo)
 	confluenceScorer := quantsvc.NewConfluenceScorer(eventRepo, cotRepo, surpriseRepo)
-	volatilityPredictor := quantsvc.NewVolatilityPredictor(eventRepo)
 	currencyRanker := quantsvc.NewCurrencyRanker(eventRepo, cotRepo, surpriseRepo)
 
 	log.Println("[MAIN] Service layer initialized")
-
-	// Suppress unused warnings for services used only by scheduler
-	_ = calParser
-	_ = cotIndexCalc
-	_ = cotSignals
 
 	// -----------------------------------------------------------------------
 	// 8. Telegram handler (registers commands on bot)
@@ -137,7 +120,6 @@ func main() {
 		cotRepo,
 		surpriseRepo,
 		prefsRepo,
-		nil,
 		aiAnalyzer, // nil-safe: handler checks IsAvailable()
 	)
 
@@ -147,24 +129,19 @@ func main() {
 	// 9. Background scheduler
 	// -----------------------------------------------------------------------
 	sched := scheduler.New(&scheduler.Deps{
-		CalService:          calService,
-		CalAlerter:          calAlerter,
-		COTAnalyzer:         cotAnalyzer,
-		SurpriseCalc:        surpriseCalc,
-		ConfluenceScorer:    confluenceScorer,
-		VolatilityPredictor: volatilityPredictor,
-		CurrencyRanker:      currencyRanker,
-		AIAnalyzer:          aiAnalyzer,
-		Bot:                 bot,
-		EventRepo:           eventRepo,
-		COTRepo:             cotRepo,
-		SurpriseRepo:        surpriseRepo,
-		ChatID:              cfg.ChatID,
+		COTAnalyzer:      cotAnalyzer,
+		ConfluenceScorer: confluenceScorer,
+		CurrencyRanker:   currencyRanker,
+		AIAnalyzer:       aiAnalyzer,
+		Bot:              bot,
+		EventRepo:        eventRepo,
+		COTRepo:          cotRepo,
+		SurpriseRepo:     surpriseRepo,
+		ChatID:           cfg.ChatID,
 	})
 
 	sched.Start(ctx, &scheduler.Intervals{
 		COTFetch:       cfg.COTFetchInterval,
-		SurpriseCalc:   cfg.SurpriseCalcInterval,
 		ConfluenceCalc: cfg.ConfluenceCalcInterval,
 	})
 
@@ -185,20 +162,6 @@ func main() {
 			log.Printf("[MAIN] Initial COT fetch failed: %v", err)
 		} else {
 			log.Println("[MAIN] Initial COT data loaded")
-		}
-
-		// Compute surprise indices
-		if _, err := surpriseCalc.ComputeAll(initCtx); err != nil {
-			log.Printf("[MAIN] Initial surprise calc failed: %v", err)
-		} else {
-			log.Println("[MAIN] Initial surprise indices computed")
-		}
-
-		// Compute currency ranking
-		if _, err := currencyRanker.RankAll(initCtx); err != nil {
-			log.Printf("[MAIN] Initial ranking failed: %v", err)
-		} else {
-			log.Println("[MAIN] Initial currency ranking computed")
 		}
 
 		log.Println("[MAIN] Initial data load complete")

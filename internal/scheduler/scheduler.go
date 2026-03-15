@@ -35,13 +35,9 @@ import (
 
 // Deps holds all service dependencies the scheduler needs.
 type Deps struct {
-	CalService          *calsvc.Service
-	CalAlerter          *calsvc.Alerter
-	COTAnalyzer         *cotsvc.Analyzer
-	SurpriseCalc        *quantsvc.SurpriseCalculator
-	ConfluenceScorer    *quantsvc.ConfluenceScorer
-	VolatilityPredictor *quantsvc.VolatilityPredictor
-	CurrencyRanker      *quantsvc.CurrencyRanker
+	COTAnalyzer      *cotsvc.Analyzer
+	ConfluenceScorer *quantsvc.ConfluenceScorer
+	CurrencyRanker   *quantsvc.CurrencyRanker
 	AIAnalyzer          *aisvc.Interpreter
 	Bot                 ports.Messenger
 	EventRepo           ports.EventRepository
@@ -53,7 +49,6 @@ type Deps struct {
 // Intervals configures how often each job runs.
 type Intervals struct {
 	COTFetch       time.Duration // Default: 6h
-	SurpriseCalc   time.Duration // Default: 1h
 	ConfluenceCalc time.Duration // Default: 2h
 }
 
@@ -93,14 +88,8 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// COT fetch + analysis
 	s.startJob(ctx, "cot-fetch", intervals.COTFetch, s.jobCOTFetch)
 
-	// Surprise index recalculation
-	s.startJobWithDelay(ctx, "surprise-calc", intervals.SurpriseCalc, 5*time.Minute, s.jobSurpriseCalc)
-
 	// Confluence score computation
 	s.startJobWithDelay(ctx, "confluence-calc", intervals.ConfluenceCalc, 10*time.Minute, s.jobConfluenceCalc)
-
-	// Volatility forecast (every 4 hours)
-	s.startJobWithDelay(ctx, "volatility", 4*time.Hour, 15*time.Minute, s.jobVolatility)
 
 	// Currency ranking (every 2 hours)
 	s.startJobWithDelay(ctx, "currency-rank", 2*time.Hour, 20*time.Minute, s.jobCurrencyRank)
@@ -108,7 +97,7 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// Weekly outlook (check every hour, fires on Sunday 18:00 WIB)
 	s.startJob(ctx, "weekly-outlook", 1*time.Hour, s.jobWeeklyOutlook)
 
-	log.Printf("[SCHED] Started 6 background jobs")
+	log.Printf("[SCHED] Started 4 background jobs")
 }
 
 // Stop signals all jobs to stop and waits for them to finish.
@@ -212,15 +201,6 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	return nil
 }
 
-// jobSurpriseCalc recalculates surprise indices for all currencies.
-func (s *Scheduler) jobSurpriseCalc(ctx context.Context) error {
-	if _, err := s.deps.SurpriseCalc.ComputeAll(ctx); err != nil {
-		return fmt.Errorf("surprise recalc: %w", err)
-	}
-
-	log.Println("[SCHED:surprise-calc] Surprise indices recalculated")
-	return nil
-}
 
 // jobConfluenceCalc computes confluence scores for major pairs.
 func (s *Scheduler) jobConfluenceCalc(ctx context.Context) error {
@@ -250,21 +230,6 @@ func (s *Scheduler) jobConfluenceCalc(ctx context.Context) error {
 	return nil
 }
 
-// jobVolatility computes volatility forecasts.
-func (s *Scheduler) jobVolatility(ctx context.Context) error {
-	forecast, err := s.deps.VolatilityPredictor.PredictUpcoming(ctx, 48)
-	if err != nil {
-		return fmt.Errorf("volatility predict: %w", err)
-	}
-
-	if err := s.deps.SurpriseRepo.SaveVolatilityForecast(ctx, *forecast); err != nil {
-		return fmt.Errorf("save volatility forecast: %w", err)
-	}
-
-	log.Printf("[SCHED:volatility] Forecast: risk_window=%s, max_expected=%.1f",
-		forecast.RiskWindow, forecast.MaxExpected)
-	return nil
-}
 
 // jobCurrencyRank computes currency strength rankings.
 func (s *Scheduler) jobCurrencyRank(ctx context.Context) error {
@@ -331,14 +296,6 @@ func (s *Scheduler) gatherWeeklyData(ctx context.Context) (ports.WeeklyData, err
 		data.COTAnalyses = analyses
 	}
 
-	// Surprise indices
-	indices, err := s.deps.SurpriseRepo.GetAllSurpriseIndices(ctx)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Surprise indices unavailable: %v", err)
-	} else {
-		data.SurpriseIndices = indices
-	}
-
 	// Confluence scores
 	confluences, err := s.deps.SurpriseRepo.GetAllConfluences(ctx)
 	if err != nil {
@@ -353,32 +310,6 @@ func (s *Scheduler) gatherWeeklyData(ctx context.Context) (ports.WeeklyData, err
 		log.Printf("[SCHED:weekly-outlook] Currency ranking unavailable: %v", err)
 	} else {
 		data.CurrencyRanking = ranking
-	}
-
-	// Upcoming week events
-	now := timeutil.NowWIB()
-	weekEnd := now.Add(7 * 24 * time.Hour)
-	events, err := s.deps.EventRepo.GetHighImpactEvents(ctx, now, weekEnd)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Upcoming events unavailable: %v", err)
-	} else {
-		data.UpcomingEvents = events
-	}
-
-	// Volatility forecast
-	vol, err := s.deps.SurpriseRepo.GetLatestVolatilityForecast(ctx)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Volatility forecast unavailable: %v", err)
-	} else {
-		data.VolatilityForecast = vol
-	}
-
-	// Recent revisions
-	revisions, err := s.deps.EventRepo.GetAllRevisions(ctx, 7)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Revisions unavailable: %v", err)
-	} else {
-		data.RecentRevisions = revisions
 	}
 
 	return data, nil
