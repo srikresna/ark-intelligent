@@ -24,12 +24,6 @@ type Config struct {
 	// Storage
 	DataDir string // BadgerDB data directory
 
-	// Scraping
-	FFScrapeInterval      time.Duration // How often to scrape FF calendar
-	FFHistoricalInterval  time.Duration // How often to scrape historical data
-	FFRevisionInterval    time.Duration // How often to check for revisions
-	FFBaseURL             string        // ForexFactory base URL
-	FFJSONFallbackURL     string        // Fair Economy JSON mirror
 
 	// COT
 	COTFetchInterval time.Duration // How often to fetch COT data
@@ -69,12 +63,6 @@ func MustLoad() *Config {
 		// Storage
 		DataDir: getEnv("DATA_DIR", "/app/data"),
 
-		// Scraping
-		FFScrapeInterval:     getDuration("FF_SCRAPE_INTERVAL", 30*time.Minute),
-		FFHistoricalInterval: getDuration("FF_HISTORICAL_INTERVAL", 168*time.Hour), // weekly
-		FFRevisionInterval:   getDuration("FF_REVISION_INTERVAL", 2*time.Hour),
-		FFBaseURL:            getEnv("FF_BASE_URL", "https://www.forexfactory.com"),
-		FFJSONFallbackURL:    getEnv("FF_JSON_FALLBACK_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.json"),
 
 		// COT
 		COTFetchInterval: getDuration("COT_FETCH_INTERVAL", 6*time.Hour),
@@ -110,9 +98,6 @@ func (c *Config) HasGemini() bool {
 
 // validate performs additional validation beyond required env vars.
 func (c *Config) validate() {
-	if c.FFScrapeInterval < 1*time.Minute {
-		log.Fatal("[CONFIG] FF_SCRAPE_INTERVAL must be >= 1 minute")
-	}
 	if c.COTHistoryWeeks < 4 {
 		log.Fatal("[CONFIG] COT_HISTORY_WEEKS must be >= 4")
 	}
@@ -218,7 +203,7 @@ func (c *Config) String() string {
 		geminiStatus = "CONFIGURED"
 	}
 	return fmt.Sprintf(
-		"Config{DataDir=%s, FFInterval=%v, COTInterval=%v, Gemini=%s, LogLevel=%s}",
-		c.DataDir, c.FFScrapeInterval, c.COTFetchInterval, geminiStatus, c.LogLevel,
+		"Config{DataDir=%s, COTInterval=%v, Gemini=%s, LogLevel=%s}",
+		c.DataDir, c.COTFetchInterval, geminiStatus, c.LogLevel,
 	)
 }

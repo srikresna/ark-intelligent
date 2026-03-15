@@ -211,25 +211,9 @@ func (kb *KeyboardBuilder) AlertActions() ports.InlineKeyboard {
 	}
 }
 
-// EventDetailLink builds a keyboard with a link to the ForexFactory event page.
+// EventDetailLink builds an empty keyboard as ForexFactory links are removed.
 func (kb *KeyboardBuilder) EventDetailLink(event domain.FFEvent) ports.InlineKeyboard {
-	var rows [][]ports.InlineButton
-
-	if event.DetailURL != "" {
-		rows = append(rows, []ports.InlineButton{{
-			Text: "View on ForexFactory",
-			URL:  event.DetailURL,
-		}})
-	}
-
-	if event.SourceURL != "" {
-		rows = append(rows, []ports.InlineButton{{
-			Text: "Source",
-			URL:  event.SourceURL,
-		}})
-	}
-
-	return ports.InlineKeyboard{Rows: rows}
+	return ports.InlineKeyboard{Rows: [][]ports.InlineButton{}}
 }
 
 // ---------------------------------------------------------------------------

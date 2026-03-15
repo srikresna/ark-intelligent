@@ -19,7 +19,6 @@ import (
 var (
 	BOT_TOKEN   = os.Getenv("BOT_TOKEN")
 	CHAT_ID     = os.Getenv("CHAT_ID")
-	FF_JSON_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 	PREFS_FILE  = getEnvDefault("PREFS_FILE", "/app/data/prefs.json")
 	WIB         *time.Location
 )
@@ -429,36 +428,6 @@ func (b *Bot) getUpdates() ([]TGUpdate, error) {
 
 // -- DATA FETCHER -------------------------------------------------------------
 
-func (b *Bot) fetchEvents() error {
-	req, _ := http.NewRequest("GET", FF_JSON_URL, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	req.Header.Set("Accept", "application/json")
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	var events []FFEvent
-	if err := json.Unmarshal(data, &events); err != nil {
-		return fmt.Errorf("json: %w (status %d)", err, resp.StatusCode)
-	}
-	b.mu.Lock()
-	b.events = events
-	b.lastFetch = time.Now()
-	for _, e := range events {
-		key := eventKey(e)
-		if _, ok := b.eventState[key]; !ok {
-			b.eventState[key] = &EventState{AlertedMinutes: make(map[int]bool)}
-		}
-	}
-	b.mu.Unlock()
-	log.Printf("[FETCH] %d events", len(events))
-	return nil
-}
 
 func eventKey(e FFEvent) string { return e.Title + "|" + e.Date }
 
@@ -1016,12 +985,6 @@ func (b *Bot) handleCommand(chatID int64, userID int64, text string) {
 	case text == "/settings":
 		b.sendWithKB(cid, fmtSettingsMenu(), kbSettingsMenu())
 
-	case text == "/refresh":
-		if err := b.fetchEvents(); err != nil {
-			b.sendMessage(cid, fmt.Sprintf("Refresh failed: %v", err))
-		} else {
-			b.sendWithKB(cid, fmt.Sprintf("\u2705 Refreshed: %d events", len(b.events)), kbBack())
-		}
 
 	case text == "/chatid":
 		b.sendWithKB(cid, fmt.Sprintf("Chat ID: <code>%d</code>", chatID), kbBack())
@@ -1080,18 +1043,7 @@ func (b *Bot) handleCallback(cb *TGCallback) {
 		kb = &k
 
 	case cb.Data == "cal_refresh":
-		if err := b.fetchEvents(); err != nil {
-			b.answerCB(cb.ID, "Refresh failed")
-			return
-		}
-		b.answerCB(cb.ID, fmt.Sprintf("%d events", len(b.events)))
-		b.mu.RLock()
-		newEv := b.events
-		b.mu.RUnlock()
-		text = fmtToday(newEv)
-		k := kbCalendarBack()
-		kb = &k
-		b.editMsg(cid, mid, text, kb)
+		b.answerCB(cb.ID, "Refresh disabled")
 		return
 
 	// -- Settings sub-menu
@@ -1206,33 +1158,6 @@ func (b *Bot) safeSend(chatID, text string, kb InlineKeyboardMarkup) {
 func (b *Bot) run() {
 	log.Println("[BOT] Starting FF Calendar Bot v4...")
 
-	if err := b.fetchEvents(); err != nil {
-		log.Printf("[BOT] Initial fetch: %v", err)
-	}
-
-	// Smart refresh: 2min near events, 5min idle
-	go func() {
-		for {
-			interval := 5 * time.Minute
-			b.mu.RLock()
-			for _, e := range b.events {
-				t, err := parseEventTime(e.Date)
-				if err != nil {
-					continue
-				}
-				diff := time.Until(t)
-				if diff > -30*time.Minute && diff < 45*time.Minute {
-					interval = 2 * time.Minute
-					break
-				}
-			}
-			b.mu.RUnlock()
-			time.Sleep(interval)
-			if err := b.fetchEvents(); err != nil {
-				log.Printf("[FETCH] %v", err)
-			}
-		}
-	}()
 
 	// Alert check every 30s
 	go func() {

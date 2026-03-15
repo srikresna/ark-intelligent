@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/arkcode369/ff-calendar-bot/internal/adapter/scraper"
 	"github.com/arkcode369/ff-calendar-bot/internal/adapter/storage"
 	tgbot "github.com/arkcode369/ff-calendar-bot/internal/adapter/telegram"
 	"github.com/arkcode369/ff-calendar-bot/internal/config"
@@ -74,13 +73,6 @@ func main() {
 	log.Println("[MAIN] Storage layer initialized")
 	logStorageSize(db)
 
-	// -----------------------------------------------------------------------
-	// 4. Scraper layer (Colly + Fair Economy fallback)
-	// -----------------------------------------------------------------------
-	fallbackScraper := scraper.NewFallbackScraper(cfg.FFJSONFallbackURL)
-	ffScraper := scraper.NewCollyFFScraper(cfg.FFBaseURL, fallbackScraper)
-
-	log.Printf("[MAIN] Scraper initialized (base=%s)", cfg.FFBaseURL)
 
 	// -----------------------------------------------------------------------
 	// 5. Telegram bot
@@ -111,7 +103,7 @@ func main() {
 	// -----------------------------------------------------------------------
 
 	// Calendar services
-	calService := calsvc.NewService(ffScraper, eventRepo, bot)
+	calService := calsvc.NewService(eventRepo, bot)
 	calParser := calsvc.NewParser()
 	calAlerter := calsvc.NewAlerter(eventRepo, bot)
 	calAlerter.SetChatIDs([]string{cfg.ChatID})
@@ -145,7 +137,7 @@ func main() {
 		cotRepo,
 		surpriseRepo,
 		prefsRepo,
-		ffScraper,
+		nil,
 		aiAnalyzer, // nil-safe: handler checks IsAvailable()
 	)
 
@@ -171,8 +163,6 @@ func main() {
 	})
 
 	sched.Start(ctx, &scheduler.Intervals{
-		FFScrape:       cfg.FFScrapeInterval,
-		FFRevision:     cfg.FFRevisionInterval,
 		COTFetch:       cfg.COTFetchInterval,
 		SurpriseCalc:   cfg.SurpriseCalcInterval,
 		ConfluenceCalc: cfg.ConfluenceCalcInterval,
@@ -189,13 +179,6 @@ func main() {
 
 		log.Println("[MAIN] Running initial data load...")
 
-		// Scrape calendar first
-		newCount, updCount, err := calService.ScrapeAndStore(initCtx)
-		if err != nil {
-			log.Printf("[MAIN] Initial calendar scrape failed: %v", err)
-		} else {
-			log.Printf("[MAIN] Initial scrape: %d new, %d updated events", newCount, updCount)
-		}
 
 		// Fetch COT data
 		if _, err := cotAnalyzer.AnalyzeAll(initCtx); err != nil {
@@ -223,10 +206,8 @@ func main() {
 		// Send startup notification
 		startupMsg := fmt.Sprintf(
 			"<b>\xF0\x9F\x9F\xA2 FF Calendar Bot v2.0 Online</b>\n\n"+
-				"Events: %d new, %d updated\n"+
 				"AI: %s\n"+
 				"Type /help for commands",
-			newCount, updCount,
 			aiStatus(aiAnalyzer),
 		)
 		if _, err := bot.SendHTML(initCtx, cfg.ChatID, startupMsg); err != nil {

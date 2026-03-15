@@ -52,8 +52,6 @@ type Deps struct {
 
 // Intervals configures how often each job runs.
 type Intervals struct {
-	FFScrape       time.Duration // Default: 30m
-	FFRevision     time.Duration // Default: 2h
 	COTFetch       time.Duration // Default: 6h
 	SurpriseCalc   time.Duration // Default: 1h
 	ConfluenceCalc time.Duration // Default: 2h
@@ -91,11 +89,6 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	}
 	s.running = true
 
-	// FF Calendar scrape
-	s.startJob(ctx, "ff-scrape", intervals.FFScrape, s.jobFFScrape)
-
-	// FF Revision detection (offset by half the scrape interval)
-	s.startJobWithDelay(ctx, "ff-revision", intervals.FFRevision, intervals.FFScrape/2, s.jobFFRevision)
 
 	// COT fetch + analysis
 	s.startJob(ctx, "cot-fetch", intervals.COTFetch, s.jobCOTFetch)
@@ -115,7 +108,7 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// Weekly outlook (check every hour, fires on Sunday 18:00 WIB)
 	s.startJob(ctx, "weekly-outlook", 1*time.Hour, s.jobWeeklyOutlook)
 
-	log.Printf("[SCHED] Started 8 background jobs")
+	log.Printf("[SCHED] Started 6 background jobs")
 }
 
 // Stop signals all jobs to stop and waits for them to finish.
@@ -208,68 +201,6 @@ func (s *Scheduler) runJob(ctx context.Context, name string, fn jobFunc) {
 // Job Implementations
 // ---------------------------------------------------------------------------
 
-// jobFFScrape scrapes FF calendar, stores events, and schedules alerts.
-func (s *Scheduler) jobFFScrape(ctx context.Context) error {
-	newCount, updCount, err := s.deps.CalService.ScrapeAndStore(ctx)
-	if err != nil {
-		return fmt.Errorf("ff scrape: %w", err)
-	}
-
-	log.Printf("[SCHED:ff-scrape] %d new, %d updated events", newCount, updCount)
-
-	// Schedule alerts for upcoming events
-	now := timeutil.NowWIB()
-	end := now.Add(24 * time.Hour)
-	events, err := s.deps.EventRepo.GetHighImpactEvents(ctx, now, end)
-	if err != nil {
-		log.Printf("[SCHED:ff-scrape] Failed to get upcoming events for alerts: %v", err)
-	} else {
-		s.deps.CalAlerter.ScheduleAlerts(ctx, events)
-	}
-
-	// Enrich with historical data (background)
-	allEvents, _ := s.deps.EventRepo.GetEventsByDateRange(ctx, now, end)
-	if len(allEvents) > 0 {
-		go func() {
-			histCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-			if err := s.deps.CalService.FetchAndStoreHistory(histCtx, allEvents); err != nil {
-				log.Printf("[SCHED:ff-scrape] History enrichment failed: %v", err)
-			}
-		}()
-	}
-
-	return nil
-}
-
-// jobFFRevision checks for data revisions in recently released events.
-func (s *Scheduler) jobFFRevision(ctx context.Context) error {
-	now := timeutil.NowWIB()
-	start := now.Add(-48 * time.Hour) // Check last 48 hours
-
-	events, err := s.deps.EventRepo.GetEventsByDateRange(ctx, start, now)
-	if err != nil {
-		return fmt.Errorf("get events for revision check: %w", err)
-	}
-
-	// Filter to only released events
-	var released []domain.FFEvent
-	for _, ev := range events {
-		if ev.Actual != "" {
-			released = append(released, ev)
-		}
-	}
-
-	if len(released) == 0 {
-		return nil
-	}
-
-	_, _, err = s.deps.CalService.ScrapeAndStore(ctx)
-	if err != nil {
-		return fmt.Errorf("revision scrape: %w", err)
-	}
-	return nil
-}
 
 // jobCOTFetch fetches latest COT data from CFTC and runs analysis.
 func (s *Scheduler) jobCOTFetch(ctx context.Context) error {

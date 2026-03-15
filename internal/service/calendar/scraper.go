@@ -12,19 +12,17 @@ import (
 	"github.com/arkcode369/ff-calendar-bot/pkg/timeutil"
 )
 
-// Service orchestrates ForexFactory calendar operations:
-// scraping, parsing, revision detection, history collection, and alert scheduling.
+// Service orchestrates economic calendar operations:
+// revision detection and data retrieval.
 type Service struct {
-	scraper   ports.FFScraper
 	eventRepo ports.EventRepository
 	messenger ports.Messenger
 	alerter   *Alerter
 }
 
 // NewService creates a calendar service with all dependencies.
-func NewService(scraper ports.FFScraper, repo ports.EventRepository, messenger ports.Messenger) *Service {
+func NewService(repo ports.EventRepository, messenger ports.Messenger) *Service {
 	s := &Service{
-		scraper:   scraper,
 		eventRepo: repo,
 		messenger: messenger,
 	}
@@ -32,68 +30,6 @@ func NewService(scraper ports.FFScraper, repo ports.EventRepository, messenger p
 	return s
 }
 
-// ScrapeAndStore fetches the current week's calendar, detects revisions,
-// stores events, and schedules alerts. Returns new/updated event count.
-func (s *Service) ScrapeAndStore(ctx context.Context) (newCount, updatedCount int, err error) {
-	// 1. Scrape current week
-	events, err := s.scraper.ScrapeWeeklyCalendar(ctx)
-	if err != nil {
-		return 0, 0, fmt.Errorf("scrape weekly calendar: %w", err)
-	}
-	if len(events) == 0 {
-		log.Println("[calendar] no events scraped")
-		return 0, 0, nil
-	}
-
-	log.Printf("[calendar] scraped %d events", len(events))
-
-	// 2. Detect revisions by comparing with stored events
-	now := timeutil.NowWIB()
-	start := timeutil.StartOfDayWIB(now)
-	end := start.AddDate(0, 0, 7)
-
-	existing, err := s.eventRepo.GetEventsByDateRange(ctx, start, end)
-	if err != nil {
-		log.Printf("[calendar] warn: could not load existing events: %v", err)
-		existing = nil
-	}
-
-	existingMap := buildEventMap(existing)
-
-	var revisions []domain.EventRevision
-	for i := range events {
-		ev := &events[i]
-		key := eventKey(ev)
-		if old, ok := existingMap[key]; ok {
-			if revs := detectRevisions(old, ev, now); len(revs) > 0 {
-				revisions = append(revisions, revs...)
-				updatedCount++
-			}
-		} else {
-			newCount++
-		}
-	}
-
-	// 3. Save revisions
-	for _, rev := range revisions {
-		if err := s.eventRepo.SaveRevision(ctx, rev); err != nil {
-			log.Printf("[calendar] warn: save revision: %v", err)
-		}
-	}
-
-	// 4. Store all events (upsert)
-	if err := s.eventRepo.SaveEvents(ctx, events); err != nil {
-		return newCount, updatedCount, fmt.Errorf("save events: %w", err)
-	}
-
-	// 5. Schedule alerts for upcoming high-impact events
-	s.alerter.ScheduleAlerts(ctx, events)
-
-	log.Printf("[calendar] stored %d events (%d new, %d updated, %d revisions)",
-		len(events), newCount, updatedCount, len(revisions))
-
-	return newCount, updatedCount, nil
-}
 
 // GetTodayEvents returns all events for today in WIB timezone.
 func (s *Service) GetTodayEvents(ctx context.Context) ([]domain.FFEvent, error) {
@@ -135,35 +71,6 @@ func (s *Service) GetEventWithHistory(ctx context.Context, eventName, currency s
 	return s.eventRepo.GetEventHistory(ctx, eventName, currency, months)
 }
 
-// FetchAndStoreHistory scrapes historical data for high-impact events
-// that don't have history yet. Runs as background enrichment.
-func (s *Service) FetchAndStoreHistory(ctx context.Context, events []domain.FFEvent) error {
-	for _, ev := range events {
-		if ev.Impact != domain.ImpactHigh || ev.SourceURL == "" {
-			continue
-		}
-
-		// Check if we already have history
-		existing, err := s.eventRepo.GetEventHistory(ctx, ev.Title, ev.Currency, 1)
-		if err == nil && len(existing) > 0 {
-			continue
-		}
-
-		history, err := s.scraper.ScrapeEventHistory(ctx, ev.SourceURL)
-		if err != nil {
-			log.Printf("[calendar] warn: scrape history for %s: %v", ev.Title, err)
-			continue
-		}
-
-		if err := s.eventRepo.SaveEventDetails(ctx, history); err != nil {
-			log.Printf("[calendar] warn: save history for %s: %v", ev.Title, err)
-		}
-
-		// Rate limit: don't hammer FF
-		time.Sleep(2 * time.Second)
-	}
-	return nil
-}
 
 // GetRecentRevisions returns data revisions for a currency in the last N days.
 func (s *Service) GetRecentRevisions(ctx context.Context, currency string, days int) ([]domain.EventRevision, error) {

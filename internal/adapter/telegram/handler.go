@@ -28,8 +28,6 @@ type Handler struct {
 	surpriseRepo ports.SurpriseRepository
 	prefsRepo    ports.PrefsRepository
 
-	// Services (called via ports interfaces where possible)
-	scraper    ports.FFScraper
 	aiAnalyzer ports.AIAnalyzer
 }
 
@@ -40,7 +38,6 @@ func NewHandler(
 	cotRepo ports.COTRepository,
 	surpriseRepo ports.SurpriseRepository,
 	prefsRepo ports.PrefsRepository,
-	scraper ports.FFScraper,
 	aiAnalyzer ports.AIAnalyzer,
 ) *Handler {
 	h := &Handler{
@@ -51,7 +48,6 @@ func NewHandler(
 		cotRepo:      cotRepo,
 		surpriseRepo: surpriseRepo,
 		prefsRepo:    prefsRepo,
-		scraper:      scraper,
 		aiAnalyzer:   aiAnalyzer,
 	}
 
@@ -69,7 +65,6 @@ func NewHandler(
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 	bot.RegisterCommand("/settings", h.cmdSettings)
 	bot.RegisterCommand("/status", h.cmdStatus)
-	bot.RegisterCommand("/refresh", h.cmdRefresh)
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
@@ -77,7 +72,7 @@ func NewHandler(
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
 
-	log.Printf("[HANDLER] Registered 14 commands and 4 callback prefixes")
+	log.Printf("[HANDLER] Registered 13 commands and 4 callback prefixes")
 	return h
 }
 
@@ -106,7 +101,6 @@ Institutional-grade forex fundamental analysis:
 <b>System Commands:</b>
 /settings - Alert preferences
 /status - Bot health status
-/refresh - Force data refresh
 /help - Show this menu
 
 Alerts are <b>enabled</b> by default for High+Medium impact events at 60, 15, 5, and 1 minute before release.`
@@ -221,7 +215,7 @@ func (h *Handler) cmdNextWeek(ctx context.Context, chatID string, userID int64, 
 	}
 
 	if len(events) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID, "No events found for next week yet. Try /refresh to fetch latest data.")
+		_, err = h.bot.SendHTML(ctx, chatID, "No events found for next week yet.")
 		return err
 	}
 
@@ -562,12 +556,6 @@ func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, u
 func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, args string) error {
 	now := timeutil.NowWIB()
 
-	// Check scraper health
-	scraperStatus := "OK"
-	if err := h.scraper.HealthCheck(ctx); err != nil {
-		scraperStatus = fmt.Sprintf("ERROR: %v", err)
-	}
-
 	// Check data freshness
 	todayEvents, _ := h.eventRepo.GetEventsByDate(ctx, now)
 	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
@@ -587,7 +575,6 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 <code>Time:       %s WIB</code>
 
 <b>Data Sources:</b>
-<code>Scraper:    %s</code>
 <code>Events:     %d today</code>
 <code>COT:        %d contracts</code>
 <code>Surprise:   %d currencies</code>
@@ -597,7 +584,6 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 
 <b>Version:</b> v2.0.0`,
 		now.Format("15:04:05"),
-		scraperStatus,
 		len(todayEvents),
 		len(cotAnalyses),
 		len(surpriseIndices),
@@ -608,53 +594,6 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 	return err
 }
 
-// ---------------------------------------------------------------------------
-// /refresh — Force data refresh
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdRefresh(ctx context.Context, chatID string, userID int64, args string) error {
-	msgID, _ := h.bot.SendHTML(ctx, chatID, "Refreshing data...")
-
-	start := time.Now()
-	events, err := h.scraper.ScrapeWeeklyCalendar(ctx)
-	if err != nil {
-		_ = h.bot.EditMessage(ctx, chatID, msgID,
-			fmt.Sprintf("Refresh failed: %v", err))
-		return err
-	}
-
-	if err := h.eventRepo.SaveEvents(ctx, events); err != nil {
-		_ = h.bot.EditMessage(ctx, chatID, msgID,
-			fmt.Sprintf("Save failed: %v", err))
-		return err
-	}
-
-	elapsed := time.Since(start)
-
-	// Count by impact
-	high, med, low := 0, 0, 0
-	for _, e := range events {
-		switch e.Impact {
-		case domain.ImpactHigh:
-			high++
-		case domain.ImpactMedium:
-			med++
-		case domain.ImpactLow:
-			low++
-		}
-	}
-
-	html := fmt.Sprintf(`<b>Data Refreshed</b> (%.1fs)
-
-<code>Total:  %d events</code>
-<code>High:   %d</code>
-<code>Medium: %d</code>
-<code>Low:    %d</code>`,
-		elapsed.Seconds(), len(events), high, med, low)
-
-	_ = h.bot.EditMessage(ctx, chatID, msgID, html)
-	return nil
-}
 
 // ---------------------------------------------------------------------------
 // Currency-to-contract mapping
