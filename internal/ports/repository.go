@@ -78,27 +78,6 @@ type COTRepository interface {
 	GetLatestReportDate(ctx context.Context) (time.Time, error)
 }
 
-// ---------------------------------------------------------------------------
-// SurpriseRepository — Persistence for surprise scores and confluence
-// ---------------------------------------------------------------------------
-
-// SurpriseRepository defines storage for quantitative calculations.
-type SurpriseRepository interface {
-	// SaveConfluence persists a confluence score.
-	SaveConfluence(ctx context.Context, score domain.ConfluenceScore) error
-
-	// GetLatestConfluence retrieves the latest confluence score for a pair.
-	GetLatestConfluence(ctx context.Context, pair string) (*domain.ConfluenceScore, error)
-
-	// GetAllConfluences retrieves latest confluence scores for all pairs.
-	GetAllConfluences(ctx context.Context) ([]domain.ConfluenceScore, error)
-
-	// SaveCurrencyRanking persists a currency ranking snapshot.
-	SaveCurrencyRanking(ctx context.Context, ranking domain.CurrencyRanking) error
-
-	// GetLatestRanking retrieves the most recent currency ranking.
-	GetLatestRanking(ctx context.Context) (*domain.CurrencyRanking, error)
-}
 
 // ---------------------------------------------------------------------------
 // PrefsRepository — User preferences persistence

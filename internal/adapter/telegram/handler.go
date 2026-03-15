@@ -24,7 +24,6 @@ type Handler struct {
 	// Repositories
 	eventRepo    ports.EventRepository
 	cotRepo      ports.COTRepository
-	surpriseRepo ports.SurpriseRepository
 	prefsRepo    ports.PrefsRepository
 
 	aiAnalyzer ports.AIAnalyzer
@@ -35,7 +34,6 @@ func NewHandler(
 	bot *Bot,
 	eventRepo ports.EventRepository,
 	cotRepo ports.COTRepository,
-	surpriseRepo ports.SurpriseRepository,
 	prefsRepo ports.PrefsRepository,
 	aiAnalyzer ports.AIAnalyzer,
 ) *Handler {
@@ -45,7 +43,6 @@ func NewHandler(
 		kb:           NewKeyboardBuilder(),
 		eventRepo:    eventRepo,
 		cotRepo:      cotRepo,
-		surpriseRepo: surpriseRepo,
 		prefsRepo:    prefsRepo,
 		aiAnalyzer:   aiAnalyzer,
 	}
@@ -56,13 +53,10 @@ func NewHandler(
 	bot.RegisterCommand("/settings", h.cmdSettings)
 	bot.RegisterCommand("/status", h.cmdStatus)
 	bot.RegisterCommand("/cot", h.cmdCOT)
-	bot.RegisterCommand("/rank", h.cmdRank)
-	bot.RegisterCommand("/confluence", h.cmdConfluence)
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
-	bot.RegisterCallback("conf:", h.cbConfluenceDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
 
@@ -81,8 +75,6 @@ Institutional-grade forex fundamental analysis (COT Focus):
 
 <b>Analysis Commands:</b>
 /cot - COT positioning analysis
-/rank - Currency strength ranking
-/confluence - Multi-factor confluence scores
 /outlook - AI weekly market outlook
 
 <b>System Commands:</b>
@@ -166,89 +158,6 @@ func (h *Handler) cbCOTDetail(ctx context.Context, chatID string, msgID int, use
 	return h.bot.EditMessage(ctx, chatID, msgID, html)
 }
 
-// ---------------------------------------------------------------------------
-// /rank — Currency strength ranking
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args string) error {
-	ranking, err := h.surpriseRepo.GetLatestRanking(ctx)
-	if err != nil {
-		return fmt.Errorf("get currency ranking: %w", err)
-	}
-
-	if ranking == nil {
-		_, err = h.bot.SendHTML(ctx, chatID,
-			"No currency ranking available yet. Rankings are calculated periodically.")
-		return err
-	}
-
-	html := h.fmt.FormatCurrencyRanking(*ranking)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /confluence — Multi-factor confluence scores
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdConfluence(ctx context.Context, chatID string, userID int64, args string) error {
-	if args != "" {
-		// Specific pair: /confluence EURUSD
-		pair := strings.ToUpper(strings.TrimSpace(args))
-		score, err := h.surpriseRepo.GetLatestConfluence(ctx, pair)
-		if err != nil {
-			return fmt.Errorf("get confluence for %s: %w", pair, err)
-		}
-		if score == nil {
-			_, err = h.bot.SendHTML(ctx, chatID,
-				fmt.Sprintf("No confluence score for <b>%s</b>.", pair))
-			return err
-		}
-
-		html := h.fmt.FormatConfluenceDetail(*score)
-
-		// AI synthesis if available
-		if h.aiAnalyzer != nil && h.aiAnalyzer.IsAvailable() {
-			narrative, aiErr := h.aiAnalyzer.SynthesizeConfluence(ctx, *score)
-			if aiErr == nil && narrative != "" {
-				html += "\n\n" + h.fmt.FormatAIInsight("Confluence", narrative)
-			}
-		}
-
-		_, err = h.bot.SendHTML(ctx, chatID, html)
-		return err
-	}
-
-	// Overview: all pairs
-	scores, err := h.surpriseRepo.GetAllConfluences(ctx)
-	if err != nil {
-		return fmt.Errorf("get all confluences: %w", err)
-	}
-
-	if len(scores) == 0 {
-		_, err = h.bot.SendHTML(ctx, chatID,
-			"No confluence scores available yet. Scores are recalculated every 2 hours.")
-		return err
-	}
-
-	html := h.fmt.FormatConfluenceOverview(scores)
-	kb := h.kb.ConfluencePairSelector(scores)
-	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
-	return err
-}
-
-// cbConfluenceDetail handles inline keyboard callback for confluence detail.
-func (h *Handler) cbConfluenceDetail(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	pair := strings.TrimPrefix(data, "conf:")
-	score, err := h.surpriseRepo.GetLatestConfluence(ctx, pair)
-	if err != nil || score == nil {
-		return h.bot.EditMessage(ctx, chatID, msgID,
-			fmt.Sprintf("No confluence data for %s", pair))
-	}
-
-	html := h.fmt.FormatConfluenceDetail(*score)
-	return h.bot.EditMessage(ctx, chatID, msgID, html)
-}
 
 
 
@@ -269,13 +178,8 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 	// Gather all data
 	now := timeutil.NowWIB()
 	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
-	confluenceScores, _ := h.surpriseRepo.GetAllConfluences(ctx)
-	ranking, _ := h.surpriseRepo.GetLatestRanking(ctx)
-
 	weeklyData := ports.WeeklyData{
-		COTAnalyses:      cotAnalyses,
-		ConfluenceScores: confluenceScores,
-		CurrencyRanking:  ranking,
+		COTAnalyses: cotAnalyses,
 	}
 
 	outlook, err := h.aiAnalyzer.GenerateWeeklyOutlook(ctx, weeklyData)

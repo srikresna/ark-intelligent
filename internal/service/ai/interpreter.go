@@ -16,8 +16,6 @@ import (
 // types that are more convenient for prompt building.
 type WeeklyOutlookData struct {
 	COTAnalyses []domain.COTAnalysis
-	Rankings    *domain.CurrencyRanking
-	Confluences []domain.ConfluenceScore
 }
 
 // Interpreter orchestrates AI-powered narrative generation for all analysis types.
@@ -65,27 +63,11 @@ func (ip *Interpreter) AnalyzeCOT(ctx context.Context, analyses []domain.COTAnal
 }
 
 
-// SynthesizeConfluence generates an AI interpretation of confluence scoring.
-func (ip *Interpreter) SynthesizeConfluence(ctx context.Context, score domain.ConfluenceScore) (string, error) {
-	prompt := BuildConfluencePrompt(score)
-
-	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
-	if err != nil {
-		log.Printf("[ai] confluence failed: %v", err)
-		// FIX: Use Bias instead of Direction
-		return fmt.Sprintf("%s Confluence: %.1f/100 (%s) - AI interpretation unavailable",
-			score.CurrencyPair, score.TotalScore, string(score.Bias)), nil
-	}
-
-	return formatResponse(fmt.Sprintf("%s CONFLUENCE", score.CurrencyPair), result), nil
-}
 
 // GenerateWeeklyOutlook creates a comprehensive weekly market outlook.
 func (ip *Interpreter) GenerateWeeklyOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
 	outlookData := WeeklyOutlookData{
 		COTAnalyses: data.COTAnalyses,
-		Rankings:    data.CurrencyRanking,
-		Confluences: data.ConfluenceScores,
 	}
 
 	prompt := BuildWeeklyOutlookPrompt(outlookData)
@@ -129,11 +111,9 @@ func (ip *Interpreter) GenerateAllInsights(ctx context.Context, data WeeklyOutlo
 		throttle()
 	}
 
-	// 2. Weekly Outlook - FIX: Convert WeeklyOutlookData back to ports.WeeklyData
+	// 2. Weekly Outlook
 	weeklyData := ports.WeeklyData{
-		COTAnalyses:      data.COTAnalyses,
-		CurrencyRanking:  data.Rankings,
-		ConfluenceScores: data.Confluences,
+		COTAnalyses: data.COTAnalyses,
 	}
 	weeklyResult, err := ip.GenerateWeeklyOutlook(ctx, weeklyData)
 	if err != nil {
@@ -200,9 +180,6 @@ func (ip *Interpreter) fallbackWeeklyOutlook(data WeeklyOutlookData) string {
 
 	if len(data.COTAnalyses) > 0 {
 		b.WriteString(fmt.Sprintf("COT: %d contracts analyzed\n", len(data.COTAnalyses)))
-	}
-	if len(data.Confluences) > 0 {
-		b.WriteString(fmt.Sprintf("Confluence: %d pairs scored\n", len(data.Confluences)))
 	}
 
 	b.WriteString("\nAI detailed analysis unavailable.\n")

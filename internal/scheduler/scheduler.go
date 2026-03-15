@@ -24,7 +24,6 @@ import (
 	"github.com/arkcode369/ff-calendar-bot/internal/ports"
 	aisvc "github.com/arkcode369/ff-calendar-bot/internal/service/ai"
 	cotsvc "github.com/arkcode369/ff-calendar-bot/internal/service/cot"
-	quantsvc "github.com/arkcode369/ff-calendar-bot/internal/service/quant"
 	"github.com/arkcode369/ff-calendar-bot/pkg/timeutil"
 )
 
@@ -35,21 +34,14 @@ import (
 // Deps holds all service dependencies the scheduler needs.
 type Deps struct {
 	COTAnalyzer      *cotsvc.Analyzer
-	ConfluenceScorer *quantsvc.ConfluenceScorer
-	CurrencyRanker   *quantsvc.CurrencyRanker
-	AIAnalyzer       *aisvc.Interpreter
-	Bot              ports.Messenger
-	EventRepo        ports.EventRepository
 	COTRepo          ports.COTRepository
-	SurpriseRepo     ports.SurpriseRepository
 	PrefsRepo        ports.PrefsRepository
 	ChatID           string
 }
 
 // Intervals configures how often each job runs.
 type Intervals struct {
-	COTFetch       time.Duration // Default: 6h
-	ConfluenceCalc time.Duration // Default: 2h
+	COTFetch time.Duration // Default: 6h
 }
 
 // ---------------------------------------------------------------------------
@@ -88,16 +80,10 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// COT fetch + analysis
 	s.startJob(ctx, "cot-fetch", intervals.COTFetch, s.jobCOTFetch)
 
-	// Confluence score computation
-	s.startJobWithDelay(ctx, "confluence-calc", intervals.ConfluenceCalc, 10*time.Minute, s.jobConfluenceCalc)
-
-	// Currency ranking (every 2 hours)
-	s.startJobWithDelay(ctx, "currency-rank", 2*time.Hour, 20*time.Minute, s.jobCurrencyRank)
-
 	// Weekly outlook (check every hour, fires on Sunday 18:00 WIB)
 	s.startJob(ctx, "weekly-outlook", 1*time.Hour, s.jobWeeklyOutlook)
 
-	log.Printf("[SCHED] Started 4 background jobs")
+	log.Printf("[SCHED] Started 2 background jobs")
 }
 
 // Stop signals all jobs to stop and waits for them to finish.
@@ -241,49 +227,6 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 }
 
 
-// jobConfluenceCalc computes confluence scores for major pairs.
-func (s *Scheduler) jobConfluenceCalc(ctx context.Context) error {
-	pairs := []struct{ base, quote string }{
-		{"EUR", "USD"}, {"GBP", "USD"}, {"USD", "JPY"}, {"AUD", "USD"},
-		{"NZD", "USD"}, {"USD", "CAD"}, {"USD", "CHF"}, {"EUR", "GBP"},
-		{"EUR", "JPY"}, {"GBP", "JPY"}, {"AUD", "NZD"}, {"EUR", "AUD"},
-	}
-
-	var errs []error
-	for _, p := range pairs {
-		score, err := s.deps.ConfluenceScorer.ComputeForPair(ctx, p.base, p.quote)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s%s: %w", p.base, p.quote, err))
-			continue
-		}
-		if err := s.deps.SurpriseRepo.SaveConfluence(ctx, *score); err != nil {
-			errs = append(errs, fmt.Errorf("save %s%s: %w", p.base, p.quote, err))
-		}
-	}
-
-	log.Printf("[SCHED:confluence-calc] Computed %d pairs, %d errors", len(pairs), len(errs))
-
-	if len(errs) > 0 {
-		return fmt.Errorf("confluence errors: %v", errs[0]) // Return first error
-	}
-	return nil
-}
-
-
-// jobCurrencyRank computes currency strength rankings.
-func (s *Scheduler) jobCurrencyRank(ctx context.Context) error {
-	ranking, err := s.deps.CurrencyRanker.RankAll(ctx)
-	if err != nil {
-		return fmt.Errorf("currency rank: %w", err)
-	}
-
-	if err := s.deps.SurpriseRepo.SaveCurrencyRanking(ctx, *ranking); err != nil {
-		return fmt.Errorf("save ranking: %w", err)
-	}
-
-	log.Printf("[SCHED:currency-rank] Ranked %d currencies", len(ranking.Rankings))
-	return nil
-}
 
 // jobWeeklyOutlook generates and sends the weekly outlook on Sunday evening.
 // Fires every hour but only executes on Sunday between 18:00-18:59 WIB.
@@ -333,22 +276,6 @@ func (s *Scheduler) gatherWeeklyData(ctx context.Context) (ports.WeeklyData, err
 		log.Printf("[SCHED:weekly-outlook] COT analyses unavailable: %v", err)
 	} else {
 		data.COTAnalyses = analyses
-	}
-
-	// Confluence scores
-	confluences, err := s.deps.SurpriseRepo.GetAllConfluences(ctx)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Confluence scores unavailable: %v", err)
-	} else {
-		data.ConfluenceScores = confluences
-	}
-
-	// Currency ranking
-	ranking, err := s.deps.SurpriseRepo.GetLatestRanking(ctx)
-	if err != nil {
-		log.Printf("[SCHED:weekly-outlook] Currency ranking unavailable: %v", err)
-	} else {
-		data.CurrencyRanking = ranking
 	}
 
 	return data, nil

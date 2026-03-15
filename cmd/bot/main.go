@@ -22,7 +22,6 @@ import (
 	"github.com/arkcode369/ff-calendar-bot/internal/scheduler"
 	aisvc "github.com/arkcode369/ff-calendar-bot/internal/service/ai"
 	cotsvc "github.com/arkcode369/ff-calendar-bot/internal/service/cot"
-	quantsvc "github.com/arkcode369/ff-calendar-bot/internal/service/quant"
 )
 
 const banner = `
@@ -64,7 +63,6 @@ func main() {
 
 	eventRepo := storage.NewEventRepo(db)
 	cotRepo := storage.NewCOTRepo(db)
-	surpriseRepo := storage.NewSurpriseRepo(db)
 	prefsRepo := storage.NewPrefsRepo(db)
 
 	log.Println("[MAIN] Storage layer initialized")
@@ -103,10 +101,6 @@ func main() {
 	cotFetcher := cotsvc.NewFetcher()
 	cotAnalyzer := cotsvc.NewAnalyzer(cotRepo, cotFetcher)
 
-	// Quant services
-	confluenceScorer := quantsvc.NewConfluenceScorer(eventRepo, cotRepo)
-	currencyRanker := quantsvc.NewCurrencyRanker(eventRepo, cotRepo)
-
 	log.Println("[MAIN] Service layer initialized")
 
 	// -----------------------------------------------------------------------
@@ -116,7 +110,6 @@ func main() {
 		bot,
 		eventRepo,
 		cotRepo,
-		surpriseRepo,
 		prefsRepo,
 		aiAnalyzer, // nil-safe: handler checks IsAvailable()
 	)
@@ -128,20 +121,16 @@ func main() {
 	// -----------------------------------------------------------------------
 	sched := scheduler.New(&scheduler.Deps{
 		COTAnalyzer:      cotAnalyzer,
-		ConfluenceScorer: confluenceScorer,
-		CurrencyRanker:   currencyRanker,
 		AIAnalyzer:       aiAnalyzer,
 		Bot:              bot,
 		EventRepo:        eventRepo,
 		COTRepo:          cotRepo,
-		SurpriseRepo:     surpriseRepo,
 		PrefsRepo:        prefsRepo,
 		ChatID:           cfg.ChatID,
 	})
 
 	sched.Start(ctx, &scheduler.Intervals{
-		COTFetch:       cfg.COTFetchInterval,
-		ConfluenceCalc: cfg.ConfluenceCalcInterval,
+		COTFetch: cfg.COTFetchInterval,
 	})
 
 	log.Println("[MAIN] Background scheduler started")

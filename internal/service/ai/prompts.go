@@ -62,27 +62,6 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 }
 
 
-// BuildConfluencePrompt creates a prompt for confluence score interpretation.
-func BuildConfluencePrompt(score domain.ConfluenceScore) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Interpret this multi-factor confluence analysis for %s.\n\n", score.CurrencyPair))
-	b.WriteString(fmt.Sprintf("Overall Score: %.1f/100 | Bias: %s | Strongest: %s\n\n",
-		score.TotalScore, score.Bias, score.StrongestFactor))
-
-	b.WriteString("Factor breakdown:\n")
-	for _, f := range score.Factors {
-		b.WriteString(fmt.Sprintf("  %s (weight %.0f%%): Score=%.1f Signal=%s\n",
-			f.Name, f.Weight*100, f.RawScore, f.Signal))
-	}
-
-	b.WriteString("\nProvide:\n")
-	b.WriteString("1. Which factors are aligned vs conflicting\n")
-	b.WriteString("2. The strongest factor driving the bias\n")
-	b.WriteString("3. Whether you agree with the score direction and why\n")
-	b.WriteString("4. Specific trade recommendation (entry timing, risk events)\n")
-
-	return b.String()
-}
 
 // BuildWeeklyOutlookPrompt creates a prompt for weekly market outlook.
 func BuildWeeklyOutlookPrompt(data WeeklyOutlookData) string {
@@ -102,14 +81,6 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData) string {
 	}
 
 
-	// Currency rankings
-	if data.Rankings != nil && len(data.Rankings.Rankings) > 0 {
-		b.WriteString("=== CURRENCY STRENGTH ===\n")
-		for _, r := range data.Rankings.Rankings {
-			b.WriteString(fmt.Sprintf("%d. %s (%.1f)\n", r.Rank, r.Score.Code, r.Score.CompositeScore))
-		}
-		b.WriteString("\n")
-	}
 
 	b.WriteString("\nProvide a structured weekly outlook in INDONESIAN:\n")
 	b.WriteString("1. MACRO THEME: Tema utama penggerak pasar minggu ini\n")

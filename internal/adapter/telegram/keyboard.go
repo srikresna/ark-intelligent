@@ -15,7 +15,6 @@ import (
 // KeyboardBuilder creates inline keyboards for interactive bot messages.
 // All callback_data values use a prefix-based routing scheme:
 //   - "cot:XXX"   -> COT detail for currency/contract
-//   - "conf:XXX"  -> Confluence detail for pair
 //   - "set:XXX"   -> Settings toggle action
 //   - "alert:XXX" -> Alert action (mute, dismiss)
 type KeyboardBuilder struct{}
@@ -112,41 +111,6 @@ func (kb *KeyboardBuilder) contractLabel(name, code string) string {
 	return code
 }
 
-// ---------------------------------------------------------------------------
-// Confluence Keyboards
-// ---------------------------------------------------------------------------
-
-// ConfluencePairSelector builds a keyboard for selecting a pair to view confluence detail.
-// Layout: 2 pairs per row, sorted by absolute score (strongest first).
-func (kb *KeyboardBuilder) ConfluencePairSelector(scores []domain.ConfluenceScore) ports.InlineKeyboard {
-	var rows [][]ports.InlineButton
-	var currentRow []ports.InlineButton
-
-	for i, s := range scores {
-		// Bias indicator
-		indicator := "--"
-		if s.TotalScore > 0.3 {
-			indicator = "BUL"
-		} else if s.TotalScore < -0.3 {
-			indicator = "BER"
-		} else {
-			indicator = "NEU"
-		}
-
-		btn := ports.InlineButton{
-			Text:         fmt.Sprintf("%s [%s]", s.CurrencyPair, indicator),
-			CallbackData: fmt.Sprintf("conf:%s", s.CurrencyPair),
-		}
-		currentRow = append(currentRow, btn)
-
-		if len(currentRow) == 2 || i == len(scores)-1 {
-			rows = append(rows, currentRow)
-			currentRow = nil
-		}
-	}
-
-	return ports.InlineKeyboard{Rows: rows}
-}
 
 // ---------------------------------------------------------------------------
 // Settings Keyboards
@@ -211,12 +175,8 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "COT", CallbackData: "nav:cot"},
-				{Text: "Rank", CallbackData: "nav:rank"},
-			},
-			{
-				{Text: "Confluence", CallbackData: "nav:confluence"},
-				{Text: "Outlook", CallbackData: "nav:outlook"},
+				{Text: "COT Analysis", CallbackData: "nav:cot"},
+				{Text: "Weekly Outlook", CallbackData: "nav:outlook"},
 			},
 		},
 	}

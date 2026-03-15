@@ -12,9 +12,7 @@ import (
 
 // WeeklyData bundles all available data for AI weekly outlook generation.
 type WeeklyData struct {
-	COTAnalyses      []domain.COTAnalysis     `json:"cot_analyses"`
-	ConfluenceScores []domain.ConfluenceScore `json:"confluence_scores"`
-	CurrencyRanking  *domain.CurrencyRanking  `json:"currency_ranking"`
+	COTAnalyses []domain.COTAnalysis `json:"cot_analyses"`
 }
 
 // ---------------------------------------------------------------------------
@@ -31,10 +29,6 @@ type AIAnalyzer interface {
 	AnalyzeCOT(ctx context.Context, analyses []domain.COTAnalysis) (string, error)
 
 
-	// SynthesizeConfluence generates an actionable trading bias paragraph.
-	// Input: multi-factor confluence score with all factor breakdowns.
-	// Output: actionable narrative with conviction level.
-	SynthesizeConfluence(ctx context.Context, score domain.ConfluenceScore) (string, error)
 
 	// GenerateWeeklyOutlook generates a comprehensive weekly briefing.
 	// Input: all available data aggregated.

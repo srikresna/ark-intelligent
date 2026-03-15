@@ -110,11 +110,6 @@ func (d *DB) Size() (lsm, vlog int64) {
 //   cot:{contractCode}:{YYYYMMDD}               -> JSON(COTRecord)
 //   cotanl:{contractCode}:{YYYYMMDD}            -> JSON(COTAnalysis)
 //
-// Surprise & Confluence:
-//   surp:{currency}:{YYYYMMDD}:{eventID}        -> JSON(SurpriseScore)
-//   surpidx:{currency}:{YYYYMMDD}               -> JSON(SurpriseIndex)
-//   confl:{pair}:{YYYYMMDD}                     -> JSON(ConfluenceScore)
-//
 // User Preferences:
 //   prefs:{userID}                              -> JSON(UserPrefs)
 //
