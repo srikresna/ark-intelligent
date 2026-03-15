@@ -121,6 +121,23 @@ func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract,
 	return records, nil
 }
 
+// FetchAllHistory retrieves a full year of historical data for all contracts.
+func (f *Fetcher) FetchAllHistory(ctx context.Context, contracts []domain.COTContract) ([]domain.COTRecord, error) {
+	var allRecords []domain.COTRecord
+	for _, c := range contracts {
+		log.Printf("[cot] Syncing history for %s...", c.Name)
+		history, err := f.FetchHistory(ctx, c, 52)
+		if err != nil {
+			log.Printf("[cot] warn: failed to fetch history for %s: %v", c.Name, err)
+			continue
+		}
+		allRecords = append(allRecords, history...)
+		// Stagger requests to avoid Socrata rate limits
+		time.Sleep(200 * time.Millisecond)
+	}
+	return allRecords, nil
+}
+
 // fetchFromSocrata queries the CFTC Socrata API for latest data from multiple reports.
 func (f *Fetcher) fetchFromSocrata(ctx context.Context, contracts []domain.COTContract) ([]domain.COTRecord, error) {
 	// Group contracts by report type

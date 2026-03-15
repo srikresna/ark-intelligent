@@ -66,6 +66,26 @@ func (a *Analyzer) AnalyzeAll(ctx context.Context) ([]domain.COTAnalysis, error)
 	return analyses, nil
 }
 
+// SyncHistory fetches a full year of history for all default contracts
+// and saves them to the repository. This should be run on first start.
+func (a *Analyzer) SyncHistory(ctx context.Context) error {
+	contracts := domain.DefaultCOTContracts
+	records, err := a.fetcher.FetchAllHistory(ctx, contracts)
+	if err != nil {
+		return fmt.Errorf("fetch all history: %w", err)
+	}
+
+	if err := a.cotRepo.SaveRecords(ctx, records); err != nil {
+		return fmt.Errorf("save history records: %w", err)
+	}
+
+	log.Printf("[cot] history synced: saved %d records", len(records))
+
+	// Run initial analysis on the synced data for each contract
+	_, err = a.AnalyzeAll(ctx) 
+	return err
+}
+
 // AnalyzeContract computes metrics for a single contract.
 func (a *Analyzer) AnalyzeContract(ctx context.Context, contractCode string) (*domain.COTAnalysis, error) {
 	latest, err := a.cotRepo.GetLatest(ctx, contractCode)
@@ -88,8 +108,12 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	rt := contract.ReportType
 
 	analysis := domain.COTAnalysis{
-		Contract:   contract,
-		ReportDate: current.ReportDate,
+		Contract:       contract,
+		ReportDate:     current.ReportDate,
+		COTIndex:       50.0,
+		COTIndexComm:   50.0,
+		SentimentScore: 0.0,
+		MomentumDir:    "FLAT",
 	}
 
 	// === Core Position Metrics (Modern) ===

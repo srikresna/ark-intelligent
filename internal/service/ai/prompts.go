@@ -12,6 +12,7 @@ import (
 const SystemPrompt = `You are a senior institutional analyst specializing in COT (Commitments of Traders) data and macro positioning.
 
 Rules:
+- RESPOND ALWAYS IN INDONESIAN (Bahasa Indonesia).
 - Be concise and actionable. Use bullet points.
 - Always state the directional bias (BULLISH/BEARISH/NEUTRAL) clearly.
 - Cite specific numbers from the data provided.
@@ -110,11 +111,11 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\nProvide a structured weekly outlook:\n")
-	b.WriteString("1. MACRO THEME: Dominant narrative driving FX this week\n")
-	b.WriteString("2. CURRENCY OUTLOOK: Bullish/Bearish bias for each G8 currency with reasons\n")
-	b.WriteString("3. TOP TRADES: 3 highest-conviction pair trades with entry logic\n")
-	b.WriteString("4. KEY RISKS: Scenarios that could invalidate the thesis\n")
+	b.WriteString("\nProvide a structured weekly outlook in INDONESIAN:\n")
+	b.WriteString("1. MACRO THEME: Tema utama penggerak pasar minggu ini\n")
+	b.WriteString("2. CURRENCY OUTLOOK: Bias Bullish/Bearish untuk mata uang G8 beserta alasannya\n")
+	b.WriteString("3. TOP TRADES: 3 ide trading dengan keyakinan tertinggi beserta logikanya\n")
+	b.WriteString("4. KEY RISKS: Skenario yang dapat membatalkan analisis ini\n")
 
 	return b.String()
 }

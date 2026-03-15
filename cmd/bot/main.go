@@ -156,14 +156,13 @@ func main() {
 		log.Println("[MAIN] Running initial data load...")
 
 
-		// Fetch COT data
-		if _, err := cotAnalyzer.AnalyzeAll(initCtx); err != nil {
-			log.Printf("[MAIN] Initial COT fetch failed: %v", err)
+		// Fetch and sync COT history (this pulls 52 weeks for all contracts)
+		log.Println("[MAIN] Syncing COT history (this may take a moment)...")
+		if err := cotAnalyzer.SyncHistory(initCtx); err != nil {
+			log.Printf("[MAIN] COT history sync failed: %v", err)
 		} else {
-			log.Println("[MAIN] Initial COT data loaded")
+			log.Println("[MAIN] COT history sync complete")
 		}
-
-		log.Println("[MAIN] Initial data load complete")
 
 		// Send startup notification
 		startupMsg := fmt.Sprintf(
