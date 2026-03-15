@@ -98,6 +98,10 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	analysis.NetPosition = current.GetSmartMoneyNet(rt)
 	analysis.CommercialNet = current.GetCommercialNet(rt)
 	analysis.SmallSpecNet = current.GetSmallSpecNet()
+	
+	// Sync legacy fields
+	analysis.NetCommercial = analysis.CommercialNet
+	analysis.NetSmallSpec = analysis.SmallSpecNet
 
 	// Specific breakdowns
 	if rt == "TFF" {
@@ -116,8 +120,10 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// 3. Long/Short ratios
 	if rt == "TFF" {
 		analysis.LongShortRatio = safeRatio(current.LevFundLong, current.LevFundShort)
+		analysis.CommLSRatio = safeRatio(current.DealerLong, current.DealerShort)
 	} else {
 		analysis.LongShortRatio = safeRatio(current.ManagedMoneyLong, current.ManagedMoneyShort)
+		analysis.CommLSRatio = safeRatio(current.ProdMercLong+current.SwapDealerLong, current.ProdMercShort+current.SwapDealerShort)
 	}
 
 	// 4. Percentage of Open Interest

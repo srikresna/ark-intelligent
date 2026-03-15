@@ -77,6 +77,18 @@ type COTRecord struct {
 
 	// Changes from previous week (for the primary Speculator/Managed Money/Lev Funds category)
 	NetChange float64 `json:"net_change"`
+
+	// --- D. Legacy/Fallback Fields (for CSV/Migration) ---
+	CommLong        float64 `json:"comm_long,omitempty"`
+	CommShort       float64 `json:"comm_short,omitempty"`
+	SpecLong        float64 `json:"spec_long,omitempty"`
+	SpecShort       float64 `json:"spec_short,omitempty"`
+	CommLongChange  float64 `json:"comm_long_change,omitempty"`
+	CommShortChange float64 `json:"comm_short_change,omitempty"`
+	SpecLongChange  float64 `json:"spec_long_change,omitempty"`
+	SpecShortChange float64 `json:"spec_short_change,omitempty"`
+	SmallLongChange float64 `json:"small_long_change,omitempty"`
+	SmallShortChange float64 `json:"small_short_change,omitempty"`
 }
 
 // GetSmartMoneyNet returns the primary speculative position (Lev Funds for TFF, Managed Money for Disaggregated).
@@ -163,6 +175,13 @@ type COTAnalysis struct {
 	
 	LongShortRatio  float64 `json:"long_short_ratio"`  // Smart Money Ratio
 	PctOfOI         float64 `json:"pct_of_oi"`         // Net as % of Open Interest
+	
+	// Legacy Field Support (Sync)
+	NetCommercial   float64 `json:"net_commercial"`    // Same as CommercialNet
+	CommPctOfOI     float64 `json:"comm_pct_of_oi"`    // Commercial net as % of OI
+	CommLSRatio     float64 `json:"comm_ls_ratio"`     // Commercial Long/Short ratio
+	CommNetChange   float64 `json:"comm_net_change"`   // WoW change in commercial net
+	NetSmallSpec    float64 `json:"net_small_spec"`    // Same as SmallSpecNet
 
 	// --- B. COT Index & Extremes ---
 	COTIndex        float64 `json:"cot_index"`         // Williams COT Index (0-100) for specs

@@ -210,7 +210,7 @@ func (f *Fetcher) fetchReport(ctx context.Context, url string, contracts []domai
 
 // fetchFromCSV downloads and parses the CFTC bulk CSV as fallback.
 func (f *Fetcher) fetchFromCSV(ctx context.Context, contracts []domain.COTContract) ([]domain.COTRecord, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.csvURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.defaultCSV, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create csv request: %w", err)
 	}
@@ -323,6 +323,7 @@ func csvRowToRecord(row []string, colIdx map[string]int, contract domain.COTCont
 		ContractCode: contract.Code,
 		ContractName: contract.Name,
 		ReportDate:   reportDate,
+		OpenInterest: csvFloat(row, colIdx, "Open_Interest_All"),
 
 		CommLong:     csvFloat(row, colIdx, "Comm_Positions_Long_All"),
 		CommShort:    csvFloat(row, colIdx, "Comm_Positions_Short_All"),
@@ -330,7 +331,6 @@ func csvRowToRecord(row []string, colIdx map[string]int, contract domain.COTCont
 		SpecShort:    csvFloat(row, colIdx, "NonComm_Positions_Short_All"),
 		SmallLong:    csvFloat(row, colIdx, "NonRept_Positions_Long_All"),
 		SmallShort:   csvFloat(row, colIdx, "NonRept_Positions_Short_All"),
-		OpenInterest: csvFloat(row, colIdx, "Open_Interest_All"),
 
 		CommLongChange:  csvFloat(row, colIdx, "Change_in_Comm_Long_All"),
 		CommShortChange: csvFloat(row, colIdx, "Change_in_Comm_Short_All"),
