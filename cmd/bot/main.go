@@ -102,8 +102,6 @@ func main() {
 	// COT services
 	cotFetcher := cotsvc.NewFetcher()
 	cotAnalyzer := cotsvc.NewAnalyzer(cotRepo, cotFetcher)
-	cotIndexCalc := cotsvc.NewIndexCalculator()
-	cotSignals := cotsvc.NewSignalDetector()
 
 	// Quant services
 	confluenceScorer := quantsvc.NewConfluenceScorer(eventRepo, cotRepo)
