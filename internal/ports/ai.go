@@ -13,6 +13,7 @@ import (
 // WeeklyData bundles all available data for AI weekly outlook generation.
 type WeeklyData struct {
 	COTAnalyses []domain.COTAnalysis `json:"cot_analyses"`
+	Language    string               `json:"language"` // "id" or "en"
 }
 
 // ---------------------------------------------------------------------------

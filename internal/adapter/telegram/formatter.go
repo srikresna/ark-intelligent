@@ -113,6 +113,10 @@ func (f *Formatter) FormatCOTDetail(a domain.COTAnalysis) string {
 	b.WriteString(fmt.Sprintf("<b>COT Analysis: %s</b>\n", a.Contract.Name))
 	b.WriteString(fmt.Sprintf("<i>Report: %s (%s)</i>\n\n", a.ReportDate.Format("Jan 2, 2006"), rt))
 
+	if a.AssetMgrAlert {
+		b.WriteString(fmt.Sprintf("⚠️ <b>WARNING: Asset Manager Structural Shift!</b> (Z-Score: %.2f)\n\n", a.AssetMgrZScore))
+	}
+
 	// Positioning
 	b.WriteString(fmt.Sprintf("<b>%s (Smart Money):</b>\n", smartMoneyLabel))
 	b.WriteString(fmt.Sprintf("<code>  Net Position:   %s</code>\n", fmtutil.FmtNumSigned(a.NetPosition, 0)))
@@ -184,17 +188,15 @@ func (f *Formatter) FormatWeeklyOutlook(outlook string, date time.Time) string {
 	var b strings.Builder
 
 	b.WriteString(fmt.Sprintf("<b>Weekly Market Outlook</b>\n"))
-	b.WriteString(fmt.Sprintf("<i>Week of %s | AI-Generated</i>\n\n",
-		date.Format("Jan 2, 2006")))
+	b.WriteString(fmt.Sprintf("<i>Week of %s</i>\n\n", date.Format("Jan 2, 2006")))
 	b.WriteString(outlook)
-	b.WriteString("\n\n<i>This analysis is AI-generated. Always validate with your own research.</i>")
 
 	return b.String()
 }
 
 // FormatAIInsight wraps an AI narrative with a labeled section.
 func (f *Formatter) FormatAIInsight(label, narrative string) string {
-	return fmt.Sprintf("<b>[AI] %s:</b>\n<i>%s</i>", label, narrative)
+	return fmt.Sprintf("<b>%s Analysis:</b>\n<i>%s</i>", label, narrative)
 }
 
 // ---------------------------------------------------------------------------
@@ -204,11 +206,6 @@ func (f *Formatter) FormatAIInsight(label, narrative string) string {
 // FormatSettings formats the user preferences display.
 func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 	var b strings.Builder
-
-	newsAlerts := "OFF"
-	if prefs.AlertsEnabled {
-		newsAlerts = "ON"
-	}
 
 	aiReports := "OFF"
 	if prefs.AIReportsEnabled {
@@ -220,21 +217,23 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 		cotAlerts = "ON"
 	}
 
-	b.WriteString("<b>Settings</b>\n\n")
-	b.WriteString(fmt.Sprintf("<code>[News] Notifications: %s</code>\n", newsAlerts))
+	b.WriteString("🦅 <b>ARK Intelligence Settings</b>\n\n")
 	b.WriteString(fmt.Sprintf("<code>[COT] Release Alerts: %s</code>\n", cotAlerts))
-	b.WriteString(fmt.Sprintf("<code>[AI] Weekly Reports: %s</code>\n", aiReports))
-	b.WriteString(fmt.Sprintf("<code>News Impacts:        %s</code>\n", strings.Join(prefs.AlertImpacts, ", ")))
-	b.WriteString(fmt.Sprintf("<code>News Timing:         %s min</code>\n",
-		f.formatIntSlice(prefs.AlertMinutes)))
+	b.WriteString(fmt.Sprintf("<code>[AI] Weekly Reports : %s</code>\n", aiReports))
+
+	langDisplay := "Indonesian 🇮🇩"
+	if prefs.Language == "en" {
+		langDisplay = "English 🇬🇧"
+	}
+	b.WriteString(fmt.Sprintf("<code>[AI] Output Language: %s</code>\n", langDisplay))
 
 	if len(prefs.CurrencyFilter) > 0 {
-		b.WriteString(fmt.Sprintf("<code>Currencies filter:    %s</code>\n", strings.Join(prefs.CurrencyFilter, ", ")))
+		b.WriteString(fmt.Sprintf("<code>Currencies filter  : %s</code>\n", strings.Join(prefs.CurrencyFilter, ", ")))
 	} else {
-		b.WriteString("<code>Currencies filter:    All</code>\n")
+		b.WriteString("<code>Currencies filter  : All</code>\n")
 	}
 
-	b.WriteString("\n<i>Use the buttons below to adjust settings</i>")
+	b.WriteString("\n<i>Use the buttons below to adjust preferences</i>")
 
 	return b.String()
 }

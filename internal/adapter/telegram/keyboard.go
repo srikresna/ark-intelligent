@@ -121,17 +121,7 @@ func (kb *KeyboardBuilder) contractLabel(name, code string) string {
 func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyboard {
 	var rows [][]ports.InlineButton
 
-	// Row 1: News News/Event Alert toggle
-	newsLabel := "News Alerts: OFF -> Turn ON"
-	if prefs.AlertsEnabled {
-		newsLabel = "News Alerts: ON -> Turn OFF"
-	}
-	rows = append(rows, []ports.InlineButton{{
-		Text:         newsLabel,
-		CallbackData: "set:alerts_toggle",
-	}})
-
-	// Row 2: COT Release Alerts toggle
+	// Row 1: COT Release Alerts toggle
 	cotLabel := "COT Alerts: OFF -> Turn ON"
 	if prefs.COTAlertsEnabled {
 		cotLabel = "COT Alerts: ON -> Turn OFF"
@@ -141,14 +131,31 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:cot_toggle",
 	}})
 
-	// Row 3: AI Reports toggle
+	// Row 2: AI Reports toggle
 	aiLabel := "AI Reports: OFF -> Turn ON"
 	if prefs.AIReportsEnabled {
+		_ = "ON"
 		aiLabel = "AI Reports: ON -> Turn OFF"
 	}
 	rows = append(rows, []ports.InlineButton{{
 		Text:         aiLabel,
 		CallbackData: "set:ai_toggle",
+	}})
+
+	// Row 3: Language Toggle
+	langLabel := "🌐 Language: Indo 🇮🇩 -> Eng 🇬🇧"
+	if prefs.Language == "en" {
+		langLabel = "🌐 Language: Eng 🇬🇧 -> Indo 🇮🇩"
+	}
+	rows = append(rows, []ports.InlineButton{{
+		Text:         langLabel,
+		CallbackData: "set:lang_toggle",
+	}})
+
+	// Row 3: View Changelog
+	rows = append(rows, []ports.InlineButton{{
+		Text:         "📜 View Changelog",
+		CallbackData: "set:changelog_view",
 	}})
 
 	return ports.InlineKeyboard{Rows: rows}

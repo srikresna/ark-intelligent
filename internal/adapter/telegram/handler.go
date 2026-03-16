@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
@@ -69,18 +70,21 @@ func NewHandler(
 // ---------------------------------------------------------------------------
 
 func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, args string) error {
-	html := `<b>FF Calendar Bot v2</b>
+	html := `🦅 <b>ARK Community Intelligent</b>
+<i>Premium Institutional Intelligence & Macro Analytics</i>
 
-Institutional-grade forex fundamental analysis (COT Focus):
+Welcome to the ARK ecosystem. We deliver level-2 institutional flow diagnostics (COT) and AI-powered narrative intelligence for high-conviction traders.
 
-<b>Analysis Commands:</b>
-/cot - COT positioning analysis
-/outlook - AI weekly market outlook
+<b>⚡ Intelligence Terminals:</b>
+/cot - COT positioning diagnostics & scalper metrics
+/outlook - AI-driven weekly market structural outlook
 
-<b>System Commands:</b>
-/settings - Alert preferences
-/status - Bot health status
-/help - Show this menu`
+<b>⚙️ Operations:</b>
+/settings - Preference management
+/status - Neural grid status
+/help - Visual guide
+
+<code>System Grid: v1.0.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
@@ -232,6 +236,11 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 		return err
 	}
 
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		prefs = domain.DefaultPrefs() // fallback
+	}
+
 	// Send "generating..." placeholder
 	placeholderID, _ := h.bot.SendHTML(ctx, chatID, "Generating weekly outlook... (this may take 10-15s)")
 
@@ -240,6 +249,7 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
 	weeklyData := ports.WeeklyData{
 		COTAnalyses: cotAnalyses,
+		Language:    prefs.Language,
 	}
 
 	outlook, err := h.aiAnalyzer.GenerateWeeklyOutlook(ctx, weeklyData)
@@ -283,6 +293,25 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 	}
 
 	switch action {
+	case "lang_toggle":
+		if prefs.Language == "en" {
+			prefs.Language = "id"
+		} else {
+			prefs.Language = "en"
+		}
+	case "changelog_view":
+		// Read CHANGELOG.md
+		content, err := os.ReadFile("CHANGELOG.md")
+		if err != nil {
+			log.Printf("[HANDLER] Failed to read CHANGELOG.md: %v", err)
+			return h.bot.EditMessage(ctx, chatID, msgID, "Changelog unavailable.")
+		}
+		
+		html := fmt.Sprintf("🦅 <b>ARK Intelligence Changelog</b>\n\n%s", string(content))
+		// Optional: Add a back button to settings
+		kb := h.kb.SettingsMenu(prefs)
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+
 	case "alerts_toggle":
 		prefs.AlertsEnabled = !prefs.AlertsEnabled
 	case "cot_toggle":

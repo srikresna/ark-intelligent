@@ -70,7 +70,7 @@ func (ip *Interpreter) GenerateWeeklyOutlook(ctx context.Context, data ports.Wee
 		COTAnalyses: data.COTAnalyses,
 	}
 
-	prompt := BuildWeeklyOutlookPrompt(outlookData)
+	prompt := BuildWeeklyOutlookPrompt(outlookData, data.Language)
 
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {

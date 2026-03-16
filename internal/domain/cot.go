@@ -220,6 +220,10 @@ type COTAnalysis struct {
 	SentimentScore  float64        `json:"sentiment_score"`  // Weighted composite (-100 to +100)
 	SignalStrength  SignalStrength `json:"signal_strength"`  // Overall signal conviction
 
+	// --- G. Institutional Outlier Alerts (TFF) ---
+	AssetMgrZScore float64 `json:"asset_mgr_z_score"` // Z-Score of Asset Mgr Net Position change
+	AssetMgrAlert  bool    `json:"asset_mgr_alert"`    // |Z-Score| > 2.0 or threshold
+
 	// AI interpretation (filled by Gemini)
 	AINarrative string `json:"ai_narrative,omitempty"`
 }

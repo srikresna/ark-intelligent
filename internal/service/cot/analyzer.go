@@ -209,6 +209,34 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// 11. Overall sentiment score (-100 to +100)
 	analysis.SentimentScore = computeSentiment(analysis)
 
+	// === 11b. Institutional Outlier Alerts (TFF) ===
+	if rt == "TFF" && len(history) >= 4 {
+		// Extract historical AssetMgrNet changes
+		var changes []float64
+		for i := 1; i < len(history); i++ {
+			currAM := history[i-1].AssetMgrLong - history[i-1].AssetMgrShort
+			var prevAM float64
+			if i < len(history) {
+				prevAM = history[i].AssetMgrLong - history[i].AssetMgrShort
+			}
+			changes = append(changes, currAM-prevAM)
+		}
+
+		if len(changes) >= 2 {
+			currentChange := (current.AssetMgrLong - current.AssetMgrShort) - (history[1].AssetMgrLong - history[1].AssetMgrShort)
+			avg := mathutil.Mean(changes)
+			stdDev := mathutil.StdDevSample(changes)
+
+			if stdDev > 0 {
+				analysis.AssetMgrZScore = (currentChange - avg) / stdDev
+				// Alert if Z-Score exceeds 2.0 (95% confidence outlier)
+				if mathutil.Abs(analysis.AssetMgrZScore) >= 2.0 {
+					analysis.AssetMgrAlert = true
+				}
+			}
+		}
+	}
+
 	// 12-14. Individual trader signals
 	analysis.CommercialSignal = classifySignal(analysis.COTIndexComm, analysis.CommMomentum4W, true)
 	analysis.SpeculatorSignal = classifySignal(analysis.COTIndex, analysis.SpecMomentum4W, false)

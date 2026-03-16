@@ -12,7 +12,7 @@ import (
 const SystemPrompt = `You are a senior institutional analyst specializing in COT (Commitments of Traders) data and macro positioning.
 
 Rules:
-- RESPOND ALWAYS IN INDONESIAN (Bahasa Indonesia).
+- RESPOND IN THE LANGUAGE REQUESTED BY THE USER PROMPT (Indonesian/Bahasa Indonesia OR English).
 - Be concise and actionable. Use bullet points.
 - Always state the directional bias (BULLISH/BEARISH/NEUTRAL) clearly.
 - Cite specific numbers from the data provided.
@@ -65,20 +65,30 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 
 
 // BuildWeeklyOutlookPrompt creates a prompt for weekly market outlook.
-func BuildWeeklyOutlookPrompt(data WeeklyOutlookData) string {
+func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string) string {
 	var b strings.Builder
-	b.WriteString("Generate a comprehensive weekly forex fundamental outlook.\n\n")
+	b.WriteString("Generate a comprehensive weekly forex fundamental outlook.\n")
+	
+	if lang == "en" {
+		b.WriteString("PLEASE RESPOND IN ENGLISH.\n\n")
+	} else {
+		b.WriteString("PLEASE RESPOND IN INDONESIAN (Bahasa Indonesia).\n\n")
+	}
 
 	// COT Summary
 	if len(data.COTAnalyses) > 0 {
 		b.WriteString("=== COT POSITIONING ===\n")
 		for _, a := range data.COTAnalyses {
-			b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f CommSignal=%s 4WMom=%s OITrend=%s STBias=%s\n",
+			b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f CommSignal=%s 4WMom=%s OITrend=%s STBias=%s",
 				a.Contract.Currency,
 				fmtutil.FmtNumSigned(a.NetPosition, 0),
 				a.COTIndex, a.CommercialSignal,
 				fmtutil.FmtNumSigned(a.SpecMomentum4W, 0),
 				a.OITrend, a.ShortTermBias))
+			if a.AssetMgrAlert {
+				b.WriteString(fmt.Sprintf(" [⚠️ AssetMgrAlert Z=%.1f]", a.AssetMgrZScore))
+			}
+			b.WriteString("\n")
 		}
 		b.WriteString("\n")
 	}
