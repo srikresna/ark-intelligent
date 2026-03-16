@@ -29,11 +29,12 @@ type Update struct {
 
 // Message represents a Telegram message.
 type Message struct {
-	MessageID int    `json:"message_id"`
-	Chat      Chat   `json:"chat"`
-	From      *User  `json:"from,omitempty"`
-	Text      string `json:"text"`
-	Date      int64  `json:"date"`
+	MessageID       int    `json:"message_id"`
+	Chat            Chat   `json:"chat"`
+	From            *User  `json:"from,omitempty"`
+	Text            string `json:"text"`
+	Date            int64  `json:"date"`
+	MessageThreadID int    `json:"message_thread_id,omitempty"` // For groups with topics
 }
 
 // Chat represents a Telegram chat.
@@ -229,6 +230,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 	}
 
 	chatID := strconv.FormatInt(msg.Chat.ID, 10)
+	if msg.MessageThreadID != 0 {
+		chatID = fmt.Sprintf("%s:%d", chatID, msg.MessageThreadID)
+	}
 	userID := int64(0)
 	if msg.From != nil {
 		userID = msg.From.ID
@@ -285,6 +289,18 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 // ports.Messenger Implementation — Outbound messaging
 // ---------------------------------------------------------------------------
 
+func (b *Bot) setChatID(params map[string]interface{}, chatID string) {
+	if strings.Contains(chatID, ":") {
+		parts := strings.SplitN(chatID, ":", 2)
+		params["chat_id"] = parts[0]
+		if threadID, err := strconv.Atoi(parts[1]); err == nil {
+			params["message_thread_id"] = threadID
+		}
+	} else {
+		params["chat_id"] = chatID
+	}
+}
+
 // SendMessage sends a plain text message.
 func (b *Bot) SendMessage(ctx context.Context, chatID string, text string) (int, error) {
 	if chatID == "" {
@@ -294,9 +310,9 @@ func (b *Bot) SendMessage(ctx context.Context, chatID string, text string) (int,
 	b.rateLimit()
 
 	params := map[string]interface{}{
-		"chat_id": chatID,
-		"text":    text,
+		"text": text,
 	}
+	b.setChatID(params, chatID)
 
 	var msg sentMessage
 	if err := b.apiCall(ctx, "sendMessage", params, &msg); err != nil {
@@ -313,17 +329,16 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 
 	b.rateLimit()
 
-	// Split long messages (Telegram limit: 4096 chars)
 	chunks := splitMessage(html, 4096)
 	var lastMsgID int
 
 	for _, chunk := range chunks {
 		params := map[string]interface{}{
-			"chat_id":                  chatID,
 			"text":                     chunk,
 			"parse_mode":               "HTML",
 			"disable_web_page_preview": true,
 		}
+		b.setChatID(params, chatID)
 
 		var msg sentMessage
 		if err := b.apiCall(ctx, "sendMessage", params, &msg); err != nil {
@@ -343,16 +358,15 @@ func (b *Bot) SendWithKeyboard(ctx context.Context, chatID string, text string, 
 
 	b.rateLimit()
 
-	// Convert ports.InlineKeyboard to Telegram API format
 	keyboard := b.buildInlineKeyboard(kb)
 
 	params := map[string]interface{}{
-		"chat_id":                  chatID,
 		"text":                     text,
 		"parse_mode":               "HTML",
 		"disable_web_page_preview": true,
 		"reply_markup":             keyboard,
 	}
+	b.setChatID(params, chatID)
 
 	var msg sentMessage
 	if err := b.apiCall(ctx, "sendMessage", params, &msg); err != nil {
@@ -368,12 +382,12 @@ func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text st
 	}
 
 	params := map[string]interface{}{
-		"chat_id":                  chatID,
 		"message_id":               msgID,
 		"text":                     text,
 		"parse_mode":               "HTML",
 		"disable_web_page_preview": true,
 	}
+	b.setChatID(params, chatID)
 
 	return b.apiCallNoResult(ctx, "editMessageText", params)
 }
@@ -387,13 +401,13 @@ func (b *Bot) EditWithKeyboard(ctx context.Context, chatID string, msgID int, te
 	keyboard := b.buildInlineKeyboard(kb)
 
 	params := map[string]interface{}{
-		"chat_id":                  chatID,
 		"message_id":               msgID,
 		"text":                     text,
 		"parse_mode":               "HTML",
 		"disable_web_page_preview": true,
 		"reply_markup":             keyboard,
 	}
+	b.setChatID(params, chatID)
 
 	return b.apiCallNoResult(ctx, "editMessageText", params)
 }
@@ -417,9 +431,9 @@ func (b *Bot) DeleteMessage(ctx context.Context, chatID string, msgID int) error
 	}
 
 	params := map[string]interface{}{
-		"chat_id":    chatID,
 		"message_id": msgID,
 	}
+	b.setChatID(params, chatID)
 
 	return b.apiCallNoResult(ctx, "deleteMessage", params)
 }
