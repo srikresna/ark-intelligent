@@ -199,10 +199,9 @@ type COTAnalysis struct {
 	SmartDumbDivergence bool `json:"smart_dumb_divergence"` // Commercial vs Speculator divergence
 
 	// --- D. Open Interest Analysis ---
+	OpenInterestChg  float64 `json:"open_interest_chg"`  // Absolute change in OI WoW
 	OIPctChange      float64 `json:"oi_pct_change"`      // OI % change week-over-week
-	OpenInterestChg  float64 `json:"open_interest_chg"`  // Absolute change in open interest
-	OITrend          string  `json:"oi_trend"`           // Trend of OI: RISING, FALLING, FLAT
-	ShortTermBias    string  `json:"short_term_bias"`    // Scalper Intel bias (e.g. STRONG BUY, AVOID BUYING)
+	OITrend          string  `json:"oi_trend"`           // OI Trend: RISING, FALLING, FLAT
 	Top4Concentration float64 `json:"top4_concentration"` // Top 4 trader dominance %
 	Top8Concentration float64 `json:"top8_concentration"` // Top 8 trader dominance %
 	SpreadPctOfOI    float64 `json:"spread_pct_of_oi"`   // Spread positions as % of OI
@@ -215,6 +214,7 @@ type COTAnalysis struct {
 	ConsecutiveWeeks int               `json:"consecutive_weeks"`  // Weeks in same direction
 
 	// --- F. Advanced Signals ---
+	ShortTermBias   string         `json:"short_term_bias"`  // Intra/Swing bias (e.g., BUY DIPS)
 	DivergenceFlag  bool           `json:"divergence_flag"`  // Price vs positioning divergence
 	CrowdingIndex   float64        `json:"crowding_index"`   // How one-sided (0-100, >80 = extreme)
 	SentimentScore  float64        `json:"sentiment_score"`  // Weighted composite (-100 to +100)

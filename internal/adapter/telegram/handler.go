@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/arkcode369/ff-calendar-bot/internal/adapter/renderer"
+	"github.com/arkcode369/ff-calendar-bot/internal/domain"
 	"github.com/arkcode369/ff-calendar-bot/internal/ports"
 	"github.com/arkcode369/ff-calendar-bot/pkg/timeutil"
 )
@@ -56,28 +56,12 @@ func NewHandler(
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 
 	// Register callback handlers
-	bot.RegisterCallback("cot:", h.cbCOT) // changed to a unified cbCOT
+	bot.RegisterCallback("cot:", h.cbCOTDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
-	bot.RegisterCallback("nav:", h.cbNav)
 
-	log.Printf("[HANDLER] Registered commands and callbacks")
+	log.Printf("[HANDLER] Registered 13 commands and 4 callback prefixes")
 	return h
-}
-
-// cbNav handles simple navigation shortcuts
-func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	switch data {
-	case "nav:cot_menu":
-		html := "<b>COT Data & Analysis</b>\n\nPilih menu di bawah ini:"
-		kb := h.kb.COTMenu()
-		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
-	case "nav:outlook":
-		// Can't edit a message to an outlook due to length properly here, we call cmdOutlook
-		_ = h.bot.DeleteMessage(ctx, chatID, msgID) // remove menu
-		return h.cmdOutlook(ctx, chatID, userID, "")
-	}
-	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -90,8 +74,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 Institutional-grade forex fundamental analysis (COT Focus):
 
 <b>Analysis Commands:</b>
-/cot - COT positioning menu
-/cot raw [asset] - View raw data chart
+/cot - COT positioning analysis
 /outlook - AI weekly market outlook
 
 <b>System Commands:</b>
@@ -107,127 +90,133 @@ func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args
 	return h.cmdStart(ctx, chatID, userID, args)
 }
 
+
 // ---------------------------------------------------------------------------
 // /cot — COT positioning analysis
 // ---------------------------------------------------------------------------
 
 func (h *Handler) cmdCOT(ctx context.Context, chatID string, userID int64, args string) error {
-	args = strings.TrimSpace(strings.ToLower(args))
+	// If specific currency requested: /cot USD or /cot raw USD
+	if args != "" {
+		parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
+		isRaw := false
+		code := parts[0]
 
-	if args == "" {
-		html := "<b>COT Data & Analysis</b>\n\nPilih menu di bawah ini:"
-		kb := h.kb.COTMenu()
-		_, err := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
-		return err
-	}
-
-	if args == "analysis" {
-		return h.handleCOTAnalysisRequest(ctx, chatID, 0, false)
-	}
-
-	if strings.HasPrefix(args, "raw ") {
-		code := strings.TrimSpace(strings.TrimPrefix(args, "raw "))
-		return h.sendCOTRawImage(ctx, chatID, code)
-	}
-
-	// fallback to raw image
-	return h.sendCOTRawImage(ctx, chatID, args)
-}
-
-func (h *Handler) handleCOTAnalysisRequest(ctx context.Context, chatID string, msgID int, isEdit bool) error {
-	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
-	if err != nil || len(analyses) == 0 {
-		msg := "No COT data available yet."
-		if isEdit {
-			return h.bot.EditMessage(ctx, chatID, msgID, msg)
+		if parts[0] == "RAW" {
+			isRaw = true
+			if len(parts) > 1 {
+				code = parts[1]
+			} else {
+				code = ""
+			}
+		} else if parts[0] == "ANALYSIS" {
+			if len(parts) > 1 {
+				code = parts[1]
+			} else {
+				code = ""
+			}
+		} else if len(parts) > 1 && parts[1] == "RAW" {
+			isRaw = true
 		}
-		_, err = h.bot.SendHTML(ctx, chatID, msg)
+
+		if code != "" {
+			contractCode := currencyToContractCode(code)
+			return h.sendCOTDetail(ctx, chatID, contractCode, code, isRaw, 0)
+		}
+	}
+
+	// Overview: all currencies
+	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil {
+		return fmt.Errorf("get all COT analyses: %w", err)
+	}
+
+	if len(analyses) == 0 {
+		_, err = h.bot.SendHTML(ctx, chatID,
+			"No COT data available yet. Data is fetched from CFTC every Friday.")
 		return err
 	}
 
 	html := h.fmt.FormatCOTOverview(analyses)
+	kb := h.kb.COTCurrencySelector(analyses)
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	return err
+}
 
-	// Keep existing AI overview logic
-	if h.aiAnalyzer != nil && h.aiAnalyzer.IsAvailable() {
-		narrative, aiErr := h.aiAnalyzer.AnalyzeCOT(ctx, analyses)
+func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode, displayCode string, isRaw bool, editMsgID int) error {
+	if isRaw {
+		records, err := h.cotRepo.GetHistory(ctx, contractCode, 1)
+		if err != nil || len(records) == 0 {
+			msg := fmt.Sprintf("No COT data for %s", displayCode)
+			if editMsgID > 0 {
+				return h.bot.EditMessage(ctx, chatID, editMsgID, msg)
+			}
+			_, e := h.bot.SendHTML(ctx, chatID, msg)
+			return e
+		}
+
+		html := h.fmt.FormatCOTRaw(records[0])
+		kb := h.kb.COTDetailMenu(contractCode, true)
+		if editMsgID > 0 {
+			return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
+		}
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+		return err
+	}
+
+	analysis, err := h.cotRepo.GetLatestAnalysis(ctx, contractCode)
+	if err != nil || analysis == nil {
+		msg := fmt.Sprintf("No COT data for %s", displayCode)
+		if editMsgID > 0 {
+			return h.bot.EditMessage(ctx, chatID, editMsgID, msg)
+		}
+		_, e := h.bot.SendHTML(ctx, chatID, msg)
+		return e
+	}
+
+	html := h.fmt.FormatCOTDetail(*analysis)
+
+	// Add AI interpretation if it's a new message
+	if editMsgID == 0 && h.aiAnalyzer != nil && h.aiAnalyzer.IsAvailable() {
+		narrative, aiErr := h.aiAnalyzer.AnalyzeCOT(ctx, []domain.COTAnalysis{*analysis})
 		if aiErr == nil && narrative != "" {
-			html += "\n\n" + h.fmt.FormatAIInsight("Global COT Analysis", narrative)
+			html += "\n\n" + h.fmt.FormatAIInsight("COT Analysis", narrative)
 		}
 	}
 
-	// Back to menu button
-	kb := h.kb.BackToOverview("nav:cot_menu") // we can re-use BackToOverview slightly or just use a basic inline row
-	kb = ports.InlineKeyboard{Rows: [][]ports.InlineButton{{{Text: "« Back", CallbackData: "nav:cot_menu"}}}}
-
-	if isEdit {
-		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	kb := h.kb.COTDetailMenu(contractCode, false)
+	if editMsgID > 0 {
+		return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
 	}
 	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 	return err
 }
 
-func (h *Handler) sendCOTRawImage(ctx context.Context, chatID string, rawCode string) error {
-	code := strings.ToUpper(strings.TrimSpace(rawCode))
-	contractCode := currencyToContractCode(code)
-	analysis, err := h.cotRepo.GetLatestAnalysis(ctx, contractCode)
-	if err != nil || analysis == nil {
-		_, err = h.bot.SendHTML(ctx, chatID, fmt.Sprintf("No raw data for %s", code))
-		return err
-	}
-
-	// Generate image
-	imgBytes, err := renderer.GenerateCOTRawImage(*analysis)
-	if err != nil {
-		_, err = h.bot.SendHTML(ctx, chatID, "Failed to render COT image: "+err.Error())
-		return err
-	}
-
-	_, err = h.bot.SendPhoto(ctx, chatID, imgBytes, fmt.Sprintf("%s COT Data", analysis.Contract.Name))
-	return err
-}
-
-// cbCOT handles all inline keyboard callbacks for the cot prefix.
-func (h *Handler) cbCOT(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	// e.g. "cot:analysis" or "cot:raw_list" or "cot:raw:099741"
+// cbCOTDetail handles inline keyboard callback for COT detail view.
+func (h *Handler) cbCOTDetail(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	// data format: "cot:analysis:099741", "cot:raw:099741", "cot:overview"
 	action := strings.TrimPrefix(data, "cot:")
 
-	if action == "analysis" {
-		return h.handleCOTAnalysisRequest(ctx, chatID, msgID, true)
-	}
-
-	if action == "raw_list" {
+	if action == "overview" {
 		analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 		if err != nil || len(analyses) == 0 {
 			return h.bot.EditMessage(ctx, chatID, msgID, "No COT data available.")
 		}
-		
-		html := "<b>Select Asset for Raw Data</b>\n\nPilih aset untuk melihat visualisasi data mentah:"
-		kb := h.kb.COTRawList(analyses)
+		html := h.fmt.FormatCOTOverview(analyses)
+		kb := h.kb.COTCurrencySelector(analyses)
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 	}
 
-	if strings.HasPrefix(action, "raw:") {
-		// e.g. "cot:raw:099741"
-		contractCode := strings.TrimPrefix(action, "raw:")
-		// Send a photo into chat directly
-		// It's a new message, so we just answer the callback and send the photo
-		_ = h.bot.AnswerCallback(ctx, cbIDFromContext(h, ctx), "Generating image...") // A bit hacky without exact ID, ignoring Answer
-		analysis, err := h.cotRepo.GetLatestAnalysis(ctx, contractCode)
-		if err == nil && analysis != nil {
-			imgBytes, err := renderer.GenerateCOTRawImage(*analysis)
-			if err == nil {
-				_, _ = h.bot.SendPhoto(ctx, chatID, imgBytes, fmt.Sprintf("%s COT Data", analysis.Contract.Name))
-				return nil
-			}
-		}
+	parts := strings.Split(action, ":")
+	if len(parts) != 2 {
 		return nil
 	}
 
-	return nil
-}
+	isRaw := parts[0] == "raw"
+	contractCode := parts[1]
 
-// cbIDFromContext is a dummy helper
-func cbIDFromContext(h *Handler, ctx context.Context) string { return "" }
+	return h.sendCOTDetail(ctx, chatID, contractCode, contractCode, isRaw, msgID)
+}
 
 
 

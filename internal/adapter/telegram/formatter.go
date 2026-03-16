@@ -127,14 +127,48 @@ func (f *Formatter) FormatCOTDetail(a domain.COTAnalysis) string {
 	b.WriteString(fmt.Sprintf("<code>  52-Week:        %.1f%%</code>\n", a.COTIndex))
 	b.WriteString(f.formatProgressBar(a.COTIndex, 20))
 
-	// Momentum
-	b.WriteString(fmt.Sprintf("\n<b>Momentum:</b>\n"))
-	b.WriteString(fmt.Sprintf("<code>  Sentiment:      %.1f</code>\n", a.SentimentScore))
-	b.WriteString(fmt.Sprintf("<code>  Trend:          %s</code>\n", f.momentumLabel(a.MomentumDir)))
+	// Scalper / Intraday Intel
+	b.WriteString(fmt.Sprintf("\n<b>Scalper Intel:</b>\n"))
+	b.WriteString(fmt.Sprintf("<code>  4W Momentum:    %s</code>\n", fmtutil.FmtNumSigned(a.SpecMomentum4W, 0)))
+	b.WriteString(fmt.Sprintf("<code>  OI Change WoW:  %s (%s)</code>\n", fmtutil.FmtNumSigned(a.OpenInterestChg, 0), a.OITrend))
+	b.WriteString(fmt.Sprintf("<code>  ST Bias:        %s</code>\n", a.ShortTermBias))
 
 	return b.String()
 }
 
+// FormatCOTRaw formats raw uncalculated CFTC data for a contract.
+func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("<b>Raw COT Data: %s</b>\n", r.ContractName))
+	b.WriteString(fmt.Sprintf("<i>Report: %s</i>\n\n", r.ReportDate.Format("Jan 2, 2006")))
+
+	b.WriteString("<b>Open Interest:</b>\n")
+	b.WriteString(fmt.Sprintf("<code>  Total:    %s</code>\n\n", fmtutil.FmtNum(r.OpenInterest, 0)))
+
+	if r.ContractName == "Gold" || r.ContractName == "Crude Oil WTI" {
+		// Disaggregated Format
+		b.WriteString("<b>Managed Money (Specs):</b>\n")
+		b.WriteString(fmt.Sprintf("<code>  Long:     %s</code>\n", fmtutil.FmtNum(r.ManagedMoneyLong, 0)))
+		b.WriteString(fmt.Sprintf("<code>  Short:    %s</code>\n\n", fmtutil.FmtNum(r.ManagedMoneyShort, 0)))
+
+		b.WriteString("<b>Prod/Swap (Commercials):</b>\n")
+		b.WriteString(fmt.Sprintf("<code>  Long:     %s</code>\n", fmtutil.FmtNum(r.ProdMercLong+r.SwapDealerLong, 0)))
+		b.WriteString(fmt.Sprintf("<code>  Short:    %s</code>\n", fmtutil.FmtNum(r.ProdMercShort+r.SwapDealerShort, 0)))
+	} else {
+		// TFF Format
+		b.WriteString("<b>Lev Funds (Specs):</b>\n")
+		b.WriteString(fmt.Sprintf("<code>  Long:     %s</code>\n", fmtutil.FmtNum(r.LevFundLong, 0)))
+		b.WriteString(fmt.Sprintf("<code>  Short:    %s</code>\n\n", fmtutil.FmtNum(r.LevFundShort, 0)))
+
+		b.WriteString("<b>Dealers (Commercials):</b>\n")
+		b.WriteString(fmt.Sprintf("<code>  Long:     %s</code>\n", fmtutil.FmtNum(r.DealerLong, 0)))
+		b.WriteString(fmt.Sprintf("<code>  Short:    %s</code>\n", fmtutil.FmtNum(r.DealerShort, 0)))
+	}
+
+	b.WriteString(fmt.Sprintf("\n<i>Data sourced directly from CFTC</i>"))
+	return b.String()
+}
 
 
 // ---------------------------------------------------------------------------

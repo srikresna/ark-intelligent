@@ -44,6 +44,7 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 		b.WriteString(fmt.Sprintf("Momentum 4W: Spec=%s Comm=%s\n",
 			fmtutil.FmtNumSigned(a.SpecMomentum4W, 0),
 			fmtutil.FmtNumSigned(a.CommMomentum4W, 0)))
+		b.WriteString(fmt.Sprintf("Intraday Context: OITrend=%s STBias=%s\n", a.OITrend, a.ShortTermBias))
 		b.WriteString(fmt.Sprintf("Sentiment: %.1f | Crowding: %.1f | Divergence: %v\n",
 			a.SentimentScore, a.CrowdingIndex, a.DivergenceFlag))
 		b.WriteString(fmt.Sprintf("Signals: Comm=%s Spec=%s SmallSpec=%s\n",
@@ -89,7 +90,7 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData) string {
 	b.WriteString("2. CURRENCY OUTLOOK: Bias Bullish/Bearish untuk mata uang G8 beserta alasannya\n")
 	b.WriteString("3. TOP TRADES: 3 ide trading dengan keyakinan tertinggi beserta logikanya\n")
 	b.WriteString("4. KEY RISKS: Skenario yang dapat membatalkan analisis ini\n")
-	b.WriteString("5. SCALPER INTEL: Rekomendasi taktis intraday/swing pendek (misal BUY on DIPS / SELL on RALLIES) berdasarkan 4W Momentum, Open Interest, dan ShortTermBias.\n")
+	b.WriteString("5. SCALPER INTEL: Rekomendasi Intraday/Swing (Buy Dips/Sell Rallies) berdasarkan data 4W Momentum & OI Trend\n")
 
 	return b.String()
 }

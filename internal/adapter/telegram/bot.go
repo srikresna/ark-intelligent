@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -361,74 +360,6 @@ func (b *Bot) SendWithKeyboard(ctx context.Context, chatID string, text string, 
 	}
 	return msg.MessageID, nil
 }
-
-// SendPhoto sends a photo with an optional caption.
-func (b *Bot) SendPhoto(ctx context.Context, chatID string, photoBytes []byte, caption string) (int, error) {
-	if chatID == "" {
-		chatID = b.defaultID
-	}
-	b.rateLimit()
-
-	urlStr := fmt.Sprintf("%s/sendPhoto", b.apiBase)
-
-	var requestBody bytes.Buffer
-	writer := multipart.NewWriter(&requestBody)
-
-	// Add chat_id param
-	_ = writer.WriteField("chat_id", chatID)
-	// Add caption param
-	if caption != "" {
-		_ = writer.WriteField("caption", caption)
-		_ = writer.WriteField("parse_mode", "HTML")
-	}
-
-	// Add photo file
-	part, err := writer.CreateFormFile("photo", "cot_data.png")
-	if err != nil {
-		return 0, fmt.Errorf("create form file: %w", err)
-	}
-	_, _ = io.Copy(part, bytes.NewReader(photoBytes))
-	writer.Close()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, &requestBody)
-	if err != nil {
-		return 0, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := b.httpClient.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("api call sendPhoto: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
-	if err != nil {
-		return 0, fmt.Errorf("read response: %w", err)
-	}
-
-	var apiResp apiResponse
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return 0, fmt.Errorf("parse response: %w", err)
-	}
-
-	if !apiResp.OK {
-		if apiResp.ErrorCode == 429 {
-			log.Printf("[BOT] Rate limited on sendPhoto, waiting 5s")
-			time.Sleep(5 * time.Second)
-			return b.SendPhoto(ctx, chatID, photoBytes, caption) // retry
-		}
-		return 0, fmt.Errorf("api error %d: %s", apiResp.ErrorCode, apiResp.Description)
-	}
-
-	var msg sentMessage
-	if len(apiResp.Result) > 0 {
-		_ = json.Unmarshal(apiResp.Result, &msg)
-	}
-
-	return msg.MessageID, nil
-}
-
 
 // EditMessage edits an existing message's text.
 func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text string) error {

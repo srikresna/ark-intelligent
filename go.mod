@@ -1,6 +1,6 @@
 module github.com/arkcode369/ff-calendar-bot
 
-go 1.25.0
+go 1.22
 
 require (
 	github.com/dgraph-io/badger/v4 v4.5.0

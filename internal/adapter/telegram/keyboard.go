@@ -48,7 +48,7 @@ func (kb *KeyboardBuilder) COTCurrencySelector(analyses []domain.COTAnalysis) po
 
 		btn := ports.InlineButton{
 			Text:         fmt.Sprintf("%s [%s]", label, indicator),
-			CallbackData: fmt.Sprintf("cot:%s", a.Contract.Code),
+			CallbackData: fmt.Sprintf("cot:analysis:%s", a.Contract.Code),
 		}
 		currentRow = append(currentRow, btn)
 
@@ -159,15 +159,25 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 // Navigation Keyboards
 // ---------------------------------------------------------------------------
 
-// BackToOverview builds a "Back" button that triggers the overview callback.
-func (kb *KeyboardBuilder) BackToOverview(section string) ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "<< Back to Overview", CallbackData: fmt.Sprintf("%s:overview", section)},
-			},
-		},
+// COTDetailMenu builds a keyboard for a specific COT detail view, allowing toggle between RAW and Analysis.
+func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	if isRaw {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "📊 View Analysis", CallbackData: fmt.Sprintf("cot:analysis:%s", code)},
+		})
+	} else {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "📄 View Raw Data", CallbackData: fmt.Sprintf("cot:raw:%s", code)},
+		})
 	}
+	
+	rows = append(rows, []ports.InlineButton{
+		{Text: "<< Back to Overview", CallbackData: "cot:overview"},
+	})
+
+	return ports.InlineKeyboard{Rows: rows}
 }
 
 // MainMenu builds a quick-access keyboard for the main bot features.
@@ -175,46 +185,9 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "COT Analysis", CallbackData: "nav:cot_menu"},
+				{Text: "COT Analysis", CallbackData: "nav:cot"},
 				{Text: "Weekly Outlook", CallbackData: "nav:outlook"},
 			},
 		},
 	}
-}
-
-// COTMenu builds the main menu for the /cot command.
-func (kb *KeyboardBuilder) COTMenu() ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "📊 AI Analysis", CallbackData: "cot:analysis"},
-				{Text: "📄 Raw Data Images", CallbackData: "cot:raw_list"},
-			},
-		},
-	}
-}
-
-// COTRawList builds a keyboard listing all assets for raw data viewing.
-func (kb *KeyboardBuilder) COTRawList(analyses []domain.COTAnalysis) ports.InlineKeyboard {
-	var rows [][]ports.InlineButton
-	var row []ports.InlineButton
-
-	for i, a := range analyses {
-		row = append(row, ports.InlineButton{
-			Text:         kb.contractLabel(a.Contract.Name, a.Contract.Code),
-			CallbackData: fmt.Sprintf("cot:raw:%s", a.Contract.Code),
-		})
-		
-		if len(row) == 2 || i == len(analyses)-1 {
-			rows = append(rows, row)
-			row = nil
-		}
-	}
-	
-	// Add back button
-	rows = append(rows, []ports.InlineButton{
-		{Text: "« Back to COT Menu", CallbackData: "nav:cot_menu"},
-	})
-
-	return ports.InlineKeyboard{Rows: rows}
 }

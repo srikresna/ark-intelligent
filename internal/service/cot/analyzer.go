@@ -157,13 +157,20 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 		analysis.CommPctOfOI = analysis.CommercialNet / oi * 100
 	}
 
-	// 5. Open Interest change %
+	// 5. Open Interest change
 	if len(history) > 1 {
 		prevOI := history[1].OpenInterest
 		if prevOI > 0 {
-			analysis.OIPctChange = (current.OpenInterest - prevOI) / prevOI * 100
 			analysis.OpenInterestChg = current.OpenInterest - prevOI
+			analysis.OIPctChange = analysis.OpenInterestChg / prevOI * 100
 		}
+	}
+	// Determine OI Context (Trend)
+	analysis.OITrend = "FLAT"
+	if analysis.OIPctChange > 1.0 {
+		analysis.OITrend = "RISING"
+	} else if analysis.OIPctChange < -1.0 {
+		analysis.OITrend = "FALLING"
 	}
 
 	// === Index Metrics (Larry Williams COT Index) ===
@@ -212,6 +219,26 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// 15. Divergence flag (commercials vs smart money moving opposite)
 	analysis.DivergenceFlag = detectDivergence(analysis.NetChange, analysis.CommNetChange)
 
+	// 15b. Scalper/Intraday Bias (Short-term context based on OI and Momentum)
+	analysis.ShortTermBias = "NEUTRAL"
+	if analysis.SpecMomentum4W > 0 {
+		if analysis.OITrend == "RISING" {
+			analysis.ShortTermBias = "STRONG BUY (Trend Confirmed)"
+		} else if analysis.OITrend == "FALLING" {
+			analysis.ShortTermBias = "WEAK BUY (Short Covering)"
+		} else {
+			analysis.ShortTermBias = "BUY DIPS"
+		}
+	} else if analysis.SpecMomentum4W < 0 {
+		if analysis.OITrend == "RISING" {
+			analysis.ShortTermBias = "STRONG SELL (Trend Confirmed)"
+		} else if analysis.OITrend == "FALLING" {
+			analysis.ShortTermBias = "WEAK SELL (Long Liquidation)"
+		} else {
+			analysis.ShortTermBias = "SELL RALLIES"
+		}
+	}
+
 	// 16. Crowding index
 	analysis.CrowdingIndex = computeCrowding(current, rt)
 
@@ -231,41 +258,6 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 
 	// === Signal Strength ===
 	analysis.SignalStrength = classifySignalStrength(analysis)
-
-	// === SCALPER INTEL / SHORT-TERM BIAS ===
-	// 1. Determine OI Trend
-	if analysis.OIPctChange > 1.0 {
-		analysis.OITrend = "RISING"
-	} else if analysis.OIPctChange < -1.0 {
-		analysis.OITrend = "FALLING"
-	} else {
-		analysis.OITrend = "FLAT"
-	}
-
-	// 2. Determine Bias based on NetChange & OI
-	if analysis.NetChange > 0 {
-		if analysis.OITrend == "RISING" {
-			// New buying
-			analysis.ShortTermBias = "STRONG BUY (BUY DIPS)"
-		} else if analysis.OITrend == "FALLING" {
-			// Short covering
-			analysis.ShortTermBias = "WEAK BUY (SELL RALLIES)"
-		} else {
-			analysis.ShortTermBias = "NEUTRAL BUY"
-		}
-	} else if analysis.NetChange < 0 {
-		if analysis.OITrend == "RISING" {
-			// New selling
-			analysis.ShortTermBias = "STRONG SELL (SELL RALLIES)"
-		} else if analysis.OITrend == "FALLING" {
-			// Long liquidation
-			analysis.ShortTermBias = "WEAK SELL (BUY DIPS)"
-		} else {
-			analysis.ShortTermBias = "NEUTRAL SELL"
-		}
-	} else {
-		analysis.ShortTermBias = "NEUTRAL"
-	}
 
 	return analysis
 }
