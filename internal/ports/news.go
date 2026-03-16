@@ -2,7 +2,6 @@ package ports
 
 import (
 	"context"
-	"time"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
 )
