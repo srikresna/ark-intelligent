@@ -201,7 +201,7 @@ func (kb *KeyboardBuilder) COTRawList(analyses []domain.COTAnalysis) ports.Inlin
 
 	for i, a := range analyses {
 		row = append(row, ports.InlineButton{
-			Text:         kb.getShortLabel(a.Contract.Code, a.Contract.Name),
+			Text:         kb.contractLabel(a.Contract.Name, a.Contract.Code),
 			CallbackData: fmt.Sprintf("cot:raw:%s", a.Contract.Code),
 		})
 		

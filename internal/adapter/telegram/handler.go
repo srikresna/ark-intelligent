@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/adapter/renderer"
-	"github.com/arkcode369/ff-calendar-bot/internal/domain"
 	"github.com/arkcode369/ff-calendar-bot/internal/ports"
 	"github.com/arkcode369/ff-calendar-bot/pkg/timeutil"
 )
