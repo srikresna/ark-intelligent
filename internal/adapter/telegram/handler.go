@@ -68,8 +68,10 @@ func NewHandler(
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
 	bot.RegisterCallback("cal:filter:", h.cbNewsFilter)
+	bot.RegisterCallback("out:", h.cbOutlook)
+	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 
-	log.Printf("[HANDLER] Registered 14 commands and 5 callback prefixes")
+	log.Printf("[HANDLER] Registered 14 commands and 7 callback prefixes")
 	return h
 }
 
@@ -490,7 +492,7 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 			return err
 		}
 		html := h.fmt.FormatCalendarWeek(now.Format("Jan 02, 2006"), events, "med")
-		kb := h.kb.CalendarFilter("med")
+		kb := h.kb.CalendarFilter("med", now.Format("20060102"), true)
 		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 		return err
 	}
@@ -503,22 +505,120 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 	}
 
 	html := h.fmt.FormatCalendarDay(now.Format("Mon Jan 02, 2006"), events, "med")
-	kb := h.kb.CalendarFilter("med")
+	kb := h.kb.CalendarFilter("med", dateStr, false)
 	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 	return err
 }
 
 func (h *Handler) cbNewsFilter(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	action := strings.TrimPrefix(data, "cal:filter:")
-	now := timeutil.NowWIB()
-	dateStr := now.Format("20060102")
+	action := strings.TrimPrefix(data, "cal:filter:") // e.g., "high:20260317:day"
+	parts := strings.Split(action, ":")
+	
+	filter := "med"
+	dateStr := timeutil.NowWIB().Format("20060102")
+	isWeek := false
 
-	events, err := h.newsRepo.GetByDate(ctx, dateStr)
+	if len(parts) > 0 {
+		filter = parts[0]
+	}
+	if len(parts) > 1 {
+		dateStr = parts[1]
+	}
+	if len(parts) > 2 && parts[2] == "week" {
+		isWeek = true
+	}
+
+	var events []domain.NewsEvent
+	var err error
+	if isWeek {
+		events, err = h.newsRepo.GetByWeek(ctx, dateStr)
+	} else {
+		events, err = h.newsRepo.GetByDate(ctx, dateStr)
+	}
 	if err != nil {
 		return h.bot.EditMessage(ctx, chatID, msgID, "Failed to refresh calendar")
 	}
 
-	html := h.fmt.FormatCalendarDay(now.Format("Mon Jan 02, 2006"), events, action)
-	kb := h.kb.CalendarFilter(action)
+	t, _ := time.Parse("20060102", dateStr)
+	var html string
+	if isWeek {
+		html = h.fmt.FormatCalendarWeek(t.Format("Jan 02, 2006"), events, filter)
+	} else {
+		html = h.fmt.FormatCalendarDay(t.Format("Mon Jan 02, 2006"), events, filter)
+	}
+
+	kb := h.kb.CalendarFilter(filter, dateStr, isWeek)
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+}
+
+func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "cal:nav:") 
+	parts := strings.Split(action, ":")
+	if len(parts) < 2 {
+		return nil
+	}
+	navType := parts[0]
+	dateStr := parts[1]
+
+	t, err := time.Parse("20060102", dateStr)
+	if err != nil {
+		return nil
+	}
+
+	isWeek := false
+	targetDate := t
+
+	switch navType {
+	case "prev":
+		targetDate = t.AddDate(0, 0, -1)
+	case "next":
+		targetDate = t.AddDate(0, 0, 1)
+	case "week":
+		isWeek = true
+	case "prevwk":
+		isWeek = true
+		targetDate = t.AddDate(0, 0, -7)
+	case "nextwk":
+		isWeek = true
+		targetDate = t.AddDate(0, 0, 7)
+	case "day":
+		isWeek = false
+	}
+
+	targetDateStr := targetDate.Format("20060102")
+
+	var events []domain.NewsEvent
+	if isWeek {
+		events, _ = h.newsRepo.GetByWeek(ctx, targetDateStr)
+	} else {
+		events, _ = h.newsRepo.GetByDate(ctx, targetDateStr)
+	}
+
+	if len(events) == 0 {
+		_ = h.bot.EditMessage(ctx, chatID, msgID, "Fetching calendar from ForexFactory... (15s) ⏳")
+		if isWeek {
+			rangeType := "this"
+			if targetDate.After(timeutil.NowWIB()) {
+				rangeType = "next"
+			}
+			events, _ = h.newsFetcher.ScrapeCalendar(ctx, rangeType)
+			_ = h.newsRepo.SaveEvents(ctx, events)
+			events, _ = h.newsRepo.GetByWeek(ctx, targetDateStr)
+		} else {
+			events, _ = h.newsFetcher.ScrapeActuals(ctx, targetDateStr)
+			_ = h.newsRepo.SaveEvents(ctx, events)
+			events, _ = h.newsRepo.GetByDate(ctx, targetDateStr)
+		}
+	}
+
+	activeFilter := "med"
+	var html string
+	if isWeek {
+		html = h.fmt.FormatCalendarWeek(targetDate.Format("Jan 02, 2006"), events, activeFilter)
+	} else {
+		html = h.fmt.FormatCalendarDay(targetDate.Format("Mon Jan 02, 2006"), events, activeFilter)
+	}
+
+	kb := h.kb.CalendarFilter(activeFilter, targetDateStr, isWeek)
 	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 }

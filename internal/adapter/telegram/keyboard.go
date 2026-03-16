@@ -73,10 +73,9 @@ func (kb *KeyboardBuilder) COTCurrencySelector(analyses []domain.COTAnalysis) po
 // ---------------------------------------------------------------------------
 
 // CalendarFilter builds the filter keyboard for the /calendar command.
-func (kb *KeyboardBuilder) CalendarFilter(activeFilter string) ports.InlineKeyboard {
+func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, isWeek bool) ports.InlineKeyboard {
 	var rows [][]ports.InlineButton
 
-	// Helper to add checkmark
 	btnText := func(label, filterKey string) string {
 		if activeFilter == filterKey {
 			return "✅ " + label
@@ -84,15 +83,51 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string) ports.InlineKeybo
 		return label
 	}
 
+	// 1. Navigation Row
+	if isWeek {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "◀ Prev Week", CallbackData: "cal:nav:prevwk:" + dateStr},
+			{Text: "Harian", CallbackData: "cal:nav:day:" + dateStr},
+			{Text: "Next Week ▶", CallbackData: "cal:nav:nextwk:" + dateStr},
+		})
+	} else {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "◀ Kemarin", CallbackData: "cal:nav:prev:" + dateStr},
+			{Text: "Seminggu", CallbackData: "cal:nav:week:" + dateStr},
+			{Text: "Besok ▶", CallbackData: "cal:nav:next:" + dateStr},
+		})
+	}
+
+	viewType := "day"
+	if isWeek {
+		viewType = "week"
+	}
+
+	// 2. Filter Rows
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnText("High Only", "high"), CallbackData: "cal:filter:high"},
-		{Text: btnText("Medium+", "med"), CallbackData: "cal:filter:med"},
+		{Text: btnText("High Only", "high"), CallbackData: "cal:filter:high:" + dateStr + ":" + viewType},
+		{Text: btnText("Medium+", "med"), CallbackData: "cal:filter:med:" + dateStr + ":" + viewType},
 	})
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnText("🇺🇸 USD", "usd"), CallbackData: "cal:filter:usd"},
-		{Text: btnText("🇪🇺 EUR", "eur"), CallbackData: "cal:filter:eur"},
-		{Text: btnText("📋 All", "all"), CallbackData: "cal:filter:all"},
+		{Text: btnText("🇺🇸 USD", "usd"), CallbackData: "cal:filter:usd:" + dateStr + ":" + viewType},
+		{Text: btnText("🇪🇺 EUR", "eur"), CallbackData: "cal:filter:eur:" + dateStr + ":" + viewType},
+		{Text: btnText("📋 All", "all"), CallbackData: "cal:filter:all:" + dateStr + ":" + viewType},
+	})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// OutlookMenu builds a keyboard for choosing the AI Outlook type.
+func (kb *KeyboardBuilder) OutlookMenu() ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	rows = append(rows, []ports.InlineButton{
+		{Text: "📊 COT Positioning", CallbackData: "out:cot"},
+		{Text: "📰 News Catalysts", CallbackData: "out:news"},
+	})
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔗 Fused (COT + News)", CallbackData: "out:combine"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}

@@ -35,17 +35,17 @@ func NewFirecrawlFetcher(apiKey string) *FirecrawlFetcher {
 // ScrapeCalendar syncs the entire week's upcoming data.
 // 'week' parameter should be "this" or "next".
 func (f *FirecrawlFetcher) ScrapeCalendar(ctx context.Context, week string) ([]domain.NewsEvent, error) {
-	urlTarget := "https://www.forexfactory.com/calendar"
+	urlTarget := "https://www.forexfactory.com/calendar?week=this" // Enforce full week anonymously
 	if week == "next" {
 		urlTarget = "https://www.forexfactory.com/calendar?week=next"
 	}
 	
-	// Create precise prompt to instruct LLM inside Firecrawl extraction
-	prompt := `Extract the upcoming economic calendar events from ForexFactory. 
+	prompt := `Extract ALL scheduled economic calendar events from the table on the page for the ENTIRE week.
+Include events for Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday. Do NOT skip items.
 Return ONLY an array of events named "calendar_events".
 For each event I need:
 - id: a unique hash string generated based on name and date
-- date: "Mon Mar 17"
+- date: e.g., "Mon Mar 16", "Tue Mar 17"
 - time: "7:30am" or "Tentative"
 - currency: "USD", "EUR" etc.
 - event: full title like "CPI m/m"
