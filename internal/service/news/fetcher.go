@@ -15,7 +15,7 @@ import (
 )
 
 // MQL5Fetcher fetches economic calendar data from MQL5's hidden POST endpoint.
-// No API key required. Returns Medium + High impact events with actual values.
+// No API key required. Returns all impact levels (low, medium, high, holiday).
 type MQL5Fetcher struct {
 	httpClient *http.Client
 }
@@ -47,20 +47,14 @@ type mql5Event struct {
 	Processed        int    `json:"Processed"` // 1=released, 0=upcoming
 }
 
-// mql5DateMode — MQL5 supports several date modes; we use mode 1 (custom date range).
-const mql5DateMode = "1"
-
 // mql5Endpoint is the hidden POST API used by the MQL5 Economic Calendar page.
 const mql5Endpoint = "https://www.mql5.com/en/economic-calendar/content"
 
-// importance values:
-//
-//	4 = Medium + High (we filter ourselves from the response)
-//	We always fetch with importance=4 and filter in Go.
-const mql5ImportanceFilter = "4"
+// mql5ImportanceAll — bitmask 15 = low(1) + medium(2) + high(4) + holiday(8)
+const mql5ImportanceAll = "15"
 
-// currencies bitmask — 262143 = all major currencies
-const mql5CurrenciesMask = "262143"
+// mql5CurrenciesMask — 131071 = all major currencies supported by MQL5
+const mql5CurrenciesMask = "131071"
 
 // nyLocation is New York (ET) — the timezone MQL5 FullDate uses.
 var nyLocation *time.Location
@@ -80,17 +74,18 @@ func init() {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Date range helpers
+// ---------------------------------------------------------------------------
+
 // getWeekRange returns the from/to ISO timestamps for a given week label.
 // week: "this" | "next" | "prev"
-// Returns times in UTC (MQL5 accepts UTC-formatted ISO strings).
-func getWeekRange(week string) (string, string) {
-	// Anchor to Monday of the current WIB week
+func getWeekRange(week string) (from, to string) {
 	now := time.Now().In(wibLocation)
 	// Walk back to Monday
 	for now.Weekday() != time.Monday {
 		now = now.AddDate(0, 0, -1)
 	}
-	// Zero out to midnight WIB Monday
 	monday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, wibLocation)
 
 	switch week {
@@ -100,47 +95,111 @@ func getWeekRange(week string) (string, string) {
 		monday = monday.AddDate(0, 0, -7)
 	}
 
-	// End = Sunday 23:59:59 of that week
 	sunday := monday.AddDate(0, 0, 6)
 	end := time.Date(sunday.Year(), sunday.Month(), sunday.Day(), 23, 59, 59, 0, wibLocation)
 
-	// MQL5 wants format: 2006-01-02T15:04:05 (no timezone, interpreted as NY time by server)
-	// But sending UTC works as the server adjusts. We'll send in UTC format.
-	fromStr := monday.UTC().Format("2006-01-02T15:04:05")
-	toStr := end.UTC().Format("2006-01-02T15:04:05")
-	return fromStr, toStr
+	from = monday.UTC().Format("2006-01-02T15:04:05")
+	to = end.UTC().Format("2006-01-02T15:04:05")
+	return
 }
 
-// ScrapeCalendar fetches all Medium+High impact events for the given week.
+// getMonthRange returns the dateMode and from/to for a given month type.
+// monthType: "current" | "prev" | "next"
+func getMonthRange(monthType string) (dateMode, from, to string) {
+	now := time.Now().In(wibLocation)
+
+	var year int
+	var month time.Month
+
+	switch monthType {
+	case "prev":
+		dateMode = "5"
+		prev := now.AddDate(0, -1, 0)
+		year, month = prev.Year(), prev.Month()
+	case "next":
+		dateMode = "6"
+		next := now.AddDate(0, 1, 0)
+		year, month = next.Year(), next.Month()
+	default: // "current"
+		dateMode = "4"
+		year, month = now.Year(), now.Month()
+	}
+
+	firstDay := time.Date(year, month, 1, 0, 0, 0, 0, wibLocation)
+	lastDay := firstDay.AddDate(0, 1, -1)
+	endOfLastDay := time.Date(lastDay.Year(), lastDay.Month(), lastDay.Day(), 23, 59, 59, 0, wibLocation)
+
+	from = firstDay.UTC().Format("2006-01-02T15:04:05")
+	to = endOfLastDay.UTC().Format("2006-01-02T15:04:05")
+	return
+}
+
+// ---------------------------------------------------------------------------
+// Public fetch methods
+// ---------------------------------------------------------------------------
+
+// ScrapeCalendar fetches all events (all impact levels) for the given week.
 // week: "this" | "next" | "prev"
 func (f *MQL5Fetcher) ScrapeCalendar(ctx context.Context, week string) ([]domain.NewsEvent, error) {
 	fromStr, toStr := getWeekRange(week)
 	log.Printf("[MQL5] ScrapeCalendar week=%s from=%s to=%s", week, fromStr, toStr)
 
-	raw, err := f.fetchMQL5(ctx, fromStr, toStr)
+	raw, err := f.fetchMQL5(ctx, "1", fromStr, toStr)
 	if err != nil {
 		return nil, fmt.Errorf("mql5 fetch failed: %w", err)
 	}
 
-	events := convertEvents(raw, "medium", "high")
-	log.Printf("[MQL5] ScrapeCalendar returned %d events (med+high)", len(events))
+	events := convertEvents(raw, "low", "medium", "high")
+	log.Printf("[MQL5] ScrapeCalendar returned %d events (all impact)", len(events))
 	return events, nil
 }
 
 // ScrapeActuals fetches today's events (for micro-scrape to pick up actuals).
-// date parameter is ignored; we always fetch "this" week's data.
 func (f *MQL5Fetcher) ScrapeActuals(ctx context.Context, date string) ([]domain.NewsEvent, error) {
-	// For actuals we fetch the current week — same as ScrapeCalendar("this")
 	return f.ScrapeCalendar(ctx, "this")
 }
 
+// ScrapeMonth fetches all events for a given month.
+// monthType: "current" | "prev" | "next"
+func (f *MQL5Fetcher) ScrapeMonth(ctx context.Context, monthType string) ([]domain.NewsEvent, error) {
+	dateMode, fromStr, toStr := getMonthRange(monthType)
+	log.Printf("[MQL5] ScrapeMonth type=%s dateMode=%s from=%s to=%s", monthType, dateMode, fromStr, toStr)
+
+	raw, err := f.fetchMQL5(ctx, dateMode, fromStr, toStr)
+	if err != nil {
+		return nil, fmt.Errorf("mql5 fetch month failed: %w", err)
+	}
+
+	events := convertEvents(raw, "low", "medium", "high")
+	log.Printf("[MQL5] ScrapeMonth returned %d events", len(events))
+	return events, nil
+}
+
+// ScrapeRange fetches events with an explicit date_mode, from, and to.
+func (f *MQL5Fetcher) ScrapeRange(ctx context.Context, dateMode, from, to string) ([]domain.NewsEvent, error) {
+	log.Printf("[MQL5] ScrapeRange dateMode=%s from=%s to=%s", dateMode, from, to)
+
+	raw, err := f.fetchMQL5(ctx, dateMode, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("mql5 fetch range failed: %w", err)
+	}
+
+	events := convertEvents(raw, "low", "medium", "high")
+	log.Printf("[MQL5] ScrapeRange returned %d events", len(events))
+	return events, nil
+}
+
+// ---------------------------------------------------------------------------
+// Internal HTTP fetch
+// ---------------------------------------------------------------------------
+
 // fetchMQL5 performs the POST request to MQL5 and returns the raw event list.
-func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, from, to string) ([]mql5Event, error) {
+func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, dateMode, from, to string) ([]mql5Event, error) {
 	form := url.Values{}
-	form.Set("date_mode", mql5DateMode)
+	form.Set("date_mode", dateMode)
 	form.Set("from", from)
 	form.Set("to", to)
-	form.Set("importance", mql5ImportanceFilter)
+	form.Set("importance", mql5ImportanceAll)
 	form.Set("currencies", mql5CurrenciesMask)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", mql5Endpoint, strings.NewReader(form.Encode()))
@@ -171,7 +230,6 @@ func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, from, to string) ([]mql5Eve
 		return nil, fmt.Errorf("mql5 API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// MQL5 returns a JSON array directly
 	var events []mql5Event
 	if err := json.Unmarshal(body, &events); err != nil {
 		return nil, fmt.Errorf("failed to parse mql5 response: %w (body: %.200s)", err, string(body))
@@ -179,6 +237,10 @@ func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, from, to string) ([]mql5Eve
 
 	return events, nil
 }
+
+// ---------------------------------------------------------------------------
+// Conversion helpers
+// ---------------------------------------------------------------------------
 
 // convertEvents converts raw MQL5 events to domain.NewsEvent, filtering by impact level.
 func convertEvents(raw []mql5Event, allowedImpacts ...string) []domain.NewsEvent {
@@ -242,27 +304,26 @@ func statusFromProcessed(processed int) string {
 }
 
 // countryIDToCurrency maps MQL5 integer country codes to currency codes.
-// Used as fallback if CurrencyCode is empty.
 func countryIDToCurrency(countryID int) string {
 	switch countryID {
 	case 840:
-		return "USD" // United States
+		return "USD"
 	case 999, 276, 250, 380, 724, 528, 56, 40, 246, 372, 620, 300, 705, 233, 428, 440, 196, 442, 470:
-		return "EUR" // Eurozone countries
+		return "EUR"
 	case 392:
-		return "JPY" // Japan
+		return "JPY"
 	case 826:
-		return "GBP" // United Kingdom
+		return "GBP"
 	case 36:
-		return "AUD" // Australia
+		return "AUD"
 	case 124:
-		return "CAD" // Canada
+		return "CAD"
 	case 756:
-		return "CHF" // Switzerland
+		return "CHF"
 	case 554:
-		return "NZD" // New Zealand
+		return "NZD"
 	case 156:
-		return "CNY" // China
+		return "CNY"
 	default:
 		return ""
 	}

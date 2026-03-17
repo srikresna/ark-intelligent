@@ -83,7 +83,12 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 		return label
 	}
 
-	// 1. Navigation Row
+	viewType := "day"
+	if isWeek {
+		viewType = "week"
+	}
+
+	// Row 1: Navigation
 	if isWeek {
 		rows = append(rows, []ports.InlineButton{
 			{Text: "◀ Prev Week", CallbackData: "cal:nav:prevwk:" + dateStr},
@@ -98,20 +103,34 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 		})
 	}
 
-	viewType := "day"
-	if isWeek {
-		viewType = "week"
-	}
-
-	// 2. Filter Rows
+	// Row 2: Impact filter — All / High Only / Med+
 	rows = append(rows, []ports.InlineButton{
+		{Text: btnText("All", "all"), CallbackData: "cal:filter:all:" + dateStr + ":" + viewType},
 		{Text: btnText("High Only", "high"), CallbackData: "cal:filter:high:" + dateStr + ":" + viewType},
-		{Text: btnText("Medium+", "med"), CallbackData: "cal:filter:med:" + dateStr + ":" + viewType},
+		{Text: btnText("Med+", "med"), CallbackData: "cal:filter:med:" + dateStr + ":" + viewType},
 	})
 
+	// Row 3: Currency filter — USD EUR GBP JPY
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnText("🇺🇸 USD", "usd"), CallbackData: "cal:filter:usd:" + dateStr + ":" + viewType},
-		{Text: btnText("🇪🇺 EUR", "eur"), CallbackData: "cal:filter:eur:" + dateStr + ":" + viewType},
+		{Text: btnText("🇺🇸 USD", "cur:USD"), CallbackData: "cal:filter:cur:USD:" + dateStr + ":" + viewType},
+		{Text: btnText("🇪🇺 EUR", "cur:EUR"), CallbackData: "cal:filter:cur:EUR:" + dateStr + ":" + viewType},
+		{Text: btnText("🇬🇧 GBP", "cur:GBP"), CallbackData: "cal:filter:cur:GBP:" + dateStr + ":" + viewType},
+		{Text: btnText("🇯🇵 JPY", "cur:JPY"), CallbackData: "cal:filter:cur:JPY:" + dateStr + ":" + viewType},
+	})
+
+	// Row 4: Currency filter — AUD CAD CHF NZD
+	rows = append(rows, []ports.InlineButton{
+		{Text: btnText("🇦🇺 AUD", "cur:AUD"), CallbackData: "cal:filter:cur:AUD:" + dateStr + ":" + viewType},
+		{Text: btnText("🇨🇦 CAD", "cur:CAD"), CallbackData: "cal:filter:cur:CAD:" + dateStr + ":" + viewType},
+		{Text: btnText("🇨🇭 CHF", "cur:CHF"), CallbackData: "cal:filter:cur:CHF:" + dateStr + ":" + viewType},
+		{Text: btnText("🇳🇿 NZD", "cur:NZD"), CallbackData: "cal:filter:cur:NZD:" + dateStr + ":" + viewType},
+	})
+
+	// Row 5: Month navigation
+	rows = append(rows, []ports.InlineButton{
+		{Text: "◀ Prev Month", CallbackData: "cal:nav:prevmonth:" + dateStr},
+		{Text: "This Month", CallbackData: "cal:nav:thismonth:" + dateStr},
+		{Text: "Next Month ▶", CallbackData: "cal:nav:nextmonth:" + dateStr},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}

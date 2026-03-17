@@ -60,16 +60,7 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 
 	for _, e := range events {
 		// Apply filters before writing lines
-		if filter == "high" && e.Impact != "high" {
-			continue
-		}
-		if filter == "med" && e.Impact != "high" && e.Impact != "medium" {
-			continue
-		}
-		if filter == "usd" && e.Currency != "USD" {
-			continue
-		}
-		if filter == "eur" && e.Currency != "EUR" {
+		if !matchesFilter(e, filter) {
 			continue
 		}
 
@@ -110,20 +101,48 @@ func (f *Formatter) FormatCalendarWeek(weekStart string, events []domain.NewsEve
 	lastDate := ""
 	for _, e := range events {
 		// Apply filters
-		if filter == "high" && e.Impact != "high" {
-			continue
-		}
-		if filter == "med" && e.Impact != "high" && e.Impact != "medium" {
-			continue
-		}
-		if filter == "usd" && e.Currency != "USD" {
-			continue
-		}
-		if filter == "eur" && e.Currency != "EUR" {
+		if !matchesFilter(e, filter) {
 			continue
 		}
 
 		// Print date header if it changed
+		if e.Date != lastDate {
+			b.WriteString(fmt.Sprintf("<b>--- %s ---</b>\n", e.Date))
+			lastDate = e.Date
+		}
+
+		timeDisplay := e.Time
+		if !e.TimeWIB.IsZero() {
+			timeDisplay = e.TimeWIB.Format("15:04 WIB")
+		}
+
+		b.WriteString(fmt.Sprintf("%s %s %s: <i>%s</i>\n", e.FormatImpactColor(), timeDisplay, e.Currency, e.Event))
+	}
+
+	return b.String()
+}
+
+// FormatCalendarMonth formats all events for a whole month, grouped by day.
+func (f *Formatter) FormatCalendarMonth(monthLabel string, events []domain.NewsEvent, filter string) string {
+	var b strings.Builder
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].TimeWIB.Before(events[j].TimeWIB)
+	})
+
+	b.WriteString(fmt.Sprintf("📅 <b>Monthly Economic Calendar</b>\n<i>%s</i>\n\n", monthLabel))
+
+	if len(events) == 0 {
+		b.WriteString("No events found.")
+		return b.String()
+	}
+
+	lastDate := ""
+	for _, e := range events {
+		if !matchesFilter(e, filter) {
+			continue
+		}
+
 		if e.Date != lastDate {
 			b.WriteString(fmt.Sprintf("<b>--- %s ---</b>\n", e.Date))
 			lastDate = e.Date
@@ -373,4 +392,24 @@ func (f *Formatter) momentumLabel(m domain.MomentumDirection) string {
 	}
 }
 
-
+// matchesFilter checks if a NewsEvent passes the given filter string.
+// filter values:
+//   - "all"     → no filtering, show everything
+//   - "high"    → only high impact
+//   - "med"     → high + medium impact
+//   - "cur:USD" → only events for the specified currency (e.g. "cur:USD", "cur:GBP")
+func matchesFilter(e domain.NewsEvent, filter string) bool {
+	switch {
+	case filter == "" || filter == "all":
+		return true
+	case filter == "high":
+		return e.Impact == "high"
+	case filter == "med":
+		return e.Impact == "high" || e.Impact == "medium"
+	case strings.HasPrefix(filter, "cur:"):
+		currency := strings.ToUpper(strings.TrimPrefix(filter, "cur:"))
+		return strings.ToUpper(e.Currency) == currency
+	default:
+		return true
+	}
+}

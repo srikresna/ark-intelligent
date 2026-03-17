@@ -121,6 +121,43 @@ func (r *NewsRepo) GetByWeek(ctx context.Context, weekStart string) ([]domain.Ne
 	return allEvents, nil
 }
 
+// GetByMonth returns all events for a given month. yearMonth format: "202603"
+func (r *NewsRepo) GetByMonth(ctx context.Context, yearMonth string) ([]domain.NewsEvent, error) {
+	// yearMonth is "YYYYMM" — scan all dates with prefix "news:YYYYMM"
+	var allEvents []domain.NewsEvent
+	prefix := []byte(fmt.Sprintf("news:%s", yearMonth))
+
+	err := r.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = prefix
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 100
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			err := item.Value(func(val []byte) error {
+				var evt domain.NewsEvent
+				if err := json.Unmarshal(val, &evt); err != nil {
+					return err
+				}
+				allEvents = append(allEvents, evt)
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("read news at %s: %w", item.Key(), err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get news by month: %w", err)
+	}
+	return allEvents, nil
+}
+
 // GetPending returns all events for a specific date where status is "pending_retry".
 func (r *NewsRepo) GetPending(ctx context.Context, date string) ([]domain.NewsEvent, error) {
 	daily, err := r.GetByDate(ctx, date)

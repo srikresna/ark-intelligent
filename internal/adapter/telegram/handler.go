@@ -509,21 +509,35 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 }
 
 func (h *Handler) cbNewsFilter(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	action := strings.TrimPrefix(data, "cal:filter:") // e.g., "high:20260317:day"
+	// Callback formats:
+	//   cal:filter:all:20260317:day
+	//   cal:filter:high:20260317:week
+	//   cal:filter:med:20260317:day
+	//   cal:filter:cur:USD:20260317:week   ← currency filter has extra segment
+	action := strings.TrimPrefix(data, "cal:filter:")
 	parts := strings.Split(action, ":")
 
-	filter := "med"
+	filter := "all"
 	dateStr := timeutil.NowWIB().Format("20060102")
 	isWeek := false
 
-	if len(parts) > 0 {
+	if len(parts) == 0 {
+		// nothing to parse
+	} else if parts[0] == "cur" && len(parts) >= 4 {
+		// cal:filter:cur:USD:20260317:week
+		filter = "cur:" + parts[1]
+		dateStr = parts[2]
+		isWeek = len(parts) > 3 && parts[3] == "week"
+	} else if len(parts) >= 3 {
+		// cal:filter:all:20260317:day  or  cal:filter:high:20260317:week
 		filter = parts[0]
-	}
-	if len(parts) > 1 {
 		dateStr = parts[1]
-	}
-	if len(parts) > 2 && parts[2] == "week" {
-		isWeek = true
+		isWeek = parts[2] == "week"
+	} else if len(parts) >= 2 {
+		filter = parts[0]
+		dateStr = parts[1]
+	} else {
+		filter = parts[0]
 	}
 
 	var events []domain.NewsEvent
@@ -557,6 +571,11 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 	}
 	navType := parts[0]
 	dateStr := parts[1]
+
+	// Handle month navigation separately (no day-level targetDate needed)
+	if navType == "prevmonth" || navType == "thismonth" || navType == "nextmonth" {
+		return h.handleMonthNav(ctx, chatID, msgID, navType, dateStr)
+	}
 
 	t, err := time.Parse("20060102", dateStr)
 	if err != nil {
@@ -593,7 +612,7 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 	}
 
 	if len(events) == 0 {
-		_ = h.bot.EditMessage(ctx, chatID, msgID, "Fetching calendar from Trading Economics... (15s) ⏳")
+		_ = h.bot.EditMessage(ctx, chatID, msgID, "Fetching calendar from MQL5... (15s) ⏳")
 		if isWeek {
 			rangeType := "this"
 			if targetDate.After(timeutil.NowWIB()) {
@@ -609,7 +628,7 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 		}
 	}
 
-	activeFilter := "med"
+	activeFilter := "all"
 	var html string
 	if isWeek {
 		html = h.fmt.FormatCalendarWeek(targetDate.Format("Jan 02, 2006"), events, activeFilter)
@@ -618,5 +637,54 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 	}
 
 	kb := h.kb.CalendarFilter(activeFilter, targetDateStr, isWeek)
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+}
+
+// handleMonthNav handles prevmonth / thismonth / nextmonth navigation.
+func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, navType, _ string) error {
+	var monthType string
+	switch navType {
+	case "prevmonth":
+		monthType = "prev"
+	case "nextmonth":
+		monthType = "next"
+	default: // "thismonth"
+		monthType = "current"
+	}
+
+	now := timeutil.NowWIB()
+	var targetYear int
+	var targetMonth time.Month
+	switch monthType {
+	case "prev":
+		prev := now.AddDate(0, -1, 0)
+		targetYear, targetMonth = prev.Year(), prev.Month()
+	case "next":
+		next := now.AddDate(0, 1, 0)
+		targetYear, targetMonth = next.Year(), next.Month()
+	default:
+		targetYear, targetMonth = now.Year(), now.Month()
+	}
+
+	yearMonth := fmt.Sprintf("%04d%02d", targetYear, targetMonth)
+	// Representative dateStr = first day of that month (for keyboard callbacks)
+	targetDateStr := fmt.Sprintf("%04d%02d01", targetYear, targetMonth)
+
+	// Try cache first
+	events, _ := h.newsRepo.GetByMonth(ctx, yearMonth)
+
+	if len(events) == 0 {
+		_ = h.bot.EditMessage(ctx, chatID, msgID, "Fetching monthly calendar from MQL5... (15-20s) ⏳")
+		fetched, err := h.newsFetcher.ScrapeMonth(ctx, monthType)
+		if err != nil {
+			return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("Failed to fetch month: %v", err))
+		}
+		_ = h.newsRepo.SaveEvents(ctx, fetched)
+		events, _ = h.newsRepo.GetByMonth(ctx, yearMonth)
+	}
+
+	monthLabel := time.Date(targetYear, targetMonth, 1, 0, 0, 0, 0, time.UTC).Format("January 2006")
+	html := h.fmt.FormatCalendarMonth(monthLabel, events, "all")
+	kb := h.kb.CalendarFilter("all", targetDateStr, true)
 	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 }
