@@ -56,18 +56,13 @@ const mql5ImportanceAll = "15"
 // mql5CurrenciesMask — 131071 = all major currencies supported by MQL5
 const mql5CurrenciesMask = "131071"
 
-// nyLocation is New York (ET) — the timezone MQL5 FullDate uses.
-var nyLocation *time.Location
-
 // wibLocation is WIB (UTC+7).
 var wibLocation *time.Location
 
 func init() {
 	var err error
-	nyLocation, err = time.LoadLocation("America/New_York")
-	if err != nil {
-		nyLocation = time.FixedZone("EST", -5*60*60)
-	}
+	// MQL5 FullDate is in UTC — confirmed via ReleaseDate (Unix ms) cross-check.
+	// e.g. RBA 04:30 UTC = 11:30 WIB ✓, Fed Manufacturing 13:15 UTC = 20:15 WIB ✓
 	wibLocation, err = time.LoadLocation("Asia/Jakarta")
 	if err != nil {
 		wibLocation = time.FixedZone("WIB", 7*60*60)
@@ -274,8 +269,8 @@ func convertEvents(raw []mql5Event, allowedImpacts ...string) []domain.NewsEvent
 			continue
 		}
 
-		// Parse FullDate as New York time
-		t, err := time.ParseInLocation("2006-01-02T15:04:05", e.FullDate, nyLocation)
+		// Parse FullDate as UTC (confirmed: MQL5 FullDate is UTC, not New York time)
+		t, err := time.ParseInLocation("2006-01-02T15:04:05", e.FullDate, time.UTC)
 		if err != nil {
 			log.Printf("[MQL5] skip event %d %q: bad date %q: %v", e.ID, e.EventName, e.FullDate, err)
 			continue
