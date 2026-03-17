@@ -144,7 +144,8 @@ func main() {
 	})
 
 	// News Background Scheduler (always starts — uses MQL5 Economic Calendar)
-	newsSched := newssvc.NewScheduler(newsRepo, newsFetcher, aiAnalyzer, bot, prefsRepo)
+	// P1.1: cotRepo injected for Confluence Alert cross-check on actual releases
+	newsSched := newssvc.NewScheduler(newsRepo, newsFetcher, aiAnalyzer, bot, prefsRepo, cotRepo)
 	newsSched.Start(ctx)
 	log.Println("[MAIN] News Background scheduler started")
 

@@ -19,6 +19,24 @@ type NewsEvent struct {
 
 	// Optional meta for detailed views
 	Description string `json:"description,omitempty"`
+
+	// P2.1 — Surprise Scoring Engine
+	SurpriseScore float64 `json:"surprise_score,omitempty"` // sigma units: (Actual - Forecast) / StdDev
+	SurpriseLabel string  `json:"surprise_label,omitempty"` // e.g., "HAWKISH SURPRISE", "IN LINE"
+}
+
+// ---------------------------------------------------------------------------
+// SurpriseRecord — Intra-week surprise accumulator for P2.2
+// ---------------------------------------------------------------------------
+
+// SurpriseRecord stores a processed surprise result for a currency event.
+// Used by the Surprise-Adjusted COT Sentiment engine.
+type SurpriseRecord struct {
+	Currency   string    `json:"currency"`
+	EventName  string    `json:"event_name"`
+	Date       time.Time `json:"date"`
+	SigmaValue float64   `json:"sigma_value"` // normalized surprise in sigma units
+	Label      string    `json:"label"`       // e.g., "HAWKISH SURPRISE"
 }
 
 // FormatImpactColor returns the appropriate UI color dot for the impact.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
 	"github.com/arkcode369/ff-calendar-bot/internal/ports"
+	"github.com/arkcode369/ff-calendar-bot/internal/service/fred"
 	"github.com/arkcode369/ff-calendar-bot/pkg/timeutil"
 )
 
@@ -67,6 +68,8 @@ func NewHandler(
 	bot.RegisterCommand("/cot", h.cmdCOT)
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 	bot.RegisterCommand("/calendar", h.cmdCalendar)
+	bot.RegisterCommand("/rank", h.cmdRank)   // P1.3 — Currency Strength Ranking
+	bot.RegisterCommand("/macro", h.cmdMacro) // P3.2 — FRED Macro Regime Dashboard
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
@@ -76,7 +79,7 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 
-	log.Printf("[HANDLER] Registered 14 commands and 7 callback prefixes")
+	log.Printf("[HANDLER] Registered 9 commands and 6 callback prefixes")
 	return h
 }
 
@@ -97,8 +100,12 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 
 <b>📊 COT Positioning</b>
 /cot - Overview semua currency
-/cot USD - Detail spesifik currency
+/cot USD - Detail + Upcoming Catalysts 48h
 /cot raw USD - Raw data positioning
+
+<b>🏆 Rankings & Regime</b>
+/rank - Currency strength ranking mingguan
+/macro - FRED Macro regime dashboard
 
 <b>📅 Economic Calendar</b>
 /calendar - Agenda hari ini
@@ -114,7 +121,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /settings - Preference management
 /status - System status
 
-<code>ARK Interface v1.0.0</code>`
+<code>ARK Interface v2.0.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
@@ -214,6 +221,23 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 		narrative, aiErr := h.aiAnalyzer.AnalyzeCOT(ctx, []domain.COTAnalysis{*analysis})
 		if aiErr == nil && narrative != "" {
 			html += "\n\n" + h.fmt.FormatAIInsight("COT Analysis", narrative)
+		}
+	}
+
+	// P1.4 — Upcoming Catalysts: fetch events for next 48h for this currency
+	if editMsgID == 0 && h.newsRepo != nil {
+		now := timeutil.NowWIB()
+		today := now.Format("20060102")
+		tomorrow := now.AddDate(0, 0, 1).Format("20060102")
+
+		todayEvts, _ := h.newsRepo.GetByDate(ctx, today)
+		tomorrowEvts, _ := h.newsRepo.GetByDate(ctx, tomorrow)
+
+		upcoming := append(todayEvts, tomorrowEvts...) //nolint:gocritic
+		currency := analysis.Contract.Currency
+		catalysts := h.fmt.FormatUpcomingCatalysts(currency, upcoming)
+		if catalysts != "" {
+			html += catalysts
 		}
 	}
 
@@ -745,4 +769,44 @@ func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, 
 	html := h.fmt.FormatCalendarMonth(monthLabel, events, "all")
 	kb := h.kb.CalendarFilter("all", targetDateStr, true)
 	return h.sendCalendarChunked(ctx, chatID, msgID, html, kb)
+}
+
+// ---------------------------------------------------------------------------
+// P1.3 — /rank — Currency Strength Ranking
+// ---------------------------------------------------------------------------
+
+// cmdRank handles the /rank command — weekly currency strength ranking.
+// Ranks 8 major currencies by COT SentimentScore and shows best pairs.
+func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args string) error {
+	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil || len(analyses) == 0 {
+		_, err = h.bot.SendHTML(ctx, chatID,
+			"No COT data available for ranking. Data is fetched from CFTC every Friday.")
+		return err
+	}
+
+	now := timeutil.NowWIB()
+	html := h.fmt.FormatRanking(analyses, now)
+	_, err = h.bot.SendHTML(ctx, chatID, html)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// P3.2 — /macro — FRED Macro Regime Dashboard
+// ---------------------------------------------------------------------------
+
+// cmdMacro handles the /macro command — fetches FRED data and displays macro regime.
+func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, args string) error {
+	placeholderID, _ := h.bot.SendHTML(ctx, chatID, "🏦 Fetching FRED macro data... ⏳ (5-10s)")
+
+	data, err := fred.FetchMacroData(ctx)
+	if err != nil {
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			fmt.Sprintf("Failed to fetch FRED data: %v\n\nMake sure FRED_API_KEY is set in .env", err))
+	}
+
+	regime := fred.ClassifyMacroRegime(data)
+	html := h.fmt.FormatMacroRegime(regime, data)
+
+	return h.bot.EditMessage(ctx, chatID, placeholderID, html)
 }

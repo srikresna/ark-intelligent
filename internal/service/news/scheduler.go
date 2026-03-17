@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ type Scheduler struct {
 	aiAnalyzer ports.AIAnalyzer
 	messenger  ports.Messenger
 	prefsRepo  ports.PrefsRepository
+	cotRepo    ports.COTRepository // P1.1 — for Confluence Alert cross-check
 
 	// sentReminders prevents duplicate pre-event alerts.
 	// Key: "{eventID}:{minsUntil}", reset at midnight.
@@ -35,6 +37,7 @@ func NewScheduler(
 	aiAnalyzer ports.AIAnalyzer,
 	messenger ports.Messenger,
 	prefsRepo ports.PrefsRepository,
+	cotRepo ports.COTRepository, // P1.1 — injected for confluence alerts
 ) *Scheduler {
 	return &Scheduler{
 		repo:          repo,
@@ -42,6 +45,7 @@ func NewScheduler(
 		aiAnalyzer:    aiAnalyzer,
 		messenger:     messenger,
 		prefsRepo:     prefsRepo,
+		cotRepo:       cotRepo,
 		sentReminders: make(map[string]bool),
 	}
 }
@@ -98,7 +102,7 @@ func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
 }
 
 // ---------------------------------------------------------------------------
-// Daily Morning Reminder
+// Daily Morning Reminder — P1.2 Storm Day Detection
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
@@ -126,6 +130,7 @@ func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
 }
 
 // broadcastDailyReminder sends a per-user morning summary filtered by their preferences.
+// P1.2: Includes Storm Day warning if 3+ high-impact events detected.
 func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 	dateStr := now.Format("20060102")
 	events, err := s.repo.GetByDate(ctx, dateStr)
@@ -138,6 +143,9 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 		log.Printf("[NEWS SCHEDULER] broadcastDailyReminder: get users failed: %v", err)
 		return
 	}
+
+	// P1.2 — Build Storm Day info once (same for all users)
+	stormWarning := s.buildStormDayWarning(events, now)
 
 	for userID, prefs := range activeUsers {
 		if !prefs.AlertsEnabled || prefs.ChatID == "" {
@@ -191,11 +199,99 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 				firstMatch.TimeWIB.Format("15:04"), firstMatch.Currency, firstMatch.Event)
 		}
 
+		// P1.2 — Append Storm Day warning if applicable
+		if stormWarning != "" {
+			html += "\n\n" + stormWarning
+		}
+
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			log.Printf("[NEWS SCHEDULER] Failed to send daily reminder to user %d: %v", userID, sendErr)
 		}
 		time.Sleep(50 * time.Millisecond) // Avoid Telegram flood
 	}
+}
+
+// buildStormDayWarning detects if today is a Storm Day (3+ high-impact events).
+// Returns the formatted HTML warning string, or "" if not a storm day.
+//
+// P1.2 — Storm Day Detection
+func (s *Scheduler) buildStormDayWarning(events []domain.NewsEvent, now time.Time) string {
+	var highEvents []domain.NewsEvent
+	currencySet := make(map[string]bool)
+
+	for _, e := range events {
+		if strings.ToLower(e.Impact) == "high" {
+			highEvents = append(highEvents, e)
+			if e.Currency != "" {
+				currencySet[strings.ToUpper(e.Currency)] = true
+			}
+		}
+	}
+
+	if len(highEvents) < 3 {
+		return "" // Not a storm day
+	}
+
+	// Build event name list (max 4 shown)
+	eventNames := make([]string, 0, len(highEvents))
+	for _, e := range highEvents {
+		eventNames = append(eventNames, e.Currency+" "+e.Event)
+	}
+	shownEvents := eventNames
+	if len(shownEvents) > 4 {
+		shownEvents = append(shownEvents[:4], fmt.Sprintf("+%d more", len(eventNames)-4))
+	}
+
+	// Build volatile pairs from involved currencies
+	pairs := buildVolatilePairs(currencySet)
+
+	html := fmt.Sprintf("⚡ <b>STORM DAY</b> — %s\n", now.Format("Mon 02 Jan"))
+	html += fmt.Sprintf("%d High-Impact Events: <i>%s</i>\n", len(highEvents), strings.Join(shownEvents, ", "))
+	if len(pairs) > 0 {
+		html += fmt.Sprintf("Pairs volatile: <b>%s</b>\n", strings.Join(pairs, ", "))
+	}
+	html += "→ Kurangi size, wider stops ⚠️"
+
+	return html
+}
+
+// buildVolatilePairs generates pair names from a set of currencies involved in high-impact events.
+func buildVolatilePairs(currencySet map[string]bool) []string {
+	var pairs []string
+	seen := make(map[string]bool)
+
+	priorityPairs := [][2]string{
+		{"USD", "GBP"}, {"USD", "EUR"}, {"USD", "JPY"}, {"USD", "AUD"},
+		{"USD", "CAD"}, {"USD", "NZD"}, {"USD", "CHF"},
+		{"GBP", "JPY"}, {"EUR", "JPY"}, {"GBP", "EUR"},
+	}
+
+	for _, pair := range priorityPairs {
+		a, b := pair[0], pair[1]
+		if currencySet[a] && currencySet[b] {
+			var pairName string
+			if a == "USD" {
+				pairName = b + "USD"
+			} else if b == "USD" {
+				pairName = a + "USD"
+			} else {
+				pairName = a + b
+			}
+			if !seen[pairName] {
+				pairs = append(pairs, pairName)
+				seen[pairName] = true
+			}
+			if len(pairs) >= 4 {
+				break
+			}
+		}
+	}
+
+	if currencySet["USD"] && !seen["DXY"] {
+		pairs = append(pairs, "DXY")
+	}
+
+	return pairs
 }
 
 // ---------------------------------------------------------------------------
@@ -253,23 +349,19 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 				continue
 			}
 
-			// Check if this reminder minute matches user's alert minutes
 			if !containsInt(prefs.AlertMinutes, minsUntil) {
 				continue
 			}
 
-			// Check impact filter
 			alertImpactsLower := toLowerSlice(prefs.AlertImpacts)
 			if !toSet(alertImpactsLower)[strings.ToLower(e.Impact)] {
 				continue
 			}
 
-			// Check currency filter
 			if len(prefs.CurrencyFilter) > 0 && !containsStr(prefs.CurrencyFilter, e.Currency) {
 				continue
 			}
 
-			// Anti-duplicate: skip if already sent this reminder
 			reminderKey := fmt.Sprintf("%s:%d:%d", e.ID, minsUntil, userID)
 			s.sentMu.Lock()
 			alreadySent := s.sentReminders[reminderKey]
@@ -319,7 +411,6 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
 
-	// Hourly Sweep logic
 	if now.Minute() == 0 {
 		log.Println("[NEWS SCHEDULER] Running Hourly Slow-Poll Sweep")
 		s.triggerMicroScrape(ctx, dateStr, "hourly")
@@ -334,14 +425,11 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 	triggerScrape := false
 	for _, e := range events {
 		if e.Actual != "" {
-			continue // Already fulfilled
+			continue
 		}
 
 		minsSinceRelease := int(now.Sub(e.TimeWIB).Minutes())
 
-		// Micro-Scrape targets: within 30 minutes after scheduled release.
-		// Check at specific intervals to avoid hammering MQL5, but broad enough
-		// to survive bot restarts or timing jitter that miss exact minutes.
 		if minsSinceRelease >= 0 && minsSinceRelease <= 30 {
 			if minsSinceRelease == 1 || minsSinceRelease == 3 || minsSinceRelease == 5 ||
 				minsSinceRelease == 10 || minsSinceRelease == 15 || minsSinceRelease == 20 ||
@@ -389,7 +477,12 @@ func (s *Scheduler) getEventByID(ctx context.Context, dateStr string, id string)
 	return nil, fmt.Errorf("not found")
 }
 
+// ---------------------------------------------------------------------------
+// onNewRelease — P1.1 Confluence Alert
+// ---------------------------------------------------------------------------
+
 // onNewRelease broadcasts an actual-release alert to all eligible users.
+// P1.1: Cross-checks the release against COT positioning for the same currency.
 func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 	log.Printf("[NEWS SCHEDULER] New Release Detected: %s %s -> %s", ev.Currency, ev.Event, ev.Actual)
 
@@ -397,6 +490,15 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 	if err != nil {
 		log.Printf("[NEWS SCHEDULER] onNewRelease: get users failed: %v", err)
 		return
+	}
+
+	// P1.1 — Fetch COT analysis for this currency (best-effort)
+	var cotAnalysis *domain.COTAnalysis
+	if s.cotRepo != nil {
+		contractCode := domain.CurrencyToContract(ev.Currency)
+		if contractCode != "" {
+			cotAnalysis, _ = s.cotRepo.GetLatestAnalysis(ctx, contractCode)
+		}
 	}
 
 	for userID, prefs := range activeUsers {
@@ -413,28 +515,13 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 			continue
 		}
 
-		// Optionally run AI flash analysis (language from prefs)
-		analysisStr := ""
-		if s.aiAnalyzer != nil && s.aiAnalyzer.IsAvailable() {
-			analysisStr, _ = s.aiAnalyzer.AnalyzeActualRelease(ctx, ev, prefs.Language)
-		}
+		var html string
 
-		// Compute direction arrow (simple string-compare fallback)
-		direction := "⚪"
-		if ev.Actual != "" && ev.Forecast != "" && ev.Actual != ev.Forecast {
-			if ev.Actual > ev.Forecast {
-				direction = "🟢"
-			} else {
-				direction = "🔴"
-			}
-		}
-
-		html := fmt.Sprintf("📈 <b>News Actual Release!</b>\n\n%s <b>%s</b>\n", ev.FormatImpactColor(), ev.Event)
-		html += fmt.Sprintf("Currency: <b>%s</b>\n", ev.Currency)
-		html += fmt.Sprintf("Actual: <b>%s %s</b> (Forecast: %s / Prev: %s)\n", ev.Actual, direction, ev.Forecast, ev.Previous)
-
-		if analysisStr != "" {
-			html += fmt.Sprintf("\n💡 <b>AI Analysis:</b>\n%s", analysisStr)
+		// P1.1 — Build confluence alert if COT data is available
+		if cotAnalysis != nil {
+			html = s.buildConfluenceAlert(ev, cotAnalysis)
+		} else {
+			html = s.buildStandardReleaseAlert(ctx, ev, prefs.Language)
 		}
 
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
@@ -442,6 +529,109 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// buildConfluenceAlert builds the P1.1 Confluence Alert message.
+func (s *Scheduler) buildConfluenceAlert(ev domain.NewsEvent, analysis *domain.COTAnalysis) string {
+	// Parse numeric values
+	actualVal, hasActual := ParseNumericValue(ev.Actual)
+	forecastVal, hasForecast := ParseNumericValue(ev.Forecast)
+
+	var dataDirection string
+	var beatMiss string
+	surpriseSigma := 0.0
+
+	if hasActual && hasForecast {
+		diff := actualVal - forecastVal
+		if diff > 0 {
+			dataDirection = "HAWKISH"
+			beatMiss = "Beat"
+		} else if diff < 0 {
+			dataDirection = "DOVISH"
+			beatMiss = "Miss"
+		} else {
+			dataDirection = "NEUTRAL"
+			beatMiss = "In Line"
+		}
+		if forecastVal != 0 {
+			surpriseSigma = diff / math.Abs(forecastVal)
+		} else {
+			surpriseSigma = diff
+		}
+	} else {
+		dataDirection = "NEUTRAL"
+		beatMiss = "Actual"
+	}
+
+	cotBullish := analysis.SentimentScore > 0
+	cotBias := "BULLISH"
+	if !cotBullish {
+		cotBias = "BEARISH"
+	}
+
+	var confluenceType string
+	var confluenceIcon string
+	var insight string
+
+	if surpriseSigma > 0.1 && cotBullish {
+		confluenceType = "CONFLUENCE"
+		confluenceIcon = "🟢"
+		insight = "Smart money dan data sepakat — " + cotBias + ". Trend continuation likely"
+	} else if surpriseSigma < -0.1 && !cotBullish {
+		confluenceType = "CONFLUENCE"
+		confluenceIcon = "🟢"
+		insight = "Smart money dan data sepakat — " + cotBias + ". Trend continuation likely"
+	} else if surpriseSigma > 0.1 && !cotBullish {
+		confluenceType = "DIVERGENCE"
+		confluenceIcon = "🔴"
+		insight = "Smart money SHORT tapi data HAWKISH → Watch: short squeeze potensial, hati-hati counter-trend"
+	} else if surpriseSigma < -0.1 && cotBullish {
+		confluenceType = "DIVERGENCE"
+		confluenceIcon = "🔴"
+		insight = "Smart money LONG tapi data DOVISH → Watch: long liquidation potensial, hati-hati counter-trend"
+	} else {
+		confluenceType = "NEUTRAL"
+		confluenceIcon = "⚪"
+		insight = "Sinyal mixed — tunggu konfirmasi lebih lanjut"
+	}
+
+	netK := analysis.NetPosition / 1000
+
+	html := fmt.Sprintf("⚡ <b>%s</b> — %s\n", ev.Event, ev.Currency)
+	html += fmt.Sprintf("✅ Actual: <b>%s</b> | %s Forecast %s → <b>%s</b>\n",
+		ev.Actual, beatMiss, ev.Forecast, dataDirection)
+	html += fmt.Sprintf("%s <b>%s</b>: COT %s <b>%s</b> (Spec Net %.0fK, idx %.0f%%)\n",
+		confluenceIcon, confluenceType, ev.Currency, cotBias, netK, analysis.COTIndex)
+	html += fmt.Sprintf("→ %s\n", insight)
+
+	return html
+}
+
+// buildStandardReleaseAlert builds the standard release alert (fallback without COT data).
+func (s *Scheduler) buildStandardReleaseAlert(ctx context.Context, ev domain.NewsEvent, language string) string {
+	analysisStr := ""
+	if s.aiAnalyzer != nil && s.aiAnalyzer.IsAvailable() {
+		analysisStr, _ = s.aiAnalyzer.AnalyzeActualRelease(ctx, ev, language)
+	}
+
+	direction := "⚪"
+	if ev.Actual != "" && ev.Forecast != "" && ev.Actual != ev.Forecast {
+		if ev.Actual > ev.Forecast {
+			direction = "🟢"
+		} else {
+			direction = "🔴"
+		}
+	}
+
+	html := fmt.Sprintf("📈 <b>News Actual Release!</b>\n\n%s <b>%s</b>\n", ev.FormatImpactColor(), ev.Event)
+	html += fmt.Sprintf("Currency: <b>%s</b>\n", ev.Currency)
+	html += fmt.Sprintf("Actual: <b>%s %s</b> (Forecast: %s / Prev: %s)\n", ev.Actual, direction, ev.Forecast, ev.Previous)
+
+	if analysisStr != "" {
+		html += fmt.Sprintf("\n💡 <b>AI Analysis:</b>\n%s", analysisStr)
+	}
+
+	return html
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +645,6 @@ func (s *Scheduler) runInitialSync(ctx context.Context) {
 	events, _ := s.repo.GetByDate(ctx, dateStr)
 	if len(events) > 0 {
 		log.Println("[NEWS SCHEDULER] Initial sync skipped: data already exists for today.")
-		// Still run a startup micro-scrape to catch any actuals missed during downtime.
 		log.Println("[NEWS SCHEDULER] Running startup missed-actuals check...")
 		s.triggerMicroScrape(ctx, dateStr, "startup-check")
 		return

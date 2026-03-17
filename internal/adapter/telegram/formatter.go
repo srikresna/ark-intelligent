@@ -2,12 +2,14 @@ package telegram
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
+	"github.com/arkcode369/ff-calendar-bot/internal/service/fred"
 	"github.com/arkcode369/ff-calendar-bot/pkg/fmtutil"
 )
 
@@ -475,4 +477,301 @@ func matchesFilter(e domain.NewsEvent, filter string) bool {
 	default:
 		return true
 	}
+}
+
+// ---------------------------------------------------------------------------
+// P1.3 — Currency Strength Ranking
+// ---------------------------------------------------------------------------
+
+// rankEntry holds a currency ranking entry for FormatRanking.
+type rankEntry struct {
+	Currency string
+	Score    float64
+	COTIndex float64
+}
+
+// FormatRanking formats the weekly currency strength ranking based on COT sentiment scores.
+// P1.3 — /rank command output.
+func (f *Formatter) FormatRanking(analyses []domain.COTAnalysis, date time.Time) string {
+	var b strings.Builder
+
+	// Filter to 8 major currencies only (no commodities)
+	majors := map[string]bool{"EUR": true, "GBP": true, "JPY": true, "AUD": true,
+		"NZD": true, "CAD": true, "CHF": true, "USD": true}
+
+	var entries []rankEntry
+	for _, a := range analyses {
+		if !majors[a.Contract.Currency] {
+			continue
+		}
+		entries = append(entries, rankEntry{
+			Currency: a.Contract.Currency,
+			Score:    a.SentimentScore,
+			COTIndex: a.COTIndex,
+		})
+	}
+
+	// Sort by sentiment score descending (strongest first)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Score > entries[j].Score
+	})
+
+	b.WriteString("🏆 <b>Currency Strength Ranking</b>\n")
+	b.WriteString(fmt.Sprintf("<i>Week of %s | Based on COT Positioning</i>\n\n", date.Format("02 Jan 2006")))
+
+	medals := []string{"🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"}
+
+	for i, e := range entries {
+		medal := ""
+		if i < len(medals) {
+			medal = medals[i]
+		}
+
+		arrow := scoreArrow(e.Score)
+		colorDot := scoreDot(e.Score)
+		label := cotLabel(e.COTIndex)
+
+		signStr := "+"
+		if e.Score < 0 {
+			signStr = ""
+		}
+
+		b.WriteString(fmt.Sprintf("%s %s %s: <b>%s%.0f %s</b>  <i>(%s)</i>\n",
+			medal, colorDot, e.Currency, signStr, e.Score, arrow, label))
+	}
+
+	// Best pairs: top 3 spread combinations
+	b.WriteString("\n📊 <b>Best Pairs:</b>\n")
+	pairs := buildBestPairs(entries)
+	for _, p := range pairs {
+		b.WriteString(p + "\n")
+	}
+
+	b.WriteString("\n<i>Tip: </i><code>/cot GBP</code> untuk detail lengkap")
+	return b.String()
+}
+
+// scoreArrow returns directional arrows for a sentiment score.
+func scoreArrow(score float64) string {
+	switch {
+	case score > 60:
+		return "↑↑"
+	case score > 30:
+		return "↑"
+	case score > -30:
+		return "→"
+	case score > -60:
+		return "↓"
+	default:
+		return "↓↓↓"
+	}
+}
+
+// scoreDot returns a colored dot based on score direction.
+func scoreDot(score float64) string {
+	if score > 15 {
+		return "🟢"
+	} else if score < -15 {
+		return "🔴"
+	}
+	return "⚪"
+}
+
+// cotLabel returns a human-readable label for a COT Index value (0-100).
+func cotLabel(idx float64) string {
+	switch {
+	case idx >= 80:
+		return "Extreme Long"
+	case idx >= 60:
+		return "Bullish"
+	case idx >= 40:
+		return "Neutral"
+	case idx >= 20:
+		return "Bearish"
+	default:
+		return "Extreme Short"
+	}
+}
+
+// buildBestPairs generates the top 3 long/short pair recommendations.
+// Long the highest-ranked currency, short the lowest-ranked.
+func buildBestPairs(entries []rankEntry) []string {
+	if len(entries) < 2 {
+		return nil
+	}
+
+	var pairs []string
+	seen := make(map[string]bool)
+
+	// Try top-bull vs bottom-bear combinations
+	for i := 0; i < len(entries) && len(pairs) < 3; i++ {
+		for j := len(entries) - 1; j > i && len(pairs) < 3; j-- {
+			long := entries[i]
+			short := entries[j]
+			spread := long.Score - short.Score
+
+			if spread < 30 {
+				continue // not enough spread to be meaningful
+			}
+
+			pairName := formatPairName(long.Currency, short.Currency)
+			if seen[pairName] {
+				continue
+			}
+			seen[pairName] = true
+
+			direction := "LONG"
+			spreadSign := "+"
+			pairs = append(pairs, fmt.Sprintf("→ %s <b>%s</b> (spread %s%.0f)",
+				direction, pairName, spreadSign, math.Abs(spread)))
+		}
+	}
+
+	// If no strong spreads, show best available
+	if len(pairs) == 0 && len(entries) >= 2 {
+		long := entries[0]
+		short := entries[len(entries)-1]
+		spread := long.Score - short.Score
+		pairName := formatPairName(long.Currency, short.Currency)
+		pairs = append(pairs, fmt.Sprintf("→ LONG <b>%s</b> (spread +%.0f)", pairName, spread))
+	}
+
+	return pairs
+}
+
+// formatPairName formats a forex pair name from two currency codes.
+// Follows standard convention: USD is always the second in majors where applicable.
+func formatPairName(longCur, shortCur string) string {
+	// Standard major pairs where USD is quote
+	usdQuote := map[string]bool{"EUR": true, "GBP": true, "AUD": true, "NZD": true}
+	// Standard major pairs where USD is base
+	usdBase := map[string]bool{"JPY": true, "CHF": true, "CAD": true}
+
+	if longCur == "USD" {
+		if usdBase[shortCur] {
+			return "USD" + shortCur // e.g., USDJPY
+		}
+		return shortCur + "USD" // e.g., EURUSD (reversed — USD short)
+	}
+	if shortCur == "USD" {
+		if usdQuote[longCur] {
+			return longCur + "USD" // e.g., GBPUSD
+		}
+		return "USD" + longCur // e.g., USDCAD
+	}
+	// Cross pair: long first
+	return longCur + shortCur
+}
+
+// ---------------------------------------------------------------------------
+// P1.4 — Upcoming Catalysts (48h COT context)
+// ---------------------------------------------------------------------------
+
+// FormatUpcomingCatalysts formats upcoming high/medium impact events for a given currency.
+// Used in /cot detail to show "Upcoming Catalysts (48h)".
+func (f *Formatter) FormatUpcomingCatalysts(currency string, events []domain.NewsEvent) string {
+	if len(events) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n📅 <b>Upcoming Catalysts (48h):</b>\n")
+
+	shown := 0
+	for _, e := range events {
+		if shown >= 5 {
+			break
+		}
+		if strings.ToUpper(e.Currency) != strings.ToUpper(currency) {
+			continue
+		}
+		if strings.ToLower(e.Impact) != "high" && strings.ToLower(e.Impact) != "medium" {
+			continue
+		}
+		if e.Actual != "" {
+			continue // already released
+		}
+
+		timeStr := "TBA"
+		if !e.TimeWIB.IsZero() {
+			timeStr = e.TimeWIB.Format("Mon 15:04 WIB")
+		}
+
+		forecastStr := ""
+		if e.Forecast != "" {
+			forecastStr = " (Fcast: " + e.Forecast
+			if e.Previous != "" {
+				forecastStr += " | Prev: " + e.Previous
+			}
+			forecastStr += ")"
+		}
+
+		b.WriteString(fmt.Sprintf("%s %s — <b>%s</b> %s%s\n",
+			e.FormatImpactColor(), timeStr, e.Currency, e.Event, forecastStr))
+		shown++
+	}
+
+	if shown == 0 {
+		return ""
+	}
+
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// P3.2 — FRED Macro Regime Dashboard
+// ---------------------------------------------------------------------------
+
+// FormatMacroRegime formats the FRED macro regime dashboard message.
+// P3.2 — /macro command output.
+func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroData) string {
+	var b strings.Builder
+
+	b.WriteString("🏦 <b>MACRO REGIME DASHBOARD</b>\n")
+	b.WriteString(fmt.Sprintf("<i>FRED Data — Updated %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<b>MACRO REGIME: %s</b>\n\n", regime.Name))
+
+	b.WriteString(fmt.Sprintf("<code>Yield Curve  : %s</code>\n", regime.YieldCurve))
+	b.WriteString(fmt.Sprintf("<code>              10Y=%.2f%% | 2Y=%.2f%%</code>\n", data.Yield10Y, data.Yield2Y))
+	b.WriteString(fmt.Sprintf("<code>Core PCE     : %s</code>\n", regime.Inflation))
+	b.WriteString(fmt.Sprintf("<code>5Y Breakeven : %.2f%%</code>\n", data.Breakeven5Y))
+	b.WriteString(fmt.Sprintf("<code>Financial Str: %s</code>\n", regime.FinStress))
+	b.WriteString(fmt.Sprintf("<code>              NFCI: %.3f</code>\n", data.NFCI))
+	b.WriteString(fmt.Sprintf("<code>Labor Market : %s</code>\n", regime.Labor))
+
+	b.WriteString(fmt.Sprintf("\n→ <b>%s</b>\n", regime.Bias))
+	b.WriteString(fmt.Sprintf("<i>%s</i>\n", regime.Description))
+
+	b.WriteString("\n<i>Data: St. Louis FRED | </i><code>/macro</code> to refresh")
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// P2.3 — COT Regime Summary (used in /outlook or /rank)
+// ---------------------------------------------------------------------------
+
+// FormatRegimeLabel formats a COT-based regime result for display.
+func (f *Formatter) FormatRegimeLabel(regime string, confidence float64, factors []string) string {
+	icon := "⚪"
+	switch regime {
+	case "RISK-ON":
+		icon = "🟢"
+	case "RISK-OFF":
+		icon = "🔴"
+	case "UNCERTAINTY":
+		icon = "🟡"
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%s <b>COT Regime: %s</b> (%.0f%% confidence)\n", icon, regime, confidence))
+	if len(factors) > 0 {
+		b.WriteString("<i>Signals: ")
+		shown := factors
+		if len(shown) > 3 {
+			shown = factors[:3]
+		}
+		b.WriteString(strings.Join(shown, " | "))
+		b.WriteString("</i>\n")
+	}
+	return b.String()
 }
