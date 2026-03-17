@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
@@ -25,6 +26,9 @@ import (
 	cotsvc "github.com/arkcode369/ff-calendar-bot/internal/service/cot"
 	newssvc "github.com/arkcode369/ff-calendar-bot/internal/service/news"
 )
+
+//go:embed CHANGELOG.md
+var changelogContent string
 
 const banner = `
 ╔══════════════════════════════════════════════════╗
@@ -118,6 +122,7 @@ func main() {
 		newsRepo,
 		newsFetcher,
 		aiAnalyzer, // nil-safe: handler checks IsAvailable()
+		changelogContent,
 	)
 
 	log.Println("[MAIN] Telegram handler registered")

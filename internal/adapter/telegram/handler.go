@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -31,6 +30,9 @@ type Handler struct {
 	newsFetcher ports.NewsFetcher
 
 	aiAnalyzer ports.AIAnalyzer
+
+	// changelog is the embedded CHANGELOG.md content, injected at startup.
+	changelog string
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
@@ -42,6 +44,7 @@ func NewHandler(
 	newsRepo ports.NewsRepository,
 	newsFetcher ports.NewsFetcher,
 	aiAnalyzer ports.AIAnalyzer,
+	changelog string,
 ) *Handler {
 	h := &Handler{
 		bot:         bot,
@@ -53,6 +56,7 @@ func NewHandler(
 		newsRepo:    newsRepo,
 		newsFetcher: newsFetcher,
 		aiAnalyzer:  aiAnalyzer,
+		changelog:   changelog,
 	}
 
 	// Register all commands
@@ -355,15 +359,10 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 			prefs.Language = "en"
 		}
 	case "changelog_view":
-		// Read CHANGELOG.md
-		content, err := os.ReadFile("CHANGELOG.md")
-		if err != nil {
-			log.Printf("[HANDLER] Failed to read CHANGELOG.md: %v", err)
+		if h.changelog == "" {
 			return h.bot.EditMessage(ctx, chatID, msgID, "Changelog unavailable.")
 		}
-
-		html := fmt.Sprintf("🦅 <b>ARK Intelligence Changelog</b>\n\n%s", string(content))
-		// Optional: Add a back button to settings
+		html := fmt.Sprintf("🦅 <b>ARK Intelligence Changelog</b>\n\n%s", h.changelog)
 		kb := h.kb.SettingsMenu(prefs)
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 
