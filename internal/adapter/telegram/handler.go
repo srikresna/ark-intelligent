@@ -105,7 +105,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 
 <b>🏆 Rankings & Regime</b>
 /rank - Currency strength ranking mingguan
-/macro - FRED Macro regime dashboard
+/macro - FRED Macro regime dashboard (7 indicators)
 
 <b>📅 Economic Calendar</b>
 /calendar - Agenda hari ini
@@ -114,14 +114,15 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 
 <b>🧠 AI Intelligence Outlook</b>
 /outlook cot - COT Positioning structural analysis
-/outlook news - News catalysts, Storm Days & Central Bank
-/outlook combine - Fused COT + News catalyst triggers
+/outlook news - News catalysts, Storm Days &amp; Central Bank
+/outlook fred - FRED Macro deep-dive (Fed policy, real rates, DXY)
+/outlook combine - Fused COT + News + FRED macro triggers
 
 <b>⚙️ Operations</b>
 /settings - Preference management
 /status - System status
 
-<code>ARK Interface v2.0.0</code>`
+<code>ARK Interface v2.1.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
@@ -288,7 +289,7 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 	subcmd := strings.ToLower(strings.TrimSpace(args))
 	if subcmd == "" {
 		html := "🦅 <b>ARK Intelligence Outlook</b>\nSelect the type of market analysis you want to generate:\n\n" +
-			"<i>Tip: </i><code>/outlook cot</code> | <code>/outlook news</code> | <code>/outlook combine</code>"
+			"<i>Tip: </i><code>/outlook cot</code> | <code>/outlook news</code> | <code>/outlook fred</code> | <code>/outlook combine</code>"
 		kb := h.kb.OutlookMenu()
 		_, err := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 		return err
@@ -326,10 +327,25 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 			return fetchErr
 		}
 		result, err = h.aiAnalyzer.AnalyzeNewsOutlook(ctx, weekEvts, prefs.Language)
+	} else if subcmd == "fred" {
+		// Fetch fresh FRED data then run AI analysis
+		macroData, fredErr := fred.FetchMacroData(ctx)
+		if fredErr != nil || macroData == nil {
+			_ = h.bot.EditMessage(ctx, chatID, placeholderID, "Failed to fetch FRED macro data. Check FRED_API_KEY.")
+			return fredErr
+		}
+		result, err = h.aiAnalyzer.AnalyzeFREDOutlook(ctx, macroData, prefs.Language)
 	} else if subcmd == "combine" {
 		cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
 		weekEvts, _ := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
-		weeklyData := ports.WeeklyData{COTAnalyses: cotAnalyses, NewsEvents: weekEvts, Language: prefs.Language}
+		// Fetch FRED data for enriched combine analysis — non-fatal if it fails
+		macroData, _ := fred.FetchMacroData(ctx)
+		weeklyData := ports.WeeklyData{
+			COTAnalyses: cotAnalyses,
+			NewsEvents:  weekEvts,
+			MacroData:   macroData,
+			Language:    prefs.Language,
+		}
 		result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
 	} else { // "cot" or default
 		cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)

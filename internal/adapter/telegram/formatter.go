@@ -682,7 +682,7 @@ func (f *Formatter) FormatUpcomingCatalysts(currency string, events []domain.New
 		if shown >= 5 {
 			break
 		}
-		if strings.ToUpper(e.Currency) != strings.ToUpper(currency) {
+		if !strings.EqualFold(e.Currency, currency) {
 			continue
 		}
 		if strings.ToLower(e.Impact) != "high" && strings.ToLower(e.Impact) != "medium" {
@@ -727,23 +727,74 @@ func (f *Formatter) FormatUpcomingCatalysts(currency string, events []domain.New
 func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroData) string {
 	var b strings.Builder
 
+	// Risk score bar (20 chars)
+	riskBar := buildRiskBar(regime.Score, 15)
+
 	b.WriteString("🏦 <b>MACRO REGIME DASHBOARD</b>\n")
 	b.WriteString(fmt.Sprintf("<i>FRED Data — Updated %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
-	b.WriteString(fmt.Sprintf("<b>MACRO REGIME: %s</b>\n\n", regime.Name))
+	b.WriteString(fmt.Sprintf("<b>REGIME: %s</b>  Risk: %d/100\n", regime.Name, regime.Score))
+	b.WriteString(fmt.Sprintf("<code>[%s]</code>\n\n", riskBar))
 
+	// Yield Curve
 	b.WriteString(fmt.Sprintf("<code>Yield Curve  : %s</code>\n", regime.YieldCurve))
-	b.WriteString(fmt.Sprintf("<code>              10Y=%.2f%% | 2Y=%.2f%%</code>\n", data.Yield10Y, data.Yield2Y))
+	b.WriteString(fmt.Sprintf("<code>               10Y=%.2f%% | 2Y=%.2f%%</code>\n", data.Yield10Y, data.Yield2Y))
+
+	// Inflation
 	b.WriteString(fmt.Sprintf("<code>Core PCE     : %s</code>\n", regime.Inflation))
-	b.WriteString(fmt.Sprintf("<code>5Y Breakeven : %.2f%%</code>\n", data.Breakeven5Y))
-	b.WriteString(fmt.Sprintf("<code>Financial Str: %s</code>\n", regime.FinStress))
-	b.WriteString(fmt.Sprintf("<code>              NFCI: %.3f</code>\n", data.NFCI))
+	if data.Breakeven5Y > 0 {
+		realRate := data.FedFundsRate - data.Breakeven5Y
+		b.WriteString(fmt.Sprintf("<code>10Y Breakeven: %.2f%% | Real Rate: %+.2f%%</code>\n", data.Breakeven5Y, realRate))
+	}
+
+	// Monetary Policy
+	if data.FedFundsRate > 0 {
+		b.WriteString(fmt.Sprintf("<code>Mon. Policy  : %s</code>\n", regime.MonPolicy))
+	}
+
+	// Financial Stress
+	b.WriteString(fmt.Sprintf("<code>Fin. Stress  : %s</code>\n", regime.FinStress))
+
+	// Labor
 	b.WriteString(fmt.Sprintf("<code>Labor Market : %s</code>\n", regime.Labor))
+
+	// Growth
+	if regime.Growth != "N/A" && regime.Growth != "" {
+		b.WriteString(fmt.Sprintf("<code>GDP Growth   : %s</code>\n", regime.Growth))
+	}
+
+	// USD
+	if regime.USDStrength != "N/A" && regime.USDStrength != "" {
+		b.WriteString(fmt.Sprintf("<code>USD Strength : %s</code>\n", regime.USDStrength))
+	}
 
 	b.WriteString(fmt.Sprintf("\n→ <b>%s</b>\n", regime.Bias))
 	b.WriteString(fmt.Sprintf("<i>%s</i>\n", regime.Description))
 
-	b.WriteString("\n<i>Data: St. Louis FRED | </i><code>/macro</code> to refresh")
+	b.WriteString("\n<i>Data: St. Louis FRED | </i><code>/macro</code><i> to refresh | </i><code>/outlook fred</code><i> for AI analysis</i>")
 	return b.String()
+}
+
+// buildRiskBar creates a visual risk score bar (higher = more risk-off).
+func buildRiskBar(score, width int) string {
+	filled := score * width / 100
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > width {
+		filled = width
+	}
+
+	var label string
+	switch {
+	case score >= 70:
+		label = " HIGH RISK"
+	case score >= 40:
+		label = " MODERATE"
+	default:
+		label = " LOW RISK"
+	}
+
+	return strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + label
 }
 
 // ---------------------------------------------------------------------------

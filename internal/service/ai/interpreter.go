@@ -9,6 +9,7 @@ import (
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
 	"github.com/arkcode369/ff-calendar-bot/internal/ports"
+	"github.com/arkcode369/ff-calendar-bot/internal/service/fred"
 )
 
 // WeeklyOutlookData is the internal data structure used by the AI interpreter
@@ -109,8 +110,19 @@ func (ip *Interpreter) AnalyzeNewsOutlook(ctx context.Context, events []domain.N
 }
 
 // AnalyzeCombinedOutlook fuses COT macro positioning with upcoming calendar catalysts.
+// If data.MacroData is populated, it also includes FRED macro backdrop in the analysis.
 func (ip *Interpreter) AnalyzeCombinedOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
-	prompt := BuildCombinedOutlookPrompt(data)
+	var prompt string
+	var header string
+
+	if data.MacroData != nil {
+		regime := fred.ClassifyMacroRegime(data.MacroData)
+		prompt = BuildCombinedWithFREDPrompt(data, regime)
+		header = "FUSED OUTLOOK (COT + NEWS + FRED)"
+	} else {
+		prompt = BuildCombinedOutlookPrompt(data)
+		header = "FUSED OUTLOOK (COT + NEWS)"
+	}
 
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
@@ -118,7 +130,40 @@ func (ip *Interpreter) AnalyzeCombinedOutlook(ctx context.Context, data ports.We
 		return "Combined outlook unavailable.", nil
 	}
 
-	return formatResponse("FUSED OUTLOOK (COT + NEWS)", result), nil
+	return formatResponse(header, result), nil
+}
+
+// AnalyzeFREDOutlook generates a macro-economic AI narrative from FRED quantitative data.
+func (ip *Interpreter) AnalyzeFREDOutlook(ctx context.Context, data *fred.MacroData, lang string) (string, error) {
+	if data == nil {
+		return "No FRED macro data available for analysis.", nil
+	}
+
+	regime := fred.ClassifyMacroRegime(data)
+	prompt := BuildFREDOutlookPrompt(data, regime, lang)
+
+	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
+	if err != nil {
+		log.Printf("[ai] FRED outlook failed: %v", err)
+		return ip.fallbackFREDSummary(data, regime), nil
+	}
+
+	return formatResponse("FRED MACRO OUTLOOK", result), nil
+}
+
+// fallbackFREDSummary generates a template-based FRED summary when Gemini is unavailable.
+func (ip *Interpreter) fallbackFREDSummary(data *fred.MacroData, regime fred.MacroRegime) string {
+	var b strings.Builder
+	b.WriteString("=== FRED MACRO OUTLOOK (Auto-generated) ===\n\n")
+	b.WriteString(fmt.Sprintf("Regime: %s | Risk Score: %d/100\n", regime.Name, regime.Score))
+	b.WriteString(fmt.Sprintf("Bias: %s\n", regime.Bias))
+	b.WriteString(fmt.Sprintf("Description: %s\n\n", regime.Description))
+	b.WriteString(fmt.Sprintf("Yield Spread: %.2f%% | Core PCE: %.1f%%\n", data.YieldSpread, data.CorePCE))
+	if data.FedFundsRate > 0 {
+		b.WriteString(fmt.Sprintf("Fed Funds: %.2f%% | NFCI: %.3f\n", data.FedFundsRate, data.NFCI))
+	}
+	b.WriteString("\nAI detailed narrative unavailable. Use /macro for raw data.")
+	return b.String()
 }
 
 // AnalyzeActualRelease evaluates a single economic release against its forecast.

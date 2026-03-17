@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
+	"github.com/arkcode369/ff-calendar-bot/internal/service/fred"
 )
 
 // ---------------------------------------------------------------------------
@@ -14,7 +15,8 @@ import (
 type WeeklyData struct {
 	COTAnalyses []domain.COTAnalysis `json:"cot_analyses"`
 	NewsEvents  []domain.NewsEvent   `json:"news_events"`
-	Language    string               `json:"language"` // "id" or "en"
+	MacroData   *fred.MacroData      `json:"macro_data,omitempty"` // FRED macro data, optional
+	Language    string               `json:"language"`             // "id" or "en"
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,10 @@ type AIAnalyzer interface {
 	// AnalyzeCombinedOutlook fuses COT macro positioning with upcoming calendar catalysts.
 	// Input: WeeklyData containing both COT and News.
 	AnalyzeCombinedOutlook(ctx context.Context, data WeeklyData) (string, error)
+
+	// AnalyzeFREDOutlook generates a macro-economic AI narrative from FRED data.
+	// Input: MacroData + regime classification + optional language preference.
+	AnalyzeFREDOutlook(ctx context.Context, data *fred.MacroData, lang string) (string, error)
 
 	// AnalyzeActualRelease evaluates a single economic release against its forecast.
 	AnalyzeActualRelease(ctx context.Context, event domain.NewsEvent, lang string) (string, error)

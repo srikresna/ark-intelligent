@@ -145,7 +145,10 @@ func (kb *KeyboardBuilder) OutlookMenu() ports.InlineKeyboard {
 		{Text: "📰 News Catalysts", CallbackData: "out:news"},
 	})
 	rows = append(rows, []ports.InlineButton{
-		{Text: "🔗 Fused (COT + News)", CallbackData: "out:combine"},
+		{Text: "🏦 FRED Macro", CallbackData: "out:fred"},
+	})
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔗 Fused (COT + News + FRED)", CallbackData: "out:combine"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
