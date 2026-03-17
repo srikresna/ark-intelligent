@@ -16,7 +16,7 @@ type NewsRepository interface {
 	UpdateStatus(ctx context.Context, id string, status string, retryCount int) error
 }
 
-// NewsFetcher defines the interface for scraping ForexFactory calendar.
+// NewsFetcher defines the interface for fetching the economic calendar.
 type NewsFetcher interface {
 	ScrapeCalendar(ctx context.Context, week string) ([]domain.NewsEvent, error)
 	ScrapeActuals(ctx context.Context, date string) ([]domain.NewsEvent, error)

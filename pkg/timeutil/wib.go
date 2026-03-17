@@ -123,7 +123,7 @@ func ParseDateTimeISO(s string) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02T15:04:05", s, WIB)
 }
 
-// ParseFFDate parses ForexFactory date formats.
+// ParseFFDate parses common calendar date formats.
 // Handles: "Mon Jan 2" (current year assumed), "Jan 2", "2006-01-02".
 func ParseFFDate(s string) (time.Time, error) {
 	now := NowWIB()
@@ -146,7 +146,7 @@ func ParseFFDate(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("timeutil: cannot parse FF date %q", s)
 }
 
-// ParseFFTime parses ForexFactory time like "8:30am", "2:00pm", "All Day", "Tentative".
+// ParseFFTime parses common calendar time strings like "8:30am", "2:00pm", "All Day", "Tentative".
 // Returns the time component and a boolean indicating if it's a valid time (not All Day/Tentative).
 func ParseFFTime(s string) (hour, minute int, valid bool) {
 	if s == "" || s == "All Day" || s == "Tentative" || s == "Day 1" || s == "Day 2" {

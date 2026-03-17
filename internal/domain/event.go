@@ -85,8 +85,8 @@ const (
 // FFEvent — Core Economic Calendar Event
 // ---------------------------------------------------------------------------
 
-// FFEvent represents a single economic calendar event from ForexFactory.
-// Enhanced from v1 with revision tracking, speech details, and metadata.
+// FFEvent represents a single economic calendar event.
+// Used by the legacy monolith (main.go) — kept for backward compatibility.
 type FFEvent struct {
 	// Core identification
 	ID       string `json:"id"`       // Unique event ID (generated: {date}:{currency}:{title_hash})
@@ -125,7 +125,7 @@ type FFEvent struct {
 
 	// Scraping metadata
 	ScrapedAt time.Time `json:"scraped_at"`          // When this data was scraped
-	Source    string    `json:"source"`              // "forexfactory", "faireconomy", "manual"
+	Source    string    `json:"source"`              // "mql5", "manual"
 }
 
 // HasActual returns true if the actual value has been released.

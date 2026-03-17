@@ -623,7 +623,7 @@ func fmtWeek(events []FFEvent) string {
 		}
 		sb.WriteString("\n")
 	}
-	sb.WriteString("<i>Source: ForexFactory</i>")
+	sb.WriteString("<i>Source: MQL5 Economic Calendar</i>")
 	return sb.String()
 }
 
@@ -670,7 +670,7 @@ func fmtHigh(events []FFEvent) string {
 			sb.WriteString("    " + strings.Join(dp, " | ") + "\n")
 		}
 	}
-	sb.WriteString("\n<i>Source: ForexFactory</i>")
+	sb.WriteString("\n<i>Source: MQL5 Economic Calendar</i>")
 	return sb.String()
 }
 

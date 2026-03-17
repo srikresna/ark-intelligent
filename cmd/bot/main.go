@@ -138,7 +138,7 @@ func main() {
 		COTFetch: cfg.COTFetchInterval,
 	})
 
-	// News Background Scheduler (always starts — uses free ForexFactory API)
+	// News Background Scheduler (always starts — uses MQL5 Economic Calendar)
 	newsSched := newssvc.NewScheduler(newsRepo, newsFetcher, aiAnalyzer, bot, prefsRepo)
 	newsSched.Start(ctx)
 	log.Println("[MAIN] News Background scheduler started")
