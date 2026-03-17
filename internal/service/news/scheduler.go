@@ -339,11 +339,17 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 
 		minsSinceRelease := int(now.Sub(e.TimeWIB).Minutes())
 
-		// Micro-Scrape targets: +1min, +5min, +10min after scheduled release
-		if minsSinceRelease == 1 || minsSinceRelease == 5 || minsSinceRelease == 10 {
-			log.Printf("[NEWS SCHEDULER] Micro-scrape triggered by %s %s (+%dm)", e.Currency, e.Event, minsSinceRelease)
-			triggerScrape = true
-			break
+		// Micro-Scrape targets: within 30 minutes after scheduled release.
+		// Check at specific intervals to avoid hammering MQL5, but broad enough
+		// to survive bot restarts or timing jitter that miss exact minutes.
+		if minsSinceRelease >= 0 && minsSinceRelease <= 30 {
+			if minsSinceRelease == 1 || minsSinceRelease == 3 || minsSinceRelease == 5 ||
+				minsSinceRelease == 10 || minsSinceRelease == 15 || minsSinceRelease == 20 ||
+				minsSinceRelease == 30 {
+				log.Printf("[NEWS SCHEDULER] Micro-scrape triggered by %s %s (+%dm)", e.Currency, e.Event, minsSinceRelease)
+				triggerScrape = true
+				break
+			}
 		}
 	}
 
@@ -413,9 +419,19 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 			analysisStr, _ = s.aiAnalyzer.AnalyzeActualRelease(ctx, ev, prefs.Language)
 		}
 
+		// Compute direction arrow (simple string-compare fallback)
+		direction := "⚪"
+		if ev.Actual != "" && ev.Forecast != "" && ev.Actual != ev.Forecast {
+			if ev.Actual > ev.Forecast {
+				direction = "🟢"
+			} else {
+				direction = "🔴"
+			}
+		}
+
 		html := fmt.Sprintf("📈 <b>News Actual Release!</b>\n\n%s <b>%s</b>\n", ev.FormatImpactColor(), ev.Event)
 		html += fmt.Sprintf("Currency: <b>%s</b>\n", ev.Currency)
-		html += fmt.Sprintf("Actual: <b>%s</b> (Forecast: %s / Prev: %s)\n", ev.Actual, ev.Forecast, ev.Previous)
+		html += fmt.Sprintf("Actual: <b>%s %s</b> (Forecast: %s / Prev: %s)\n", ev.Actual, direction, ev.Forecast, ev.Previous)
 
 		if analysisStr != "" {
 			html += fmt.Sprintf("\n💡 <b>AI Analysis:</b>\n%s", analysisStr)
@@ -439,6 +455,9 @@ func (s *Scheduler) runInitialSync(ctx context.Context) {
 	events, _ := s.repo.GetByDate(ctx, dateStr)
 	if len(events) > 0 {
 		log.Println("[NEWS SCHEDULER] Initial sync skipped: data already exists for today.")
+		// Still run a startup micro-scrape to catch any actuals missed during downtime.
+		log.Println("[NEWS SCHEDULER] Running startup missed-actuals check...")
+		s.triggerMicroScrape(ctx, dateStr, "startup-check")
 		return
 	}
 

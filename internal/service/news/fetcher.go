@@ -154,9 +154,27 @@ func (f *MQL5Fetcher) ScrapeCalendar(ctx context.Context, week string) ([]domain
 	return events, nil
 }
 
-// ScrapeActuals fetches today's events (for micro-scrape to pick up actuals).
+// ScrapeActuals fetches events for a specific day using a precise from/to range.
+// date format: "20060102" (WIB). Falls back to "this" week on parse error.
 func (f *MQL5Fetcher) ScrapeActuals(ctx context.Context, date string) ([]domain.NewsEvent, error) {
-	return f.ScrapeCalendar(ctx, "this")
+	t, err := time.ParseInLocation("20060102", date, wibLocation)
+	if err != nil {
+		log.Printf("[MQL5] ScrapeActuals: bad date %q, falling back to this week: %v", date, err)
+		return f.ScrapeCalendar(ctx, "this")
+	}
+
+	// Build a [00:00, 23:59:59] WIB window for that specific day, converted to UTC for MQL5.
+	from := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, wibLocation).UTC().Format("2006-01-02T15:04:05")
+	to := time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, wibLocation).UTC().Format("2006-01-02T15:04:05")
+
+	log.Printf("[MQL5] ScrapeActuals date=%s from=%s to=%s", date, from, to)
+	raw, err := f.fetchMQL5(ctx, "1", from, to)
+	if err != nil {
+		return nil, fmt.Errorf("mql5 fetch actuals failed: %w", err)
+	}
+	events := convertEvents(raw, "low", "medium", "high", "holiday", "none")
+	log.Printf("[MQL5] ScrapeActuals returned %d events", len(events))
+	return events, nil
 }
 
 // ScrapeMonth fetches all events for a given month.
