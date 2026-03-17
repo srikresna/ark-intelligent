@@ -43,6 +43,7 @@ type scrapedEvent struct {
 	Actual    string `json:"actual"`
 	Previous  string `json:"previous"`
 	Consensus string `json:"consensus"`
+	Forecast  string `json:"forecast"`
 }
 
 type scrapeResp struct {
@@ -105,7 +106,12 @@ func (f *FirecrawlFetcher) doScrape(ctx context.Context, targetURL string) ([]sc
 		URL:     targetURL,
 		Formats: []string{"json"},
 		JSONOptions: map[string]interface{}{
-			"prompt": "Extract economic calendar events from the table. Combine date headers with rows to provide 'date' (e.g., 'Tuesday March 17 2026'). Extract time (e.g. '12:30 AM'), country (2-letter code), event name, actual, previous, and consensus/forecast.",
+			"prompt": `Extract ALL economic calendar events from the layout table associated with each date header. DO NOT SKIP any row.
+VERY IMPORTANT FOR COLUMN ALIGNMENT: The table columns are strictly ordered left to right: [Time], [Country], [Event Name], [Actual], [Previous], [Consensus], [Forecast].
+If a cell value is EMPTY (like no Actual for an upcoming event), DO NOT shift the next number left! Place it strictly in its correct struct key based on the column index.
+
+NUMERCIAL VALUE EXTRACTION: For Actual, Previous, Consensus, and Forecast, strictly extract the VISIBLE VISUAL numerical values (e.g. '0.5%', '15.5K', '58.3', '-12.0'). 
+DO NOT extract underlying link identifiers, anchor tags, historical code IDs, or text tracking codes (like 'USAAECW' or 'UNITEDSTAPENHOMSAL').`,
 			"schema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -121,6 +127,7 @@ func (f *FirecrawlFetcher) doScrape(ctx context.Context, targetURL string) ([]sc
 								"actual":    map[string]interface{}{"type": "string"},
 								"previous":  map[string]interface{}{"type": "string"},
 								"consensus": map[string]interface{}{"type": "string"},
+								"forecast":  map[string]interface{}{"type": "string"},
 							},
 							"required": []string{"date", "time", "country", "event"},
 						},
@@ -215,10 +222,13 @@ func mergeEvents(medHigh, high []scrapedEvent) []domain.NewsEvent {
 			Date:     wibTime.Format("Mon Jan 2"),
 			Time:     wibTime.Format("3:04pm"),
 			TimeWIB:  wibTime,
-			Currency: strings.ToUpper(raw.Country),
+			Currency: countryToCurrency(raw.Country),
 			Event:    raw.Event,
 			Impact:   impact,
-			Forecast: raw.Consensus,
+			Forecast: func() string {
+				if raw.Forecast != "" { return raw.Forecast }
+				return raw.Consensus
+			}(),
 			Previous: raw.Previous,
 			Actual:   raw.Actual,
 			Status:   statusFromActual(raw.Actual),
@@ -232,4 +242,18 @@ func statusFromActual(actual string) string {
 		return "released"
 	}
 	return "upcoming"
+}
+
+func countryToCurrency(c string) string {
+	switch strings.ToUpper(c) {
+	case "US": return "USD"
+	case "EU", "DE", "FR", "IT", "ES", "NL": return "EUR"
+	case "JP": return "JPY"
+	case "GB": return "GBP"
+	case "AU": return "AUD"
+	case "NZ": return "NZD"
+	case "CA": return "CAD"
+	case "CH": return "CHF"
+	default: return strings.ToUpper(c)
+	}
 }

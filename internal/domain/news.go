@@ -27,9 +27,9 @@ func (e NewsEvent) FormatImpactColor() string {
 	case "high":
 		return "🔴"
 	case "medium":
-		return "🟡"
+		return "🟠"
 	case "low":
-		return "🟢"
+		return "🟡"
 	default:
 		return "⚪"
 	}

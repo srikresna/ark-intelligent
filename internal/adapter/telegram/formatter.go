@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -58,6 +59,10 @@ func directionArrow(actual, forecast string) string {
 // FormatCalendarDay builds a message for a single day of events.
 func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent, filter string) string {
 	var b strings.Builder
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].TimeWIB.Before(events[j].TimeWIB)
+	})
 	
 	// Format title
 	b.WriteString(fmt.Sprintf("📅 <b>Economic Calendar</b>\n<i>Date: %s</i>\n\n", dateStr))
@@ -96,6 +101,11 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 // FormatCalendarWeek summarizes all events in a week based on the filter.
 func (f *Formatter) FormatCalendarWeek(weekStart string, events []domain.NewsEvent, filter string) string {
 	var b strings.Builder
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].TimeWIB.Before(events[j].TimeWIB)
+	})
+
 	b.WriteString(fmt.Sprintf("📅 <b>Weekly Economic Calendar</b>\n<i>Week starting: %s</i>\n\n", weekStart))
 
 	if len(events) == 0 {

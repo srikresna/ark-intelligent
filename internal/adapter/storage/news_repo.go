@@ -104,6 +104,10 @@ func (r *NewsRepo) GetByWeek(ctx context.Context, weekStart string) ([]domain.Ne
 		return nil, fmt.Errorf("invalid weekStart format: %w", err)
 	}
 
+	for startT.Weekday() != time.Monday {
+		startT = startT.AddDate(0, 0, -1)
+	}
+
 	// Iterate for 7 days
 	for i := 0; i < 7; i++ {
 		dateStr := startT.AddDate(0, 0, i).Format("20060102")
