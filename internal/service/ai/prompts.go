@@ -48,7 +48,7 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 		b.WriteString(fmt.Sprintf("Intraday Context: OITrend=%s STBias=%s\n", a.OITrend, a.ShortTermBias))
 		b.WriteString(fmt.Sprintf("Sentiment: %.1f | Crowding: %.1f | Divergence: %v\n",
 			a.SentimentScore, a.CrowdingIndex, a.DivergenceFlag))
-		b.WriteString(fmt.Sprintf("Signals: Comm=%s Spec=%s SmallSpec=%s\n",	
+		b.WriteString(fmt.Sprintf("Signals: Comm=%s Spec=%s SmallSpec=%s\n",
 			a.CommercialSignal, a.SpeculatorSignal, a.SmallSpecSignal))
 		b.WriteString(fmt.Sprintf("Concentration: Top4=%.1f%% Top8=%.1f%%\n\n",
 			a.Top4Concentration, a.Top8Concentration))
@@ -67,7 +67,7 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string) string {
 	var b strings.Builder
 	b.WriteString("Generate a comprehensive weekly forex fundamental outlook.\n")
-	
+
 	if lang == "en" {
 		b.WriteString("PLEASE RESPOND IN ENGLISH.\n\n")
 	} else {
@@ -91,8 +91,6 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string) string {
 		}
 		b.WriteString("\n")
 	}
-
-
 
 	b.WriteString("\nProvide a structured weekly outlook in INDONESIAN:\n")
 	b.WriteString("1. MACRO THEME: Tema utama penggerak pasar minggu ini\n")
@@ -133,7 +131,7 @@ func BuildCrossMarketPrompt(cotData map[string]*domain.COTAnalysis) string {
 func BuildNewsOutlookPrompt(events []domain.NewsEvent, lang string) string {
 	var b strings.Builder
 	b.WriteString("Analyze the following economic calendar events for the week.\n")
-	
+
 	if lang == "en" {
 		b.WriteString("PLEASE RESPOND IN ENGLISH.\n\n")
 	} else {
@@ -162,7 +160,7 @@ func BuildNewsOutlookPrompt(events []domain.NewsEvent, lang string) string {
 func BuildCombinedOutlookPrompt(data ports.WeeklyData) string {
 	var b strings.Builder
 	b.WriteString("Generate a fused analysis combining COT Speculator Positioning and Upcoming Economic Catalysts.\n")
-	
+
 	if data.Language == "en" {
 		b.WriteString("PLEASE RESPOND IN ENGLISH.\n\n")
 	} else {

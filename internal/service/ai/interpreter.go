@@ -62,8 +62,6 @@ func (ip *Interpreter) AnalyzeCOT(ctx context.Context, analyses []domain.COTAnal
 	return formatResponse("COT ANALYSIS", result), nil
 }
 
-
-
 // GenerateWeeklyOutlook creates a comprehensive weekly market outlook.
 func (ip *Interpreter) GenerateWeeklyOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
 	outlookData := WeeklyOutlookData{
@@ -99,40 +97,40 @@ func (ip *Interpreter) AnalyzeNewsOutlook(ctx context.Context, events []domain.N
 	if len(events) == 0 {
 		return "No upcoming economic events found for the week.", nil
 	}
-	
+
 	prompt := BuildNewsOutlookPrompt(events, lang)
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
 		log.Printf("[ai] news outlook failed: %v", err)
 		return "News outlook unavailable.", nil
 	}
-	
+
 	return formatResponse("NEWS OUTLOOK", result), nil
 }
 
 // AnalyzeCombinedOutlook fuses COT macro positioning with upcoming calendar catalysts.
 func (ip *Interpreter) AnalyzeCombinedOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
 	prompt := BuildCombinedOutlookPrompt(data)
-	
+
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
 		log.Printf("[ai] combined outlook failed: %v", err)
 		return "Combined outlook unavailable.", nil
 	}
-	
+
 	return formatResponse("FUSED OUTLOOK (COT + NEWS)", result), nil
 }
 
 // AnalyzeActualRelease evaluates a single economic release against its forecast.
 func (ip *Interpreter) AnalyzeActualRelease(ctx context.Context, event domain.NewsEvent, lang string) (string, error) {
 	prompt := BuildActualReleasePrompt(event, lang)
-	
+
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
 		log.Printf("[ai] actual release flash failed: %v", err)
 		return "", err
 	}
-	
+
 	return result, nil // no header needed for inline alert
 }
 
@@ -182,7 +180,6 @@ func (ip *Interpreter) GenerateAllInsights(ctx context.Context, data WeeklyOutlo
 		throttle()
 	}
 
-
 	log.Printf("[ai] generated %d insights", len(results))
 	return results, nil
 }
@@ -214,7 +211,6 @@ func (ip *Interpreter) fallbackCOTSummary(analyses []domain.COTAnalysis) string 
 
 	return b.String()
 }
-
 
 func (ip *Interpreter) fallbackWeeklyOutlook(data WeeklyOutlookData) string {
 	var b strings.Builder

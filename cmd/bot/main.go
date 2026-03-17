@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+
 	"github.com/arkcode369/ff-calendar-bot/internal/adapter/storage"
 	tgbot "github.com/arkcode369/ff-calendar-bot/internal/adapter/telegram"
 	"github.com/arkcode369/ff-calendar-bot/internal/config"
@@ -70,16 +71,15 @@ func main() {
 	log.Println("[MAIN] Storage layer initialized")
 	logStorageSize(db)
 
-
 	// -----------------------------------------------------------------------
-	// 5. Telegram bot
+	// 4. Telegram bot
 	// -----------------------------------------------------------------------
 	bot := tgbot.NewBot(cfg.BotToken, cfg.ChatID)
 
 	log.Println("[MAIN] Telegram bot created")
 
 	// -----------------------------------------------------------------------
-	// 6. AI layer (optional — graceful degradation)
+	// 5. AI layer (optional — graceful degradation)
 	// -----------------------------------------------------------------------
 	var aiAnalyzer *aisvc.Interpreter
 
@@ -96,7 +96,7 @@ func main() {
 	}
 
 	// -----------------------------------------------------------------------
-	// 7. Service layer
+	// 6. Service layer
 	// -----------------------------------------------------------------------
 
 	// COT services
@@ -108,7 +108,7 @@ func main() {
 	log.Println("[MAIN] Service layer initialized")
 
 	// -----------------------------------------------------------------------
-	// 8. Telegram handler (registers commands on bot)
+	// 7. Telegram handler (registers commands on bot)
 	// -----------------------------------------------------------------------
 	_ = tgbot.NewHandler(
 		bot,
@@ -123,7 +123,7 @@ func main() {
 	log.Println("[MAIN] Telegram handler registered")
 
 	// -----------------------------------------------------------------------
-	// 9. Background scheduler
+	// 8. Background scheduler
 	// -----------------------------------------------------------------------
 	sched := scheduler.New(&scheduler.Deps{
 		COTAnalyzer: cotAnalyzer,
@@ -146,14 +146,13 @@ func main() {
 	log.Println("[MAIN] Background schedulers started")
 
 	// -----------------------------------------------------------------------
-	// 10. Initial data load (non-blocking)
+	// 9. Initial data load (non-blocking)
 	// -----------------------------------------------------------------------
 	go func() {
 		initCtx, initCancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer initCancel()
 
 		log.Println("[MAIN] Running initial data load...")
-
 
 		// Fetch and sync COT history (this pulls 52 weeks for all contracts)
 		log.Println("[MAIN] Syncing COT history (this may take a moment)...")
@@ -179,7 +178,7 @@ func main() {
 	}()
 
 	// -----------------------------------------------------------------------
-	// 11. Signal handling & graceful shutdown
+	// 10. Signal handling & graceful shutdown
 	// -----------------------------------------------------------------------
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

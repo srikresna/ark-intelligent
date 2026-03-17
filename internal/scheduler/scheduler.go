@@ -77,7 +77,6 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	}
 	s.running = true
 
-
 	// COT fetch + analysis
 	s.startJob(ctx, "cot-fetch", intervals.COTFetch, s.jobCOTFetch)
 
@@ -177,7 +176,6 @@ func (s *Scheduler) runJob(ctx context.Context, name string, fn jobFunc) {
 // Job Implementations
 // ---------------------------------------------------------------------------
 
-
 // jobCOTFetch fetches latest COT data from CFTC and runs analysis.
 func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	// 1. Get current latest date before fetch
@@ -208,7 +206,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 		return
 	}
 
-	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nLatest positioning data has been fetched and analyzed. Use /cot to view the new insights.", 
+	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nLatest positioning data has been fetched and analyzed. Use /cot to view the new insights.",
 		date.Format("Monday, 02 Jan 2006"))
 
 	count := 0
@@ -226,8 +224,6 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	log.Printf("[SCHED:broadcast] Sent COT release alert to %d users", count)
 }
-
-
 
 // jobWeeklyOutlook generates and sends the weekly outlook on Sunday evening.
 // Fires every hour but only executes on Sunday between 18:00-18:59 WIB.

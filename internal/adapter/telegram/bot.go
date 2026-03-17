@@ -96,7 +96,6 @@ type Bot struct {
 
 	// Polling state
 	offset int
-	mu     sync.Mutex
 
 	// Rate limiting: Telegram allows ~30 msg/sec to same chat
 	sendMu   sync.Mutex
@@ -176,9 +175,9 @@ func (b *Bot) StartPolling(ctx context.Context) error {
 // getUpdates calls the Telegram getUpdates API with long polling.
 func (b *Bot) getUpdates(ctx context.Context, offset, limit, timeout int) ([]Update, error) {
 	params := map[string]interface{}{
-		"offset":  offset,
-		"limit":   limit,
-		"timeout": timeout,
+		"offset":          offset,
+		"limit":           limit,
+		"timeout":         timeout,
 		"allowed_updates": []string{"message", "callback_query"},
 	}
 

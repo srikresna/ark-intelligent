@@ -19,16 +19,16 @@ import (
 
 // Handler holds all service dependencies and registers commands on the bot.
 type Handler struct {
-	bot        *Bot
-	fmt        *Formatter
-	kb         *KeyboardBuilder
+	bot *Bot
+	fmt *Formatter
+	kb  *KeyboardBuilder
 
 	// Repositories
-	eventRepo    ports.EventRepository
-	cotRepo      ports.COTRepository
-	prefsRepo    ports.PrefsRepository
-	newsRepo     ports.NewsRepository
-	newsFetcher  ports.NewsFetcher
+	eventRepo   ports.EventRepository
+	cotRepo     ports.COTRepository
+	prefsRepo   ports.PrefsRepository
+	newsRepo    ports.NewsRepository
+	newsFetcher ports.NewsFetcher
 
 	aiAnalyzer ports.AIAnalyzer
 }
@@ -44,15 +44,15 @@ func NewHandler(
 	aiAnalyzer ports.AIAnalyzer,
 ) *Handler {
 	h := &Handler{
-		bot:          bot,
-		fmt:          NewFormatter(),
-		kb:           NewKeyboardBuilder(),
-		eventRepo:    eventRepo,
-		cotRepo:      cotRepo,
-		prefsRepo:    prefsRepo,
-		newsRepo:     newsRepo,
-		newsFetcher:  newsFetcher,
-		aiAnalyzer:   aiAnalyzer,
+		bot:         bot,
+		fmt:         NewFormatter(),
+		kb:          NewKeyboardBuilder(),
+		eventRepo:   eventRepo,
+		cotRepo:     cotRepo,
+		prefsRepo:   prefsRepo,
+		newsRepo:    newsRepo,
+		newsFetcher: newsFetcher,
+		aiAnalyzer:  aiAnalyzer,
 	}
 
 	// Register all commands
@@ -112,7 +112,6 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {
 	return h.cmdStart(ctx, chatID, userID, args)
 }
-
 
 // ---------------------------------------------------------------------------
 // /cot — COT positioning analysis
@@ -241,9 +240,6 @@ func (h *Handler) cbCOTDetail(ctx context.Context, chatID string, msgID int, use
 	return h.sendCOTDetail(ctx, chatID, contractCode, contractCode, isRaw, msgID)
 }
 
-
-
-
 // ---------------------------------------------------------------------------
 // /outlook — AI weekly market outlook
 // ---------------------------------------------------------------------------
@@ -288,10 +284,10 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	var result string
 
 	if subcmd == "news" {
-		weekEvts, err := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
-		if err != nil {
+		weekEvts, fetchErr := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
+		if fetchErr != nil {
 			_ = h.bot.EditMessage(ctx, chatID, placeholderID, "Failed to load news for analysis.")
-			return err
+			return fetchErr
 		}
 		result, err = h.aiAnalyzer.AnalyzeNewsOutlook(ctx, weekEvts, prefs.Language)
 	} else if subcmd == "combine" {
@@ -357,7 +353,7 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 			log.Printf("[HANDLER] Failed to read CHANGELOG.md: %v", err)
 			return h.bot.EditMessage(ctx, chatID, msgID, "Changelog unavailable.")
 		}
-		
+
 		html := fmt.Sprintf("🦅 <b>ARK Intelligence Changelog</b>\n\n%s", string(content))
 		// Optional: Add a back button to settings
 		kb := h.kb.SettingsMenu(prefs)
@@ -454,7 +450,6 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 	return err
 }
 
-
 // ---------------------------------------------------------------------------
 // Currency-to-contract mapping
 // ---------------------------------------------------------------------------
@@ -462,14 +457,14 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 // currencyToContractCode maps 3-letter currency codes to CFTC contract codes.
 func currencyToContractCode(currency string) string {
 	mapping := map[string]string{
-		"EUR": "099741", // Euro FX
-		"GBP": "096742", // British Pound
-		"JPY": "097741", // Japanese Yen
-		"AUD": "232741", // Australian Dollar
-		"NZD": "112741", // New Zealand Dollar
-		"CAD": "090741", // Canadian Dollar
-		"CHF": "092741", // Swiss Franc
-		"USD": "098662", // US Dollar Index
+		"EUR":  "099741", // Euro FX
+		"GBP":  "096742", // British Pound
+		"JPY":  "097741", // Japanese Yen
+		"AUD":  "232741", // Australian Dollar
+		"NZD":  "112741", // New Zealand Dollar
+		"CAD":  "090741", // Canadian Dollar
+		"CHF":  "092741", // Swiss Franc
+		"USD":  "098662", // US Dollar Index
 		"GOLD": "088691", // Gold
 		"XAU":  "088691", // Gold alias
 		"OIL":  "067651", // Crude Oil
@@ -487,7 +482,7 @@ func currencyToContractCode(currency string) string {
 
 func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, args string) error {
 	now := timeutil.NowWIB()
-	
+
 	if strings.ToLower(strings.TrimSpace(args)) == "week" {
 		events, err := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
 		if err != nil {
@@ -516,7 +511,7 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 func (h *Handler) cbNewsFilter(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
 	action := strings.TrimPrefix(data, "cal:filter:") // e.g., "high:20260317:day"
 	parts := strings.Split(action, ":")
-	
+
 	filter := "med"
 	dateStr := timeutil.NowWIB().Format("20060102")
 	isWeek := false
@@ -555,7 +550,7 @@ func (h *Handler) cbNewsFilter(ctx context.Context, chatID string, msgID int, us
 }
 
 func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
-	action := strings.TrimPrefix(data, "cal:nav:") 
+	action := strings.TrimPrefix(data, "cal:nav:")
 	parts := strings.Split(action, ":")
 	if len(parts) < 2 {
 		return nil

@@ -2,7 +2,6 @@ package cot
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/arkcode369/ff-calendar-bot/internal/domain"
@@ -246,10 +245,6 @@ func classifyROCSignal(roc4w, acceleration float64) string {
 	default:
 		return "NEUTRAL"
 	}
-}
-
-func absFloat(v float64) float64 {
-	return math.Abs(v)
 }
 
 func extractNetsFloat(history []domain.COTRecord, fn func(domain.COTRecord) float64) []float64 {

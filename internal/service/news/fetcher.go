@@ -31,20 +31,20 @@ func NewMQL5Fetcher() *MQL5Fetcher {
 
 // mql5Event is the raw JSON structure returned by the MQL5 API.
 type mql5Event struct {
-	ID                int    `json:"Id"`
-	EventName         string `json:"EventName"`
-	Importance        string `json:"Importance"`   // "low", "medium", "high"
-	CurrencyCode      string `json:"CurrencyCode"` // Already the currency code e.g. "USD"
-	Country           int    `json:"Country"`       // int country code
-	ActualValue       string `json:"ActualValue"`
-	ForecastValue     string `json:"ForecastValue"`
-	PreviousValue     string `json:"PreviousValue"`
-	OldPreviousValue  string `json:"OldPreviousValue"`
-	FullDate          string `json:"FullDate"`      // "2026-03-17T14:00:00" — New York (ET)
-	ReleaseDate       int64  `json:"ReleaseDate"`   // Unix milliseconds (unused; use FullDate)
-	ImpactDirection   int    `json:"ImpactDirection"` // 0=neutral, 1=positive, 2=negative
-	ImpactValue       string `json:"ImpactValue"`
-	Processed         int    `json:"Processed"` // 1=released, 0=upcoming
+	ID               int    `json:"Id"`
+	EventName        string `json:"EventName"`
+	Importance       string `json:"Importance"`   // "low", "medium", "high"
+	CurrencyCode     string `json:"CurrencyCode"` // Already the currency code e.g. "USD"
+	Country          int    `json:"Country"`      // int country code
+	ActualValue      string `json:"ActualValue"`
+	ForecastValue    string `json:"ForecastValue"`
+	PreviousValue    string `json:"PreviousValue"`
+	OldPreviousValue string `json:"OldPreviousValue"`
+	FullDate         string `json:"FullDate"`        // "2026-03-17T14:00:00" — New York (ET)
+	ReleaseDate      int64  `json:"ReleaseDate"`     // Unix milliseconds (unused; use FullDate)
+	ImpactDirection  int    `json:"ImpactDirection"` // 0=neutral, 1=positive, 2=negative
+	ImpactValue      string `json:"ImpactValue"`
+	Processed        int    `json:"Processed"` // 1=released, 0=upcoming
 }
 
 // mql5DateMode — MQL5 supports several date modes; we use mode 1 (custom date range).
@@ -54,8 +54,9 @@ const mql5DateMode = "1"
 const mql5Endpoint = "https://www.mql5.com/en/economic-calendar/content"
 
 // importance values:
-//   4 = Medium + High (we filter ourselves from the response)
-//   We always fetch with importance=4 and filter in Go.
+//
+//	4 = Medium + High (we filter ourselves from the response)
+//	We always fetch with importance=4 and filter in Go.
 const mql5ImportanceFilter = "4"
 
 // currencies bitmask — 262143 = all major currencies

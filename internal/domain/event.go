@@ -59,7 +59,7 @@ func ParseImpactLevel(s string) ImpactLevel {
 type EventCategory string
 
 const (
-	CategoryEconomicIndicator EventCategory = "INDICATOR"  // GDP, CPI, NFP, etc.
+	CategoryEconomicIndicator EventCategory = "INDICATOR"    // GDP, CPI, NFP, etc.
 	CategoryCentralBank       EventCategory = "CENTRAL_BANK" // Rate decisions, minutes
 	CategorySpeech            EventCategory = "SPEECH"       // Fed/ECB/BOE speeches
 	CategoryAuction           EventCategory = "AUCTION"      // Bond auctions
@@ -95,9 +95,9 @@ type FFEvent struct {
 	Country  string `json:"country"`  // Country name (e.g., "United States")
 
 	// Timing
-	Date    time.Time `json:"date"`     // Event date in WIB
-	Time    string    `json:"time"`     // Original time string (e.g., "8:30pm", "All Day", "Tentative")
-	IsAllDay bool     `json:"is_all_day"` // True for all-day events (holidays, etc.)
+	Date     time.Time `json:"date"`       // Event date in WIB
+	Time     string    `json:"time"`       // Original time string (e.g., "8:30pm", "All Day", "Tentative")
+	IsAllDay bool      `json:"is_all_day"` // True for all-day events (holidays, etc.)
 
 	// Impact & category
 	Impact   ImpactLevel   `json:"impact"`
@@ -108,10 +108,10 @@ type FFEvent struct {
 	Forecast string `json:"forecast"` // Market consensus forecast
 	Previous string `json:"previous"` // Previous period value
 
-	Revision      *EventRevision `json:"revision,omitempty"`       // Non-nil if Previous was revised
-	ReleaseType   ReleaseType    `json:"release_type"`             // Preliminary/Revised/Final/Regular
-	IsPreliminary bool           `json:"is_preliminary"`           // Flash/advance estimate
-	IsFinal       bool           `json:"is_final"`                 // Final release (no more revisions expected)
+	Revision      *EventRevision `json:"revision,omitempty"` // Non-nil if Previous was revised
+	ReleaseType   ReleaseType    `json:"release_type"`       // Preliminary/Revised/Final/Regular
+	IsPreliminary bool           `json:"is_preliminary"`     // Flash/advance estimate
+	IsFinal       bool           `json:"is_final"`           // Final release (no more revisions expected)
 
 	SpeakerName string `json:"speaker_name,omitempty"` // e.g., "Powell", "Lagarde"
 	SpeakerRole string `json:"speaker_role,omitempty"` // e.g., "Fed Chair", "ECB President"
@@ -124,8 +124,8 @@ type FFEvent struct {
 	DetailURL string `json:"detail_url,omitempty"` // Link to historical data page
 
 	// Scraping metadata
-	ScrapedAt time.Time `json:"scraped_at"`          // When this data was scraped
-	Source    string    `json:"source"`              // "mql5", "manual"
+	ScrapedAt time.Time `json:"scraped_at"` // When this data was scraped
+	Source    string    `json:"source"`     // "mql5", "manual"
 }
 
 // HasActual returns true if the actual value has been released.
@@ -196,15 +196,15 @@ const (
 // EventRevision records when a "Previous" value gets revised.
 // Revision momentum is a leading indicator for economic trends.
 type EventRevision struct {
-	EventID       string            `json:"event_id,omitempty"`      // Links to FFEvent.ID
+	EventID       string            `json:"event_id,omitempty"` // Links to FFEvent.ID
 	EventName     string            `json:"event_name"`
 	Currency      string            `json:"currency"`
-	Field         string            `json:"field,omitempty"`         // "actual", "previous", "forecast", "status"
-	RevisionDate  time.Time         `json:"revision_date"`           // When the revision was detected
-	OriginalValue string            `json:"original_value"`          // Original "Previous" value
-	RevisedValue  string            `json:"revised_value"`           // New revised value
-	Direction     RevisionDirection `json:"direction"`               // UP, DOWN, or FLAT
-	Magnitude     float64           `json:"magnitude"`               // Absolute change in numeric terms
+	Field         string            `json:"field,omitempty"` // "actual", "previous", "forecast", "status"
+	RevisionDate  time.Time         `json:"revision_date"`   // When the revision was detected
+	OriginalValue string            `json:"original_value"`  // Original "Previous" value
+	RevisedValue  string            `json:"revised_value"`   // New revised value
+	Direction     RevisionDirection `json:"direction"`       // UP, DOWN, or FLAT
+	Magnitude     float64           `json:"magnitude"`       // Absolute change in numeric terms
 }
 
 // ---------------------------------------------------------------------------

@@ -36,12 +36,12 @@ type Signal struct {
 type SignalType string
 
 const (
-	SignalSmartMoney       SignalType = "SMART_MONEY"
-	SignalExtreme          SignalType = "EXTREME_POSITIONING"
-	SignalDivergence       SignalType = "DIVERGENCE"
-	SignalMomentumShift    SignalType = "MOMENTUM_SHIFT"
-	SignalConcentration    SignalType = "CONCENTRATION"
-	SignalCrowdContrarian  SignalType = "CROWD_CONTRARIAN"
+	SignalSmartMoney      SignalType = "SMART_MONEY"
+	SignalExtreme         SignalType = "EXTREME_POSITIONING"
+	SignalDivergence      SignalType = "DIVERGENCE"
+	SignalMomentumShift   SignalType = "MOMENTUM_SHIFT"
+	SignalConcentration   SignalType = "CONCENTRATION"
+	SignalCrowdContrarian SignalType = "CROWD_CONTRARIAN"
 )
 
 // DetectAll runs all signal detectors on a set of analyses.

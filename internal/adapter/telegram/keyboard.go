@@ -175,7 +175,6 @@ func (kb *KeyboardBuilder) contractLabel(name, code string) string {
 	return code
 }
 
-
 // ---------------------------------------------------------------------------
 // Settings Keyboards
 // ---------------------------------------------------------------------------
@@ -225,7 +224,6 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 	return ports.InlineKeyboard{Rows: rows}
 }
 
-
 // ---------------------------------------------------------------------------
 // Navigation Keyboards
 // ---------------------------------------------------------------------------
@@ -243,7 +241,7 @@ func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKe
 			{Text: "📄 View Raw Data", CallbackData: fmt.Sprintf("cot:raw:%s", code)},
 		})
 	}
-	
+
 	rows = append(rows, []ports.InlineButton{
 		{Text: "<< Back to Overview", CallbackData: "cot:overview"},
 	})

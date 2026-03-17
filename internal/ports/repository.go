@@ -78,7 +78,6 @@ type COTRepository interface {
 	GetLatestReportDate(ctx context.Context) (time.Time, error)
 }
 
-
 // ---------------------------------------------------------------------------
 // PrefsRepository — User preferences persistence
 // ---------------------------------------------------------------------------

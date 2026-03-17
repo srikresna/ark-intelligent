@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -23,7 +22,6 @@ type Config struct {
 
 	// Storage
 	DataDir string // BadgerDB data directory
-
 
 	// COT
 	COTFetchInterval time.Duration // How often to fetch COT data
@@ -55,7 +53,6 @@ func MustLoad() *Config {
 
 		// Storage
 		DataDir: getEnv("DATA_DIR", "/app/data"),
-
 
 		// COT
 		COTFetchInterval: getDuration("COT_FETCH_INTERVAL", 6*time.Hour),
@@ -128,53 +125,6 @@ func getInt(key string, defaultVal int) int {
 			return defaultVal
 		}
 		return n
-	}
-	return defaultVal
-}
-
-func getFloat(key string, defaultVal float64) float64 {
-	if v := os.Getenv(key); v != "" {
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			log.Printf("[CONFIG] Invalid float for %s=%q, using default %f", key, v, defaultVal)
-			return defaultVal
-		}
-		return f
-	}
-	return defaultVal
-}
-
-func getIntSlice(key string, defaultVal []int) []int {
-	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		result := make([]int, 0, len(parts))
-		for _, p := range parts {
-			n, err := strconv.Atoi(strings.TrimSpace(p))
-			if err != nil {
-				continue
-			}
-			result = append(result, n)
-		}
-		if len(result) > 0 {
-			return result
-		}
-	}
-	return defaultVal
-}
-
-func getStringSlice(key string, defaultVal []string) []string {
-	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		result := make([]string, 0, len(parts))
-		for _, p := range parts {
-			s := strings.TrimSpace(p)
-			if s != "" {
-				result = append(result, s)
-			}
-		}
-		if len(result) > 0 {
-			return result
-		}
 	}
 	return defaultVal
 }

@@ -30,8 +30,6 @@ type AIAnalyzer interface {
 	// Output: 3-4 sentence institutional positioning narrative.
 	AnalyzeCOT(ctx context.Context, analyses []domain.COTAnalysis) (string, error)
 
-
-
 	// GenerateWeeklyOutlook generates a comprehensive weekly briefing.
 	// Input: all available data aggregated.
 	// Output: 500-800 word market outlook.

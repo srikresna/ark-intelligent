@@ -19,9 +19,9 @@ import (
 // Primary: CFTC Socrata Open Data API (JSON)
 // Fallback: CFTC bulk CSV download from cftc.gov
 type Fetcher struct {
-	httpClient  *http.Client
-	endpoints   map[string]string // reportType -> url
-	defaultCSV  string
+	httpClient *http.Client
+	endpoints  map[string]string // reportType -> url
+	defaultCSV string
 }
 
 // NewFetcher creates a COT fetcher with modern CFTC endpoints.
@@ -299,19 +299,19 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 		OpenInterest: socrataFloat(sr.OpenInterest),
 
 		// TFF
-		DealerLong:   socrataFloat(sr.DealerPositionsLong),
-		DealerShort:  socrataFloat(sr.DealerPositionsShort),
-		AssetMgrLong: socrataFloat(sr.AssetMgrPositionsLong),
+		DealerLong:    socrataFloat(sr.DealerPositionsLong),
+		DealerShort:   socrataFloat(sr.DealerPositionsShort),
+		AssetMgrLong:  socrataFloat(sr.AssetMgrPositionsLong),
 		AssetMgrShort: socrataFloat(sr.AssetMgrPositionsShort),
-		LevFundLong:  socrataFloat(sr.LevMoneyPositionsLong),
-		LevFundShort: socrataFloat(sr.LevMoneyPositionsShort),
+		LevFundLong:   socrataFloat(sr.LevMoneyPositionsLong),
+		LevFundShort:  socrataFloat(sr.LevMoneyPositionsShort),
 
 		// Disaggregated
-		ProdMercLong:   socrataFloat(sr.ProdMercPositionsLong),
-		ProdMercShort:  socrataFloat(sr.ProdMercPositionsShort),
-		SwapDealerLong: socrataFloat(sr.SwapPositionsLong),
-		SwapDealerShort: socrataFloat(sr.SwapPositionsShort),
-		ManagedMoneyLong: socrataFloat(sr.MMoneyPositionsLong),
+		ProdMercLong:      socrataFloat(sr.ProdMercPositionsLong),
+		ProdMercShort:     socrataFloat(sr.ProdMercPositionsShort),
+		SwapDealerLong:    socrataFloat(sr.SwapPositionsLong),
+		SwapDealerShort:   socrataFloat(sr.SwapPositionsShort),
+		ManagedMoneyLong:  socrataFloat(sr.MMoneyPositionsLong),
 		ManagedMoneyShort: socrataFloat(sr.MMoneyPositionsShort),
 
 		// Shared
@@ -342,18 +342,18 @@ func csvRowToRecord(row []string, colIdx map[string]int, contract domain.COTCont
 		ReportDate:   reportDate,
 		OpenInterest: csvFloat(row, colIdx, "Open_Interest_All"),
 
-		CommLong:     csvFloat(row, colIdx, "Comm_Positions_Long_All"),
-		CommShort:    csvFloat(row, colIdx, "Comm_Positions_Short_All"),
-		SpecLong:     csvFloat(row, colIdx, "NonComm_Positions_Long_All"),
-		SpecShort:    csvFloat(row, colIdx, "NonComm_Positions_Short_All"),
-		SmallLong:    csvFloat(row, colIdx, "NonRept_Positions_Long_All"),
-		SmallShort:   csvFloat(row, colIdx, "NonRept_Positions_Short_All"),
+		CommLong:   csvFloat(row, colIdx, "Comm_Positions_Long_All"),
+		CommShort:  csvFloat(row, colIdx, "Comm_Positions_Short_All"),
+		SpecLong:   csvFloat(row, colIdx, "NonComm_Positions_Long_All"),
+		SpecShort:  csvFloat(row, colIdx, "NonComm_Positions_Short_All"),
+		SmallLong:  csvFloat(row, colIdx, "NonRept_Positions_Long_All"),
+		SmallShort: csvFloat(row, colIdx, "NonRept_Positions_Short_All"),
 
-		CommLongChange:  csvFloat(row, colIdx, "Change_in_Comm_Long_All"),
-		CommShortChange: csvFloat(row, colIdx, "Change_in_Comm_Short_All"),
-		SpecLongChange:  csvFloat(row, colIdx, "Change_in_NonComm_Long_All"),
-		SpecShortChange: csvFloat(row, colIdx, "Change_in_NonComm_Short_All"),
-		SmallLongChange: csvFloat(row, colIdx, "Change_in_NonRept_Long_All"),
+		CommLongChange:   csvFloat(row, colIdx, "Change_in_Comm_Long_All"),
+		CommShortChange:  csvFloat(row, colIdx, "Change_in_Comm_Short_All"),
+		SpecLongChange:   csvFloat(row, colIdx, "Change_in_NonComm_Long_All"),
+		SpecShortChange:  csvFloat(row, colIdx, "Change_in_NonComm_Short_All"),
+		SmallLongChange:  csvFloat(row, colIdx, "Change_in_NonRept_Long_All"),
 		SmallShortChange: csvFloat(row, colIdx, "Change_in_NonRept_Short_All"),
 
 		Top4Long:  csvFloat(row, colIdx, "Pct_of_OI_4_or_Less_Long_All"),
@@ -386,13 +386,6 @@ func getCSVField(row []string, colIdx map[string]int, col string) string {
 		return strings.TrimSpace(row[i])
 	}
 	return ""
-}
-
-func csvInt(row []string, colIdx map[string]int, col string) int64 {
-	s := getCSVField(row, colIdx, col)
-	s = strings.ReplaceAll(s, ",", "")
-	v, _ := strconv.ParseInt(s, 10, 64)
-	return v
 }
 
 func csvFloat(row []string, colIdx map[string]int, col string) float64 {

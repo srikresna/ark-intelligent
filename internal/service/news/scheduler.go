@@ -150,7 +150,7 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 	// For simplicity, we just send to a generic target if we know it, or we rely on user subscriptions.
 	// In the FF bot design, broadcasts go to a default Channel via a specific wrapper.
 	// We'll use SendHTML with empty string which defaults to the global Broadcast if implemented.
-	_, _ = s.messenger.SendHTML(ctx, "", html) 
+	_, _ = s.messenger.SendHTML(ctx, "", html)
 }
 
 func (s *Scheduler) runMicroScrapeLoop(ctx context.Context) {
@@ -170,7 +170,7 @@ func (s *Scheduler) runMicroScrapeLoop(ctx context.Context) {
 func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
-	
+
 	// Hourly Sweep logic (checking for missed/pending data across the day if at top of hour)
 	if now.Minute() == 0 {
 		log.Println("[NEWS SCHEDULER] Running Hourly Slow-Poll Sweep")
@@ -189,9 +189,9 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 		if e.Actual != "" {
 			continue // Already fulfilled
 		}
-		
+
 		minsSinceRelease := int(now.Sub(e.TimeWIB).Minutes())
-		
+
 		// Micro-Scrape targets: +1min, +5min, +10min
 		if minsSinceRelease == 1 || minsSinceRelease == 5 || minsSinceRelease == 10 {
 			log.Printf("[NEWS SCHEDULER] Micro-scrape triggered by %s %s (+%dm)", e.Currency, e.Event, minsSinceRelease)
@@ -255,7 +255,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 	html := fmt.Sprintf("📈 <b>News Actual Release!</b>\n\n%s <b>%s</b>\n", ev.FormatImpactColor(), ev.Event)
 	html += fmt.Sprintf("Data: <b>%s</b>\n", ev.Currency)
 	html += fmt.Sprintf("Actual: <b>%s</b> (Forecast: %s / Prev: %s)\n", ev.Actual, ev.Forecast, ev.Previous)
-	
+
 	if analysisStr != "" {
 		html += fmt.Sprintf("\n💡 <b>AI Analysis:</b>\n%s", analysisStr)
 	}
@@ -266,7 +266,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 func (s *Scheduler) runInitialSync(ctx context.Context) {
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
-	
+
 	events, _ := s.repo.GetByDate(ctx, dateStr)
 	if len(events) > 0 {
 		log.Println("[NEWS SCHEDULER] Initial sync skipped: data already exists for today.")

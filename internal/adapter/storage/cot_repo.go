@@ -288,6 +288,7 @@ func (r *COTRepo) GetAnalysisHistory(_ context.Context, contractCode string, wee
 	}
 	return analyses, nil
 }
+
 // GetLatestReportDate finds the most recent report date across all COT records.
 func (r *COTRepo) GetLatestReportDate(_ context.Context) (time.Time, error) {
 	var latest time.Time

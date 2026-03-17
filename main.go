@@ -16,10 +16,10 @@ import (
 // -- CONFIG -------------------------------------------------------------------
 
 var (
-	BOT_TOKEN   = os.Getenv("BOT_TOKEN")
-	CHAT_ID     = os.Getenv("CHAT_ID")
-	PREFS_FILE  = getEnvDefault("PREFS_FILE", "/app/data/prefs.json")
-	WIB         *time.Location
+	BOT_TOKEN  = os.Getenv("BOT_TOKEN")
+	CHAT_ID    = os.Getenv("CHAT_ID")
+	PREFS_FILE = getEnvDefault("PREFS_FILE", "/app/data/prefs.json")
+	WIB        *time.Location
 )
 
 func getEnvDefault(key, def string) string {
@@ -249,10 +249,10 @@ type TGUpdate struct {
 }
 
 type TGMessage struct {
-	MessageID int    `json:"message_id"`
-	Chat      TGChat `json:"chat"`
+	MessageID int     `json:"message_id"`
+	Chat      TGChat  `json:"chat"`
 	From      *TGUser `json:"from"`
-	Text      string `json:"text"`
+	Text      string  `json:"text"`
 }
 
 type TGChat struct {
@@ -426,7 +426,6 @@ func (b *Bot) getUpdates() ([]TGUpdate, error) {
 }
 
 // -- DATA FETCHER -------------------------------------------------------------
-
 
 func eventKey(e FFEvent) string { return e.Title + "|" + e.Date }
 
@@ -984,7 +983,6 @@ func (b *Bot) handleCommand(chatID int64, userID int64, text string) {
 	case text == "/settings":
 		b.sendWithKB(cid, fmtSettingsMenu(), kbSettingsMenu())
 
-
 	case text == "/chatid":
 		b.sendWithKB(cid, fmt.Sprintf("Chat ID: <code>%d</code>", chatID), kbBack())
 	}
@@ -1156,7 +1154,6 @@ func (b *Bot) safeSend(chatID, text string, kb InlineKeyboardMarkup) {
 
 func (b *Bot) run() {
 	log.Println("[BOT] Starting ARK Community Intelligent v1...")
-
 
 	// Alert check every 30s
 	go func() {

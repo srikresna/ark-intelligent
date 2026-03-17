@@ -82,7 +82,7 @@ func (a *Analyzer) SyncHistory(ctx context.Context) error {
 	log.Printf("[cot] history synced: saved %d records", len(records))
 
 	// Run initial analysis on the synced data for each contract
-	_, err = a.AnalyzeAll(ctx) 
+	_, err = a.AnalyzeAll(ctx)
 	return err
 }
 
@@ -122,7 +122,7 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	analysis.NetPosition = current.GetSmartMoneyNet(rt)
 	analysis.CommercialNet = current.GetCommercialNet(rt)
 	analysis.SmallSpecNet = current.GetSmallSpecNet()
-	
+
 	// Sync legacy fields
 	analysis.NetCommercial = analysis.CommercialNet
 	analysis.NetSmallSpec = analysis.SmallSpecNet

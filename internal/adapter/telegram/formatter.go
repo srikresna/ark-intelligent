@@ -24,23 +24,9 @@ func NewFormatter() *Formatter {
 	return &Formatter{}
 }
 
-// Impact emoji mapping.
-func impactIcon(impact domain.ImpactLevel) string {
-	switch impact {
-	case domain.ImpactHigh:
-		return "🔴"
-	case domain.ImpactMedium:
-		return "🟠"
-	case domain.ImpactLow:
-		return "🟡"
-	default:
-		return "⚪️"
-	}
-}
-
 // directionArrow checks if Actual beats Forecast.
 func directionArrow(actual, forecast string) string {
-	// Need numeric logic if you want to be precise, but since FF returns strings like "3.5%", 
+	// Need numeric logic if you want to be precise, but since FF returns strings like "3.5%",
 	// we'll just return a neutral dot if it's not easily parsed.
 	if actual != "" && forecast != "" {
 		if actual > forecast {
@@ -63,7 +49,7 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].TimeWIB.Before(events[j].TimeWIB)
 	})
-	
+
 	// Format title
 	b.WriteString(fmt.Sprintf("📅 <b>Economic Calendar</b>\n<i>Date: %s</i>\n\n", dateStr))
 
@@ -74,10 +60,18 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 
 	for _, e := range events {
 		// Apply filters before writing lines
-		if filter == "high" && e.Impact != "high" { continue }
-		if filter == "med" && e.Impact != "high" && e.Impact != "medium" { continue }
-		if filter == "usd" && e.Currency != "USD" { continue }
-		if filter == "eur" && e.Currency != "EUR" { continue }
+		if filter == "high" && e.Impact != "high" {
+			continue
+		}
+		if filter == "med" && e.Impact != "high" && e.Impact != "medium" {
+			continue
+		}
+		if filter == "usd" && e.Currency != "USD" {
+			continue
+		}
+		if filter == "eur" && e.Currency != "EUR" {
+			continue
+		}
 
 		timeDisplay := e.Time
 		if !e.TimeWIB.IsZero() {
@@ -86,7 +80,7 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 
 		b.WriteString(fmt.Sprintf("%s <b>%s - %s</b>\n", e.FormatImpactColor(), timeDisplay, e.Currency))
 		b.WriteString(fmt.Sprintf("↳ <i>%s</i>\n", e.Event))
-		
+
 		if e.Actual != "" {
 			b.WriteString(fmt.Sprintf("   Actual: <b>%s</b> %s (Fcast: %s | Prev: %s)\n", e.Actual, directionArrow(e.Actual, e.Forecast), e.Forecast, e.Previous))
 		} else {
@@ -116,10 +110,18 @@ func (f *Formatter) FormatCalendarWeek(weekStart string, events []domain.NewsEve
 	lastDate := ""
 	for _, e := range events {
 		// Apply filters
-		if filter == "high" && e.Impact != "high" { continue }
-		if filter == "med" && e.Impact != "high" && e.Impact != "medium" { continue }
-		if filter == "usd" && e.Currency != "USD" { continue }
-		if filter == "eur" && e.Currency != "EUR" { continue }
+		if filter == "high" && e.Impact != "high" {
+			continue
+		}
+		if filter == "med" && e.Impact != "high" && e.Impact != "medium" {
+			continue
+		}
+		if filter == "usd" && e.Currency != "USD" {
+			continue
+		}
+		if filter == "eur" && e.Currency != "EUR" {
+			continue
+		}
 
 		// Print date header if it changed
 		if e.Date != lastDate {
@@ -137,8 +139,6 @@ func (f *Formatter) FormatCalendarWeek(weekStart string, events []domain.NewsEve
 
 	return b.String()
 }
-
-
 
 // ---------------------------------------------------------------------------
 // COT Formatting
@@ -223,7 +223,7 @@ func (f *Formatter) FormatCOTDetail(a domain.COTAnalysis) string {
 	b.WriteString(f.formatProgressBar(a.COTIndex, 20))
 
 	// Scalper / Intraday Intel
-	b.WriteString(fmt.Sprintf("\n<b>Scalper Intel:</b>\n"))
+	b.WriteString("\n<b>Scalper Intel:</b>\n")
 	b.WriteString(fmt.Sprintf("<code>  4W Momentum:    %s</code>\n", fmtutil.FmtNumSigned(a.SpecMomentum4W, 0)))
 	b.WriteString(fmt.Sprintf("<code>  OI Change WoW:  %s (%s)</code>\n", fmtutil.FmtNumSigned(a.OpenInterestChg, 0), a.OITrend))
 	b.WriteString(fmt.Sprintf("<code>  ST Bias:        %s</code>\n", a.ShortTermBias))
@@ -265,10 +265,9 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 		b.WriteString(fmt.Sprintf("<code>  Short:    %s</code>\n", fmtutil.FmtNum(r.DealerShort, 0)))
 	}
 
-	b.WriteString(fmt.Sprintf("\n<i>Data sourced directly from CFTC</i>"))
+	b.WriteString("\n<i>Data sourced directly from CFTC</i>")
 	return b.String()
 }
-
 
 // ---------------------------------------------------------------------------
 // Weekly Outlook Formatting
@@ -278,7 +277,7 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 func (f *Formatter) FormatWeeklyOutlook(outlook string, date time.Time) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("<b>Weekly Market Outlook</b>\n"))
+	b.WriteString("<b>Weekly Market Outlook</b>\n")
 	b.WriteString(fmt.Sprintf("<i>Week of %s</i>\n\n", date.Format("Jan 2, 2006")))
 	b.WriteString(outlook)
 
@@ -374,27 +373,4 @@ func (f *Formatter) momentumLabel(m domain.MomentumDirection) string {
 	}
 }
 
-// trendLabel converts trend float to readable label.
-func (f *Formatter) trendLabel(t float64) string {
-	switch {
-	case t > 0.3:
-		return "Improving"
-	case t > 0.1:
-		return "Slightly Better"
-	case t > -0.1:
-		return "Flat"
-	case t > -0.3:
-		return "Slightly Worse"
-	default:
-		return "Deteriorating"
-	}
-}
 
-// formatIntSlice joins ints as comma-separated string.
-func (f *Formatter) formatIntSlice(nums []int) string {
-	parts := make([]string, len(nums))
-	for i, n := range nums {
-		parts[i] = fmt.Sprintf("%d", n)
-	}
-	return strings.Join(parts, ", ")
-}

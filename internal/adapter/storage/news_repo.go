@@ -48,7 +48,7 @@ func (r *NewsRepo) SaveEvents(_ context.Context, events []domain.NewsEvent) erro
 		// For simplicity, we can use TimeWIB to format a solid "20060102"
 		dateKeyStr := events[i].TimeWIB.Format("20060102")
 		key := newsKey(dateKeyStr, events[i].ID)
-		
+
 		if err := wb.Set(key, data); err != nil {
 			return fmt.Errorf("batch set news %s: %w", events[i].ID, err)
 		}
@@ -141,10 +141,10 @@ func (r *NewsRepo) GetPending(ctx context.Context, date string) ([]domain.NewsEv
 // UpdateActual updates a specific event's Actual field without touching other records.
 func (r *NewsRepo) UpdateActual(ctx context.Context, id string, actual string) error {
 	// Because keys contain date, we need a prefix scan over all dates to find this ID?
-	// Usually ID is unique, but Badger limits us to prefix. 
+	// Usually ID is unique, but Badger limits us to prefix.
 	// To optimize: we should pass date as well, but Interface only gives ID.
 	// We'll iterate the whole news keys to find it if we don't know the date.
-	
+
 	// A better way: let's scan all news keys that contain the ID.
 	var targetKey []byte
 	var evt domain.NewsEvent
@@ -152,7 +152,7 @@ func (r *NewsRepo) UpdateActual(ctx context.Context, id string, actual string) e
 	err := r.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = []byte("news:")
-		
+
 		it := txn.NewIterator(opts)
 		defer it.Close()
 
@@ -177,7 +177,7 @@ func (r *NewsRepo) UpdateActual(ctx context.Context, id string, actual string) e
 	if actual != "" {
 		evt.Status = "released"
 	}
-	
+
 	// Write back
 	data, _ := json.Marshal(&evt)
 	return r.db.Update(func(txn *badger.Txn) error {
@@ -193,7 +193,7 @@ func (r *NewsRepo) UpdateStatus(ctx context.Context, id string, status string, r
 	err := r.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = []byte("news:")
-		
+
 		it := txn.NewIterator(opts)
 		defer it.Close()
 
@@ -216,7 +216,7 @@ func (r *NewsRepo) UpdateStatus(ctx context.Context, id string, status string, r
 	evt.Status = status
 	evt.RetryCount = retryCount
 	data, _ := json.Marshal(&evt)
-	
+
 	return r.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(targetKey, data)
 	})
