@@ -64,12 +64,21 @@ func (ip *Interpreter) AnalyzeCOT(ctx context.Context, analyses []domain.COTAnal
 }
 
 // GenerateWeeklyOutlook creates a comprehensive weekly market outlook.
+// Gap E: if MacroData is provided in WeeklyData, the FRED macro regime is injected
+// into the COT outlook prompt so the COT outlook is always regime-aware.
 func (ip *Interpreter) GenerateWeeklyOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
 	outlookData := WeeklyOutlookData{
 		COTAnalyses: data.COTAnalyses,
 	}
 
-	prompt := BuildWeeklyOutlookPrompt(outlookData, data.Language)
+	// Gap E: derive regime from MacroData when available
+	var macroRegime *fred.MacroRegime
+	if data.MacroData != nil {
+		r := fred.ClassifyMacroRegime(data.MacroData)
+		macroRegime = &r
+	}
+
+	prompt := BuildWeeklyOutlookPrompt(outlookData, data.Language, macroRegime)
 
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
@@ -94,12 +103,21 @@ func (ip *Interpreter) AnalyzeCrossMarket(ctx context.Context, cotData map[strin
 }
 
 // AnalyzeNewsOutlook generates a calendar-focused weekly intelligence report.
+// Gap E: macroData is fetched from cache (non-blocking) so news analysis
+// gets FRED regime context injected into the prompt automatically.
 func (ip *Interpreter) AnalyzeNewsOutlook(ctx context.Context, events []domain.NewsEvent, lang string) (string, error) {
 	if len(events) == 0 {
 		return "No upcoming economic events found for the week.", nil
 	}
 
-	prompt := BuildNewsOutlookPrompt(events, lang)
+	// Gap E: try to get cached FRED regime — non-fatal if unavailable
+	var macroRegime *fred.MacroRegime
+	if macroData, err := fred.GetCachedOrFetch(ctx); err == nil && macroData != nil {
+		r := fred.ClassifyMacroRegime(macroData)
+		macroRegime = &r
+	}
+
+	prompt := BuildNewsOutlookPrompt(events, lang, macroRegime)
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt, prompt)
 	if err != nil {
 		log.Printf("[ai] news outlook failed: %v", err)

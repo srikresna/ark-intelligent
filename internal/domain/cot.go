@@ -224,6 +224,11 @@ type COTAnalysis struct {
 	AssetMgrZScore float64 `json:"asset_mgr_z_score"` // Z-Score of Asset Mgr Net Position change
 	AssetMgrAlert  bool    `json:"asset_mgr_alert"`   // |Z-Score| > 2.0 or threshold
 
+	// --- H. FRED-Adjusted Scores (Gap B) ---
+	// RegimeAdjustedScore is SentimentScore adjusted by FRED macro regime multiplier per currency.
+	// Range: -100 to +100. Populated after FRED data is available.
+	RegimeAdjustedScore float64 `json:"regime_adjusted_score"`
+
 	// AI interpretation (filled by Gemini)
 	AINarrative string `json:"ai_narrative,omitempty"`
 }

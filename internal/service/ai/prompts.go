@@ -65,7 +65,10 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis) string {
 }
 
 // BuildWeeklyOutlookPrompt creates a prompt for weekly market outlook.
-func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string) string {
+//
+// Gap E: accepts optional macroRegime — if provided, injects FRED macro regime context
+// so the COT-focused outlook is always regime-aware, without requiring /outlook combine.
+func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *fred.MacroRegime) string {
 	var b strings.Builder
 	b.WriteString("Generate a comprehensive weekly forex fundamental outlook.\n")
 
@@ -91,6 +94,16 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string) string {
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
+	}
+
+	// Gap E: inject FRED regime context when available
+	if macroRegime != nil {
+		b.WriteString("=== FRED MACRO REGIME (CONTEXT) ===\n")
+		b.WriteString(fmt.Sprintf("Regime: %s | Risk-Off Score: %d/100\n", macroRegime.Name, macroRegime.Score))
+		b.WriteString(fmt.Sprintf("Yield Curve: %s\n", macroRegime.YieldCurve))
+		b.WriteString(fmt.Sprintf("Financial Stress: %s\n", macroRegime.FinStress))
+		b.WriteString(fmt.Sprintf("Implied Bias: %s\n", macroRegime.Bias))
+		b.WriteString("NOTE: Adjust currency biases above considering this macro regime context.\n\n")
 	}
 
 	b.WriteString("\nProvide a structured weekly outlook in INDONESIAN:\n")
@@ -129,7 +142,10 @@ func BuildCrossMarketPrompt(cotData map[string]*domain.COTAnalysis) string {
 }
 
 // BuildNewsOutlookPrompt creates a prompt for analyzing the weekly economic calendar.
-func BuildNewsOutlookPrompt(events []domain.NewsEvent, lang string) string {
+//
+// Gap E: accepts optional macroRegime — if provided, injects FRED regime context so
+// news analysis is always macro-aware without requiring /outlook combine.
+func BuildNewsOutlookPrompt(events []domain.NewsEvent, lang string, macroRegime *fred.MacroRegime) string {
 	var b strings.Builder
 	b.WriteString("Analyze the following economic calendar events for the week.\n")
 
@@ -146,6 +162,16 @@ func BuildNewsOutlookPrompt(events []domain.NewsEvent, lang string) string {
 				e.Date, e.Currency, e.Event, e.Impact,
 				e.Forecast, e.Previous, e.Actual))
 		}
+	}
+
+	// Gap E: inject FRED regime context when available
+	if macroRegime != nil {
+		b.WriteString("\n=== FRED MACRO REGIME (CONTEXT) ===\n")
+		b.WriteString(fmt.Sprintf("Regime: %s | Risk-Off Score: %d/100\n", macroRegime.Name, macroRegime.Score))
+		b.WriteString(fmt.Sprintf("Yield Curve: %s\n", macroRegime.YieldCurve))
+		b.WriteString(fmt.Sprintf("Financial Stress: %s\n", macroRegime.FinStress))
+		b.WriteString(fmt.Sprintf("Implied Bias: %s\n", macroRegime.Bias))
+		b.WriteString("NOTE: Adjust currency biases above considering this macro regime context.\n")
 	}
 
 	b.WriteString("\nProvide a structured outlook:\n")
