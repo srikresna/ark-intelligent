@@ -58,6 +58,23 @@ func ConfluenceScoreV2(
 		// Normalize: 0..100 raw → -100..+100 (50 = neutral)
 		fredScore := mathutil.Clamp(fredRaw-50, -100, 100)
 
+		// GDP growth factor: positive growth → bullish risk bias
+		if macroData.GDPGrowth != 0 {
+			gdpFactor := 0.0
+			switch {
+			case macroData.GDPGrowth > 3.0:
+				gdpFactor = 10
+			case macroData.GDPGrowth > 1.5:
+				gdpFactor = 5
+			case macroData.GDPGrowth < 0:
+				gdpFactor = -15
+			case macroData.GDPGrowth < 1.0:
+				gdpFactor = -5
+			}
+			// Blend GDP into the FRED component (reduce FRED weight slightly, add GDP)
+			fredScore += gdpFactor * 0.3
+		}
+
 		total := cotScore*0.35 + surpriseScore*0.20 + stressScore*0.15 + fredScore*0.30
 		return mathutil.Clamp(total, -100, 100)
 	}

@@ -1152,3 +1152,77 @@ func (f *Formatter) FormatRegimeLabel(regime string, confidence float64, factors
 	}
 	return b.String()
 }
+
+// ---------------------------------------------------------------------------
+// Signal Detection Formatting
+// ---------------------------------------------------------------------------
+
+// FormatSignalsHTML formats detected COT signals for Telegram display.
+func (f *Formatter) FormatSignalsHTML(signals []cot.Signal, filterCurrency string) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x8E\xAF <b>COT SIGNAL DETECTION</b>\n")
+	if filterCurrency != "" {
+		b.WriteString(fmt.Sprintf("<i>Filtered: %s</i>\n", filterCurrency))
+	}
+	b.WriteString("\n")
+
+	if len(signals) == 0 {
+		b.WriteString("No actionable signals detected.\n")
+		b.WriteString("\n<i>Tip: Signals fire on extreme positioning, smart money moves,\ndivergences, momentum shifts, and thin markets.</i>")
+		return b.String()
+	}
+
+	for i, s := range signals {
+		if i >= 10 {
+			b.WriteString(fmt.Sprintf("\n<i>... +%d more signals</i>", len(signals)-10))
+			break
+		}
+
+		dirIcon := "\xF0\x9F\x9F\xA2"
+		if s.Direction == "BEARISH" {
+			dirIcon = "\xF0\x9F\x94\xB4"
+		}
+
+		strengthBar := strings.Repeat("\xE2\x96\x88", s.Strength) + strings.Repeat("\xE2\x96\x91", 5-s.Strength)
+
+		b.WriteString(fmt.Sprintf("%s <b>%s</b> \xE2\x80\x94 %s\n", dirIcon, s.Currency, s.Type))
+		b.WriteString(fmt.Sprintf("<code>  Str: [%s] %d/5 | Conf: %.0f%%</code>\n", strengthBar, s.Strength, s.Confidence))
+		b.WriteString(fmt.Sprintf("<i>  %s</i>\n", s.Description))
+
+		for _, factor := range s.Factors {
+			b.WriteString(fmt.Sprintf("<code>  \xE2\x80\xA2 %s</code>\n", factor))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("<i>Tip: </i><code>/signals EUR</code> | <code>/cot EUR</code>")
+	return b.String()
+}
+
+// FormatSignalsSummary formats a compact signal summary for the /cot detail view.
+func (f *Formatter) FormatSignalsSummary(signals []cot.Signal) string {
+	if len(signals) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n\xF0\x9F\x8E\xAF <b>Active Signals:</b>\n")
+
+	for i, s := range signals {
+		if i >= 3 {
+			b.WriteString(fmt.Sprintf("<i>  +%d more \xE2\x80\x94 use /signals %s</i>\n", len(signals)-3, s.Currency))
+			break
+		}
+
+		dirIcon := "\xF0\x9F\x9F\xA2"
+		if s.Direction == "BEARISH" {
+			dirIcon = "\xF0\x9F\x94\xB4"
+		}
+
+		b.WriteString(fmt.Sprintf("%s %s (%d/5, %.0f%%) \xE2\x80\x94 <i>%s</i>\n",
+			dirIcon, s.Type, s.Strength, s.Confidence, s.Description))
+	}
+
+	return b.String()
+}

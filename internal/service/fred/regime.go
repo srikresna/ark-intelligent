@@ -268,6 +268,16 @@ func ClassifyMacroRegime(data *MacroData) MacroRegime {
 		r.USDStrength = "N/A"
 	}
 
+	// DXY score contribution to risk assessment
+	if data.DXY > 0 {
+		switch {
+		case data.DXY > 107:
+			riskScore += 10 // Very strong USD = pressure on risk assets
+		case data.DXY < 95:
+			riskScore -= 5 // Weak USD = loose conditions
+		}
+	}
+
 	// --- 9. Fed Balance Sheet (QT/QE) ---
 	if data.FedBalSheet > 0 {
 		balDir := data.FedBalSheetTrend.Arrow()

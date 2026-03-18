@@ -16,6 +16,9 @@ type NewsRepository interface {
 	GetPending(ctx context.Context, date string) ([]domain.NewsEvent, error)
 	UpdateActual(ctx context.Context, id string, actual string) error
 	UpdateStatus(ctx context.Context, id string, status string, retryCount int) error
+
+	// SaveRevision records a data revision for historical tracking.
+	SaveRevision(ctx context.Context, rev domain.EventRevision) error
 }
 
 // NewsFetcher defines the interface for fetching the economic calendar.

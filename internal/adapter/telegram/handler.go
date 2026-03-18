@@ -83,7 +83,8 @@ func NewHandler(
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 	bot.RegisterCommand("/calendar", h.cmdCalendar)
 	bot.RegisterCommand("/rank", h.cmdRank)   // P1.3 — Currency Strength Ranking
-	bot.RegisterCommand("/macro", h.cmdMacro) // P3.2 — FRED Macro Regime Dashboard
+	bot.RegisterCommand("/macro", h.cmdMacro)     // P3.2 — FRED Macro Regime Dashboard
+	bot.RegisterCommand("/signals", h.cmdSignals) // COT Signal Detection
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
@@ -93,7 +94,7 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 
-	log.Printf("[HANDLER] Registered 9 commands and 6 callback prefixes")
+	log.Printf("[HANDLER] Registered 10 commands and 6 callback prefixes")
 	return h
 }
 
@@ -120,6 +121,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>🏆 Rankings & Regime</b>
 /rank - Currency strength ranking mingguan
 /macro - FRED Macro regime dashboard (7 indicators)
+/signals - COT signal detection (7 types)
 
 <b>📅 Economic Calendar</b>
 /calendar - Agenda hari ini
@@ -131,6 +133,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /outlook news - News catalysts, Storm Days &amp; Central Bank
 /outlook fred - FRED Macro deep-dive (Fed policy, real rates, DXY)
 /outlook combine - Fused COT + News + FRED macro triggers
+/outlook cross - Cross-market correlation (Gold/Oil/Bond/USD)
 
 <b>⚙️ Operations</b>
 /settings - Preference management
@@ -272,6 +275,19 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 		}
 	}
 
+	// Signal detection for this currency
+	if editMsgID == 0 && analysis != nil {
+		records, histErr := h.cotRepo.GetHistory(ctx, contractCode, 8)
+		if histErr == nil && len(records) > 0 {
+			histMap := map[string][]domain.COTRecord{contractCode: records}
+			detector := cot.NewSignalDetector()
+			signals := detector.DetectAll([]domain.COTAnalysis{*analysis}, histMap)
+			if len(signals) > 0 {
+				html += h.fmt.FormatSignalsSummary(signals)
+			}
+		}
+	}
+
 	// P1.4 — Upcoming Catalysts: fetch events for next 48h for this currency
 	if editMsgID == 0 && h.newsRepo != nil {
 		now := timeutil.NowWIB()
@@ -336,7 +352,7 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 	subcmd := strings.ToLower(strings.TrimSpace(args))
 	if subcmd == "" {
 		html := "🦅 <b>ARK Intelligence Outlook</b>\nSelect the type of market analysis you want to generate:\n\n" +
-			"<i>Tip: </i><code>/outlook cot</code> | <code>/outlook news</code> | <code>/outlook fred</code> | <code>/outlook combine</code>"
+			"<i>Tip: </i><code>/outlook cot</code> | <code>/outlook news</code> | <code>/outlook fred</code> | <code>/outlook combine</code> | <code>/outlook cross</code>"
 		kb := h.kb.OutlookMenu()
 		_, err := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 		return err
@@ -394,6 +410,13 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 			Language:    prefs.Language,
 		}
 		result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
+	} else if subcmd == "cross" {
+		cotSlice, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
+		cotMap := make(map[string]*domain.COTAnalysis, len(cotSlice))
+		for i := range cotSlice {
+			cotMap[cotSlice[i].Contract.Code] = &cotSlice[i]
+		}
+		result, err = h.aiAnalyzer.AnalyzeCrossMarket(ctx, cotMap)
 	} else { // "cot" or default
 		cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
 		// Gap E — pass MacroData so FRED regime context is injected into the /outlook cot prompt
@@ -570,6 +593,46 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 	)
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// /signals — COT Signal Detection
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdSignals(ctx context.Context, chatID string, userID int64, args string) error {
+	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil || len(analyses) == 0 {
+		_, err = h.bot.SendHTML(ctx, chatID, "No COT data available for signal detection.")
+		return err
+	}
+
+	// Build history map (8 weeks needed for momentum/divergence detection)
+	historyMap := make(map[string][]domain.COTRecord, len(analyses))
+	for _, a := range analyses {
+		records, hErr := h.cotRepo.GetHistory(ctx, a.Contract.Code, 8)
+		if hErr == nil && len(records) > 0 {
+			historyMap[a.Contract.Code] = records
+		}
+	}
+
+	detector := cot.NewSignalDetector()
+	signals := detector.DetectAll(analyses, historyMap)
+
+	// Filter by currency if specified
+	filterCurrency := strings.ToUpper(strings.TrimSpace(args))
+	if filterCurrency != "" {
+		var filtered []cot.Signal
+		for _, s := range signals {
+			if s.Currency == filterCurrency {
+				filtered = append(filtered, s)
+			}
+		}
+		signals = filtered
+	}
+
+	html := h.fmt.FormatSignalsHTML(signals, filterCurrency)
+	_, err = h.bot.SendHTML(ctx, chatID, html)
 	return err
 }
 

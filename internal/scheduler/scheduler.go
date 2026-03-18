@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -231,6 +232,63 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 	}
 
 	log.Printf("[SCHED:broadcast] Sent COT release alert to %d users", count)
+
+	// Signal detection — alert on strong signals (Strength >= 4)
+	historyMap := make(map[string][]domain.COTRecord)
+	for _, a := range analyses {
+		records, hErr := s.deps.COTRepo.GetHistory(ctx, a.Contract.Code, 8)
+		if hErr == nil && len(records) > 0 {
+			historyMap[a.Contract.Code] = records
+		}
+	}
+	detector := cotsvc.NewSignalDetector()
+	signals := detector.DetectAll(analyses, historyMap)
+
+	var strongSignals []cotsvc.Signal
+	for _, sig := range signals {
+		if sig.Strength >= 4 {
+			strongSignals = append(strongSignals, sig)
+		}
+	}
+
+	if len(strongSignals) > 0 {
+		signalHTML := formatStrongSignalAlert(strongSignals)
+		for _, prefs := range activeUsers {
+			if prefs.COTAlertsEnabled && prefs.ChatID != "" {
+				_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, signalHTML)
+			}
+		}
+		log.Printf("[SCHED:broadcast] Sent strong signal alert (%d signals) to active users", len(strongSignals))
+	}
+
+	// Thin market and concentration alerts
+	for _, a := range analyses {
+		var alerts []string
+		if a.ThinMarketAlert {
+			alerts = append(alerts, fmt.Sprintf("\xF0\x9F\x9A\xA8 <b>THIN MARKET:</b> %s \xe2\x80\x94 %s", a.Contract.Currency, a.ThinMarketDesc))
+		}
+		if a.Top4Concentration > 50 {
+			direction := "long unwind"
+			if a.NetPosition < 0 {
+				direction = "short squeeze"
+			}
+			alerts = append(alerts, fmt.Sprintf("\xe2\x9a\xa0\xef\xb8\x8f <b>CONCENTRATION:</b> %s \xe2\x80\x94 Top 4 traders hold %.0f%% of OI (%s risk)",
+				a.Contract.Currency, a.Top4Concentration, direction))
+		}
+
+		if len(alerts) > 0 {
+			html := "\xF0\x9F\x93\xA1 <b>COT POSITION ALERT</b>\n\n"
+			html += strings.Join(alerts, "\n")
+			html += "\n\n<i>Use /cot " + a.Contract.Currency + " for details</i>"
+
+			for _, prefs := range activeUsers {
+				if prefs.COTAlertsEnabled && prefs.ChatID != "" {
+					_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, html)
+					time.Sleep(50 * time.Millisecond)
+				}
+			}
+		}
+	}
 }
 
 // jobWeeklyOutlook generates and sends the weekly outlook on Sunday evening.
@@ -313,6 +371,23 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// formatStrongSignalAlert formats a Telegram alert for high-strength COT signals.
+func formatStrongSignalAlert(signals []cotsvc.Signal) string {
+	var b strings.Builder
+	b.WriteString("\xF0\x9F\x8E\xAF <b>STRONG COT SIGNAL ALERT</b>\n\n")
+	for _, s := range signals {
+		dirIcon := "\xF0\x9F\x9F\xA2"
+		if s.Direction == "BEARISH" {
+			dirIcon = "\xF0\x9F\x94\xB4"
+		}
+		b.WriteString(fmt.Sprintf("%s <b>%s %s</b> \xE2\x80\x94 Strength: %d/5 (%.0f%%)\n",
+			dirIcon, s.Currency, string(s.Type), s.Strength, s.Confidence))
+		b.WriteString(fmt.Sprintf("<i>%s</i>\n\n", s.Description))
+	}
+	b.WriteString("<i>Use /signals for full signal list</i>")
+	return b.String()
 }
 
 // gatherWeeklyData collects all data needed for the weekly outlook.

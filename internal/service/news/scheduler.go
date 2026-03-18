@@ -539,6 +539,27 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		}
 	}
 
+	// Persist revision to storage for historical tracking
+	if ev.RevisionLabel != "" && s.repo != nil {
+		dir := domain.RevisionUp
+		if ev.RevisionSurprise < 0 {
+			dir = domain.RevisionDown
+		}
+		revRecord := domain.EventRevision{
+			EventID:       ev.ID,
+			EventName:     ev.Event,
+			Currency:      ev.Currency,
+			RevisionDate:  time.Now(),
+			OriginalValue: ev.OldPrevious,
+			RevisedValue:  ev.Previous,
+			Direction:     dir,
+			Magnitude:     math.Abs(ev.RevisionSurprise),
+		}
+		if saveErr := s.repo.SaveRevision(ctx, revRecord); saveErr != nil {
+			log.Printf("[NEWS SCHEDULER] Failed to save revision for %s %s: %v", ev.Currency, ev.Event, saveErr)
+		}
+	}
+
 	for userID, prefs := range activeUsers {
 		if !prefs.AlertsEnabled || prefs.ChatID == "" {
 			continue
@@ -566,6 +587,44 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 			log.Printf("[NEWS SCHEDULER] Failed to send release alert to user %d: %v", userID, sendErr)
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Real-time conviction update — recompute and broadcast when surprise is significant
+	if math.Abs(ev.SurpriseScore) > 0.5 && s.cotRepo != nil {
+		contractCode := domain.CurrencyToContract(ev.Currency)
+		if contractCode != "" {
+			cotAn, cotErr := s.cotRepo.GetLatestAnalysis(ctx, contractCode)
+			if cotErr == nil && cotAn != nil {
+				macroD, _ := fred.GetCachedOrFetch(ctx)
+				var regime fred.MacroRegime
+				if macroD != nil {
+					regime = fred.ClassifyMacroRegime(macroD)
+				}
+				sigmaAcc := s.GetSurpriseSigma(ev.Currency)
+				cs := cot.ComputeConvictionScore(*cotAn, regime, sigmaAcc, ev.Event, macroD)
+
+				convHTML := fmt.Sprintf("📊 <b>CONVICTION UPDATE: %s</b>\n", ev.Currency)
+				convHTML += fmt.Sprintf("After: <i>%s</i> (%s)\n", ev.Event, ev.SurpriseLabel)
+				dirIcon := "⚪"
+				if cs.Direction == "LONG" {
+					dirIcon = "🟢"
+				} else if cs.Direction == "SHORT" {
+					dirIcon = "🔴"
+				}
+				convHTML += fmt.Sprintf("%s Conv: <b>%.0f/100 %s</b>\n", dirIcon, cs.Score, cs.Label)
+				convHTML += fmt.Sprintf("<code>COT Bias: %s | FRED: %s</code>\n", cs.COTBias, cs.FREDRegime)
+				convHTML += "<i>Real-time update — /rank for full ranking</i>"
+
+				for _, prefs := range activeUsers {
+					if prefs.AlertsEnabled && prefs.ChatID != "" {
+						if len(prefs.CurrencyFilter) == 0 || containsStr(prefs.CurrencyFilter, ev.Currency) {
+							_, _ = s.messenger.SendHTML(ctx, prefs.ChatID, convHTML)
+							time.Sleep(50 * time.Millisecond)
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

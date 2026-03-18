@@ -258,3 +258,20 @@ func (r *NewsRepo) UpdateStatus(ctx context.Context, id string, status string, r
 		return txn.Set(targetKey, data)
 	})
 }
+
+// SaveRevision stores an event revision record for historical tracking.
+func (r *NewsRepo) SaveRevision(_ context.Context, rev domain.EventRevision) error {
+	data, err := json.Marshal(&rev)
+	if err != nil {
+		return fmt.Errorf("marshal revision: %w", err)
+	}
+
+	key := []byte(fmt.Sprintf("evtrev:%s:%s:%s",
+		rev.Currency,
+		rev.RevisionDate.Format("20060102"),
+		rev.EventID,
+	))
+	return r.db.Update(func(txn *badger.Txn) error {
+		return txn.Set(key, data)
+	})
+}
