@@ -181,12 +181,25 @@ func (sd *SignalDetector) detectDivergence(a domain.COTAnalysis, history []domai
 	}
 
 	// Check if divergence is persistent (at least 2 consecutive weeks)
+	// Count consecutive weeks of divergence using modern API fields.
+	// Compute changes from position diffs between consecutive weeks.
 	consecutive := 1
+	rt := a.Contract.ReportType
 	if len(history) >= 3 {
 		for i := 1; i < min(4, len(history)-1); i++ {
-			prevSpecChg := history[i].SpecLongChange - history[i].SpecShortChange
-			prevCommChg := history[i].CommLongChange - history[i].CommShortChange
-			if (prevSpecChg > 0 && prevCommChg < 0) || (prevSpecChg < 0 && prevCommChg > 0) {
+			curr := history[i]
+			prev := history[i+1]
+			// Use modern fields: compute spec/comm net change from position diffs
+			var specChg, commChg float64
+			if rt == "TFF" {
+				specChg = (curr.LevFundLong - curr.LevFundShort) - (prev.LevFundLong - prev.LevFundShort)
+				commChg = (curr.DealerLong - curr.DealerShort) - (prev.DealerLong - prev.DealerShort)
+			} else {
+				specChg = (curr.ManagedMoneyLong - curr.ManagedMoneyShort) - (prev.ManagedMoneyLong - prev.ManagedMoneyShort)
+				commChg = (curr.ProdMercLong - curr.ProdMercShort + curr.SwapDealerLong - curr.SwapDealerShort) -
+					(prev.ProdMercLong - prev.ProdMercShort + prev.SwapDealerLong - prev.SwapDealerShort)
+			}
+			if (specChg > 0 && commChg < 0) || (specChg < 0 && commChg > 0) {
 				consecutive++
 			} else {
 				break
@@ -240,7 +253,7 @@ func (sd *SignalDetector) detectMomentumShift(a domain.COTAnalysis, history []do
 		return nil
 	}
 	prevNets := extractNetsFloat(history[1:min(6, len(history))], func(r domain.COTRecord) float64 {
-		return float64(r.SpecLong - r.SpecShort)
+		return r.GetSmartMoneyNet(a.Contract.ReportType)
 	})
 	prevMom := mathutil.Momentum(prevNets, 4)
 
@@ -263,6 +276,18 @@ func (sd *SignalDetector) detectMomentumShift(a domain.COTAnalysis, history []do
 	}
 
 	confidence := mathutil.Clamp(magnitude/300, 40, 85)
+
+	// 8W momentum as higher-timeframe confirmation
+	if a.SpecMomentum8W != 0 {
+		m8Confirms := (currentMom > 0 && a.SpecMomentum8W > 0) || (currentMom < 0 && a.SpecMomentum8W < 0)
+		if m8Confirms {
+			strength = min(strength+1, 5)
+			confidence = mathutil.Clamp(confidence+10, 40, 95)
+		} else {
+			// 8W opposes — reduce confidence
+			confidence = mathutil.Clamp(confidence-15, 30, 85)
+		}
+	}
 
 	factors := []string{
 		fmt.Sprintf("Momentum flipped from %s to %s", fmtutil.FmtNumSigned(prevMom, 0), fmtutil.FmtNumSigned(currentMom, 0)),

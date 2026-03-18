@@ -512,6 +512,33 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		}
 	}
 
+	// Compute and store surprise metrics on the event
+	actualVal, hasActual := ParseNumericValue(ev.Actual)
+	forecastVal, hasForecast := ParseNumericValue(ev.Forecast)
+	previousVal, hasPrevious := ParseNumericValue(ev.Previous)
+	oldPreviousVal, hasOldPrevious := ParseNumericValue(ev.OldPrevious)
+
+	if hasActual && hasForecast {
+		// Use ImpactDirection-aware surprise computation
+		ev.SurpriseScore = ComputeSurpriseWithDirection(actualVal, forecastVal, nil, ev.ImpactDirection)
+		ev.SurpriseLabel = ClassifySurpriseWithDirection(ev.SurpriseScore, ev.ImpactDirection)
+	}
+
+	// Revision tracking: OldPrevious → Previous
+	if hasOldPrevious && hasPrevious && math.Abs(previousVal-oldPreviousVal) > 0.001 {
+		revDiff := previousVal - oldPreviousVal
+		if revDiff > 0 {
+			ev.RevisionLabel = "UPWARD REVISION"
+		} else {
+			ev.RevisionLabel = "DOWNWARD REVISION"
+		}
+		if oldPreviousVal != 0 {
+			ev.RevisionSurprise = revDiff / math.Abs(oldPreviousVal)
+		} else {
+			ev.RevisionSurprise = revDiff
+		}
+	}
+
 	for userID, prefs := range activeUsers {
 		if !prefs.AlertsEnabled || prefs.ChatID == "" {
 			continue

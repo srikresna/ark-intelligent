@@ -92,3 +92,73 @@ func SurpriseDirection(sigma float64) string {
 	}
 	return "NEUTRAL"
 }
+
+// ComputeSurpriseWithDirection returns the normalized surprise adjusted by MQL5's ImpactDirection.
+// ImpactDirection: 0=neutral (use raw diff), 1=bullish for currency, 2=bearish for currency.
+// When ImpactDirection=2 and actual > forecast, the surprise is negative (bearish),
+// e.g., unemployment claims rising = bad for currency even though actual > forecast.
+func ComputeSurpriseWithDirection(actual, forecast float64, history []float64, impactDirection int) float64 {
+	raw := actual - forecast
+
+	// If MQL5 says higher actual is bearish (e.g., unemployment, CPI for non-USD),
+	// flip the sign so positive sigma always means "good for currency".
+	if impactDirection == 2 && raw > 0 {
+		raw = -raw
+	} else if impactDirection == 1 && raw < 0 {
+		// MQL5 says bullish but raw diff is negative — this means
+		// it's an inverted indicator (lower = better, e.g., unemployment rate).
+		raw = -raw
+	}
+
+	if len(history) < 3 {
+		return raw
+	}
+	stddev := mathutil.StdDevSample(history)
+	if stddev == 0 {
+		return 0
+	}
+	return raw / stddev
+}
+
+// ClassifySurpriseWithDirection returns a label that respects ImpactDirection.
+// When impactDirection is known (1 or 2), the label reflects the actual market impact
+// rather than just the numeric direction of the surprise.
+func ClassifySurpriseWithDirection(sigma float64, impactDirection int) string {
+	abs := math.Abs(sigma)
+
+	// After ComputeSurpriseWithDirection, positive sigma = good for currency,
+	// negative = bad for currency. Labels follow this convention.
+	bullish := sigma > 0
+	_ = impactDirection // direction already baked into sigma by ComputeSurpriseWithDirection
+
+	switch {
+	case abs >= 2.0:
+		if bullish {
+			return "MAJOR BULLISH SURPRISE"
+		}
+		return "MAJOR BEARISH SURPRISE"
+	case abs >= 1.0:
+		if bullish {
+			return "BULLISH SURPRISE"
+		}
+		return "BEARISH SURPRISE"
+	case abs >= 0.5:
+		if bullish {
+			return "SLIGHT BULLISH"
+		}
+		return "SLIGHT BEARISH"
+	default:
+		return "IN LINE"
+	}
+}
+
+// SurpriseDirectionWithImpact classifies the direction of a surprise
+// after ImpactDirection adjustment. Positive sigma = BULLISH for currency.
+func SurpriseDirectionWithImpact(sigma float64) string {
+	if sigma > 0.5 {
+		return "BULLISH"
+	} else if sigma < -0.5 {
+		return "BEARISH"
+	}
+	return "NEUTRAL"
+}

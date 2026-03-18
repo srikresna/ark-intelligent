@@ -87,6 +87,8 @@ type COTRecord struct {
 
 	// DISAGG Spread positions
 	ManagedMoneySpread float64 `json:"managed_money_spread"`
+	ProdMercSpread    float64 `json:"prod_merc_spread"`
+	SwapDealerSpread  float64 `json:"swap_dealer_spread"`
 
 	// DISAGG WoW changes
 	ProdMercLongChg      float64 `json:"prod_merc_long_chg"`
@@ -95,6 +97,12 @@ type COTRecord struct {
 	SwapShortChg         float64 `json:"swap_short_chg"`
 	ManagedMoneyLongChg  float64 `json:"managed_money_long_chg"`
 	ManagedMoneyShortChg float64 `json:"managed_money_short_chg"`
+
+	// Shared WoW changes (both TFF and DISAGG) — from API
+	SmallLongChgAPI  float64 `json:"small_long_chg_api"`
+	SmallShortChgAPI float64 `json:"small_short_chg_api"`
+	OtherLongChg     float64 `json:"other_long_chg"`
+	OtherShortChg    float64 `json:"other_short_chg"`
 
 	// DISAGG Trader counts
 	ProdMercLongTraders  int `json:"prod_merc_long_traders"`
@@ -161,7 +169,7 @@ func (r *COTRecord) GetTotalSpread(reportType string) float64 {
 	if reportType == "TFF" {
 		return r.DealerSpread + r.AssetMgrSpread + r.LevFundSpread + r.OtherSpread
 	}
-	return r.ManagedMoneySpread
+	return r.ManagedMoneySpread + r.ProdMercSpread + r.SwapDealerSpread
 }
 
 // GetSmartMoneyNetChangeAPI returns API-provided WoW change for smart money.
@@ -171,6 +179,11 @@ func (r *COTRecord) GetSmartMoneyNetChangeAPI(reportType string) float64 {
 		return (r.LevFundLongChg) - (r.LevFundShortChg)
 	}
 	return r.ManagedMoneyLongChg - r.ManagedMoneyShortChg
+}
+
+// GetSmallSpecNetChangeAPI returns API-provided WoW change for small speculators.
+func (r *COTRecord) GetSmallSpecNetChangeAPI() float64 {
+	return r.SmallLongChgAPI - r.SmallShortChgAPI
 }
 
 // CurrencyToContract maps a currency code to the CFTC contract code used in COT data.
@@ -343,6 +356,8 @@ type SocrataRecord struct {
 	MMoneyPositionsLong    string `json:"m_money_positions_long_all"`
 	MMoneyPositionsShort   string `json:"m_money_positions_short_all"`
 	MMoneyPositionsSpread  string `json:"m_money_positions_spread"`
+	ProdMercPositionsSpread string `json:"prod_merc_positions_spread"`
+	SwapPositionsSpread     string `json:"swap_positions_spread_all"`
 
 	// DISAGG WoW changes
 	ChangeProdMercLong  string `json:"change_in_prod_merc_long"`
@@ -352,12 +367,18 @@ type SocrataRecord struct {
 	ChangeMMoneyLong    string `json:"change_in_m_money_long_all"`
 	ChangeMMoneyShort   string `json:"change_in_m_money_short_all"`
 
+	// Shared WoW changes (both TFF and DISAGG)
+	ChangeNonReptLong  string `json:"change_in_nonrept_long_all"`
+	ChangeNonReptShort string `json:"change_in_nonrept_short_all"`
+	ChangeOtherReptLong  string `json:"change_in_other_rept_long"`
+	ChangeOtherReptShort string `json:"change_in_other_rept_short"`
+
 	// DISAGG Trader counts
 	TradersMMoneyLong    string `json:"traders_m_money_long_all"`
 	TradersMMoneyShort   string `json:"traders_m_money_short_all"`
 	TradersProdMercLong  string `json:"traders_prod_merc_long_all"`
 	TradersProdMercShort string `json:"traders_prod_merc_short_all"`
-	TradersTotDisag      string `json:"traders_tot_all"`
+	TradersTotDisag      string `json:"-"` // Mapped manually from TradersTotAll for DISAGG
 
 	// --- C. Shared ---
 	OtherReptPositionsLong  string `json:"other_rept_positions_long"`

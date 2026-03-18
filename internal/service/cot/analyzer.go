@@ -195,9 +195,11 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	}
 	if len(history) > 1 {
 		prev := history[1]
-		// CommNetChange: use API dealer change if TFF, else compute
-		if rt == "TFF" && current.DealerLongChg != 0 || current.DealerShortChg != 0 {
+		// CommNetChange: prefer API-provided change fields
+		if rt == "TFF" && (current.DealerLongChg != 0 || current.DealerShortChg != 0) {
 			analysis.CommNetChange = current.DealerLongChg - current.DealerShortChg
+		} else if rt == "DISAGGREGATED" && (current.ProdMercLongChg != 0 || current.ProdMercShortChg != 0 || current.SwapLongChg != 0 || current.SwapShortChg != 0) {
+			analysis.CommNetChange = (current.ProdMercLongChg - current.ProdMercShortChg) + (current.SwapLongChg - current.SwapShortChg)
 		} else {
 			analysis.CommNetChange = analysis.CommercialNet - prev.GetCommercialNet(rt)
 		}

@@ -346,6 +346,8 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 
 		// DISAGG spread
 		ManagedMoneySpread: socrataFloat(sr.MMoneyPositionsSpread),
+		ProdMercSpread:    socrataFloat(sr.ProdMercPositionsSpread),
+		SwapDealerSpread:  socrataFloat(sr.SwapPositionsSpread),
 
 		// DISAGG WoW changes
 		ProdMercLongChg:      socrataFloat(sr.ChangeProdMercLong),
@@ -354,6 +356,12 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 		SwapShortChg:         socrataFloat(sr.ChangeSwapShort),
 		ManagedMoneyLongChg:  socrataFloat(sr.ChangeMMoneyLong),
 		ManagedMoneyShortChg: socrataFloat(sr.ChangeMMoneyShort),
+
+		// Shared WoW changes
+		SmallLongChgAPI:  socrataFloat(sr.ChangeNonReptLong),
+		SmallShortChgAPI: socrataFloat(sr.ChangeNonReptShort),
+		OtherLongChg:     socrataFloat(sr.ChangeOtherReptLong),
+		OtherShortChg:    socrataFloat(sr.ChangeOtherReptShort),
 
 		// DISAGG trader counts
 		MMoneyLongTraders:    socrataInt(sr.TradersMMoneyLong),
@@ -378,6 +386,12 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 	// Populate NetChange from API-provided change fields (more accurate than history diff).
 	// Falls back to zero — analyzer will compute from history if needed.
 	rec.NetChange = rec.GetSmartMoneyNetChangeAPI(contract.ReportType)
+
+	// Manually map TotalTradersDisag from shared TradersTotAll field
+	// (TradersTotDisag has json:"-" to avoid duplicate tag conflict)
+	if contract.ReportType == "DISAGGREGATED" {
+		rec.TotalTradersDisag = socrataInt(sr.TradersTotAll)
+	}
 
 	return rec
 }
