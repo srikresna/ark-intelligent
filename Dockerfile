@@ -1,5 +1,5 @@
 # ===========================================================================
-# ARK Community Intelligent v1 — Multi-stage Docker build
+# ARK Intelligence v3 — Multi-stage Docker build
 # Stage 1: Build Go binary with CGO disabled (static linking)
 # Stage 2: Minimal Alpine runtime with ca-certs and timezone data
 # ===========================================================================
@@ -53,9 +53,9 @@ COPY --from=builder /build/ark-intelligent /app/ark-intelligent
 # Set timezone
 ENV TZ=Asia/Jakarta
 
-# Health check — verify process is running
+# Health check — HTTP liveness probe via /health endpoint
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \
-    CMD pgrep ark-intelligent || exit 1
+    CMD curl -sf http://localhost:8080/health || exit 1
 
 # Switch to non-root user
 USER botuser

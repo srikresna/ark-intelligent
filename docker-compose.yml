@@ -1,5 +1,5 @@
 # ===========================================================================
-# ARK Community Intelligent v1 — Docker Compose
+# ARK Intelligence v3 — Docker Compose
 # ===========================================================================
 #
 # Usage:
@@ -50,9 +50,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Health check
+    # Health check — HTTP liveness probe
     healthcheck:
-      test: ["CMD", "pgrep", "ark-intelligent"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 60s
       timeout: 5s
       retries: 3
