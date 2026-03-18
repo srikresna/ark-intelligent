@@ -169,6 +169,13 @@ func main() {
 		log.Println("[MAIN] Syncing COT history (this may take a moment)...")
 		if err := cotAnalyzer.SyncHistory(initCtx); err != nil {
 			log.Printf("[MAIN] COT history sync failed: %v", err)
+			// Even if full history sync fails, attempt a fresh fetch of latest data
+			log.Println("[MAIN] Attempting fallback: fetch latest COT only...")
+			if _, err2 := cotAnalyzer.AnalyzeAll(initCtx); err2 != nil {
+				log.Printf("[MAIN] Fallback COT fetch also failed: %v", err2)
+			} else {
+				log.Println("[MAIN] Fallback COT fetch succeeded")
+			}
 		} else {
 			log.Println("[MAIN] COT history sync complete")
 		}

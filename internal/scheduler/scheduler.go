@@ -113,7 +113,7 @@ func (s *Scheduler) Stop() {
 
 type jobFunc func(ctx context.Context) error
 
-// startJob launches a goroutine that runs fn on every tick.
+// startJob launches a goroutine that runs fn immediately on start, then on every tick.
 func (s *Scheduler) startJob(ctx context.Context, name string, interval time.Duration, fn jobFunc) {
 	s.startJobWithDelay(ctx, name, interval, 0, fn)
 }
@@ -139,6 +139,9 @@ func (s *Scheduler) startJobWithDelay(ctx context.Context, name string, interval
 		defer ticker.Stop()
 
 		log.Printf("[SCHED] Job %q started (interval=%v, delay=%v)", name, interval, delay)
+
+		// Run immediately on first start (don't wait for first tick)
+		s.runJob(ctx, name, fn)
 
 		for {
 			select {
