@@ -112,23 +112,7 @@ func main() {
 	log.Println("[MAIN] Service layer initialized")
 
 	// -----------------------------------------------------------------------
-	// 7. Telegram handler (registers commands on bot)
-	// -----------------------------------------------------------------------
-	_ = tgbot.NewHandler(
-		bot,
-		eventRepo,
-		cotRepo,
-		prefsRepo,
-		newsRepo,
-		newsFetcher,
-		aiAnalyzer, // nil-safe: handler checks IsAvailable()
-		changelogContent,
-	)
-
-	log.Println("[MAIN] Telegram handler registered")
-
-	// -----------------------------------------------------------------------
-	// 8. Background scheduler
+	// 7. Background schedulers
 	// -----------------------------------------------------------------------
 	sched := scheduler.New(&scheduler.Deps{
 		COTAnalyzer: cotAnalyzer,
@@ -145,9 +129,30 @@ func main() {
 
 	// News Background Scheduler (always starts — uses MQL5 Economic Calendar)
 	// P1.1: cotRepo injected for Confluence Alert cross-check on actual releases
+	// newsSched is created before NewHandler so the surprise accumulator can be injected.
 	newsSched := newssvc.NewScheduler(newsRepo, newsFetcher, aiAnalyzer, bot, prefsRepo, cotRepo)
 	newsSched.Start(ctx)
 	log.Println("[MAIN] News Background scheduler started")
+
+	// -----------------------------------------------------------------------
+	// 8. Telegram handler (registers commands on bot)
+	// -----------------------------------------------------------------------
+	// Handler is wired after newsSched so it can receive the surprise accumulator.
+	// newsSched implements SurpriseProvider via GetSurpriseSigma — enables full
+	// 3-source conviction scoring (COT + FRED + Calendar) in /rank and /cot detail.
+	_ = tgbot.NewHandler(
+		bot,
+		eventRepo,
+		cotRepo,
+		prefsRepo,
+		newsRepo,
+		newsFetcher,
+		aiAnalyzer,     // nil-safe: handler checks IsAvailable()
+		changelogContent,
+		newsSched,      // SurpriseProvider: weekly per-currency surprise accumulator
+	)
+
+	log.Println("[MAIN] Telegram handler registered")
 
 	log.Println("[MAIN] Background schedulers started")
 
@@ -166,6 +171,12 @@ func main() {
 			log.Printf("[MAIN] COT history sync failed: %v", err)
 		} else {
 			log.Println("[MAIN] COT history sync complete")
+		}
+
+		// Gap B — Backfill RegimeAdjustedScore for any stored analyses that predate the feature.
+		// Non-fatal: logs warning and continues if FRED data is unavailable.
+		if err := cotAnalyzer.BackfillRegimeScores(initCtx); err != nil {
+			log.Printf("[MAIN] backfill regime scores (non-fatal): %v", err)
 		}
 
 		// Send startup notification

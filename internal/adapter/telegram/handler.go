@@ -18,6 +18,12 @@ import (
 // Handler — Wires services to Telegram commands
 // ---------------------------------------------------------------------------
 
+// SurpriseProvider is a minimal interface allowing the handler to read
+// the per-currency accumulated surprise sigma from the news scheduler.
+type SurpriseProvider interface {
+	GetSurpriseSigma(currency string) float64
+}
+
 // Handler holds all service dependencies and registers commands on the bot.
 type Handler struct {
 	bot *Bot
@@ -33,11 +39,16 @@ type Handler struct {
 
 	aiAnalyzer ports.AIAnalyzer
 
+	// newsScheduler provides access to per-currency surprise sigma for conviction scoring.
+	// May be nil — all callers guard with a nil check.
+	newsScheduler SurpriseProvider
+
 	// changelog is the embedded CHANGELOG.md content, injected at startup.
 	changelog string
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
+// newsScheduler may be nil; all callers guard with nil checks before use.
 func NewHandler(
 	bot *Bot,
 	eventRepo ports.EventRepository,
@@ -47,18 +58,20 @@ func NewHandler(
 	newsFetcher ports.NewsFetcher,
 	aiAnalyzer ports.AIAnalyzer,
 	changelog string,
+	newsScheduler SurpriseProvider,
 ) *Handler {
 	h := &Handler{
-		bot:         bot,
-		fmt:         NewFormatter(),
-		kb:          NewKeyboardBuilder(),
-		eventRepo:   eventRepo,
-		cotRepo:     cotRepo,
-		prefsRepo:   prefsRepo,
-		newsRepo:    newsRepo,
-		newsFetcher: newsFetcher,
-		aiAnalyzer:  aiAnalyzer,
-		changelog:   changelog,
+		bot:           bot,
+		fmt:           NewFormatter(),
+		kb:            NewKeyboardBuilder(),
+		eventRepo:     eventRepo,
+		cotRepo:       cotRepo,
+		prefsRepo:     prefsRepo,
+		newsRepo:      newsRepo,
+		newsFetcher:   newsFetcher,
+		aiAnalyzer:    aiAnalyzer,
+		changelog:     changelog,
+		newsScheduler: newsScheduler,
 	}
 
 	// Register all commands
@@ -235,6 +248,20 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 			if fredCtx != "" {
 				html += fredCtx
 			}
+		}
+	}
+
+	// Gap D — Conviction Score for this currency (COT + FRED + Calendar fused)
+	if editMsgID == 0 && analysis != nil {
+		macroData2, fredErr2 := fred.GetCachedOrFetch(ctx)
+		if fredErr2 == nil && macroData2 != nil {
+			regime2 := fred.ClassifyMacroRegime(macroData2)
+			surpriseSigma2 := 0.0
+			if h.newsScheduler != nil {
+				surpriseSigma2 = h.newsScheduler.GetSurpriseSigma(analysis.Contract.Currency)
+			}
+			cs := cot.ComputeConvictionScore(*analysis, regime2, surpriseSigma2, "", macroData2)
+			html += h.fmt.FormatConvictionBlock(cs)
 		}
 	}
 
@@ -829,14 +856,19 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		regime = &r
 	}
 
-	// Compute conviction scores for each currency
+	// Compute conviction scores for each currency (full 3-source: COT + FRED + Calendar)
 	convictions := make([]cot.ConvictionScore, 0, len(analyses))
 	for _, a := range analyses {
 		var r fred.MacroRegime
 		if regime != nil {
 			r = *regime
 		}
-		cs := cot.ComputeConvictionScore(a, r, 0.0, "", macroData)
+		// Pull per-currency weekly surprise sigma from accumulator (0.0 if not available)
+		surpriseSigma := 0.0
+		if h.newsScheduler != nil {
+			surpriseSigma = h.newsScheduler.GetSurpriseSigma(a.Contract.Currency)
+		}
+		cs := cot.ComputeConvictionScore(a, r, surpriseSigma, "", macroData)
 		convictions = append(convictions, cs)
 	}
 

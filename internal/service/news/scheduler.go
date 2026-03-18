@@ -30,6 +30,14 @@ type Scheduler struct {
 	sentMu        sync.Mutex
 	sentReminders map[string]bool
 	lastResetDay  string
+
+	// surpriseAccMu guards surpriseAccum.
+	surpriseAccMu sync.RWMutex
+	// surpriseAccum holds cumulative sigma per currency for the current ISO week.
+	// Key: "YYYYWW:CURRENCY" (e.g. "202612:EUR"), Value: cumulative sigma sum.
+	surpriseAccum map[string]float64
+	// surpriseWeek tracks the current ISO week global key (e.g. "202612") for auto-reset.
+	surpriseWeek string
 }
 
 // NewScheduler creates a new background scheduler.
@@ -49,6 +57,7 @@ func NewScheduler(
 		prefsRepo:     prefsRepo,
 		cotRepo:       cotRepo,
 		sentReminders: make(map[string]bool),
+		surpriseAccum: make(map[string]float64),
 	}
 }
 
@@ -566,6 +575,11 @@ func (s *Scheduler) buildConfluenceAlert(ctx context.Context, ev domain.NewsEven
 		beatMiss = "Actual"
 	}
 
+	// Record raw surprise sigma in the weekly per-currency accumulator (non-fatal)
+	if surpriseSigma != 0 {
+		s.recordSurprise(ev.Currency, surpriseSigma)
+	}
+
 	// Gap A/C — Fetch FRED macro data for regime-adjusted scoring (best-effort, non-fatal)
 	var macroData *fred.MacroData
 	var adjustedSigma = surpriseSigma
@@ -664,6 +678,41 @@ func (s *Scheduler) buildStandardReleaseAlert(ctx context.Context, ev domain.New
 	}
 
 	return html
+}
+
+// ---------------------------------------------------------------------------
+// Per-Currency Surprise Accumulator
+// ---------------------------------------------------------------------------
+
+// recordSurprise adds a sigma value to the current-week accumulator for a currency.
+// The accumulator auto-resets on each new ISO week so stale surprises never carry over.
+func (s *Scheduler) recordSurprise(currency string, sigma float64) {
+	now := timeutil.NowWIB()
+	year, week := now.ISOWeek()
+	weekKey := fmt.Sprintf("%d%02d:%s", year, week, currency)
+	globalKey := fmt.Sprintf("%d%02d", year, week)
+
+	s.surpriseAccMu.Lock()
+	defer s.surpriseAccMu.Unlock()
+
+	// Auto-reset on new ISO week
+	if s.surpriseWeek != globalKey {
+		s.surpriseAccum = make(map[string]float64)
+		s.surpriseWeek = globalKey
+	}
+	s.surpriseAccum[weekKey] += sigma
+}
+
+// GetSurpriseSigma returns the accumulated surprise sigma for a currency this week.
+// Returns 0.0 if no surprises have been recorded yet for that currency.
+func (s *Scheduler) GetSurpriseSigma(currency string) float64 {
+	now := timeutil.NowWIB()
+	year, week := now.ISOWeek()
+	weekKey := fmt.Sprintf("%d%02d:%s", year, week, currency)
+
+	s.surpriseAccMu.RLock()
+	defer s.surpriseAccMu.RUnlock()
+	return s.surpriseAccum[weekKey]
 }
 
 // ---------------------------------------------------------------------------

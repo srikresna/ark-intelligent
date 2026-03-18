@@ -97,6 +97,43 @@ func (a *Analyzer) SyncHistory(ctx context.Context) error {
 	return err
 }
 
+// BackfillRegimeScores fetches all stored analyses, populates RegimeAdjustedScore
+// using the current FRED regime, and re-saves them. This ensures existing records
+// written before Gap B was implemented carry the new field.
+// Safe to call multiple times — only updates analyses where the field is still zero.
+func (a *Analyzer) BackfillRegimeScores(ctx context.Context) error {
+	macroData, err := fred.GetCachedOrFetch(ctx)
+	if err != nil || macroData == nil {
+		return fmt.Errorf("backfill: no FRED data available: %w", err)
+	}
+	regime := fred.ClassifyMacroRegime(macroData)
+
+	analyses, err := a.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil {
+		return fmt.Errorf("backfill: get analyses: %w", err)
+	}
+
+	updated := 0
+	for i := range analyses {
+		if analyses[i].RegimeAdjustedScore == 0 {
+			analyses[i].RegimeAdjustedScore = ComputeRegimeAdjustedScore(analyses[i], regime)
+			updated++
+		}
+	}
+
+	if updated == 0 {
+		log.Println("[cot] backfill: all analyses already have RegimeAdjustedScore, skipping save")
+		return nil
+	}
+
+	if err := a.cotRepo.SaveAnalyses(ctx, analyses); err != nil {
+		return fmt.Errorf("backfill: save analyses: %w", err)
+	}
+
+	log.Printf("[cot] backfill: populated RegimeAdjustedScore for %d/%d analyses", updated, len(analyses))
+	return nil
+}
+
 // AnalyzeContract computes metrics for a single contract.
 // Uses the cached FRED regime from the last AnalyzeAll run if available.
 func (a *Analyzer) AnalyzeContract(ctx context.Context, contractCode string) (*domain.COTAnalysis, error) {

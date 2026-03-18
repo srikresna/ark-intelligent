@@ -689,6 +689,27 @@ func regimeAdvisory(regimeName string) string {
 	}
 }
 
+// FormatConvictionBlock renders a compact conviction score block for the /cot detail view.
+// Gap D — shows the unified 0-100 conviction score (COT + FRED + Calendar).
+func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
+	icon := "⚪"
+	switch {
+	case cs.Score >= 65 && cs.Direction == "LONG":
+		icon = "🟢"
+	case cs.Score >= 65 && cs.Direction == "SHORT":
+		icon = "🔴"
+	case cs.Score >= 55:
+		icon = "🟡"
+	}
+
+	return fmt.Sprintf(
+		"\n<b>🎯 Conviction Score</b>\n"+
+			"<code>%s %s %.0f/100 — %s</code>\n"+
+			"<i>COT+FRED+Calendar fused signal</i>\n",
+		icon, cs.Direction, cs.Score, cs.Label,
+	)
+}
+
 // scoreArrow returns directional arrows for a sentiment score.
 func scoreArrow(score float64) string {
 	switch {
