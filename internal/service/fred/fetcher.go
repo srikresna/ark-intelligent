@@ -141,7 +141,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		// Inflation
 		{"T10YIE", 5, &data.Breakeven5Y},
 		// Financial stress
-		{"TEDRATE", 5, &data.TedSpread},
+		// Financial stress — TED Spread was discontinued Jan 2023.
+		// Use ICE BofA HY Corporate OAS spread as credit stress proxy instead.
+		{"BAMLH0A0HYM2", 5, &data.TedSpread},
 		// Short-term rates
 		{"SOFR", 5, &data.SOFR},
 		{"IORB", 5, &data.IORB},
@@ -166,20 +168,21 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 
 	// --- Trend series (need latest + previous) ---
 
-	// Core PCE — monthly, limit=3 for safety
-	if obs := fetchSeries(ctx, client, "PCEPILFE", apiKey, 3); len(obs) >= 1 {
+	// Core PCE — PCEPILFE is a raw price index; compute YoY% manually
+	if obs := fetchSeries(ctx, client, "PCEPILFE", apiKey, 14); len(obs) >= 13 {
+		data.CorePCE = (obs[0] - obs[12]) / obs[12] * 100
+		data.CorePCETrend = computeTrend(obs[0], obs[1], 0.05)
+	} else if len(obs) >= 1 {
+		// Fallback: not enough history for YoY, use raw (will be labeled as index)
 		data.CorePCE = obs[0]
-		if len(obs) >= 2 {
-			data.CorePCETrend = computeTrend(obs[0], obs[1], 0.05)
-		}
 	}
 
-	// CPI — monthly
-	if obs := fetchSeries(ctx, client, "CPIAUCSL", apiKey, 3); len(obs) >= 1 {
+	// CPI — CPIAUCSL is a raw price index; compute YoY% manually
+	if obs := fetchSeries(ctx, client, "CPIAUCSL", apiKey, 14); len(obs) >= 13 {
+		data.CPI = (obs[0] - obs[12]) / obs[12] * 100
+		data.CPITrend = computeTrend(obs[0], obs[1], 0.05)
+	} else if len(obs) >= 1 {
 		data.CPI = obs[0]
-		if len(obs) >= 2 {
-			data.CPITrend = computeTrend(obs[0], obs[1], 0.05)
-		}
 	}
 
 	// NFCI — weekly

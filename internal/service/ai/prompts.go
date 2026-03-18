@@ -277,7 +277,7 @@ func BuildFREDOutlookPrompt(data *fred.MacroData, regime fred.MacroRegime, lang 
 	b.WriteString(fmt.Sprintf("NFCI:              %.3f %s (%s)\n",
 		data.NFCI, data.NFCITrend.Arrow(), regime.FinStress))
 	if data.TedSpread > 0 {
-		b.WriteString(fmt.Sprintf("TED Spread:        %.0f bps\n", data.TedSpread))
+		b.WriteString(fmt.Sprintf("HY Credit Spread:  %.2f%% (ICE BofA OAS; >4%%=elevated, >6%%=stress)\n", data.TedSpread))
 	}
 
 	// Labor

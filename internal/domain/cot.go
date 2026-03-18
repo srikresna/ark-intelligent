@@ -246,30 +246,33 @@ type SocrataRecord struct {
 	OpenInterest string `json:"open_interest_all"`
 
 	// --- A. TFF (Financials) ---
+	// Note: Dealer uses _all suffix; AssetMgr/LevMoney/OtherRept do NOT
 	DealerPositionsLong    string `json:"dealer_positions_long_all"`
 	DealerPositionsShort   string `json:"dealer_positions_short_all"`
-	AssetMgrPositionsLong  string `json:"asset_mgr_positions_long"`  // TFF format
-	AssetMgrPositionsShort string `json:"asset_mgr_positions_short"` // TFF format
-	LevMoneyPositionsLong  string `json:"lev_money_positions_long"`  // TFF format
-	LevMoneyPositionsShort string `json:"lev_money_positions_short"` // TFF format
+	AssetMgrPositionsLong  string `json:"asset_mgr_positions_long"`
+	AssetMgrPositionsShort string `json:"asset_mgr_positions_short"`
+	LevMoneyPositionsLong  string `json:"lev_money_positions_long"`
+	LevMoneyPositionsShort string `json:"lev_money_positions_short"`
 
 	// --- B. Disaggregated (Physicals) ---
-	ProdMercPositionsLong  string `json:"prod_merc_positions_long_all"`
-	ProdMercPositionsShort string `json:"prod_merc_positions_short_all"`
+	// Note: ProdMerc has no _all; Swap short has double-underscore (swap__)
+	ProdMercPositionsLong  string `json:"prod_merc_positions_long"`
+	ProdMercPositionsShort string `json:"prod_merc_positions_short"`
 	SwapPositionsLong      string `json:"swap_positions_long_all"`
-	SwapPositionsShort     string `json:"swap_positions_short_all"`
+	SwapPositionsShort     string `json:"swap__positions_short_all"` // double underscore: API quirk
 	MMoneyPositionsLong    string `json:"m_money_positions_long_all"`
 	MMoneyPositionsShort   string `json:"m_money_positions_short_all"`
 
-	// --- C. Shared ---
-	OtherReptPositionsLong  string `json:"other_rept_positions_long_all"`
-	OtherReptPositionsShort string `json:"other_rept_positions_short_all"`
+	// --- C. Shared (both TFF and DISAGG) ---
+	// Note: OtherRept has no _all suffix; NonRept has _all suffix
+	OtherReptPositionsLong  string `json:"other_rept_positions_long"`
+	OtherReptPositionsShort string `json:"other_rept_positions_short"`
 	NonReptPositionsLong    string `json:"nonrept_positions_long_all"`
 	NonReptPositionsShort   string `json:"nonrept_positions_short_all"`
 
-	// Concentration
-	Top4Long  string `json:"pct_of_oi_4_or_less_long_all"`
-	Top4Short string `json:"pct_of_oi_4_or_less_short_all"`
-	Top8Long  string `json:"pct_of_oi_8_or_less_long_all"`
-	Top8Short string `json:"pct_of_oi_8_or_less_short_all"`
+	// Concentration — actual field: conc_gross_le_4_tdr_long (no _all)
+	Top4Long  string `json:"conc_gross_le_4_tdr_long"`
+	Top4Short string `json:"conc_gross_le_4_tdr_short"`
+	Top8Long  string `json:"conc_gross_le_8_tdr_long"`
+	Top8Short string `json:"conc_gross_le_8_tdr_short"`
 }

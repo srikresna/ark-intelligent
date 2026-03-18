@@ -110,7 +110,9 @@ func ClassifyMacroRegime(data *MacroData) MacroRegime {
 		r.M2Label = "N/A"
 	}
 
-	// --- 4. Financial Stress (NFCI + TED Spread) ---
+	// --- 4. Financial Stress (NFCI + HY Credit Spread) ---
+	// TedSpread field now holds ICE BofA HY OAS spread (BAMLH0A0HYM2).
+	// Normal range: <3.5% = tight credit, 3.5-6% = elevated, >6% = stress.
 	nfciArrow := ""
 	if data.NFCITrend.Direction != "" {
 		nfciArrow = " " + data.NFCITrend.Arrow()
@@ -133,16 +135,17 @@ func ClassifyMacroRegime(data *MacroData) MacroRegime {
 	}
 	riskScore += nfciStress
 
+	// HY Credit Spread (BAMLH0A0HYM2) — in percent, not bps
 	if data.TedSpread > 0 {
 		switch {
-		case data.TedSpread > 100:
-			r.FinStress += fmt.Sprintf(" | TED: %.0fbps 🔴", data.TedSpread)
+		case data.TedSpread > 6.0:
+			r.FinStress += fmt.Sprintf(" | HY Spread: %.2f%% 🔴", data.TedSpread)
 			riskScore += 15
-		case data.TedSpread > 50:
-			r.FinStress += fmt.Sprintf(" | TED: %.0fbps ⚠️", data.TedSpread)
+		case data.TedSpread > 4.0:
+			r.FinStress += fmt.Sprintf(" | HY Spread: %.2f%% ⚠️", data.TedSpread)
 			riskScore += 5
 		default:
-			r.FinStress += fmt.Sprintf(" | TED: %.0fbps ✅", data.TedSpread)
+			r.FinStress += fmt.Sprintf(" | HY Spread: %.2f%% ✅", data.TedSpread)
 		}
 	}
 
