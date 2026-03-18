@@ -17,7 +17,7 @@
 - Day/week/month view with inline navigation
 - Real-time actual release values with direction indicators
 - Pre-event reminders + actual release alerts
-- AI flash analysis on releases (if Gemini active)
+- AI flash analysis on releases (if Opus active)
 - Daily morning summary (06:00 WIB)
 - Weekly auto-sync (Minggu 23:00 WIB)
 - Per-user filter & alert preferences
@@ -26,7 +26,7 @@
 ## v1.0.0 — Initial Release
 - COT positioning analysis (CFTC Socrata + CSV)
 - Williams COT Index, sentiment scoring, divergence detection
-- AI narrative generation (Gemini)
+- AI narrative generation (Opus)
 - Currency strength ranking (/rank)
 - FRED macro regime dashboard (/macro)
 - COT signal detection (/signals)
