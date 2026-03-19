@@ -260,6 +260,15 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 		// 7. COT Index for commercials
 		commNets := extractNets(history, func(r domain.COTRecord) float64 { return r.GetCommercialNet(rt) })
 		analysis.COTIndexComm = computeCOTIndex(commNets)
+
+		// 7b. WillcoIndex — blended smart money + commercial index for cross-confirmation.
+		// Values near 0 or 100 confirm extreme positioning; ~50 = no confirmation.
+		// Used by signals.detectExtreme as secondary confirmation (|WillcoIndex-50| > 30).
+		if len(smartNets) >= 3 && len(commNets) >= 3 {
+			analysis.WillcoIndex = (analysis.COTIndex + (100 - analysis.COTIndexComm)) / 2
+		} else {
+			analysis.WillcoIndex = 50.0 // neutral when insufficient data
+		}
 	}
 
 	// === Momentum Metrics ===
@@ -324,18 +333,19 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 
 	// === 11b. Institutional Outlier Alerts (TFF) ===
 	if rt == "TFF" && len(history) >= 4 {
-		// Extract historical AssetMgrNet changes
+		// Extract historical AssetMgrNet week-over-week changes.
+		// Start at i=2 to exclude the current week's change from the
+		// distribution — including it would bias mean/stddev toward the
+		// test value and reduce Z-score sensitivity.
 		var changes []float64
-		for i := 1; i < len(history); i++ {
+		for i := 2; i < len(history); i++ {
 			currAM := history[i-1].AssetMgrLong - history[i-1].AssetMgrShort
-			var prevAM float64
-			if i < len(history) {
-				prevAM = history[i].AssetMgrLong - history[i].AssetMgrShort
-			}
+			prevAM := history[i].AssetMgrLong - history[i].AssetMgrShort
 			changes = append(changes, currAM-prevAM)
 		}
 
 		if len(changes) >= 2 {
+			// Current week's change: history[0] (newest) vs history[1] (previous)
 			currentChange := (current.AssetMgrLong - current.AssetMgrShort) - (history[1].AssetMgrLong - history[1].AssetMgrShort)
 			avg := mathutil.Mean(changes)
 			stdDev := mathutil.StdDevSample(changes)

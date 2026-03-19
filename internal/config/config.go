@@ -89,6 +89,12 @@ func (c *Config) validate() {
 	if c.COTHistoryWeeks < 4 {
 		log.Fatal().Msg("COT_HISTORY_WEEKS must be >= 4")
 	}
+	if c.COTFetchInterval < 1*time.Minute {
+		log.Fatal().Msg("COT_FETCH_INTERVAL must be >= 1m")
+	}
+	if c.ConfluenceCalcInterval < 1*time.Minute {
+		log.Fatal().Msg("CONFLUENCE_CALC_INTERVAL must be >= 1m")
+	}
 }
 
 // ---------------------------------------------------------------------------

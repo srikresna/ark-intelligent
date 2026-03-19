@@ -173,7 +173,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 
 	// Core PCE — PCEPILFE is a raw price index; compute YoY% manually
 	if obs := fetchSeries(ctx, client, "PCEPILFE", apiKey, 14); len(obs) >= 13 {
-		data.CorePCE = (obs[0] - obs[12]) / obs[12] * 100
+		if obs[12] != 0 {
+			data.CorePCE = (obs[0] - obs[12]) / obs[12] * 100
+		}
 		data.CorePCETrend = computeTrend(obs[0], obs[1], 0.05)
 	} else if len(obs) >= 1 {
 		// Fallback: not enough history for YoY, use raw (will be labeled as index)
@@ -182,7 +184,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 
 	// CPI — CPIAUCSL is a raw price index; compute YoY% manually
 	if obs := fetchSeries(ctx, client, "CPIAUCSL", apiKey, 14); len(obs) >= 13 {
-		data.CPI = (obs[0] - obs[12]) / obs[12] * 100
+		if obs[12] != 0 {
+			data.CPI = (obs[0] - obs[12]) / obs[12] * 100
+		}
 		data.CPITrend = computeTrend(obs[0], obs[1], 0.05)
 	} else if len(obs) >= 1 {
 		data.CPI = obs[0]
@@ -239,6 +243,28 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		data.YieldSpreadTrend = SeriesTrend{Latest: data.YieldSpread, Direction: "FLAT"}
 	}
 
+	// Sanitize: replace any NaN/Inf with 0 to prevent propagation through
+	// regime classification, conviction scoring, and AI prompts.
+	sanitizeFloat(&data.Yield2Y)
+	sanitizeFloat(&data.Yield10Y)
+	sanitizeFloat(&data.Yield3M)
+	sanitizeFloat(&data.YieldSpread)
+	sanitizeFloat(&data.Spread3M10Y)
+	sanitizeFloat(&data.CorePCE)
+	sanitizeFloat(&data.CPI)
+	sanitizeFloat(&data.Breakeven5Y)
+	sanitizeFloat(&data.FedFundsRate)
+	sanitizeFloat(&data.SOFR)
+	sanitizeFloat(&data.IORB)
+	sanitizeFloat(&data.NFCI)
+	sanitizeFloat(&data.InitialClaims)
+	sanitizeFloat(&data.UnemployRate)
+	sanitizeFloat(&data.SahmRule)
+	sanitizeFloat(&data.GDPGrowth)
+	sanitizeFloat(&data.M2Growth)
+	sanitizeFloat(&data.FedBalSheet)
+	sanitizeFloat(&data.DXY)
+
 	return data, nil
 }
 
@@ -258,6 +284,11 @@ func fetchSeries(ctx context.Context, client *http.Client, seriesID, apiKey stri
 		return nil
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Error().Str("series", seriesID).Int("status", resp.StatusCode).Msg("FRED API non-2xx response")
+		return nil
+	}
 
 	var result fredResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -290,4 +321,11 @@ func buildFREDURL(seriesID, apiKey string, limit int) string {
 		base += "&api_key=" + apiKey
 	}
 	return base
+}
+
+// sanitizeFloat replaces NaN or Inf with 0 to prevent propagation.
+func sanitizeFloat(v *float64) {
+	if math.IsNaN(*v) || math.IsInf(*v, 0) {
+		*v = 0
+	}
 }

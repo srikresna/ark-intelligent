@@ -216,7 +216,10 @@ func (r *NewsRepo) UpdateActual(ctx context.Context, id string, actual string) e
 	}
 
 	// Write back
-	data, _ := json.Marshal(&evt)
+	data, err := json.Marshal(&evt)
+	if err != nil {
+		return fmt.Errorf("marshal event for update actual: %w", err)
+	}
 	return r.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(targetKey, data)
 	})
@@ -252,7 +255,10 @@ func (r *NewsRepo) UpdateStatus(ctx context.Context, id string, status string, r
 
 	evt.Status = status
 	evt.RetryCount = retryCount
-	data, _ := json.Marshal(&evt)
+	data, err := json.Marshal(&evt)
+	if err != nil {
+		return fmt.Errorf("marshal event for update status: %w", err)
+	}
 
 	return r.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(targetKey, data)
