@@ -104,7 +104,7 @@ func (r *COTRepo) GetLatest(_ context.Context, contractCode string) (*domain.COT
 }
 
 // GetHistory returns COT records for a contract over N weeks.
-// Returns records in chronological order (oldest first).
+// Returns records in reverse chronological order (newest first).
 //
 // NOTE: CFTC reports are as-of Tuesday but published on Friday. This means
 // the latest record in DB may be older than (weeks*7) days when called shortly
@@ -166,6 +166,14 @@ func (r *COTRepo) GetHistory(_ context.Context, contractCode string, weeks int) 
 	if err != nil {
 		return nil, fmt.Errorf("get COT history %s: %w", contractCode, err)
 	}
+
+	// Reverse to newest-first order.
+	// BadgerDB iterates keys ascending (oldest date first), but all callers
+	// (computeMetrics, COT Index, momentum, /cot raw) expect newest-first.
+	for i, j := 0, len(records)-1; i < j; i, j = i+1, j-1 {
+		records[i], records[j] = records[j], records[i]
+	}
+
 	return records, nil
 }
 
@@ -311,6 +319,12 @@ func (r *COTRepo) GetAnalysisHistory(_ context.Context, contractCode string, wee
 	if err != nil {
 		return nil, fmt.Errorf("get COT analysis history %s: %w", contractCode, err)
 	}
+
+	// Reverse to newest-first order (same convention as GetHistory).
+	for i, j := 0, len(analyses)-1; i < j; i, j = i+1, j-1 {
+		analyses[i], analyses[j] = analyses[j], analyses[i]
+	}
+
 	return analyses, nil
 }
 
