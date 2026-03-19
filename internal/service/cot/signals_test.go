@@ -361,26 +361,30 @@ func TestDetectMomentumShift(t *testing.T) {
 
 	// Build history where previous momentum was negative (decreasing net positions).
 	historyFlipBullish := []domain.COTRecord{
-		{LevFundLong: 120000, LevFundShort: 80000}, // [0] not used by prevNets (history[1:5])
-		{LevFundLong: 100000, LevFundShort: 80000}, // [1] net=20000
-		{LevFundLong: 105000, LevFundShort: 80000}, // [2] net=25000
-		{LevFundLong: 108000, LevFundShort: 80000}, // [3] net=28000
-		{LevFundLong: 110000, LevFundShort: 80000}, // [4] net=30000
-		{LevFundLong: 115000, LevFundShort: 80000}, // [5] net=35000
+		{LevFundLong: 120000, LevFundShort: 80000}, // [0] current week (not used by prevNets)
+		{LevFundLong: 80000, LevFundShort: 80000},  // [1] net=0     (newest in prevNets)
+		{LevFundLong: 85000, LevFundShort: 80000},  // [2] net=5000
+		{LevFundLong: 90000, LevFundShort: 80000},  // [3] net=10000
+		{LevFundLong: 95000, LevFundShort: 80000},  // [4] net=15000
+		{LevFundLong: 100000, LevFundShort: 80000}, // [5] net=20000 (oldest in prevNets)
 	}
-	// prevNets = [20000, 25000, 28000, 30000, 35000] → Momentum(prevNets,4) = 35000 - 20000 = 15000 (positive)
-	// So for a flip, currentMom must be negative.
+	// prevNets newest-first = [0, 5000, 10000, 15000, 20000]
+	// after reverseFloats oldest-first = [20000, 15000, 10000, 5000, 0]
+	// Momentum(4) = 0 - 20000 = -20000 (negative prevMom)
+	// For a bullish flip: currentMom must be positive.
 
 	historyFlipBearish := []domain.COTRecord{
-		{LevFundLong: 80000, LevFundShort: 100000}, // [0]
-		{LevFundLong: 100000, LevFundShort: 80000},  // [1] net=20000
-		{LevFundLong: 95000, LevFundShort: 80000},   // [2] net=15000
-		{LevFundLong: 90000, LevFundShort: 80000},   // [3] net=10000
-		{LevFundLong: 85000, LevFundShort: 80000},   // [4] net=5000
-		{LevFundLong: 80000, LevFundShort: 80000},   // [5] net=0
+		{LevFundLong: 80000, LevFundShort: 100000},  // [0] current week (not used)
+		{LevFundLong: 115000, LevFundShort: 80000},  // [1] net=35000 (newest in prevNets)
+		{LevFundLong: 110000, LevFundShort: 80000},  // [2] net=30000
+		{LevFundLong: 108000, LevFundShort: 80000},  // [3] net=28000
+		{LevFundLong: 105000, LevFundShort: 80000},  // [4] net=25000
+		{LevFundLong: 100000, LevFundShort: 80000},  // [5] net=20000 (oldest in prevNets)
 	}
-	// prevNets = [20000, 15000, 10000, 5000, 0] → Momentum = 0 - 20000 = -20000 (negative)
-	// For flip, currentMom must be positive.
+	// prevNets newest-first = [35000, 30000, 28000, 25000, 20000]
+	// after reverseFloats oldest-first = [20000, 25000, 28000, 30000, 35000]
+	// Momentum(4) = 35000 - 20000 = 15000 (positive prevMom)
+	// For a bearish flip: currentMom must be negative.
 
 	tests := []struct {
 		name    string
@@ -393,9 +397,9 @@ func TestDetectMomentumShift(t *testing.T) {
 			name: "bullish_momentum_flip",
 			analysis: domain.COTAnalysis{
 				Contract:       baseContract("TFF"),
-				SpecMomentum4W: 5000,  // positive
+				SpecMomentum4W: 5000, // positive (flipped from negative prevMom)
 			},
-			history: historyFlipBearish, // prevMom = -20000
+			history: historyFlipBullish, // prevMom = -20000 (negative)
 			wantNil: false,
 			wantDir: "BULLISH",
 		},
@@ -403,9 +407,9 @@ func TestDetectMomentumShift(t *testing.T) {
 			name: "bearish_momentum_flip",
 			analysis: domain.COTAnalysis{
 				Contract:       baseContract("TFF"),
-				SpecMomentum4W: -5000, // negative
+				SpecMomentum4W: -5000, // negative (flipped from positive prevMom)
 			},
-			history: historyFlipBullish, // prevMom = 15000
+			history: historyFlipBearish, // prevMom = 15000 (positive)
 			wantNil: false,
 			wantDir: "BEARISH",
 		},
@@ -413,9 +417,9 @@ func TestDetectMomentumShift(t *testing.T) {
 			name: "no_signal_same_sign",
 			analysis: domain.COTAnalysis{
 				Contract:       baseContract("TFF"),
-				SpecMomentum4W: 5000,
+				SpecMomentum4W: 5000, // positive
 			},
-			history: historyFlipBullish, // prevMom = 15000, same sign
+			history: historyFlipBearish, // prevMom = 15000 (also positive, same sign)
 			wantNil: true,
 		},
 		{
