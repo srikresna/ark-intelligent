@@ -226,8 +226,9 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// 5. Open Interest change — use API field if available
 	if current.OIChangeAPI != 0 {
 		analysis.OpenInterestChg = current.OIChangeAPI
-		if current.OpenInterest > 0 {
-			analysis.OIPctChange = current.OIChangeAPI / (current.OpenInterest - current.OIChangeAPI) * 100
+		prevOI := current.OpenInterest - current.OIChangeAPI
+		if prevOI > 0 {
+			analysis.OIPctChange = current.OIChangeAPI / prevOI * 100
 		}
 	} else if len(history) > 1 {
 		prevOI := history[1].OpenInterest

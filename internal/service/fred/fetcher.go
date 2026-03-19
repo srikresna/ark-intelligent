@@ -264,6 +264,7 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	sanitizeFloat(&data.M2Growth)
 	sanitizeFloat(&data.FedBalSheet)
 	sanitizeFloat(&data.DXY)
+	sanitizeFloat(&data.TedSpread)
 
 	return data, nil
 }

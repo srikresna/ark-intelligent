@@ -253,7 +253,7 @@ func (sd *SignalDetector) detectMomentumShift(a domain.COTAnalysis, history []do
 	currentMom := a.SpecMomentum4W
 
 	// Calculate previous week's momentum for comparison
-	if len(history) < 5 {
+	if len(history) < 6 {
 		return nil
 	}
 	prevNets := extractNetsFloat(history[1:min(6, len(history))], func(r domain.COTRecord) float64 {
