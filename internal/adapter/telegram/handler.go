@@ -1149,13 +1149,17 @@ func (h *Handler) cmdMembership(ctx context.Context, chatID string, userID int64
 		"<code>COT Data   : </code>\xe2\x9c\x85 Full access\n" +
 		"<code>Calendar   : </code>\xe2\x9c\x85 Full access\n\n"
 
-	html += "" +
-		"<b>\xf0\x9f\x9b\xa1 ADMIN</b>\n" +
-		"<code>Commands   : 30/min (no daily cap)</code>\n" +
-		"<code>AI Analysis: 50/day (10s cooldown)</code>\n" +
-		"<code>News Alert : All currencies &amp; impacts</code>\n" +
-		"<code>FRED Macro : </code>\xe2\x9c\x85 Regime alerts\n" +
-		"<code>User Mgmt  : </code>\xe2\x9c\x85 /users, /ban, /setrole\n\n"
+	// Only show ADMIN tier to admins and owners
+	isAdmin := domain.RoleHierarchy(currentRole) >= domain.RoleHierarchy(domain.RoleAdmin)
+	if isAdmin {
+		html += "" +
+			"<b>\xf0\x9f\x9b\xa1 ADMIN</b>\n" +
+			"<code>Commands   : 30/min (no daily cap)</code>\n" +
+			"<code>AI Analysis: 50/day (10s cooldown)</code>\n" +
+			"<code>News Alert : All currencies &amp; impacts</code>\n" +
+			"<code>FRED Macro : </code>\xe2\x9c\x85 Regime alerts\n" +
+			"<code>User Mgmt  : </code>\xe2\x9c\x85 /users, /ban, /setrole\n\n"
+	}
 
 	// Show upgrade CTA for non-owner users
 	if currentRole == domain.RoleFree || currentRole == domain.RoleMember {

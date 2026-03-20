@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -124,13 +125,19 @@ type Bot struct {
 // For private chats, chat ID == user ID. For groups (negative IDs), owner derivation
 // is skipped — the owner must be set via OWNER_ID env or identified at runtime.
 func NewBot(token, defaultChatID string) *Bot {
-	// Parse owner ID from default chat ID.
-	// Only treat it as an owner ID if it's a positive number (private chat).
-	// Group/supergroup IDs are negative and should not be used as owner IDs.
+	// Check dedicated OWNER_ID env var first, then fall back to defaultChatID.
 	var ownerID int64
-	rawID := strings.Split(defaultChatID, ":")[0]
-	if parsed, err := strconv.ParseInt(rawID, 10, 64); err == nil && parsed > 0 {
-		ownerID = parsed
+	if ownerStr := strings.TrimSpace(os.Getenv("OWNER_ID")); ownerStr != "" {
+		if parsed, err := strconv.ParseInt(ownerStr, 10, 64); err == nil && parsed > 0 {
+			ownerID = parsed
+		}
+	} else {
+		// Legacy: parse owner ID from default chat ID.
+		// Only treat it as an owner ID if it's a positive number (private chat).
+		rawID := strings.Split(defaultChatID, ":")[0]
+		if parsed, err := strconv.ParseInt(rawID, 10, 64); err == nil && parsed > 0 {
+			ownerID = parsed
+		}
 	}
 
 	return &Bot{
