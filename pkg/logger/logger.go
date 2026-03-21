@@ -16,25 +16,26 @@ import (
 )
 
 // Log is the root logger instance. Use Component() for sub-loggers.
-var Log zerolog.Logger
+// Initialized with stderr output immediately so that Component() loggers
+// created at package init time (before Init() is called) still produce output.
+var Log = zerolog.New(os.Stderr).With().
+	Timestamp().
+	Caller().
+	Logger()
 
-// Init initializes the global logger with the given level string.
+// Init initializes the global log level from a level string.
 // Valid levels: "trace", "debug", "info", "warn", "error", "fatal", "panic".
 // Defaults to "info" if the level string is invalid.
+//
+// Note: zerolog.SetGlobalLevel affects ALL loggers (including those created
+// before Init), so Component() loggers from package init time will respect
+// the level set here.
 func Init(level string) {
 	lvl, err := zerolog.ParseLevel(level)
 	if err != nil {
 		lvl = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(lvl)
-
-	// Use console writer for development, JSON for production.
-	// Since this is a Telegram bot (not a web service), we keep JSON
-	// for structured log aggregation but include timestamps and caller.
-	Log = zerolog.New(os.Stderr).With().
-		Timestamp().
-		Caller().
-		Logger()
 }
 
 // Component returns a sub-logger tagged with a component name.
