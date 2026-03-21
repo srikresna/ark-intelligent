@@ -94,9 +94,60 @@ func (a *Analyzer) SyncHistory(ctx context.Context) error {
 
 	log.Info().Int("records", len(records)).Msg("history synced")
 
-	// Run initial analysis on the synced data for each contract
-	_, err = a.AnalyzeAll(ctx)
-	return err
+	// Run analysis on all synced data — both latest (for live use)
+	// and full history (for bootstrap backtest).
+	if _, err = a.AnalyzeAll(ctx); err != nil {
+		return err
+	}
+	return a.AnalyzeHistory(ctx)
+}
+
+// AnalyzeHistory computes and stores analysis records for ALL historical
+// COT records across all contracts. This populates GetAnalysisHistory()
+// with 52 weeks of data so the backtest bootstrap can replay signals
+// across the full history window.
+func (a *Analyzer) AnalyzeHistory(ctx context.Context) error {
+	// Best-effort FRED regime (may be nil)
+	var cachedRegime *fred.MacroRegime
+	if macroData, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && macroData != nil {
+		r := fred.ClassifyMacroRegime(macroData)
+		cachedRegime = &r
+	}
+
+	totalAnalyses := 0
+	for _, contract := range domain.DefaultCOTContracts {
+		history, err := a.cotRepo.GetHistory(ctx, contract.Code, 52)
+		if err != nil || len(history) < 2 {
+			continue
+		}
+
+		// history is newest-first; reverse to oldest-first for windowing
+		for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
+			history[i], history[j] = history[j], history[i]
+		}
+
+		var analyses []domain.COTAnalysis
+		for i := range history {
+			// Build a history window from the start up to (and including) this record
+			window := history[:i+1]
+			// computeMetrics expects newest-first history, so reverse the window
+			reversed := make([]domain.COTRecord, len(window))
+			for k := range window {
+				reversed[len(window)-1-k] = window[k]
+			}
+			analysis := a.computeMetrics(history[i], reversed, cachedRegime)
+			analyses = append(analyses, analysis)
+		}
+
+		if err := a.cotRepo.SaveAnalyses(ctx, analyses); err != nil {
+			log.Warn().Err(err).Str("contract", contract.Code).Msg("failed to save historical analyses")
+			continue
+		}
+		totalAnalyses += len(analyses)
+	}
+
+	log.Info().Int("analyses", totalAnalyses).Msg("historical analyses computed for backtest")
+	return nil
 }
 
 // BackfillRegimeScores fetches all stored analyses, populates RegimeAdjustedScore

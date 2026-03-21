@@ -74,17 +74,14 @@ func (e *Evaluator) EvaluatePending(ctx context.Context) (int, error) {
 		Msg("Signal evaluation complete")
 
 	if evaluated == 0 && len(pending) > 0 {
-		// Diagnostic: log sample signal details to help debug
 		sample := pending[0]
-		log.Warn().
+		log.Debug().
 			Str("contract", sample.ContractCode).
 			Time("report_date", sample.ReportDate).
 			Float64("entry_price", sample.EntryPrice).
 			Str("outcome_1w", sample.Outcome1W).
-			Str("outcome_2w", sample.Outcome2W).
-			Str("outcome_4w", sample.Outcome4W).
 			Dur("age", time.Since(sample.ReportDate)).
-			Msg("DIAGNOSTIC: sample pending signal (0 evaluated — possible price data gap)")
+			Msg("sample pending signal (0 evaluated — possible price data gap)")
 	}
 
 	return evaluated, nil
@@ -96,7 +93,7 @@ func (e *Evaluator) EvaluatePending(ctx context.Context) (int, error) {
 // successful evaluations on other horizons.
 func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSignal) (bool, error) {
 	if sig.EntryPrice == 0 {
-		log.Warn().
+		log.Debug().
 			Str("contract", sig.ContractCode).
 			Time("report_date", sig.ReportDate).
 			Msg("Skipping signal with zero entry price")
@@ -119,9 +116,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome1W = classifyOutcome(sig.Direction, sig.Return1W)
 			updated = true
 		} else {
-			log.Warn().
+			log.Debug().
 				Str("contract", sig.ContractCode).
-				Time("report_date", sig.ReportDate).
 				Time("target", targetDate).
 				Msg("no price record found at +1W")
 		}
@@ -140,9 +136,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome2W = classifyOutcome(sig.Direction, sig.Return2W)
 			updated = true
 		} else {
-			log.Warn().
+			log.Debug().
 				Str("contract", sig.ContractCode).
-				Time("report_date", sig.ReportDate).
 				Time("target", targetDate).
 				Msg("no price record found at +2W")
 		}
@@ -161,9 +156,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome4W = classifyOutcome(sig.Direction, sig.Return4W)
 			updated = true
 		} else {
-			log.Warn().
+			log.Debug().
 				Str("contract", sig.ContractCode).
-				Time("report_date", sig.ReportDate).
 				Time("target", targetDate).
 				Msg("no price record found at +4W")
 		}

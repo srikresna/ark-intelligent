@@ -265,6 +265,20 @@ func main() {
 			}
 		}
 
+		// Log existing signal state before purge/bootstrap
+		if allSigs, err := signalRepo.GetAllSignals(initCtx); err == nil && len(allSigs) > 0 {
+			zeroEntry := 0
+			for _, s := range allSigs {
+				if s.EntryPrice == 0 {
+					zeroEntry++
+				}
+			}
+			log.Info().
+				Int("total", len(allSigs)).
+				Int("zero_entry_price", zeroEntry).
+				Msg("existing signals before purge")
+		}
+
 		// Purge any signals with EntryPrice=0 (created by older bootstrap code).
 		// This allows re-bootstrap to recreate them with valid entry prices.
 		if purged, err := signalRepo.PurgeInvalidSignals(initCtx); err != nil {
