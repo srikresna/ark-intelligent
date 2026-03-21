@@ -144,11 +144,11 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 
 <b>📊 COT Positioning</b>
 /cot - Overview semua currency
-/cot USD - Detail + Upcoming Catalysts 48h
+/cot USD - Detail + Price Context + Divergence
 /cot raw USD - Raw data positioning
 
 <b>🏆 Rankings & Regime</b>
-/rank - Currency strength ranking mingguan
+/rank - Currency strength ranking (Price + COT)
 /macro - FRED Macro regime dashboard (7 indicators)
 /signals - COT signal detection (7 types)
 
@@ -164,12 +164,22 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /outlook combine - Fused COT + News + FRED macro triggers
 /outlook cross - Cross-market correlation (Gold/Oil/Bond/USD)
 
+<b>📈 Backtest &amp; Accuracy</b>
+/backtest - Signal backtest stats (win rate, Sharpe, drawdown)
+/accuracy - Quick accuracy summary per contract
+
 <b>⚙️ Operations</b>
 /settings - Preference management
 /membership - Tier benefits &amp; upgrade info
 /status - System status
 
-<code>ARK Interface v3.0.0</code>`
+<b>🔐 Admin</b>
+/users - List registered users &amp; roles
+/setrole - Change user role (e.g. /setrole 123 admin)
+/ban - Ban a user
+/unban - Unban a user
+
+<code>ARK Interface v3.1.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
