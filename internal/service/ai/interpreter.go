@@ -86,11 +86,21 @@ func (ip *Interpreter) IsAvailable() bool {
 
 // AnalyzeCOT generates a natural language interpretation of COT positioning data.
 func (ip *Interpreter) AnalyzeCOT(ctx context.Context, analyses []domain.COTAnalysis) (string, error) {
+	return ip.AnalyzeCOTWithPrice(ctx, analyses, nil)
+}
+
+// AnalyzeCOTWithPrice generates a price-aware COT interpretation.
+func (ip *Interpreter) AnalyzeCOTWithPrice(ctx context.Context, analyses []domain.COTAnalysis, priceCtx map[string]*domain.PriceContext) (string, error) {
 	if len(analyses) == 0 {
 		return "No COT data available for analysis.", nil
 	}
 
-	prompt := BuildCOTAnalysisPrompt(analyses)
+	var prompt string
+	if len(priceCtx) > 0 {
+		prompt = BuildCOTAnalysisPrompt(analyses, priceCtx)
+	} else {
+		prompt = BuildCOTAnalysisPrompt(analyses)
+	}
 
 	result, err := ip.gemini.GenerateWithSystem(ctx, SystemPrompt(), prompt)
 	if err != nil {

@@ -42,19 +42,28 @@ func (c *CachedInterpreter) IsAvailable() bool {
 
 // AnalyzeCOT caches by latest COT report date.
 func (c *CachedInterpreter) AnalyzeCOT(ctx context.Context, analyses []domain.COTAnalysis) (string, error) {
+	return c.AnalyzeCOTWithPrice(ctx, analyses, nil)
+}
+
+// AnalyzeCOTWithPrice caches by latest COT report date + price availability.
+func (c *CachedInterpreter) AnalyzeCOTWithPrice(ctx context.Context, analyses []domain.COTAnalysis, priceCtx map[string]*domain.PriceContext) (string, error) {
 	if len(analyses) == 0 || c.cache == nil {
-		return c.inner.AnalyzeCOT(ctx, analyses)
+		return c.inner.AnalyzeCOTWithPrice(ctx, analyses, priceCtx)
 	}
 
 	version := latestReportDate(analyses)
-	key := fmt.Sprintf("aicache:cot:%s", version)
+	priceSuffix := "np"
+	if len(priceCtx) > 0 {
+		priceSuffix = "wp"
+	}
+	key := fmt.Sprintf("aicache:cot:%s:%s", version, priceSuffix)
 
 	if cached, ok := c.cache.Get(ctx, key); ok {
 		clog.Debug().Str("key", key).Msg("cache HIT")
 		return cached, nil
 	}
 
-	result, err := c.inner.AnalyzeCOT(ctx, analyses)
+	result, err := c.inner.AnalyzeCOTWithPrice(ctx, analyses, priceCtx)
 	if err != nil {
 		return result, err
 	}

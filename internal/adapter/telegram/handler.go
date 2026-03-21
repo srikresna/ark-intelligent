@@ -12,6 +12,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -270,9 +271,19 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 
 	html := h.fmt.FormatCOTDetailWithCode(*analysis, displayCode)
 
-	// Add AI interpretation if it's a new message
+	// Build price context for this contract (best-effort, non-fatal)
+	var priceCtxMap map[string]*domain.PriceContext
+	if editMsgID == 0 && h.priceRepo != nil {
+		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+		if pc, err := ctxBuilder.Build(ctx, contractCode, displayCode); err == nil && pc != nil {
+			priceCtxMap = map[string]*domain.PriceContext{contractCode: pc}
+			html += h.fmt.FormatPriceContext(pc)
+		}
+	}
+
+	// Add AI interpretation with price context if available
 	if editMsgID == 0 && h.aiAnalyzer != nil && h.aiAnalyzer.IsAvailable() {
-		narrative, aiErr := h.aiAnalyzer.AnalyzeCOT(ctx, []domain.COTAnalysis{*analysis})
+		narrative, aiErr := h.aiAnalyzer.AnalyzeCOTWithPrice(ctx, []domain.COTAnalysis{*analysis}, priceCtxMap)
 		if aiErr == nil && narrative != "" {
 			html += "\n\n" + h.fmt.FormatAIInsight("COT Analysis", narrative)
 		}
