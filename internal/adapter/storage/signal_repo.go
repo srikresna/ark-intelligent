@@ -187,6 +187,41 @@ func reverseSignals(s []domain.PersistedSignal) {
 	}
 }
 
+// PurgeInvalidSignals deletes signals that have EntryPrice == 0.
+// These are leftovers from an older bootstrap that didn't check entry prices.
+// Returns the number of signals deleted.
+func (r *SignalRepo) PurgeInvalidSignals(_ context.Context) (int, error) {
+	all, err := r.scanSignals(signalAllPrefix())
+	if err != nil {
+		return 0, fmt.Errorf("scan signals for purge: %w", err)
+	}
+
+	var deleteKeys [][]byte
+	for i := range all {
+		if all[i].EntryPrice == 0 {
+			deleteKeys = append(deleteKeys, signalKey(all[i]))
+		}
+	}
+
+	if len(deleteKeys) == 0 {
+		return 0, nil
+	}
+
+	wb := r.db.NewWriteBatch()
+	defer wb.Cancel()
+	for _, key := range deleteKeys {
+		if err := wb.Delete(key); err != nil {
+			return 0, fmt.Errorf("batch delete signal: %w", err)
+		}
+	}
+	if err := wb.Flush(); err != nil {
+		return 0, fmt.Errorf("flush signal purge: %w", err)
+	}
+
+	log.Info().Int("purged", len(deleteKeys)).Msg("purged signals with zero entry price")
+	return len(deleteKeys), nil
+}
+
 // SignalExists checks if a signal with the given key already exists.
 // Used by the bootstrapper to avoid duplicate inserts.
 func (r *SignalRepo) SignalExists(_ context.Context, contractCode string, reportDate time.Time, signalType string) (bool, error) {

@@ -265,6 +265,14 @@ func main() {
 			}
 		}
 
+		// Purge any signals with EntryPrice=0 (created by older bootstrap code).
+		// This allows re-bootstrap to recreate them with valid entry prices.
+		if purged, err := signalRepo.PurgeInvalidSignals(initCtx); err != nil {
+			log.Warn().Err(err).Msg("signal purge failed (non-fatal)")
+		} else if purged > 0 {
+			log.Info().Int("purged", purged).Msg("purged invalid signals (EntryPrice=0)")
+		}
+
 		// Backtest bootstrap (replay historical COT signals against prices)
 		log.Info().Msg("Running backtest bootstrap...")
 		bootstrapper := backtestsvc.NewBootstrapper(cotRepo, priceRepo, signalRepo, signalRepo)
