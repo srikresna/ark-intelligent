@@ -172,6 +172,7 @@ func main() {
 		Evaluator:      signalEvaluator,
 		FREDAlertCheck: authMiddleware.ShouldReceiveFREDAlerts,
 		IsBanned:       authMiddleware.IsUserBanned,
+		OwnerChatID:    ownerChatIDForScheduler(bot.OwnerID()),
 	})
 
 	sched.Start(ctx, &scheduler.Intervals{
@@ -401,4 +402,13 @@ func logStorageSize(db *storage.DB) {
 			Int64("vlog_kb", vlog>>10).
 			Msg("Storage size")
 	}
+}
+
+// ownerChatIDForScheduler converts an owner user ID to a chat ID string.
+// Returns "" if the owner ID is not set (disabling owner notifications).
+func ownerChatIDForScheduler(ownerID int64) string {
+	if ownerID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", ownerID)
 }

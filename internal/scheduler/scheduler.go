@@ -26,6 +26,7 @@ import (
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
@@ -60,6 +61,10 @@ type Deps struct {
 
 	// IsBanned checks if a user is banned. May be nil (no ban check).
 	IsBanned func(ctx context.Context, userID int64) bool
+
+	// OwnerChatID is the owner's chat ID for debug notifications.
+	// If empty, debug notifications are skipped.
+	OwnerChatID string
 }
 
 // Intervals configures how often each job runs.
@@ -493,9 +498,23 @@ func (s *Scheduler) jobPriceFetch(ctx context.Context) error {
 		return nil
 	}
 
-	records, err := s.deps.PriceFetcher.FetchAll(ctx, 52)
-	if err != nil {
-		return fmt.Errorf("price fetch: %w", err)
+	// Use detailed fetch if the concrete Fetcher type is available.
+	var records []domain.PriceRecord
+	var report *pricesvc.FetchReport
+
+	if fetcher, ok := s.deps.PriceFetcher.(*pricesvc.Fetcher); ok {
+		var err error
+		records, report, err = fetcher.FetchAllDetailed(ctx, 52)
+		if err != nil {
+			s.notifyOwnerPriceFetch(ctx, report, err)
+			return fmt.Errorf("price fetch: %w", err)
+		}
+	} else {
+		var err error
+		records, err = s.deps.PriceFetcher.FetchAll(ctx, 52)
+		if err != nil {
+			return fmt.Errorf("price fetch: %w", err)
+		}
 	}
 
 	if len(records) > 0 {
@@ -505,7 +524,63 @@ func (s *Scheduler) jobPriceFetch(ctx context.Context) error {
 		log.Info().Int("records", len(records)).Msg("price data saved")
 	}
 
+	// Send debug report to owner (only if detailed report available)
+	if report != nil {
+		s.notifyOwnerPriceFetch(ctx, report, nil)
+	}
+
 	return nil
+}
+
+// notifyOwnerPriceFetch sends a debug-level price fetch report to the owner.
+func (s *Scheduler) notifyOwnerPriceFetch(ctx context.Context, report *pricesvc.FetchReport, fetchErr error) {
+	if s.deps.OwnerChatID == "" || s.deps.Bot == nil {
+		return
+	}
+	if report == nil {
+		return
+	}
+
+	var b strings.Builder
+	b.WriteString("🔧 <b>Price Fetch Report</b>\n\n")
+
+	// Per-contract results
+	for _, r := range report.Results {
+		if r.Error != "" {
+			b.WriteString(fmt.Sprintf("❌ <b>%s</b>: %s\n", r.Currency, r.Error))
+		} else {
+			b.WriteString(fmt.Sprintf("✅ %s: <code>%s</code> (%d rec)\n", r.Currency, r.Source, r.Records))
+		}
+	}
+
+	// Summary
+	b.WriteString(fmt.Sprintf("\n<b>%d</b>/%d OK", report.Success, report.Success+report.Failed))
+	if report.Duration > 0 {
+		b.WriteString(fmt.Sprintf(" | took %s", report.Duration.Round(time.Millisecond)))
+	}
+
+	// Source breakdown
+	srcCount := make(map[string]int)
+	for _, r := range report.Results {
+		if r.Source != "" {
+			srcCount[r.Source]++
+		}
+	}
+	if len(srcCount) > 0 {
+		var srcParts []string
+		for src, n := range srcCount {
+			srcParts = append(srcParts, fmt.Sprintf("%s(%d)", src, n))
+		}
+		b.WriteString(fmt.Sprintf(" | %s", strings.Join(srcParts, ", ")))
+	}
+
+	if fetchErr != nil {
+		b.WriteString(fmt.Sprintf("\n\n⚠️ <b>Error:</b> %s", fetchErr.Error()))
+	}
+
+	if _, err := s.deps.Bot.SendHTML(ctx, s.deps.OwnerChatID, b.String()); err != nil {
+		log.Warn().Err(err).Msg("failed to send price fetch report to owner")
+	}
 }
 
 // jobSignalEval evaluates pending signals by checking future price outcomes.

@@ -285,7 +285,7 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 	var priceCtxMap map[string]*domain.PriceContext
 	if editMsgID == 0 && h.priceRepo != nil {
 		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
-		if pc, err := ctxBuilder.Build(ctx, contractCode, displayCode); err == nil && pc != nil {
+		if pc, pcErr := ctxBuilder.Build(ctx, contractCode, displayCode); pcErr == nil && pc != nil {
 			priceCtxMap = map[string]*domain.PriceContext{contractCode: pc}
 			html += h.fmt.FormatPriceContext(pc)
 
@@ -294,6 +294,9 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 			if len(divs) > 0 {
 				html += h.fmt.FormatPriceCOTDivergence(divs[0])
 			}
+		} else if pcErr != nil {
+			// Notify owner about price context failure (non-blocking)
+			h.notifyOwnerDebug(ctx, fmt.Sprintf("⚠️ Price context failed for <b>%s</b>\n<code>%s</code>", displayCode, pcErr.Error()))
 		}
 	}
 
@@ -1415,4 +1418,16 @@ func (h *Handler) cmdUnban(ctx context.Context, chatID string, userID int64, arg
 
 	_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("User <code>%d</code> has been unbanned (set to Free).", targetID))
 	return err
+}
+
+// notifyOwnerDebug sends a debug message to the bot owner (non-blocking, best-effort).
+// Does nothing if OwnerID is not set.
+func (h *Handler) notifyOwnerDebug(ctx context.Context, html string) {
+	ownerID := h.bot.OwnerID()
+	if ownerID <= 0 {
+		return
+	}
+	go func() {
+		_, _ = h.bot.SendHTML(ctx, fmt.Sprintf("%d", ownerID), html)
+	}()
 }

@@ -45,35 +45,80 @@ func NewFetcher(twelveDataKey string, avKeys []string) *Fetcher {
 	}
 }
 
+// ContractFetchResult holds the result of fetching price data for a single contract.
+type ContractFetchResult struct {
+	Currency string // e.g. "EUR"
+	Source   string // "twelvedata", "alphavantage", "yahoo", or "" if failed
+	Records  int    // number of records fetched
+	Error    string // non-empty if all sources failed
+}
+
+// FetchReport summarises a FetchAll run — which provider served each contract.
+type FetchReport struct {
+	Results  []ContractFetchResult
+	Success  int
+	Failed   int
+	Duration time.Duration
+}
+
 // FetchAll fetches weekly prices for all 11 default contracts,
 // routing each to the optimal API source.
 func (f *Fetcher) FetchAll(ctx context.Context, weeks int) ([]domain.PriceRecord, error) {
+	records, _, err := f.FetchAllDetailed(ctx, weeks)
+	return records, err
+}
+
+// FetchAllDetailed is like FetchAll but also returns a FetchReport
+// with per-contract source and error information.
+func (f *Fetcher) FetchAllDetailed(ctx context.Context, weeks int) ([]domain.PriceRecord, *FetchReport, error) {
+	start := time.Now()
 	var allRecords []domain.PriceRecord
 	var lastErr error
+	report := &FetchReport{}
 
 	for _, mapping := range domain.DefaultPriceSymbolMappings {
 		records, err := f.FetchWeekly(ctx, mapping, weeks)
 		if err != nil {
 			log.Warn().Err(err).Str("contract", mapping.Currency).Msg("Failed to fetch price")
 			lastErr = err
+			report.Results = append(report.Results, ContractFetchResult{
+				Currency: mapping.Currency,
+				Error:    err.Error(),
+			})
+			report.Failed++
 			continue
 		}
 		allRecords = append(allRecords, records...)
 
+		// Determine source from first record
+		src := ""
+		if len(records) > 0 {
+			src = records[0].Source
+		}
+		report.Results = append(report.Results, ContractFetchResult{
+			Currency: mapping.Currency,
+			Source:   src,
+			Records:  len(records),
+		})
+		report.Success++
+
 		// Rate limit between calls to respect API limits
 		select {
 		case <-ctx.Done():
-			return allRecords, ctx.Err()
+			report.Duration = time.Since(start)
+			return allRecords, report, ctx.Err()
 		case <-time.After(500 * time.Millisecond):
 		}
 	}
 
+	report.Duration = time.Since(start)
+
 	if len(allRecords) == 0 && lastErr != nil {
-		return nil, fmt.Errorf("all price fetches failed, last error: %w", lastErr)
+		return nil, report, fmt.Errorf("all price fetches failed, last error: %w", lastErr)
 	}
 
 	log.Info().Int("records", len(allRecords)).Msg("Price fetch complete")
-	return allRecords, nil
+	return allRecords, report, nil
 }
 
 // FetchWeekly fetches weekly OHLC data for a single contract.
