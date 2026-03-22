@@ -161,6 +161,16 @@ func main() {
 		}
 
 		chatService = aisvc.NewChatService(claudeClient, geminiForFallback, convRepo, contextBuilder, toolConfig)
+
+		// Wire owner notification for AI failure alerts
+		chatService.SetOwnerNotify(func(ctx context.Context, html string) {
+			ownerChatID := ownerChatIDForScheduler(bot.OwnerID())
+			if ownerChatID == "" {
+				return
+			}
+			_, _ = bot.SendHTML(ctx, ownerChatID, html)
+		})
+
 		log.Info().Str("endpoint", cfg.ClaudeEndpoint).Msg("Claude chatbot initialized")
 	} else {
 		log.Info().Msg("No CLAUDE_ENDPOINT — chatbot mode disabled")

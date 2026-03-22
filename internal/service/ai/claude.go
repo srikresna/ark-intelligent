@@ -92,10 +92,11 @@ type claudeResponse struct {
 }
 
 type claudeContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
-	Name string `json:"name,omitempty"` // for tool_use blocks
-	ID   string `json:"id,omitempty"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	Thinking string `json:"thinking,omitempty"` // for type="thinking" (extended thinking)
+	Name     string `json:"name,omitempty"`     // for tool_use blocks
+	ID       string `json:"id,omitempty"`
 }
 
 type claudeUsage struct {
@@ -182,7 +183,13 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		// Extract text content and tool usage
 		text, toolsUsed := extractClaudeContent(resp)
 		if text == "" {
-			lastErr = fmt.Errorf("empty Claude response (attempt %d)", attempt+1)
+			// Log response metadata for diagnostics (content blocks logged by extractClaudeContent)
+			claudeLog.Warn().
+				Str("stop_reason", resp.StopReason).
+				Str("model", resp.Model).
+				Int("content_blocks", len(resp.Content)).
+				Msg("empty text from Claude response")
+			lastErr = fmt.Errorf("empty Claude response (attempt %d, stop_reason=%s, blocks=%d)", attempt+1, resp.StopReason, len(resp.Content))
 			continue
 		}
 
@@ -253,11 +260,17 @@ func (c *ClaudeClient) doRequest(ctx context.Context, apiReq *claudeRequest) (*c
 }
 
 // extractClaudeContent pulls the text and tool usage from a Claude response.
+// Handles standard text blocks, server tool use blocks, and thinking blocks
+// (from extended thinking). Thinking content is not shown to users but is
+// logged for diagnostics.
 func extractClaudeContent(resp *claudeResponse) (string, []string) {
 	var textParts []string
 	var toolsUsed []string
+	var blockTypes []string
+	hasThinking := false
 
 	for _, block := range resp.Content {
+		blockTypes = append(blockTypes, block.Type)
 		switch block.Type {
 		case "text":
 			if block.Text != "" {
@@ -267,10 +280,26 @@ func extractClaudeContent(resp *claudeResponse) (string, []string) {
 			if block.Name != "" {
 				toolsUsed = append(toolsUsed, block.Name)
 			}
+		case "thinking":
+			hasThinking = true
+			// Thinking blocks are internal reasoning — not shown to user.
+			// Log presence for diagnostics.
 		}
 	}
 
-	return strings.Join(textParts, "\n"), toolsUsed
+	text := strings.Join(textParts, "\n")
+
+	// Diagnostic logging when no text was extracted but blocks exist
+	if text == "" && len(resp.Content) > 0 {
+		claudeLog.Warn().
+			Strs("block_types", blockTypes).
+			Bool("has_thinking", hasThinking).
+			Str("stop_reason", resp.StopReason).
+			Str("model", resp.Model).
+			Msg("Claude response has content blocks but no text extracted")
+	}
+
+	return text, toolsUsed
 }
 
 // deriveToolName extracts the tool name from a versioned type string.

@@ -18,6 +18,10 @@ var chatLog = logger.Component("chat-service")
 // this error to refund consumed AI quota since no real AI call succeeded.
 var ErrAIFallback = errors.New("all AI services unavailable, using template fallback")
 
+// OwnerNotifyFunc is a callback to notify the bot owner of AI service issues.
+// html is the notification message in Telegram HTML format.
+type OwnerNotifyFunc func(ctx context.Context, html string)
+
 // ChatService orchestrates the chatbot pipeline:
 // 1. Load conversation history
 // 2. Build context-aware system prompt
@@ -29,6 +33,7 @@ type ChatService struct {
 	convRepo       ports.ConversationRepository
 	contextBuilder *ContextBuilder
 	toolConfig     *ToolConfig
+	ownerNotify    OwnerNotifyFunc // may be nil
 }
 
 // NewChatService creates a ChatService with the given dependencies.
@@ -47,6 +52,12 @@ func NewChatService(
 		contextBuilder: contextBuilder,
 		toolConfig:     toolConfig,
 	}
+}
+
+// SetOwnerNotify registers a callback for notifying the bot owner about
+// AI service failures. Non-blocking — caller should fire in a goroutine.
+func (cs *ChatService) SetOwnerNotify(fn OwnerNotifyFunc) {
+	cs.ownerNotify = fn
 }
 
 // HandleMessage processes a free-text user message through the AI pipeline.
@@ -143,6 +154,13 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 			cs.saveConversation(ctx, userID, effectiveText, geminiResp)
 
 			chatLog.Info().Int64("user_id", userID).Msg("Gemini fallback succeeded")
+
+			// Notify owner: Claude down but Gemini handled it
+			cs.notifyOwner(ctx, fmt.Sprintf(
+				"⚠️ <b>Claude Fallback Triggered</b>\nUser: <code>%d</code>\nError: <code>%s</code>\nGemini fallback: ✅ succeeded",
+				userID, truncateErr(err),
+			))
+
 			return fallbackResponse, nil
 		}
 
@@ -153,6 +171,13 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 
 	// 7. Template fallback (last resort)
 	chatLog.Error().Int64("user_id", userID).Msg("all AI services unavailable — using template fallback")
+
+	// Notify owner: both AI services down
+	cs.notifyOwner(ctx, fmt.Sprintf(
+		"🚨 <b>All AI Services Down</b>\nUser: <code>%d</code>\nClaude: <code>%s</code>\nGemini: unavailable\nFallback: template response sent",
+		userID, truncateErr(err),
+	))
+
 	return templateFallback(), ErrAIFallback
 }
 
@@ -197,6 +222,28 @@ func templateFallback() string {
 	b.WriteString("/rank — Currency strength ranking\n\n")
 	b.WriteString("<i>Please try again later for AI chat features.</i>")
 	return b.String()
+}
+
+// notifyOwner sends a notification to the bot owner if the callback is set.
+// Non-blocking — fires in a goroutine to avoid delaying user response.
+func (cs *ChatService) notifyOwner(ctx context.Context, html string) {
+	if cs.ownerNotify == nil {
+		return
+	}
+	go cs.ownerNotify(ctx, html)
+}
+
+// truncateErr returns a truncated error string (max 150 chars) safe for Telegram HTML.
+// Returns "nil" for nil errors.
+func truncateErr(err error) string {
+	if err == nil {
+		return "nil"
+	}
+	s := err.Error()
+	if len(s) > 150 {
+		s = s[:150] + "..."
+	}
+	return s
 }
 
 // describeContentBlocks generates a descriptive label for multimodal content
