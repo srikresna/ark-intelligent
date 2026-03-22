@@ -144,8 +144,14 @@ func buildDesignMatrix(signals []domain.PersistedSignal) (X [][]float64, y []flo
 // Returns [COT, Stress, FRED, Price] each normalized to [-1, +1].
 // Calendar is excluded because PersistedSignal does not store surprise data.
 func extractFactorScores(s domain.PersistedSignal) []float64 {
-	// 1. COT score: use SentimentScore directly (already -100..+100).
-	cotScore := mathutil.Clamp(s.SentimentScore, -100, 100)
+	// 1. COT score: prefer SentimentScore if populated; otherwise derive from
+	//    COTIndex (0-100, always stored by bootstrap and scheduler).
+	//    Re-center COTIndex to -100..+100: (index - 50) * 2.
+	cotScore := s.SentimentScore
+	if cotScore == 0 && s.COTIndex != 0 {
+		cotScore = (s.COTIndex - 50) * 2
+	}
+	cotScore = mathutil.Clamp(cotScore, -100, 100)
 
 	// 2. Financial stress: approximate from FRED regime label.
 	// STRESS/RECESSION regimes imply high stress (bearish risk), others neutral/positive.
@@ -155,13 +161,22 @@ func extractFactorScores(s domain.PersistedSignal) []float64 {
 	fredScore := fredRegimeToScore(s.FREDRegime)
 
 	// 4. Price momentum: derive from signal direction and conviction.
-	// ConvictionScore (0-100) encodes the combined signal including price.
-	// Translate to -100..+100 centered at 0.
+	//    Prefer ConvictionScore if populated; otherwise derive from
+	//    Confidence (0-100, always stored) + Direction as a proxy.
 	priceScore := 0.0
 	if s.ConvictionScore > 0 {
 		// ConvictionScore is 0-100 where 50 = neutral.
 		priceScore = mathutil.Clamp((s.ConvictionScore-50)*2, -100, 100)
 		// Adjust sign based on direction.
+		if s.Direction == "BEARISH" {
+			priceScore = -math.Abs(priceScore)
+		} else if s.Direction == "BULLISH" {
+			priceScore = math.Abs(priceScore)
+		}
+	} else if s.Confidence > 0 {
+		// Fallback: use Confidence as magnitude, Direction as sign.
+		// Confidence is 0-100; re-center to -100..+100.
+		priceScore = mathutil.Clamp((s.Confidence-50)*2, -100, 100)
 		if s.Direction == "BEARISH" {
 			priceScore = -math.Abs(priceScore)
 		} else if s.Direction == "BULLISH" {

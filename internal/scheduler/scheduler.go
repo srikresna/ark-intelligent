@@ -679,6 +679,13 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 	now := time.Now()
 	var toSave []domain.PersistedSignal
 
+	// Best-effort: fetch current FRED regime once for all signals.
+	var fredRegime string
+	if md, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && md != nil {
+		regime := fred.ClassifyMacroRegime(md)
+		fredRegime = regime.Name
+	}
+
 	for _, sig := range signals {
 		analysis := analysisMap[sig.ContractCode]
 		if analysis == nil {
@@ -703,19 +710,22 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		}
 
 		ps := domain.PersistedSignal{
-			ContractCode: sig.ContractCode,
-			Currency:     sig.Currency,
-			SignalType:   string(sig.Type),
-			Direction:    sig.Direction,
-			Strength:     sig.Strength,
-			Confidence:   sig.Confidence,
-			Description:  sig.Description,
-			ReportDate:   analysis.ReportDate,
-			DetectedAt:   now,
-			EntryPrice:   entryClose,
-			Inverse:      inverse,
-			COTIndex:     analysis.COTIndex,
+			ContractCode:   sig.ContractCode,
+			Currency:       sig.Currency,
+			SignalType:     string(sig.Type),
+			Direction:      sig.Direction,
+			Strength:       sig.Strength,
+			Confidence:     sig.Confidence,
+			Description:    sig.Description,
+			ReportDate:     analysis.ReportDate,
+			DetectedAt:     now,
+			EntryPrice:     entryClose,
+			Inverse:        inverse,
+			COTIndex:       analysis.COTIndex,
+			SentimentScore: analysis.SentimentScore,
 		}
+
+		ps.FREDRegime = fredRegime
 		toSave = append(toSave, ps)
 	}
 

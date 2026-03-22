@@ -156,18 +156,19 @@ func (b *Bootstrapper) bootstrapContract(ctx context.Context, mapping domain.Pri
 			}
 
 			ps := domain.PersistedSignal{
-				ContractCode: mapping.ContractCode,
-				Currency:     mapping.Currency,
-				SignalType:   string(sig.Type),
-				Direction:    sig.Direction,
-				Strength:     sig.Strength,
-				Confidence:   sig.Confidence,
-				Description:  sig.Description,
-				ReportDate:   analysis.ReportDate,
-				DetectedAt:   analysis.ReportDate, // Retroactive — use report date
-				EntryPrice:   entryClose,
-				Inverse:      mapping.Inverse,
-				COTIndex:     analysis.COTIndex,
+				ContractCode:   mapping.ContractCode,
+				Currency:       mapping.Currency,
+				SignalType:     string(sig.Type),
+				Direction:      sig.Direction,
+				Strength:       sig.Strength,
+				Confidence:     sig.Confidence,
+				Description:    sig.Description,
+				ReportDate:     analysis.ReportDate,
+				DetectedAt:     analysis.ReportDate, // Retroactive — use report date
+				EntryPrice:     entryClose,
+				Inverse:        mapping.Inverse,
+				COTIndex:       analysis.COTIndex,
+				SentimentScore: analysis.SentimentScore,
 			}
 			toSave = append(toSave, ps)
 		}

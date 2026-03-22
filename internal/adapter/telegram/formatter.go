@@ -1500,11 +1500,9 @@ func (f *Formatter) FormatWalkForward(result *backtestsvc.WalkForwardResult) str
 	b.WriteString(strings.Repeat("\xe2\x94\x80", 36) + "\n")
 
 	for i, w := range result.Windows {
-		degSign := "+"
+		degSign := ""
 		if w.Degradation >= 0 {
 			degSign = "+"
-		} else {
-			degSign = ""
 		}
 		b.WriteString(fmt.Sprintf(" %2d   %5.1f%% %5.1f%% %s%.1f %3d/%-3d\n",
 			i+1, w.InSampleWinRate, w.OutOfSampleWinRate,
