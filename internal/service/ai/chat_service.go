@@ -141,9 +141,11 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 	}
 
 	// Claude failed — log and attempt fallback
+	// Ensure err is always descriptive for owner notifications downstream.
 	if err != nil {
 		chatLog.Warn().Err(err).Int64("user_id", userID).Msg("Claude failed, attempting Gemini fallback")
 	} else {
+		err = fmt.Errorf("empty response (no text content)")
 		chatLog.Warn().Int64("user_id", userID).Msg("Claude returned empty response, attempting Gemini fallback")
 	}
 
