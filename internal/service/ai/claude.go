@@ -283,7 +283,17 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 
 			resp, err := c.doRequest(ctx, &apiReq)
 			if err != nil {
-				lastErr = fmt.Errorf("claude request (attempt %d): %w", attempt+1, err)
+				lastErr = fmt.Errorf("claude request (attempt %d, tool_round %d): %w", attempt+1, toolRound, err)
+				// If tool round-trips already happened, messages are modified —
+				// retrying from the outer loop sends the same bloated payload
+				// which will likely timeout again. Fail fast instead.
+				if toolRound > 0 {
+					claudeLog.Warn().
+						Int("tool_round", toolRound).
+						Err(err).
+						Msg("error after tool round-trips, not retrying (payload too large)")
+					return nil, lastErr
+				}
 				if isClaudeTransient(err) {
 					break // break inner loop, continue outer retry
 				}
@@ -297,6 +307,14 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 			}
 			if apiErr != nil {
 				lastErr = fmt.Errorf("claude API error: %s: %s", apiErr.Type, apiErr.Message)
+				// Same logic: don't retry after tool round-trips
+				if toolRound > 0 {
+					claudeLog.Warn().
+						Int("tool_round", toolRound).
+						Str("error_type", apiErr.Type).
+						Msg("API error after tool round-trips, not retrying")
+					return nil, lastErr
+				}
 				if apiErr.Type == "overloaded_error" || strings.Contains(apiErr.Message, "rate") {
 					break // break inner, retry outer
 				}
