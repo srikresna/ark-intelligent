@@ -1516,12 +1516,10 @@ func (h *Handler) HandleFreeText(ctx context.Context, chatID string, userID int6
 		}
 	}
 
-	// Call chat service with a per-request timeout to prevent unbounded waits.
-	// Extended thinking + tool round-trips (memory, web search, code execution)
-	// can take multiple rounds. Allow 5 minutes for complex multi-tool pipelines.
-	chatCtx, chatCancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer chatCancel()
-	response, err := h.chatService.HandleMessage(chatCtx, userID, text, role, contentBlocks, onProgress)
+	// Call chat service. No blanket timeout — the Claude HTTP client already has
+	// a per-request timeout (default 120s) that handles hung requests.
+	// As long as Claude keeps responding (tool round-trips), let it work freely.
+	response, err := h.chatService.HandleMessage(ctx, userID, text, role, contentBlocks, onProgress)
 
 	// Delete "thinking" indicator
 	if thinkMsgID > 0 {

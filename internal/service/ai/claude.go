@@ -269,25 +269,11 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		}
 
 		// Inner tool round-trip loop: Claude may request multiple tool calls
-		// before producing a final text response. No strict round-trip limit —
-		// we let the model work freely but guard against context deadline.
+		// before producing a final text response. No blanket timeout — the HTTP
+		// client timeout (default 120s) handles hung individual requests.
 		// The soft cap (10) is only a safety net against infinite loops.
 		const maxToolRoundTrips = 10
 		for toolRound := 0; toolRound < maxToolRoundTrips; toolRound++ {
-			// Guard: check remaining context time before making a request.
-			// Each Claude round-trip can take 5-30s; need enough headroom.
-			if deadline, ok := ctx.Deadline(); ok {
-				remaining := time.Until(deadline)
-				if remaining < 10*time.Second {
-					claudeLog.Warn().
-						Dur("remaining", remaining).
-						Int("tool_round", toolRound).
-						Msg("insufficient time for another Claude request, aborting")
-					lastErr = fmt.Errorf("claude: context deadline too close (%s remaining) after %d tool rounds", remaining, toolRound)
-					break
-				}
-			}
-
 			resp, err := c.doRequest(ctx, &apiReq)
 			if err != nil {
 				lastErr = fmt.Errorf("claude request (attempt %d): %w", attempt+1, err)
