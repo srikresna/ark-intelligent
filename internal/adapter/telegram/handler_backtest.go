@@ -61,6 +61,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		return h.backtestWalkForward(ctx, chatID)
 	case args == "WEIGHTS" || args == "WEIGHT":
 		return h.backtestWeights(ctx, chatID)
+	case args == "SMARTMONEY" || args == "SM":
+		return h.backtestSmartMoney(ctx, chatID)
 	case knownSignalTypes[args]:
 		// e.g. /backtest SMART_MONEY
 		return h.backtestOneSignalType(ctx, chatID, calc, args)
@@ -78,6 +80,7 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 			"<code>/backtest timing</code> — optimal horizon per signal type\n" +
 			"<code>/backtest walkforward</code> — walk-forward overfit detection\n" +
 			"<code>/backtest weights</code> — factor weight optimization\n" +
+			"<code>/backtest sm</code> — smart money tracking accuracy\n" +
 			"<code>/backtest SMART_MONEY</code> — specific signal type\n" +
 			"<code>/backtest EUR</code> — specific currency\n\n" +
 			"<b>Signal types:</b> SMART_MONEY · EXTREME_POSITIONING · DIVERGENCE · MOMENTUM_SHIFT · CONCENTRATION · CROWD_CONTRARIAN · THIN_MARKET"
@@ -275,6 +278,30 @@ func (h *Handler) backtestWeights(ctx context.Context, chatID string) error {
 	}
 
 	htmlOut := h.fmt.FormatWeightOptimization(result)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
+// backtestSmartMoney shows smart money tracking accuracy per contract.
+func (h *Handler) backtestSmartMoney(ctx context.Context, chatID string) error {
+	if h.cotRepo == nil || h.priceRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Smart money analysis requires both COT and price data.")
+		return err
+	}
+
+	analyzer := backtestsvc.NewSmartMoneyAnalyzer(h.cotRepo, h.priceRepo)
+	results, err := analyzer.Analyze(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	if len(results) == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "Not enough data for smart money analysis. Need COT + price history.")
+		return err
+	}
+
+	htmlOut := h.fmt.FormatSmartMoneyAccuracy(results)
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }

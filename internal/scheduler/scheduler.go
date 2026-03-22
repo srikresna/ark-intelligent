@@ -305,6 +305,14 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 		}
 	}
 
+	// Set FRED regime for regime-conditional signal filtering
+	if md, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && md != nil {
+		regime := fred.ClassifyMacroRegime(md)
+		if regime.Name != "" {
+			recalDetector.SetCurrentRegime(regime.Name)
+		}
+	}
+
 	// Build VIX/SPX risk context (nil-safe — no adjustment if unavailable)
 	var riskCtx *domain.RiskContext
 	var priceCtxsSched map[string]*domain.PriceContext

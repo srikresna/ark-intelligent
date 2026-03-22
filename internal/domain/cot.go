@@ -128,6 +128,14 @@ type COTRecord struct {
 	// Populated from API change_in_* fields (preferred) or computed from history.
 	NetChange float64 `json:"net_change"`
 
+	// --- E. Options Positions (computed: Combined - FuturesOnly) ---
+	HasOptions         bool    `json:"has_options,omitempty"`          // true if options data was computed
+	OptionsOI          float64 `json:"opt_oi,omitempty"`              // Options-only open interest
+	OptSmartMoneyLong  float64 `json:"opt_smart_money_long,omitempty"`
+	OptSmartMoneyShort float64 `json:"opt_smart_money_short,omitempty"`
+	OptCommercialLong  float64 `json:"opt_commercial_long,omitempty"`
+	OptCommercialShort float64 `json:"opt_commercial_short,omitempty"`
+
 	// --- D. Legacy/Fallback Fields (for CSV/Migration) ---
 	CommLong         float64 `json:"comm_long,omitempty"`
 	CommShort        float64 `json:"comm_short,omitempty"`
@@ -303,6 +311,11 @@ type COTAnalysis struct {
 
 	// --- I. FRED-Adjusted Scores ---
 	RegimeAdjustedScore float64 `json:"regime_adjusted_score"`
+
+	// --- J. Options-Derived Metrics ---
+	OptionsNetPosition  float64 `json:"opt_net_position,omitempty"`    // Smart money options net
+	OptionsPctOfTotalOI float64 `json:"opt_pct_of_total_oi,omitempty"` // Options OI / Total OI * 100
+	OptionsSmartBias    string  `json:"opt_smart_bias,omitempty"`      // "CALL-HEAVY", "PUT-HEAVY", "BALANCED"
 
 	// AINarrative is reserved for per-contract AI narrative caching (populated by cache layer).
 	AINarrative string `json:"ai_narrative,omitempty"`

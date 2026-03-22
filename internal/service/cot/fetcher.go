@@ -22,11 +22,12 @@ var fetchLog = logger.Component("cot-fetcher")
 // Primary: CFTC Socrata Open Data API (JSON)
 // Fallback: CFTC bulk CSV download from cftc.gov
 type Fetcher struct {
-	httpClient *http.Client
-	endpoints  map[string]string // reportType -> url
-	defaultCSV string
-	cbSocrata  *circuitbreaker.Breaker
-	cbCSV      *circuitbreaker.Breaker
+	httpClient           *http.Client
+	endpoints            map[string]string // reportType -> url
+	futuresOnlyEndpoints map[string]string // reportType -> futures-only url
+	defaultCSV           string
+	cbSocrata            *circuitbreaker.Breaker
+	cbCSV                *circuitbreaker.Breaker
 }
 
 // NewFetcher creates a COT fetcher with modern CFTC endpoints.
@@ -36,6 +37,10 @@ func NewFetcher() *Fetcher {
 		endpoints: map[string]string{
 			"TFF":           "https://publicreporting.cftc.gov/resource/yw9f-hn96.json", // TFF Combined
 			"DISAGGREGATED": "https://publicreporting.cftc.gov/resource/kh3c-gbw2.json", // Disaggregated Combined
+		},
+		futuresOnlyEndpoints: map[string]string{
+			"TFF":           "https://publicreporting.cftc.gov/resource/gpe5-46if.json",
+			"DISAGGREGATED": "https://publicreporting.cftc.gov/resource/72hh-3qpy.json",
 		},
 		defaultCSV: "https://www.cftc.gov/dea/newcot/deafut.txt", // Legacy fallback (still useful)
 		cbSocrata:  circuitbreaker.New("cftc-socrata", 3, 5*time.Minute),
@@ -504,4 +509,72 @@ func csvFloat(row []string, colIdx map[string]int, col string) float64 {
 	s = strings.ReplaceAll(s, ",", "")
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// FetchOptionsPositions fetches futures-only data and computes the difference
+// from combined (which the main FetchLatest already provides) to isolate options.
+// The provided combinedRecords should be the output of FetchLatest (which uses combined endpoints).
+func (f *Fetcher) FetchOptionsPositions(ctx context.Context, contracts []domain.COTContract, combinedRecords []domain.COTRecord) ([]domain.COTRecord, error) {
+	// Build futures-only records
+	byReport := make(map[string][]domain.COTContract)
+	for _, c := range contracts {
+		byReport[c.ReportType] = append(byReport[c.ReportType], c)
+	}
+
+	futuresOnly := make(map[string]domain.COTRecord) // keyed by contract code
+	for reportType, reportContracts := range byReport {
+		url, ok := f.futuresOnlyEndpoints[reportType]
+		if !ok {
+			continue
+		}
+		records, err := f.fetchReport(ctx, url, reportContracts)
+		if err != nil {
+			fetchLog.Warn().Str("report_type", reportType).Err(err).Msg("failed to fetch futures-only data for options computation")
+			continue
+		}
+		for _, r := range records {
+			futuresOnly[r.ContractCode] = r
+		}
+	}
+
+	if len(futuresOnly) == 0 {
+		return combinedRecords, nil // no futures-only data available, return as-is
+	}
+
+	// Compute options = combined - futures-only
+	result := make([]domain.COTRecord, len(combinedRecords))
+	for i, combined := range combinedRecords {
+		result[i] = combined
+		fo, ok := futuresOnly[combined.ContractCode]
+		if !ok {
+			continue
+		}
+
+		// Find contract to determine report type
+		var reportType string
+		for _, c := range contracts {
+			if c.Code == combined.ContractCode {
+				reportType = c.ReportType
+				break
+			}
+		}
+
+		result[i].HasOptions = true
+		result[i].OptionsOI = combined.OpenInterest - fo.OpenInterest
+
+		if reportType == "TFF" {
+			result[i].OptSmartMoneyLong = combined.LevFundLong - fo.LevFundLong
+			result[i].OptSmartMoneyShort = combined.LevFundShort - fo.LevFundShort
+			result[i].OptCommercialLong = combined.DealerLong - fo.DealerLong
+			result[i].OptCommercialShort = combined.DealerShort - fo.DealerShort
+		} else {
+			// DISAGGREGATED
+			result[i].OptSmartMoneyLong = combined.ManagedMoneyLong - fo.ManagedMoneyLong
+			result[i].OptSmartMoneyShort = combined.ManagedMoneyShort - fo.ManagedMoneyShort
+			result[i].OptCommercialLong = (combined.ProdMercLong + combined.SwapDealerLong) - (fo.ProdMercLong + fo.SwapDealerLong)
+			result[i].OptCommercialShort = (combined.ProdMercShort + combined.SwapDealerShort) - (fo.ProdMercShort + fo.SwapDealerShort)
+		}
+	}
+
+	return result, nil
 }

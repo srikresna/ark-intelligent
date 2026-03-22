@@ -86,6 +86,12 @@ func (cb *ContextBuilder) Build(ctx context.Context, contractCode, currency stri
 		pc.VolatilityMultiplier = vc.ConfidenceMultiplier
 	}
 
+	// Price regime classification (TRENDING / RANGING / CRISIS)
+	if regime := ClassifyPriceRegime(records, pc); regime != nil {
+		pc.PriceRegime = regime.Regime
+		pc.ADX = regime.ADX
+	}
+
 	return pc, nil
 }
 

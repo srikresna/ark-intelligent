@@ -14,6 +14,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -1035,13 +1036,16 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 	b.WriteString(fmt.Sprintf("<code>Recession Risk: %s</code>\n\n", regime.RecessionRisk))
 
 	// --- Yield Curve ---
-	b.WriteString(fmt.Sprintf("<code>2Y-10Y Curve : %s</code>\n", regime.YieldCurve))
-	b.WriteString(fmt.Sprintf("<code>               10Y=%.2f%% | 2Y=%.2f%%</code>\n", data.Yield10Y, data.Yield2Y))
+	b.WriteString("<code>━━━ Treasury Yield Curve ━━━</code>\n")
+	b.WriteString(fmt.Sprintf("<code> 3M    2Y    5Y   10Y   30Y</code>\n"))
+	b.WriteString(fmt.Sprintf("<code>%4.2f  %4.2f  %4.2f  %4.2f  %4.2f</code>\n",
+		data.Yield3M, data.Yield2Y, data.Yield5Y, data.Yield10Y, data.Yield30Y))
+	b.WriteString(fmt.Sprintf("<code>2Y-10Y Spread: %s</code>\n", regime.YieldCurve))
 	if regime.Yield3M10Y != "N/A" && regime.Yield3M10Y != "" {
-		b.WriteString(fmt.Sprintf("<code>3M-10Y Curve : %s</code>\n", regime.Yield3M10Y))
-		if data.Yield3M > 0 {
-			b.WriteString(fmt.Sprintf("<code>               3M=%.2f%%</code>\n", data.Yield3M))
-		}
+		b.WriteString(fmt.Sprintf("<code>3M-10Y Spread: %s</code>\n", regime.Yield3M10Y))
+	}
+	if regime.Yield2Y30Y != "N/A" && regime.Yield2Y30Y != "" {
+		b.WriteString(fmt.Sprintf("<code>2Y-30Y Spread: %s</code>\n", regime.Yield2Y30Y))
 	}
 
 	// --- Inflation ---
@@ -1724,6 +1728,70 @@ func (f *Formatter) FormatStrengthRanking(strengths []pricesvc.CurrencyStrength)
 }
 
 // ---------------------------------------------------------------------------
+// Regime-Asset Performance Matrix Formatting
+// ---------------------------------------------------------------------------
+
+// FormatRegimePerformance formats the regime-asset performance matrix.
+func (f *Formatter) FormatRegimePerformance(matrix *fred.RegimePerformanceMatrix) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x93\x8A <b>REGIME-ASSET PERFORMANCE MATRIX</b>\n")
+	b.WriteString("<i>Annualized returns (%) by FRED macro regime</i>\n\n")
+
+	if matrix == nil || len(matrix.Regimes) == 0 {
+		b.WriteString("No regime performance data available yet.\n")
+		b.WriteString("<i>Data builds as signals accumulate with FRED regime labels.</i>")
+		return b.String()
+	}
+
+	// For each regime, show a compact table
+	for _, regime := range matrix.Regimes {
+		returns := matrix.Data[regime]
+		if len(returns) == 0 {
+			continue
+		}
+
+		icon := "\xF0\x9F\x93\x88"
+		if regime == "STRESS" || regime == "RECESSION" {
+			icon = "\xF0\x9F\x94\xB4"
+		} else if regime == "STAGFLATION" {
+			icon = "\xF0\x9F\x9F\xA0"
+		} else if regime == "GOLDILOCKS" {
+			icon = "\xF0\x9F\x9F\xA2"
+		}
+
+		currentTag := ""
+		if regime == matrix.Current {
+			currentTag = " \xe2\x86\x90 CURRENT"
+		}
+
+		b.WriteString(fmt.Sprintf("%s <b>%s</b>%s\n<pre>", icon, regime, currentTag))
+		b.WriteString(fmt.Sprintf("%-5s %7s %5s %4s\n", "CCY", "Ann.%", "WR%", "N"))
+		b.WriteString(strings.Repeat("\xe2\x94\x80", 26) + "\n")
+
+		for _, r := range returns {
+			if r.TotalWeeks == 0 {
+				continue
+			}
+			sign := "+"
+			if r.AnnualizedReturn < 0 {
+				sign = ""
+			}
+			b.WriteString(fmt.Sprintf("%-5s %s%6.1f %4.0f%% %4d\n",
+				r.Currency, sign, r.AnnualizedReturn, r.WinRate, r.TotalWeeks))
+		}
+		b.WriteString("</pre>\n")
+	}
+
+	if matrix.Current != "" {
+		b.WriteString(fmt.Sprintf("\nCurrent regime: <b>%s</b>\n", matrix.Current))
+	}
+	b.WriteString("<i>Ann.% = avg weekly return \xc3\x97 52 | WR% = weeks with positive return</i>")
+
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
 // Weekly Report Formatting
 // ---------------------------------------------------------------------------
 
@@ -1892,6 +1960,52 @@ func (f *Formatter) FormatTrackedEvents(events []string) string {
 }
 
 // ---------------------------------------------------------------------------
+// Smart Money Accuracy Formatting
+// ---------------------------------------------------------------------------
+
+// FormatSmartMoneyAccuracy formats smart money tracking accuracy per contract.
+func (f *Formatter) FormatSmartMoneyAccuracy(results []backtestsvc.SmartMoneyAccuracy) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\xA7\xA0 <b>SMART MONEY TRACKING ACCURACY</b>\n")
+	b.WriteString("<i>Does \"smart money\" actually predict price? (52-week analysis)</i>\n\n")
+
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-5s %5s %5s %5s %5s %5s\n", "CCY", "1W", "2W", "4W", "Corr", "Edge"))
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 38) + "\n")
+
+	for _, r := range results {
+		edgeIcon := "\xe2\x9c\x97"
+		if r.Edge == "YES" {
+			edgeIcon = "\xe2\x9c\x93"
+		} else if r.Edge == "INSUFFICIENT" {
+			edgeIcon = "?"
+		}
+		b.WriteString(fmt.Sprintf("%-5s %4.0f%% %4.0f%% %4.0f%% %+.2f  %s\n",
+			r.Currency, r.Accuracy1W, r.Accuracy2W, r.Accuracy4W, r.Correlation, edgeIcon))
+	}
+	b.WriteString("</pre>\n")
+
+	// Highlight best and worst
+	if len(results) > 0 {
+		best := results[0] // already sorted by BestAccuracy desc
+		b.WriteString(fmt.Sprintf("\n\xF0\x9F\x8F\x86 <b>Most Reliable:</b> %s \xe2\x80\x94 %.0f%% at %s\n",
+			best.Currency, best.BestAccuracy, best.BestHorizon))
+
+		worst := results[len(results)-1]
+		if worst.Edge == "NO" {
+			b.WriteString(fmt.Sprintf("\xe2\x9a\xa0\xef\xb8\x8f <b>No Edge:</b> %s \xe2\x80\x94 %.0f%% (consider ignoring SM signals)\n",
+				worst.Currency, worst.BestAccuracy))
+		}
+	}
+
+	b.WriteString("\n<i>Edge = best horizon \xe2\x89\xa555%% with n\xe2\x89\xa510</i>\n")
+	b.WriteString("<i>Corr = Pearson correlation (net change vs 1W price)</i>")
+
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
 // Portfolio Risk Formatting
 // ---------------------------------------------------------------------------
 
@@ -1986,6 +2100,266 @@ func (f *Formatter) FormatPortfolioRisk(risk *domain.PortfolioRisk) string {
 	}
 
 	b.WriteString("\n<i>Use /portfolio add, /portfolio remove, /portfolio clear</i>")
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// Sentiment Survey Dashboard
+// ---------------------------------------------------------------------------
+
+// FormatSentiment renders the sentiment survey dashboard as Telegram HTML.
+func (f *Formatter) FormatSentiment(data *sentiment.SentimentData) string {
+	var b strings.Builder
+
+	b.WriteString("🧠 <b>SENTIMENT SURVEY DASHBOARD</b>\n")
+	b.WriteString(fmt.Sprintf("<i>Updated %s WIB</i>\n", data.FetchedAt.Format("02 Jan 15:04")))
+
+	// --- CNN Fear & Greed Index ---
+	b.WriteString("\n<b>CNN Fear &amp; Greed Index</b>\n")
+	if data.CNNAvailable {
+		gauge := sentimentGauge(data.CNNFearGreed, 15)
+		emoji := fearGreedEmoji(data.CNNFearGreed)
+		b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", gauge))
+		b.WriteString(fmt.Sprintf("<code>Score : %.0f / 100  %s %s</code>\n", data.CNNFearGreed, emoji, data.CNNFearGreedLabel))
+
+		// Contrarian signal
+		if data.CNNFearGreed <= 25 {
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear often precedes rallies\n")
+		} else if data.CNNFearGreed >= 75 {
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed often precedes pullbacks\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable</code>\n")
+	}
+
+	// --- AAII Investor Sentiment Survey ---
+	b.WriteString("\n<b>AAII Investor Sentiment Survey</b>\n")
+	if data.AAIIAvailable {
+		b.WriteString(fmt.Sprintf("<code>Bullish : %5.1f%%</code>  %s\n", data.AAIIBullish, sentimentBar(data.AAIIBullish, "🟢")))
+		b.WriteString(fmt.Sprintf("<code>Neutral : %5.1f%%</code>  %s\n", data.AAIINeutral, sentimentBar(data.AAIINeutral, "⚪")))
+		b.WriteString(fmt.Sprintf("<code>Bearish : %5.1f%%</code>  %s\n", data.AAIIBearish, sentimentBar(data.AAIIBearish, "🔴")))
+		b.WriteString(fmt.Sprintf("<code>Bull/Bear: %.2f</code>", data.AAIIBullBear))
+		if data.AAIIBullBear > 0 {
+			if data.AAIIBullBear >= 2.0 {
+				b.WriteString("  — ⚠️ Elevated optimism")
+			} else if data.AAIIBullBear <= 0.5 {
+				b.WriteString("  — 🟢 Deep pessimism (contrarian bullish)")
+			}
+		}
+		b.WriteString("\n")
+
+		// Historical context: AAII long-term averages are ~37.5% bull, 31% bear, 31.5% neutral
+		if data.AAIIBullish >= 50 {
+			b.WriteString("<code>Note   : Bullish reading well above historical avg (~37.5%%)</code>\n")
+		} else if data.AAIIBearish >= 50 {
+			b.WriteString("<code>Note   : Bearish reading well above historical avg (~31%%)</code>\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable — AAII updates weekly (Thursday)</code>\n")
+	}
+
+	// --- Composite reading ---
+	if data.CNNAvailable || data.AAIIAvailable {
+		b.WriteString("\n<b>Interpretation</b>\n")
+		b.WriteString("<i>Sentiment surveys are contrarian indicators.\n")
+		b.WriteString("Extreme readings often mark turning points.</i>\n")
+	}
+
+	return b.String()
+}
+
+// sentimentGauge builds a visual gauge bar for Fear & Greed (0-100).
+func sentimentGauge(score float64, width int) string {
+	pos := int(score / 100 * float64(width))
+	if pos < 0 {
+		pos = 0
+	}
+	if pos >= width {
+		pos = width - 1
+	}
+
+	bar := make([]byte, width)
+	for i := range bar {
+		bar[i] = '-'
+	}
+	bar[pos] = '|'
+
+	return "Fear " + string(bar) + " Greed"
+}
+
+// fearGreedEmoji returns an emoji indicator for the CNN F&G score.
+func fearGreedEmoji(score float64) string {
+	switch {
+	case score <= 25:
+		return "😱"
+	case score <= 45:
+		return "😟"
+	case score <= 55:
+		return "😐"
+	case score <= 75:
+		return "😏"
+	default:
+		return "🤑"
+	}
+}
+
+// sentimentBar builds a compact visual bar for a percentage (0-100).
+func sentimentBar(pct float64, emoji string) string {
+	const barWidth = 10
+	filled := int(pct / 100 * barWidth)
+	if filled > barWidth {
+		filled = barWidth
+	}
+	return strings.Repeat(emoji, filled)
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal Pattern Formatting
+// ---------------------------------------------------------------------------
+
+// FormatSeasonalPatterns formats seasonal analysis results as a compact HTML table.
+func (f *Formatter) FormatSeasonalPatterns(patterns []pricesvc.SeasonalPattern) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x93\x85 <b>SEASONAL PATTERN ANALYSIS</b>\n")
+	b.WriteString("<i>Historical monthly bias (up to 5 years)</i>\n\n")
+
+	// Compact table: currency + 12 months with emoji bias indicators
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-5s", "CCY"))
+	shortMonths := [12]string{"J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"}
+	for _, m := range shortMonths {
+		b.WriteString(fmt.Sprintf(" %s", m))
+	}
+	b.WriteString("\n")
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 30) + "\n")
+
+	for _, p := range patterns {
+		b.WriteString(fmt.Sprintf("%-5s", p.Currency))
+		for i := 0; i < 12; i++ {
+			icon := "\xc2\xb7" // middle dot for NEUTRAL
+			switch p.Monthly[i].Bias {
+			case "BULLISH":
+				icon = "\xe2\x96\xb2" // triangle up
+			case "BEARISH":
+				icon = "\xe2\x96\xbc" // triangle down
+			}
+			if i+1 == p.CurrentMonth {
+				b.WriteString(fmt.Sprintf("[%s", icon))
+			} else {
+				b.WriteString(fmt.Sprintf(" %s", icon))
+			}
+			if i+1 == p.CurrentMonth {
+				b.WriteString("]")
+			}
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("</pre>\n")
+
+	// Legend
+	b.WriteString("<i>\xe2\x96\xb2 = Bullish (avg&gt;0, WR&gt;55%%)  \xe2\x96\xbc = Bearish  \xc2\xb7 = Neutral</i>\n")
+	b.WriteString("<i>[x] = current month</i>\n")
+
+	// Strongest tendencies
+	type tendency struct {
+		currency string
+		month    string
+		avgRet   float64
+		winRate  float64
+		bias     string
+	}
+	var strong []tendency
+	for _, p := range patterns {
+		for i := 0; i < 12; i++ {
+			ms := p.Monthly[i]
+			if ms.Bias != "NEUTRAL" && ms.SampleSize >= 3 {
+				strong = append(strong, tendency{
+					currency: p.Currency,
+					month:    ms.Month,
+					avgRet:   ms.AvgReturn,
+					winRate:  ms.WinRate,
+					bias:     ms.Bias,
+				})
+			}
+		}
+	}
+
+	// Sort by absolute avg return descending to find strongest
+	sort.Slice(strong, func(i, j int) bool {
+		ai := strong[i].avgRet
+		if ai < 0 {
+			ai = -ai
+		}
+		aj := strong[j].avgRet
+		if aj < 0 {
+			aj = -aj
+		}
+		return ai > aj
+	})
+
+	if len(strong) > 0 {
+		b.WriteString("\n\xF0\x9F\x94\xA5 <b>Strongest Tendencies:</b>\n")
+		limit := 5
+		if len(strong) < limit {
+			limit = len(strong)
+		}
+		for _, t := range strong[:limit] {
+			icon := "\xF0\x9F\x9F\xA2"
+			if t.bias == "BEARISH" {
+				icon = "\xF0\x9F\x94\xB4"
+			}
+			b.WriteString(fmt.Sprintf("%s %s %s: %+.2f%% (%.0f%% WR)\n",
+				icon, t.currency, t.month, t.avgRet, t.winRate))
+		}
+	}
+
+	return b.String()
+}
+
+// FormatSeasonalSingle formats seasonal analysis for a single contract in detail.
+func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x85 <b>SEASONAL PATTERNS: %s</b>\n", html.EscapeString(p.Currency)))
+	b.WriteString("<i>Historical monthly return statistics (up to 5 years)</i>\n\n")
+
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-5s %7s %5s %3s %s\n", "Month", "AvgRet", "WR", "N", "Bias"))
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 32) + "\n")
+
+	for i := 0; i < 12; i++ {
+		ms := p.Monthly[i]
+		marker := " "
+		if i+1 == p.CurrentMonth {
+			marker = "\xe2\x96\xb6" // current month indicator
+		}
+
+		biasIcon := "\xc2\xb7"
+		switch ms.Bias {
+		case "BULLISH":
+			biasIcon = "\xe2\x96\xb2"
+		case "BEARISH":
+			biasIcon = "\xe2\x96\xbc"
+		}
+
+		b.WriteString(fmt.Sprintf("%s%-4s %+6.2f%% %4.0f%% %2d  %s\n",
+			marker, ms.Month, ms.AvgReturn, ms.WinRate, ms.SampleSize, biasIcon))
+	}
+	b.WriteString("</pre>\n")
+
+	// Current month summary
+	curMs := p.Monthly[p.CurrentMonth-1]
+	biasEmoji := "\xe2\x9a\xaa" // white circle
+	switch p.CurrentBias {
+	case "BULLISH":
+		biasEmoji = "\xF0\x9F\x9F\xA2"
+	case "BEARISH":
+		biasEmoji = "\xF0\x9F\x94\xB4"
+	}
+	b.WriteString(fmt.Sprintf("\n%s <b>Current Month (%s):</b> %s \xe2\x80\x94 Avg %+.2f%%, WR %.0f%% (n=%d)\n",
+		biasEmoji, curMs.Month, p.CurrentBias, curMs.AvgReturn, curMs.WinRate, curMs.SampleSize))
+
 	return b.String()
 }
 

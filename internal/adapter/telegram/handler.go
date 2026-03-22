@@ -17,6 +17,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	portfoliosvc "github.com/arkcode369/ark-intelligent/internal/service/portfolio"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -147,6 +148,8 @@ func NewHandler(
 	bot.RegisterCommand("/report", h.cmdReport)      // Weekly performance report
 	bot.RegisterCommand("/impact", h.cmdImpact)      // Event Impact Database
 	bot.RegisterCommand("/portfolio", h.cmdPortfolio) // Portfolio Risk Monitor
+	bot.RegisterCommand("/sentiment", h.cmdSentiment) // Sentiment Survey Dashboard
+	bot.RegisterCommand("/seasonal", h.cmdSeasonal)   // Seasonal Pattern Analysis
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -168,7 +171,7 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 
-	log.Info().Int("commands", 21).Int("callbacks", 6).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 23).Int("callbacks", 6).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -1241,7 +1244,12 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 
 // cmdMacro handles the /macro command — fetches FRED data and displays macro regime.
 // Usage: /macro (uses cache) or /macro refresh (force re-fetch from FRED).
+// Usage: /macro matrix or /macro performance — shows regime-asset performance matrix.
 func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, args string) error {
+	if upper := strings.ToUpper(strings.TrimSpace(args)); upper == "MATRIX" || upper == "PERFORMANCE" {
+		return h.macroRegimePerformance(ctx, chatID)
+	}
+
 	forceRefresh := strings.EqualFold(strings.TrimSpace(args), "refresh")
 	if forceRefresh {
 		// Only admin+ can force-refresh (prevents FRED API quota abuse)
@@ -1305,6 +1313,61 @@ func (h *Handler) buildRegimeAssetInsight(ctx context.Context, data *fred.MacroD
 
 	matrix := fred.ComputeRegimeAssetMatrix(regimeHistory, priceHistory)
 	return fred.GetCurrentRegimeInsight(regime.Name, matrix)
+}
+
+// macroRegimePerformance builds and sends the regime-asset performance matrix
+// from historical persisted signals with FRED regime labels.
+func (h *Handler) macroRegimePerformance(ctx context.Context, chatID string) error {
+	if h.signalRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Regime performance requires signal history with FRED regime data.")
+		return err
+	}
+
+	builder := fred.NewRegimePerformanceBuilder(h.signalRepo)
+	matrix, err := builder.Build(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	htmlOut := h.fmt.FormatRegimePerformance(matrix)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// /sentiment — Sentiment Survey Dashboard
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64, args string) error {
+	forceRefresh := strings.EqualFold(strings.TrimSpace(args), "refresh")
+	if forceRefresh {
+		if !h.requireAdmin(ctx, chatID, userID) {
+			return nil
+		}
+		sentiment.InvalidateCache()
+	}
+
+	cacheStatus := "🧠 Fetching sentiment data... ⏳"
+	if !forceRefresh && sentiment.CacheAge() >= 0 {
+		cacheStatus = "🧠 Loading sentiment data (from cache)... ⏳"
+	}
+	placeholderID, _ := h.bot.SendHTML(ctx, chatID, cacheStatus)
+
+	data, err := sentiment.GetCachedOrFetch(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("sentiment data fetch failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"Failed to fetch sentiment data. Please try again later.")
+	}
+
+	if !data.CNNAvailable && !data.AAIIAvailable {
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"⚠️ Sentiment data currently unavailable from all sources. Try again later.")
+	}
+
+	htmlMsg := h.fmt.FormatSentiment(data)
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
 
 // ---------------------------------------------------------------------------
@@ -1745,6 +1808,9 @@ func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args st
 
 	query := strings.TrimSpace(args)
 
+	// Resolve common abbreviations to full event names
+	query = resolveEventAlias(query)
+
 	// No arguments: show list of tracked events
 	if query == "" {
 		events, err := h.impactProvider.GetTrackedEvents(ctx)
@@ -1764,6 +1830,23 @@ func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args st
 		log.Error().Err(err).Str("query", query).Msg("cmdImpact: get summary failed")
 		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load impact data.")
 		return sendErr
+	}
+
+	// If no results, try substring matching against tracked events
+	if len(summaries) == 0 {
+		events, listErr := h.impactProvider.GetTrackedEvents(ctx)
+		if listErr == nil {
+			matched := fuzzyMatchEvent(query, events)
+			if matched != "" {
+				summaries, err = h.impactProvider.GetEventImpactSummary(ctx, matched)
+				if err != nil {
+					log.Error().Err(err).Str("query", matched).Msg("cmdImpact: fuzzy match summary failed")
+					_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load impact data.")
+					return sendErr
+				}
+				query = matched
+			}
+		}
 	}
 
 	html := h.fmt.FormatEventImpact(query, summaries)
@@ -1964,4 +2047,53 @@ func parseFloat(s string) (float64, error) {
 	var f float64
 	_, err := fmt.Sscanf(s, "%f", &f)
 	return f, err
+}
+
+// eventAliases maps common abbreviations to full event names.
+var eventAliases = map[string]string{
+	"NFP":      "Non-Farm Employment Change",
+	"NONFARM":  "Non-Farm Employment Change",
+	"CPI":      "CPI m/m",
+	"CORE CPI": "Core CPI m/m",
+	"PPI":      "PPI m/m",
+	"FOMC":     "Federal Funds Rate",
+	"FED":      "Federal Funds Rate",
+	"BOE":      "Official Bank Rate",
+	"ECB":      "Main Refinancing Rate",
+	"BOJ":      "BOJ Policy Rate",
+	"RBA":      "Cash Rate",
+	"BOC":      "Overnight Rate",
+	"RBNZ":     "Official Cash Rate",
+	"SNB":      "SNB Policy Rate",
+	"GDP":      "GDP q/q",
+	"PMI":      "ISM Manufacturing PMI",
+	"RETAIL":   "Core Retail Sales m/m",
+	"CLAIMS":   "Unemployment Claims",
+	"JOBLESS":  "Unemployment Claims",
+	"PCE":      "Core PCE Price Index m/m",
+	"ISM":      "ISM Manufacturing PMI",
+	"ADP":      "ADP Non-Farm Employment Change",
+	"WAGES":    "Average Hourly Earnings m/m",
+}
+
+// resolveEventAlias resolves a known abbreviation to its full event name.
+// Returns the input unchanged if no alias matches.
+func resolveEventAlias(query string) string {
+	upper := strings.ToUpper(strings.TrimSpace(query))
+	if full, ok := eventAliases[upper]; ok {
+		return full
+	}
+	return query
+}
+
+// fuzzyMatchEvent finds the first tracked event whose name contains the query (case-insensitive).
+// Returns the matched event name, or empty string if no match found.
+func fuzzyMatchEvent(query string, events []string) string {
+	lower := strings.ToLower(query)
+	for _, ev := range events {
+		if strings.Contains(strings.ToLower(ev), lower) {
+			return ev
+		}
+	}
+	return ""
 }

@@ -53,6 +53,10 @@ type PriceContext struct {
 	AboveMA4W     bool    `json:"above_ma_4w"`      // Price above 4W MA
 	AboveMA13W    bool    `json:"above_ma_13w"`     // Price above 13W MA
 
+	// Price regime classification
+	PriceRegime string  `json:"price_regime,omitempty"` // TRENDING, RANGING, CRISIS
+	ADX         float64 `json:"adx,omitempty"`          // Approximated directional index
+
 	// ATR-based volatility context (nil if insufficient price data).
 	VolatilityRegime     string  `json:"volatility_regime,omitempty"`      // EXPANDING, CONTRACTING, NORMAL
 	ATR                  float64 `json:"atr,omitempty"`                    // 20-week Average True Range

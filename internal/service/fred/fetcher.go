@@ -60,10 +60,13 @@ func computeTrend(latest, previous, threshold float64) SeriesTrend {
 type MacroData struct {
 	// Yield curve
 	Yield2Y         float64     // DGS2  — 2-Year Treasury Constant Maturity Rate
+	Yield5Y         float64     // DGS5  — 5-Year Treasury Constant Maturity Rate
 	Yield10Y        float64     // DGS10 — 10-Year Treasury Constant Maturity Rate
+	Yield30Y        float64     // DGS30 — 30-Year Treasury Constant Maturity Rate
 	Yield3M         float64     // DGS3MO — 3-Month Treasury (for 3M-10Y spread)
 	YieldSpread     float64     // DGS10 - DGS2 (positive = normal, negative = inverted)
 	Spread3M10Y     float64     // DGS10 - DGS3MO (better recession predictor)
+	Spread2Y30Y     float64     // DGS30 - DGS2 (long-end term premium)
 	YieldSpreadTrend SeriesTrend // trend: is spread steepening or flattening?
 
 	// Inflation
@@ -105,6 +108,10 @@ type MacroData struct {
 	// USD strength
 	DXY float64 // DTWEXBGS — Nominal Broad U.S. Dollar Index
 
+	// Sentiment surveys (populated separately via sentiment package)
+	CNNFearGreed float64 // 0-100 (0=Extreme Fear, 100=Extreme Greed)
+	AAIIBullBear float64 // Bull/Bear ratio (>1 = bullish sentiment)
+
 	FetchedAt time.Time
 }
 
@@ -139,7 +146,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	singles := []singleTarget{
 		// Yield curve
 		{"DGS2", 5, &data.Yield2Y},
+		{"DGS5", 5, &data.Yield5Y},
 		{"DGS10", 5, &data.Yield10Y},
+		{"DGS30", 5, &data.Yield30Y},
 		{"DGS3MO", 5, &data.Yield3M},
 		// Inflation
 		{"T10YIE", 5, &data.Breakeven5Y},
@@ -237,6 +246,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	if data.Yield3M > 0 && data.Yield10Y > 0 {
 		data.Spread3M10Y = data.Yield10Y - data.Yield3M
 	}
+	if data.Yield2Y > 0 && data.Yield30Y > 0 {
+		data.Spread2Y30Y = data.Yield30Y - data.Yield2Y
+	}
 	// Yield spread trend (steepening vs flattening)
 	if data.YieldSpread != 0 && data.YieldSpreadTrend.Latest == 0 {
 		// We'll compute this after we have prev spread — use current as latest only
@@ -246,10 +258,13 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	// Sanitize: replace any NaN/Inf with 0 to prevent propagation through
 	// regime classification, conviction scoring, and AI prompts.
 	sanitizeFloat(&data.Yield2Y)
+	sanitizeFloat(&data.Yield5Y)
 	sanitizeFloat(&data.Yield10Y)
+	sanitizeFloat(&data.Yield30Y)
 	sanitizeFloat(&data.Yield3M)
 	sanitizeFloat(&data.YieldSpread)
 	sanitizeFloat(&data.Spread3M10Y)
+	sanitizeFloat(&data.Spread2Y30Y)
 	sanitizeFloat(&data.CorePCE)
 	sanitizeFloat(&data.CPI)
 	sanitizeFloat(&data.Breakeven5Y)

@@ -396,16 +396,22 @@ func BuildFREDOutlookPrompt(data *fred.MacroData, regime fred.MacroRegime, lang 
 
 	b.WriteString("=== FRED QUANTITATIVE DATA ===\n")
 
-	// Yield curve (2Y-10Y)
+	// Yield curve
+	b.WriteString(fmt.Sprintf("3M Treasury:       %.2f%%\n", data.Yield3M))
 	b.WriteString(fmt.Sprintf("2Y Treasury:       %.2f%%\n", data.Yield2Y))
+	b.WriteString(fmt.Sprintf("5Y Treasury:       %.2f%%\n", data.Yield5Y))
 	b.WriteString(fmt.Sprintf("10Y Treasury:      %.2f%%\n", data.Yield10Y))
+	b.WriteString(fmt.Sprintf("30Y Treasury:      %.2f%%\n", data.Yield30Y))
 	b.WriteString(fmt.Sprintf("2Y-10Y Spread:     %+.2f%% %s (%s)\n",
 		data.YieldSpread, data.YieldSpreadTrend.Arrow(), regime.YieldCurve))
 
 	// 3M-10Y spread (NY Fed recession predictor)
 	if data.Yield3M > 0 {
-		b.WriteString(fmt.Sprintf("3M Treasury:       %.2f%%\n", data.Yield3M))
 		b.WriteString(fmt.Sprintf("3M-10Y Spread:     %+.2f%% (%s)\n", data.Spread3M10Y, regime.Yield3M10Y))
+	}
+	// 2Y-30Y spread (long-end term premium)
+	if data.Spread2Y30Y != 0 {
+		b.WriteString(fmt.Sprintf("2Y-30Y Spread:     %+.2f%% (%s)\n", data.Spread2Y30Y, regime.Yield2Y30Y))
 	}
 
 	// Inflation
@@ -562,10 +568,15 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 			regime.Name, regime.Score, regime.RecessionRisk))
 
 		// Yield curves
+		b.WriteString(fmt.Sprintf("Yields: 3M=%.2f%% 2Y=%.2f%% 5Y=%.2f%% 10Y=%.2f%% 30Y=%.2f%%\n",
+			m.Yield3M, m.Yield2Y, m.Yield5Y, m.Yield10Y, m.Yield30Y))
 		b.WriteString(fmt.Sprintf("2Y-10Y Spread: %+.2f%% %s (%s)\n",
 			m.YieldSpread, m.YieldSpreadTrend.Arrow(), regime.YieldCurve))
 		if m.Yield3M > 0 {
 			b.WriteString(fmt.Sprintf("3M-10Y Spread: %+.2f%% (%s)\n", m.Spread3M10Y, regime.Yield3M10Y))
+		}
+		if m.Spread2Y30Y != 0 {
+			b.WriteString(fmt.Sprintf("2Y-30Y Spread: %+.2f%% (%s)\n", m.Spread2Y30Y, regime.Yield2Y30Y))
 		}
 
 		// Inflation

@@ -8,6 +8,7 @@ type MacroRegime struct {
 	Name         string // e.g., "DISINFLATIONARY", "INFLATIONARY", "STRESS", "STAGFLATION"
 	YieldCurve   string // human-readable yield curve label (2Y-10Y)
 	Yield3M10Y   string // human-readable 3M-10Y spread label
+	Yield2Y30Y   string // human-readable 2Y-30Y spread label
 	Inflation    string // human-readable inflation label
 	M2Label      string // M2 YoY growth label
 	FinStress    string // human-readable financial stress label
@@ -59,6 +60,21 @@ func ClassifyMacroRegime(data *MacroData) MacroRegime {
 		}
 	} else {
 		r.Yield3M10Y = "N/A"
+	}
+
+	// --- 2b. Yield Curve 2Y-30Y (long-end term premium) ---
+	if data.Spread2Y30Y != 0 {
+		switch {
+		case data.Spread2Y30Y > 0.75:
+			r.Yield2Y30Y = fmt.Sprintf("Steep (%.2f%%) ✅", data.Spread2Y30Y)
+		case data.Spread2Y30Y > 0:
+			r.Yield2Y30Y = fmt.Sprintf("Normal (%.2f%%) ✅", data.Spread2Y30Y)
+		default:
+			r.Yield2Y30Y = fmt.Sprintf("INVERTED (%.2f%%) 🔴", data.Spread2Y30Y)
+			riskScore += 10
+		}
+	} else {
+		r.Yield2Y30Y = "N/A"
 	}
 
 	// --- 3. Inflation (Core PCE with trend) ---

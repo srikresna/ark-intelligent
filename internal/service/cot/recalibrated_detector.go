@@ -50,11 +50,21 @@ type SignalTypeStats struct {
 // to pooled stats. This prevents a signal type that works for EUR from being
 // suppressed because it underperforms on JPY (or vice versa).
 type RecalibratedDetector struct {
-	base         *SignalDetector
-	signalRepo   ports.SignalRepository
-	mu           sync.RWMutex // protects typeStats and granularStats
-	typeStats    map[string]*SignalTypeStats // pooled by signal type
+	base          *SignalDetector
+	signalRepo    ports.SignalRepository
+	mu            sync.RWMutex // protects typeStats, granularStats, regimeStats, currentRegime
+	typeStats     map[string]*SignalTypeStats // pooled by signal type
 	granularStats map[string]*SignalTypeStats // keyed "TYPE:CURRENCY"
+	regimeStats   map[string]*SignalTypeStats // keyed "TYPE:REGIME" e.g. "MOMENTUM_SHIFT:STRESS"
+	currentRegime string                      // FRED regime for current detection run
+}
+
+// SetCurrentRegime sets the FRED regime for the current detection run.
+// When set, DetectAll will also check regime-specific suppression stats.
+func (rd *RecalibratedDetector) SetCurrentRegime(regime string) {
+	rd.mu.Lock()
+	defer rd.mu.Unlock()
+	rd.currentRegime = regime
 }
 
 // NewRecalibratedDetector creates a recalibrated detector backed by historical data.
@@ -74,6 +84,7 @@ func (rd *RecalibratedDetector) LoadTypeStats(ctx context.Context) error {
 		rd.mu.Lock()
 		rd.typeStats = nil
 		rd.granularStats = nil
+		rd.regimeStats = nil
 		rd.mu.Unlock()
 		return nil
 	}
@@ -95,9 +106,21 @@ func (rd *RecalibratedDetector) LoadTypeStats(ctx context.Context) error {
 	pooled := computeStatsMap(byType)
 	granular := computeStatsMap(byTypeCurrency)
 
+	// Group signals by type:regime
+	byTypeRegime := make(map[string][]domain.PersistedSignal)
+	for _, s := range allSignals {
+		if s.FREDRegime == "" {
+			continue
+		}
+		regimeKey := s.SignalType + ":" + s.FREDRegime
+		byTypeRegime[regimeKey] = append(byTypeRegime[regimeKey], s)
+	}
+	regime := computeStatsMap(byTypeRegime)
+
 	rd.mu.Lock()
 	rd.typeStats = pooled
 	rd.granularStats = granular
+	rd.regimeStats = regime
 	rd.mu.Unlock()
 
 	return nil
@@ -170,6 +193,16 @@ func (rd *RecalibratedDetector) TypeStats(sigType string) *SignalTypeStats {
 	return rd.typeStats[sigType]
 }
 
+// RegimeStats returns the stats for a signal type in a specific regime, or nil if no data.
+func (rd *RecalibratedDetector) RegimeStats(sigType, regime string) *SignalTypeStats {
+	rd.mu.RLock()
+	defer rd.mu.RUnlock()
+	if rd.regimeStats == nil {
+		return nil
+	}
+	return rd.regimeStats[sigType+":"+regime]
+}
+
 // AllTypeStats returns a shallow copy of all loaded type stats (pooled + granular).
 // Granular keys use "TYPE:CURRENCY" format, pooled keys use "TYPE" format.
 func (rd *RecalibratedDetector) AllTypeStats() map[string]*SignalTypeStats {
@@ -211,6 +244,8 @@ func (rd *RecalibratedDetector) DetectAll(
 	rd.mu.RLock()
 	localPooled := rd.typeStats
 	localGranular := rd.granularStats
+	localRegime := rd.regimeStats
+	localCurrentRegime := rd.currentRegime
 	rd.mu.RUnlock()
 
 	result := make([]Signal, 0, len(rawSignals))
@@ -224,6 +259,18 @@ func (rd *RecalibratedDetector) DetectAll(
 		// --- Signal Suppression ---
 		if stats != nil && stats.Suppressed {
 			continue
+		}
+
+		// --- Regime-Conditional Suppression ---
+		if localCurrentRegime != "" && localRegime != nil {
+			regimeKey := sigTypeKey + ":" + localCurrentRegime
+			if rs := localRegime[regimeKey]; rs != nil && rs.Suppressed {
+				sig.Factors = append(sig.Factors,
+					"🔴 Regime-suppressed: "+sigTypeKey+" has "+fmtWinRate(rs.WinRate)+
+						" win rate during "+localCurrentRegime+" (n="+strconv.Itoa(rs.SampleSize)+")",
+				)
+				continue // drop this signal
+			}
 		}
 
 		// --- Confidence Recalibration ---
@@ -382,6 +429,11 @@ func (rd *RecalibratedDetector) SuppressedTypes() []string {
 	for k, v := range rd.granularStats {
 		if v.Suppressed {
 			out = append(out, k)
+		}
+	}
+	for k, v := range rd.regimeStats {
+		if v.Suppressed {
+			out = append(out, k+" [regime]")
 		}
 	}
 	return out

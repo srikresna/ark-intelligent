@@ -42,6 +42,9 @@ func (a *Analyzer) AnalyzeAll(ctx context.Context) ([]domain.COTAnalysis, error)
 		return nil, fmt.Errorf("fetch latest: %w", err)
 	}
 
+	// Enrich with options positions
+	records, _ = a.fetcher.FetchOptionsPositions(ctx, contracts, records)
+
 	// Save raw records
 	if err := a.cotRepo.SaveRecords(ctx, records); err != nil {
 		log.Warn().Err(err).Msg("failed to save records")
@@ -526,6 +529,22 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// This mathematically links macro regime to the COT sentiment score.
 	if regime != nil {
 		analysis.RegimeAdjustedScore = ComputeRegimeAdjustedScore(analysis, *regime)
+	}
+
+	// Options-derived metrics
+	if current.HasOptions {
+		optNet := current.OptSmartMoneyLong - current.OptSmartMoneyShort
+		analysis.OptionsNetPosition = optNet
+		if current.OpenInterest > 0 {
+			analysis.OptionsPctOfTotalOI = current.OptionsOI / current.OpenInterest * 100
+		}
+		if current.OptSmartMoneyLong > current.OptSmartMoneyShort*1.3 {
+			analysis.OptionsSmartBias = "CALL-HEAVY"
+		} else if current.OptSmartMoneyShort > current.OptSmartMoneyLong*1.3 {
+			analysis.OptionsSmartBias = "PUT-HEAVY"
+		} else {
+			analysis.OptionsSmartBias = "BALANCED"
+		}
 	}
 
 	return analysis
