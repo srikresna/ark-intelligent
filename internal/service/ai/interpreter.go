@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
@@ -248,56 +247,6 @@ func (ip *Interpreter) AnalyzeActualRelease(ctx context.Context, event domain.Ne
 	return result, nil // no header needed for inline alert
 }
 
-// --- Batch Operations ---
-
-// GenerateAllInsights runs all AI analyses and returns combined output.
-func (ip *Interpreter) GenerateAllInsights(ctx context.Context, data WeeklyOutlookData) (map[string]string, error) {
-	results := make(map[string]string)
-
-	// 1. COT Analysis
-	if len(data.COTAnalyses) > 0 {
-		cotResult, err := ip.AnalyzeCOT(ctx, data.COTAnalyses)
-		if err != nil {
-			log.Error().Err(err).Msg("batch COT failed")
-		} else {
-			results["cot"] = cotResult
-		}
-		throttle()
-	}
-
-	// 2. Weekly Outlook
-	weeklyData := ports.WeeklyData{
-		COTAnalyses: data.COTAnalyses,
-	}
-	weeklyResult, err := ip.GenerateWeeklyOutlook(ctx, weeklyData)
-	if err != nil {
-		log.Error().Err(err).Msg("batch weekly failed")
-	} else {
-		results["weekly"] = weeklyResult
-	}
-	throttle()
-
-	// 3. Cross-Market
-	if len(data.COTAnalyses) > 1 {
-		cotMap := make(map[string]*domain.COTAnalysis)
-		for i := range data.COTAnalyses {
-			a := data.COTAnalyses[i]
-			// FIX: Use Contract.Code instead of ContractCode
-			cotMap[a.Contract.Code] = &a
-		}
-		crossResult, err := ip.AnalyzeCrossMarket(ctx, cotMap)
-		if err != nil {
-			log.Error().Err(err).Msg("batch cross-market failed")
-		} else {
-			results["cross_market"] = crossResult
-		}
-		throttle()
-	}
-
-	log.Info().Int("count", len(results)).Msg("generated insights")
-	return results, nil
-}
-
 // --- Fallback summaries (when Gemini is unavailable) ---
 
 func (ip *Interpreter) fallbackCOTSummary(analyses []domain.COTAnalysis) string {
@@ -345,7 +294,3 @@ func formatResponse(header, content string) string {
 	return fmt.Sprintf("=== %s ===\n\n%s", header, sanitizeTelegramHTML(content))
 }
 
-// throttle adds a small delay between API calls to avoid rate limiting.
-func throttle() {
-	time.Sleep(500 * time.Millisecond)
-}
