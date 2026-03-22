@@ -151,6 +151,13 @@ func main() {
 		} else {
 			claudeClient.SetThinkingBudget(0) // explicitly disable
 		}
+
+		// Memory tool: per-user file-based memory persisted in BadgerDB
+		memoryRepo := storage.NewMemoryRepo(db, 30*24*time.Hour) // 30-day TTL
+		memoryStore := aisvc.NewMemoryStore(memoryRepo)
+		toolExecutor := aisvc.NewMemoryToolExecutor(memoryStore)
+		claudeClient.SetToolExecutor(toolExecutor)
+
 		convRepo := storage.NewConversationRepo(db, cfg.ChatHistoryLimit, cfg.ChatHistoryTTL)
 		toolConfig := aisvc.NewToolConfig()
 		contextBuilder := aisvc.NewContextBuilder(cotRepo, newsRepo, priceRepo)
@@ -176,7 +183,7 @@ func main() {
 			_, _ = bot.SendHTML(ctx, ownerChatID, html)
 		})
 
-		log.Info().Str("endpoint", cfg.ClaudeEndpoint).Msg("Claude chatbot initialized")
+		log.Info().Str("endpoint", cfg.ClaudeEndpoint).Msg("Claude chatbot initialized (with memory tool)")
 	} else {
 		log.Info().Msg("No CLAUDE_ENDPOINT — chatbot mode disabled")
 	}

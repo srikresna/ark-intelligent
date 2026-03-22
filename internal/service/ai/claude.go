@@ -25,6 +25,18 @@ type ClaudeClient struct {
 	maxTokens      int
 	thinkingBudget int  // extended thinking budget_tokens (0 = disabled)
 	useCache       bool // enable prompt caching for system prompt
+
+	// toolExecutor handles client-side tool_use requests (e.g. memory tool).
+	// When Claude returns stop_reason="tool_use", the executor processes the
+	// tool calls and the client continues the conversation automatically.
+	toolExecutor ToolExecutor
+}
+
+// ToolExecutor processes client-side tool_use requests from Claude.
+// userID is needed for per-user memory isolation.
+type ToolExecutor interface {
+	// Execute processes a tool call and returns the result text.
+	Execute(ctx context.Context, userID int64, toolName string, input map[string]interface{}) string
 }
 
 // NewClaudeClient creates a Claude client targeting the given endpoint.
@@ -39,6 +51,11 @@ func NewClaudeClient(endpoint string, timeout time.Duration, maxTokens int) *Cla
 		thinkingBudget: 2048, // default thinking budget for extended thinking
 		useCache:       true, // enable prompt caching by default
 	}
+}
+
+// SetToolExecutor sets the handler for client-side tool_use requests.
+func (c *ClaudeClient) SetToolExecutor(executor ToolExecutor) {
+	c.toolExecutor = executor
 }
 
 // SetThinkingBudget sets the extended thinking budget_tokens.
@@ -122,13 +139,17 @@ type claudeResponse struct {
 }
 
 type claudeContentBlock struct {
-	Type      string            `json:"type"`
-	Text      string            `json:"text,omitempty"`
-	Thinking  string            `json:"thinking,omitempty"`  // for type="thinking" (extended thinking)
-	Signature string            `json:"signature,omitempty"` // thinking block signature
-	Name      string            `json:"name,omitempty"`      // for tool_use blocks
-	ID        string            `json:"id,omitempty"`
-	Citations []claudeCitation  `json:"citations,omitempty"` // document citations
+	Type      string                 `json:"type"`
+	Text      string                 `json:"text,omitempty"`
+	Thinking  string                 `json:"thinking,omitempty"`  // for type="thinking" (extended thinking)
+	Signature string                 `json:"signature,omitempty"` // thinking block signature
+	Name      string                 `json:"name,omitempty"`      // for tool_use blocks
+	ID        string                 `json:"id,omitempty"`
+	Input     map[string]interface{} `json:"input,omitempty"`     // for tool_use blocks (command args)
+	Citations []claudeCitation       `json:"citations,omitempty"` // document citations
+	// tool_result fields (for round-trip messages)
+	ToolUseID string      `json:"tool_use_id,omitempty"` // references a tool_use block
+	Content   interface{} `json:"content,omitempty"`      // tool_result content (string or structured)
 }
 
 // claudeCitation represents a citation reference from a Claude response.
@@ -165,6 +186,11 @@ type claudeError struct {
 
 // Chat sends a conversation to Claude and returns the response.
 // Implements ports.ChatEngine.
+//
+// Multi-turn tool handling: when Claude returns stop_reason="tool_use",
+// the client automatically processes the tool calls via toolExecutor,
+// appends the tool results to the conversation, and re-sends the request.
+// This loop runs up to maxToolRoundTrips times before giving up.
 func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.ChatResponse, error) {
 	// Build messages array
 	messages := make([]claudeMessage, len(req.Messages))
@@ -195,9 +221,6 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 	var system interface{}
 	if req.SystemPrompt != "" {
 		if c.useCache {
-			// Use array format with cache_control for prompt caching.
-			// Anthropic caches system prompts with cache_control: ephemeral,
-			// saving tokens on repeated calls with the same system prompt.
 			system = []claudeSystemBlock{{
 				Type: "text",
 				Text: req.SystemPrompt,
@@ -219,19 +242,20 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 	}
 
 	// Enable extended thinking when budget is configured.
-	// Extended thinking gives Claude a scratchpad for complex reasoning,
-	// producing higher quality analysis for financial/macro questions.
 	if c.thinkingBudget > 0 {
 		apiReq.Thinking = &claudeThinking{
 			Type:         "enabled",
 			BudgetTokens: c.thinkingBudget,
 		}
-		// Extended thinking requires max_tokens > budget_tokens
 		if apiReq.MaxTokens <= c.thinkingBudget {
 			apiReq.MaxTokens = c.thinkingBudget + 4096
 		}
 	}
 
+	// Cumulative token tracking across tool round-trips
+	var totalInput, totalOutput, totalCacheCreate, totalCacheRead int
+
+	// Outer retry loop (for transient errors)
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
@@ -244,76 +268,134 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 			}
 		}
 
-		resp, err := c.doRequest(ctx, &apiReq)
-		if err != nil {
-			lastErr = fmt.Errorf("claude request (attempt %d): %w", attempt+1, err)
-			if isClaudeTransient(err) {
-				continue
+		// Inner tool round-trip loop: Claude may request multiple tool calls
+		// before producing a final text response (e.g. memory: view → create → done).
+		const maxToolRoundTrips = 5
+		for toolRound := 0; toolRound <= maxToolRoundTrips; toolRound++ {
+			resp, err := c.doRequest(ctx, &apiReq)
+			if err != nil {
+				lastErr = fmt.Errorf("claude request (attempt %d): %w", attempt+1, err)
+				if isClaudeTransient(err) {
+					break // break inner loop, continue outer retry
+				}
+				return nil, lastErr
 			}
-			return nil, lastErr
-		}
 
-		// Check for API-level error (handle both standard and proxy error formats)
-		apiErr := resp.Error
-		if apiErr == nil {
-			apiErr = resp.AnthropicError
-		}
-		if apiErr != nil {
-			lastErr = fmt.Errorf("claude API error: %s: %s", apiErr.Type, apiErr.Message)
-			if apiErr.Type == "overloaded_error" || strings.Contains(apiErr.Message, "rate") {
-				continue
+			// Check for API-level error
+			apiErr := resp.Error
+			if apiErr == nil {
+				apiErr = resp.AnthropicError
 			}
-			return nil, lastErr
-		}
+			if apiErr != nil {
+				lastErr = fmt.Errorf("claude API error: %s: %s", apiErr.Type, apiErr.Message)
+				if apiErr.Type == "overloaded_error" || strings.Contains(apiErr.Message, "rate") {
+					break // break inner, retry outer
+				}
+				return nil, lastErr
+			}
 
-		// Extract text content and tool usage
-		text, toolsUsed := extractClaudeContent(resp)
+			// Accumulate tokens
+			if resp.Usage != nil {
+				totalInput += resp.Usage.InputTokens
+				totalOutput += resp.Usage.OutputTokens
+				totalCacheCreate += resp.Usage.CacheCreationInputTokens
+				totalCacheRead += resp.Usage.CacheReadInputTokens
+			}
 
-		// If stop_reason is "tool_use", Claude wants client-side tool execution
-		// which we don't support. This is non-retryable — don't waste attempts.
-		if resp.StopReason == "tool_use" {
-			claudeLog.Warn().
-				Str("stop_reason", resp.StopReason).
-				Str("model", resp.Model).
-				Int("content_blocks", len(resp.Content)).
-				Msg("Claude requested client-side tool execution (unsupported)")
-			return nil, fmt.Errorf("claude requested unsupported client-side tool execution")
-		}
+			// Handle tool_use: Claude wants us to execute tools
+			if resp.StopReason == "tool_use" {
+				if c.toolExecutor == nil {
+					claudeLog.Warn().Msg("Claude requested tool execution but no toolExecutor configured")
+					return nil, fmt.Errorf("claude requested unsupported client-side tool execution")
+				}
 
-		if text == "" {
-			claudeLog.Warn().
-				Str("stop_reason", resp.StopReason).
-				Str("model", resp.Model).
-				Int("content_blocks", len(resp.Content)).
-				Msg("empty text from Claude response")
-			lastErr = fmt.Errorf("empty Claude response (attempt %d, stop_reason=%s, blocks=%d)", attempt+1, resp.StopReason, len(resp.Content))
-			continue
-		}
+				if toolRound >= maxToolRoundTrips {
+					claudeLog.Warn().Int("rounds", toolRound).Msg("tool round-trip limit reached")
+					return nil, fmt.Errorf("claude tool loop exceeded %d round-trips", maxToolRoundTrips)
+				}
 
-		result := &ports.ChatResponse{
-			Content:   text,
-			ToolsUsed: toolsUsed,
-		}
-		if resp.Usage != nil {
-			result.InputTokens = resp.Usage.InputTokens
-			result.OutputTokens = resp.Usage.OutputTokens
-			result.CacheCreationTokens = resp.Usage.CacheCreationInputTokens
-			result.CacheReadTokens = resp.Usage.CacheReadInputTokens
+				// Process tool_use blocks and build tool_result responses
+				toolResults := c.processToolUse(ctx, req.UserID, resp.Content)
+				if len(toolResults) == 0 {
+					return nil, fmt.Errorf("claude returned tool_use but no tool calls found")
+				}
 
-			// Log cache performance for monitoring cost savings
-			if resp.Usage.CacheReadInputTokens > 0 {
+				// Append assistant message (with tool_use) and user message (with tool_results)
+				apiReq.Messages = append(apiReq.Messages,
+					claudeMessage{Role: "assistant", Content: resp.Content},
+					claudeMessage{Role: "user", Content: toolResults},
+				)
+
 				claudeLog.Info().
-					Int("cache_read", resp.Usage.CacheReadInputTokens).
-					Int("cache_create", resp.Usage.CacheCreationInputTokens).
-					Int("input", resp.Usage.InputTokens).
+					Int("round", toolRound+1).
+					Int("tool_calls", len(toolResults)).
+					Msg("tool round-trip")
+
+				continue // next tool round
+			}
+
+			// Extract text content and tool usage
+			text, toolsUsed := extractClaudeContent(resp)
+
+			if text == "" {
+				claudeLog.Warn().
+					Str("stop_reason", resp.StopReason).
+					Str("model", resp.Model).
+					Int("content_blocks", len(resp.Content)).
+					Msg("empty text from Claude response")
+				lastErr = fmt.Errorf("empty Claude response (attempt %d, stop_reason=%s, blocks=%d)", attempt+1, resp.StopReason, len(resp.Content))
+				break // break inner, retry outer
+			}
+
+			result := &ports.ChatResponse{
+				Content:             text,
+				ToolsUsed:           toolsUsed,
+				InputTokens:         totalInput,
+				OutputTokens:        totalOutput,
+				CacheCreationTokens: totalCacheCreate,
+				CacheReadTokens:     totalCacheRead,
+			}
+
+			if totalCacheRead > 0 {
+				claudeLog.Info().
+					Int("cache_read", totalCacheRead).
+					Int("cache_create", totalCacheCreate).
+					Int("input", totalInput).
 					Msg("prompt cache hit")
 			}
-		}
 
-		return result, nil
+			return result, nil
+		}
 	}
 
 	return nil, fmt.Errorf("claude: all retries exhausted: %w", lastErr)
+}
+
+// processToolUse extracts tool_use blocks from the response and executes them,
+// returning tool_result content blocks for the next request.
+func (c *ClaudeClient) processToolUse(ctx context.Context, userID int64, content []claudeContentBlock) []claudeContentBlock {
+	var results []claudeContentBlock
+
+	for _, block := range content {
+		if block.Type != "tool_use" || block.ID == "" {
+			continue
+		}
+
+		result := c.toolExecutor.Execute(ctx, userID, block.Name, block.Input)
+
+		claudeLog.Info().
+			Str("tool", block.Name).
+			Str("id", block.ID).
+			Msg("executed client-side tool")
+
+		results = append(results, claudeContentBlock{
+			Type:      "tool_result",
+			ToolUseID: block.ID,
+			Content:   result,
+		})
+	}
+
+	return results
 }
 
 // IsAvailable returns true if the client is configured.
