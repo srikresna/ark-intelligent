@@ -2,7 +2,6 @@ package price
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
@@ -19,18 +18,19 @@ func NewRiskContextBuilder(priceRepo ports.PriceRepository) *RiskContextBuilder 
 }
 
 // Build computes the current risk context from stored VIX and SPX price records.
-// Returns nil (not an error) if price data is not yet available — caller should treat
-// nil RiskContext as "no adjustment" (multiplier = 1.0).
+// Returns nil, nil if VIX data is unavailable — callers should treat nil RiskContext
+// as "no adjustment" (multiplier = 1.0). SPX data is optional — missing SPX only
+// disables the SPX trend modifier, not the whole risk context.
 func (rb *RiskContextBuilder) Build(ctx context.Context) (*domain.RiskContext, error) {
 	vixRecords, err := rb.priceRepo.GetHistory(ctx, "risk_VIX", 4)
 	if err != nil || len(vixRecords) == 0 {
-		return nil, fmt.Errorf("VIX price data unavailable: %w", err)
+		// VIX is required — without it we cannot compute the regime.
+		// Return nil, nil (not an error) so callers skip adjustment gracefully.
+		return nil, nil
 	}
 
-	spxRecords, err := rb.priceRepo.GetHistory(ctx, "risk_SPX", 5)
-	if err != nil || len(spxRecords) == 0 {
-		return nil, fmt.Errorf("SPX price data unavailable: %w", err)
-	}
+	// SPX is optional — fetch best-effort, missing data just disables SPX modifier.
+	spxRecords, _ := rb.priceRepo.GetHistory(ctx, "risk_SPX", 5)
 
 	rc := &domain.RiskContext{}
 
@@ -55,18 +55,13 @@ func (rb *RiskContextBuilder) Build(ctx context.Context) (*domain.RiskContext, e
 
 	rc.Regime = domain.ClassifyRiskRegime(rc.VIXLevel)
 
-	// --- SPX ---
-	rc.SPXWeeklyChg = 0
+	// --- SPX (optional) ---
 	if len(spxRecords) >= 2 && spxRecords[1].Close > 0 {
 		rc.SPXWeeklyChg = roundN((spxRecords[0].Close-spxRecords[1].Close)/spxRecords[1].Close*100, 4)
 	}
-
-	rc.SPXMonthlyChg = 0
 	if len(spxRecords) >= 5 && spxRecords[4].Close > 0 {
 		rc.SPXMonthlyChg = roundN((spxRecords[0].Close-spxRecords[4].Close)/spxRecords[4].Close*100, 4)
 	}
-
-	// SPX above 4W MA
 	if len(spxRecords) >= 4 {
 		var sumSPX float64
 		for i := 0; i < 4; i++ {

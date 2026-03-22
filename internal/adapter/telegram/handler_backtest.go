@@ -39,9 +39,10 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		// e.g. /backtest SMART_MONEY
 		return h.backtestOneSignalType(ctx, chatID, calc, args)
 	default:
-		// Try currency first; if not found, show help
+		// Try currency first; if not found, show help.
+		// Exclude RiskOnly instruments (VIX, SPX) — they are not COT contracts.
 		mapping := domain.FindPriceMappingByCurrency(args)
-		if mapping != nil {
+		if mapping != nil && !mapping.RiskOnly {
 			return h.backtestByContract(ctx, chatID, calc, args)
 		}
 		helpMsg := "❓ <b>Usage:</b> <code>/backtest [option]</code>\n\n" +

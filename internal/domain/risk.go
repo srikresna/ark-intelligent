@@ -41,11 +41,17 @@ func ClassifyRiskRegime(vix float64) RiskRegime {
 
 // IsRiskOn returns true when market is in risk-on mode (SPX rising + VIX low).
 func (rc *RiskContext) IsRiskOn() bool {
+	if rc == nil {
+		return false
+	}
 	return rc.SPXAboveMA4W && rc.VIXLevel < 20
 }
 
 // IsRiskOff returns true when market is in risk-off mode (VIX panic or SPX falling).
 func (rc *RiskContext) IsRiskOff() bool {
+	if rc == nil {
+		return false
+	}
 	return rc.VIXLevel > 25 || rc.SPXMonthlyChg < -5
 }
 
@@ -60,6 +66,9 @@ func (rc *RiskContext) IsRiskOff() bool {
 //   - SPX rising (risk-on bonus): +5% for risk-correlated assets
 //   - SPX falling sharply: -10% additional dampening
 func (rc *RiskContext) ConfidenceAdjustment() float64 {
+	if rc == nil {
+		return 1.0 // no adjustment when context unavailable
+	}
 	adj := 1.0
 
 	switch rc.Regime {
@@ -108,6 +117,9 @@ func (rc *RiskContext) AdjustConfidence(confidence float64) float64 {
 
 // RegimeLabel returns a human-readable label for the risk regime.
 func (rc *RiskContext) RegimeLabel() string {
+	if rc == nil {
+		return "UNKNOWN"
+	}
 	switch rc.Regime {
 	case RiskRegimePanic:
 		return "⛔ PANIC (VIX>" + fmtFloat(rc.VIXLevel) + ")"
@@ -126,6 +138,10 @@ func fmtFloat(v float64) string {
 	// Simple one-decimal formatter without importing fmt
 	// to avoid circular import issues in domain package.
 	// Format: "25.3"
+	// Guard: VIX values above ~200 are nonsensical but don't crash.
+	if v > 9999 || v < -9999 {
+		return "?.?"
+	}
 	i := int(v * 10)
 	neg := ""
 	if i < 0 {

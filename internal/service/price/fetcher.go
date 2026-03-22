@@ -76,7 +76,9 @@ func (f *Fetcher) FetchAllDetailed(ctx context.Context, weeks int) ([]domain.Pri
 	var lastErr error
 	report := &FetchReport{}
 
-	for _, mapping := range domain.DefaultPriceSymbolMappings {
+	// Use COTPriceSymbolMappings to exclude RiskOnly instruments (VIX, SPX).
+	// Risk-only instruments are fetched separately via FetchRiskInstruments.
+	for _, mapping := range domain.COTPriceSymbolMappings() {
 		records, err := f.FetchWeekly(ctx, mapping, weeks)
 		if err != nil {
 			log.Warn().Err(err).Str("contract", mapping.Currency).Msg("Failed to fetch price")
@@ -119,6 +121,24 @@ func (f *Fetcher) FetchAllDetailed(ctx context.Context, weeks int) ([]domain.Pri
 
 	log.Info().Int("records", len(allRecords)).Msg("Price fetch complete")
 	return allRecords, report, nil
+}
+
+// FetchRiskInstruments fetches VIX and SPX weekly price data (risk-only instruments).
+// These are fetched separately from COT contracts and stored with their synthetic
+// contract codes ("risk_VIX", "risk_SPX") for use in the risk context builder.
+// Returns nil error if fetching partially fails — callers should treat missing
+// risk data as "no adjustment" rather than a hard failure.
+func (f *Fetcher) FetchRiskInstruments(ctx context.Context, weeks int) ([]domain.PriceRecord, error) {
+	var allRecords []domain.PriceRecord
+	for _, mapping := range domain.RiskPriceSymbolMappings() {
+		records, err := f.FetchWeekly(ctx, mapping, weeks)
+		if err != nil {
+			log.Warn().Err(err).Str("instrument", mapping.Currency).Msg("Risk instrument fetch failed — skipping")
+			continue
+		}
+		allRecords = append(allRecords, records...)
+	}
+	return allRecords, nil
 }
 
 // FetchWeekly fetches weekly OHLC data for a single contract.

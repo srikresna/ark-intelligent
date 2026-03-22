@@ -144,7 +144,7 @@ func (rd *RecalibratedDetector) DetectAll(
 			// Log suppression at debug level (no logger in this package — use signal factor annotation)
 			// Append suppression note to factors so it's visible in debug output
 			sig.Factors = append(sig.Factors,
-				"⛔ SUPPRESSED: win rate "+fmtWinRate(stats.WinRate)+" (n="+itoa(stats.SampleSize)+")",
+				"⛔ SUPPRESSED: win rate "+fmtWinRate(stats.WinRate)+" (n="+intToStr(stats.SampleSize)+")",
 			)
 			// Skip — do not include in output
 			continue
@@ -159,7 +159,7 @@ func (rd *RecalibratedDetector) DetectAll(
 			if math.Abs(originalConf-sig.Confidence) > 5 {
 				sig.Factors = append(sig.Factors,
 					"📊 Confidence recalibrated: "+fmtWinRate(originalConf)+" → "+fmtWinRate(sig.Confidence)+
-						" (n="+itoa(stats.SampleSize)+")",
+						" (n="+intToStr(stats.SampleSize)+")",
 				)
 			}
 		}
@@ -209,22 +209,25 @@ func (rd *RecalibratedDetector) SuppressedTypes() []string {
 }
 
 // fmtWinRate formats a float as "XX.X%".
+// Handles range [0, 100] correctly. Values outside this range are clamped.
 func fmtWinRate(v float64) string {
-	// Integer part
-	i := int(v * 10)
-	if i < 0 {
-		i = 0
+	if v < 0 {
+		v = 0
 	}
-	return itoa(i/10) + "." + itoa(i%10) + "%"
+	if v > 100 {
+		v = 100
+	}
+	i := int(v*10 + 0.5) // round to nearest tenth
+	return intToStr(i/10) + "." + intToStr(i%10) + "%"
 }
 
-// itoa converts a non-negative int to string (avoids strconv import).
-func itoa(i int) string {
+// intToStr converts a non-negative int to string (avoids strconv import).
+func intToStr(i int) string {
 	if i == 0 {
 		return "0"
 	}
 	if i < 0 {
-		return "-" + itoa(-i)
+		return "-" + intToStr(-i)
 	}
 	digits := ""
 	for i > 0 {

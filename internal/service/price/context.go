@@ -85,7 +85,9 @@ func (cb *ContextBuilder) Build(ctx context.Context, contractCode, currency stri
 func (cb *ContextBuilder) BuildAll(ctx context.Context) (map[string]*domain.PriceContext, error) {
 	result := make(map[string]*domain.PriceContext)
 
-	for _, mapping := range domain.DefaultPriceSymbolMappings {
+	// Use COTPriceSymbolMappings to exclude risk-only instruments (VIX, SPX).
+	// VIX/SPX context is built separately via RiskContextBuilder.
+	for _, mapping := range domain.COTPriceSymbolMappings() {
 		pc, err := cb.Build(ctx, mapping.ContractCode, mapping.Currency)
 		if err != nil {
 			log.Debug().Err(err).Str("contract", mapping.Currency).Msg("skipping price context")

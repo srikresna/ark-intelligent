@@ -56,7 +56,9 @@ func (b *Bootstrapper) Run(ctx context.Context) (int, error) {
 
 	totalCreated := 0
 
-	for _, mapping := range domain.DefaultPriceSymbolMappings {
+	// Use COTPriceSymbolMappings to exclude risk-only instruments (VIX, SPX).
+	// Bootstrapping VIX/SPX as COT contracts would generate nonsense signals.
+	for _, mapping := range domain.COTPriceSymbolMappings() {
 		created, err := b.bootstrapContract(ctx, mapping)
 		if err != nil {
 			log.Warn().Err(err).Str("contract", mapping.Currency).Msg("Bootstrap failed for contract")
