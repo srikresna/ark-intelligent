@@ -232,23 +232,25 @@ func templateFallback() string {
 }
 
 // notifyOwner sends a notification to the bot owner if the callback is set.
-// Non-blocking — fires in a goroutine to avoid delaying user response.
-func (cs *ChatService) notifyOwner(ctx context.Context, html string) {
+// Non-blocking — fires in a goroutine with a detached context so the
+// notification survives even if the request context is cancelled.
+func (cs *ChatService) notifyOwner(_ context.Context, html string) {
 	if cs.ownerNotify == nil {
 		return
 	}
-	go cs.ownerNotify(ctx, html)
+	go cs.ownerNotify(context.Background(), html)
 }
 
 // truncateErr returns a truncated error string (max 150 chars) safe for Telegram HTML.
-// Returns "nil" for nil errors.
+// Returns "nil" for nil errors. Uses rune-based truncation to avoid splitting UTF-8.
 func truncateErr(err error) string {
 	if err == nil {
 		return "nil"
 	}
 	s := err.Error()
-	if len(s) > 150 {
-		s = s[:150] + "..."
+	runes := []rune(s)
+	if len(runes) > 150 {
+		s = string(runes[:150]) + "..."
 	}
 	return s
 }

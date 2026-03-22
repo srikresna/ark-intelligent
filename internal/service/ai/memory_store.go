@@ -73,8 +73,17 @@ func (ms *MemoryStore) Execute(ctx context.Context, userID int64, cmd memoryComm
 }
 
 // view lists a directory or reads a file.
+// Holds RLock during the entire operation to prevent concurrent map read/write panic.
 func (ms *MemoryStore) view(ctx context.Context, userID int64, p string) string {
-	files := ms.getUserFiles(ctx, userID)
+	ms.ensureLoaded(ctx, userID)
+
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	files := ms.cache[userID]
+	if files == nil {
+		return "No files or directories found at " + normalizePath(p)
+	}
 
 	// Normalize path
 	p = normalizePath(p)
@@ -122,11 +131,9 @@ func (ms *MemoryStore) view(ctx context.Context, userID int64, p string) string 
 // create creates a new file.
 func (ms *MemoryStore) create(ctx context.Context, userID int64, p string, content string) string {
 	p = normalizePath(p)
+	ms.ensureLoaded(ctx, userID)
 
 	ms.mu.Lock()
-	if ms.cache[userID] == nil {
-		ms.cache[userID] = make(map[string]string)
-	}
 	ms.cache[userID][p] = content
 	ms.mu.Unlock()
 
@@ -142,6 +149,7 @@ func (ms *MemoryStore) create(ctx context.Context, userID int64, p string, conte
 // edit modifies an existing file using old_str → new_str replacement.
 func (ms *MemoryStore) edit(ctx context.Context, userID int64, p string, oldStr, newStr string) string {
 	p = normalizePath(p)
+	ms.ensureLoaded(ctx, userID)
 
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -175,6 +183,7 @@ func (ms *MemoryStore) edit(ctx context.Context, userID int64, p string, oldStr,
 // del deletes a file.
 func (ms *MemoryStore) del(ctx context.Context, userID int64, p string) string {
 	p = normalizePath(p)
+	ms.ensureLoaded(ctx, userID)
 
 	ms.mu.Lock()
 	if files, ok := ms.cache[userID]; ok {
@@ -191,12 +200,13 @@ func (ms *MemoryStore) del(ctx context.Context, userID int64, p string) string {
 	return fmt.Sprintf("File deleted: %s", p)
 }
 
-// getUserFiles returns the user's memory files, loading from persister if needed.
-func (ms *MemoryStore) getUserFiles(ctx context.Context, userID int64) map[string]string {
+// ensureLoaded loads the user's memory files from the persister into cache
+// if not already cached. Safe for concurrent access.
+func (ms *MemoryStore) ensureLoaded(ctx context.Context, userID int64) {
 	ms.mu.RLock()
-	if files, ok := ms.cache[userID]; ok {
+	if _, ok := ms.cache[userID]; ok {
 		ms.mu.RUnlock()
-		return files
+		return
 	}
 	ms.mu.RUnlock()
 
@@ -205,8 +215,8 @@ func (ms *MemoryStore) getUserFiles(ctx context.Context, userID int64) map[strin
 	defer ms.mu.Unlock()
 
 	// Double-check after acquiring write lock
-	if files, ok := ms.cache[userID]; ok {
-		return files
+	if _, ok := ms.cache[userID]; ok {
+		return
 	}
 
 	files := make(map[string]string)
@@ -219,7 +229,6 @@ func (ms *MemoryStore) getUserFiles(ctx context.Context, userID int64) map[strin
 		}
 	}
 	ms.cache[userID] = files
-	return files
 }
 
 // normalizePath cleans up a memory file path.

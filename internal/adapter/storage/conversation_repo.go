@@ -111,7 +111,8 @@ func (r *ConversationRepo) GetHistory(_ context.Context, userID int64, limit int
 				return json.Unmarshal(val, &entry)
 			})
 			if err != nil {
-				continue // skip corrupt entries
+				convLog.Warn().Err(err).Str("key", string(it.Item().Key())).Msg("skipping corrupt conversation entry")
+				continue
 			}
 			entries = append(entries, entry)
 		}

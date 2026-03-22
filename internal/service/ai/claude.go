@@ -274,6 +274,13 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		// The soft cap (10) is only a safety net against infinite loops.
 		const maxToolRoundTrips = 10
 		for toolRound := 0; toolRound < maxToolRoundTrips; toolRound++ {
+			// Check context cancellation before each round-trip
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
+
 			resp, err := c.doRequest(ctx, &apiReq)
 			if err != nil {
 				lastErr = fmt.Errorf("claude request (attempt %d): %w", attempt+1, err)
