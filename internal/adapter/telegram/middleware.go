@@ -247,12 +247,34 @@ func (m *Middleware) CheckAIQuota(ctx context.Context, userID int64) (bool, stri
 	defer mu.Unlock()
 
 	profile, err := m.userRepo.GetUser(ctx, userID)
-	if err != nil || profile == nil {
-		// Fail-closed for AI quota (costs money)
+	if err != nil {
+		// Fail-closed for AI quota on DB error (costs money)
 		if m.ownerID != 0 && userID == m.ownerID {
 			return true, ""
 		}
 		return false, "Service temporarily unavailable. Please try again."
+	}
+
+	// Auto-create free-tier profile for new users who start with chat.
+	// Without this, users who send a chat message before any slash command
+	// would be blocked because AuthorizeCallback doesn't create profiles.
+	if profile == nil {
+		if m.ownerID != 0 && userID == m.ownerID {
+			return true, ""
+		}
+		now := time.Now()
+		role := domain.RoleFree
+		profile = &domain.UserProfile{
+			UserID:           userID,
+			Role:             role,
+			CreatedAt:        now,
+			LastSeenAt:       now,
+			CounterResetDate: todayWIB(),
+		}
+		if err := m.userRepo.UpsertUser(ctx, profile); err != nil {
+			log.Error().Err(err).Int64("user_id", userID).Msg("middleware: auto-create user in CheckAIQuota failed")
+			return false, "Service temporarily unavailable. Please try again."
+		}
 	}
 
 	limits := domain.GetTierLimits(profile.Role)

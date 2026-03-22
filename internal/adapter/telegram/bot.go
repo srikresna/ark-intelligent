@@ -898,6 +898,11 @@ func (b *Bot) handleChatMessage(ctx context.Context, msg *Message) {
 		data, mimeType, err := b.downloadFileBase64(ctx, msg.Document.FileID)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to download document")
+			if strings.Contains(err.Error(), "too large") {
+				chatID := strconv.FormatInt(msg.Chat.ID, 10)
+				_, _ = b.SendHTML(ctx, chatID, "Document is too large (max 5MB). Please send a smaller file.")
+				return
+			}
 		} else {
 			if mimeType == "" {
 				mimeType = msg.Document.MimeType

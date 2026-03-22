@@ -55,6 +55,10 @@ type Handler struct {
 	aiCooldownMu sync.Mutex
 	aiCooldown   map[int64]time.Time // userID -> last AI command time
 
+	// Per-user chat cooldown (separate from AI command cooldown to avoid interference).
+	chatCooldownMu sync.Mutex
+	chatCooldown   map[int64]time.Time // userID -> last chat message time
+
 	// Authorization middleware for tiered access control.
 	middleware *Middleware
 
@@ -93,6 +97,7 @@ func NewHandler(
 		changelog:     changelog,
 		newsScheduler: newsScheduler,
 		aiCooldown:    make(map[int64]time.Time),
+		chatCooldown:  make(map[int64]time.Time),
 		middleware:    middleware,
 		priceRepo:     priceRepo,
 		signalRepo:    signalRepo,
@@ -1522,18 +1527,30 @@ func (h *Handler) HandleFreeText(ctx context.Context, chatID string, userID int6
 
 // checkChatCooldown returns true if the user is allowed to send a chat message (cooldown elapsed).
 // Updates the cooldown timestamp if allowed.
+// Uses a separate map from AI command cooldown to avoid interference.
 func (h *Handler) checkChatCooldown(userID int64) bool {
-	h.aiCooldownMu.Lock()
-	defer h.aiCooldownMu.Unlock()
+	h.chatCooldownMu.Lock()
+	defer h.chatCooldownMu.Unlock()
 
 	now := time.Now()
-	if last, ok := h.aiCooldown[userID]; ok {
+
+	// Opportunistic cleanup: remove stale entries when map grows large.
+	if len(h.chatCooldown) > 100 {
+		cutoff := now.Add(-5 * time.Minute)
+		for uid, ts := range h.chatCooldown {
+			if ts.Before(cutoff) {
+				delete(h.chatCooldown, uid)
+			}
+		}
+	}
+
+	if last, ok := h.chatCooldown[userID]; ok {
 		// Use a 5-second cooldown for chat messages
 		if now.Sub(last) < 5*time.Second {
 			return false
 		}
 	}
-	h.aiCooldown[userID] = now
+	h.chatCooldown[userID] = now
 	return true
 }
 
