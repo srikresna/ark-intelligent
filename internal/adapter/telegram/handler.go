@@ -1478,20 +1478,21 @@ func (h *Handler) HandleFreeText(ctx context.Context, chatID string, userID int6
 		return err
 	}
 
-	// Check AI quota via middleware
+	// Check per-user chat cooldown BEFORE quota check to avoid consuming
+	// AI quota on cooldown-blocked requests (owner bypassed — unlimited access).
+	if !h.bot.isOwner(userID) && !h.checkChatCooldown(userID) {
+		_, err := h.bot.SendHTML(ctx, chatID,
+			"\u23f3 Please wait a moment before sending another message.")
+		return err
+	}
+
+	// Check AI quota via middleware (after cooldown so blocked requests don't waste quota)
 	if h.middleware != nil {
 		allowed, reason := h.middleware.CheckAIQuota(ctx, userID)
 		if !allowed {
 			_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("\u26d4 %s", reason))
 			return err
 		}
-	}
-
-	// Check per-user chat cooldown (owner bypassed — unlimited access)
-	if !h.bot.isOwner(userID) && !h.checkChatCooldown(userID) {
-		_, err := h.bot.SendHTML(ctx, chatID,
-			"\u23f3 Please wait a moment before sending another message.")
-		return err
 	}
 
 	// Send "thinking" indicator
