@@ -140,46 +140,31 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 	}
 
 	html := `🦅 <b>ARK Intelligence Terminal</b>
-<i>Institutional Flow & Macro Analytics</i>
+<i>Institutional Flow &amp; Macro Analytics</i>
 
-<b>📊 COT Positioning</b>
-/cot - Overview semua currency
-/cot USD - Detail + Price Context + Divergence
-/cot raw USD - Raw data positioning
+<b>📊 Market Data</b>
+/cot — COT overview · <code>/cot EUR</code> detail · <code>/cot raw EUR</code>
+/rank — Currency strength ranking
+/signals — COT signal detection (7 types)
+/calendar — Economic calendar · <code>/calendar week</code>
 
-<b>🏆 Rankings & Regime</b>
-/rank - Currency strength ranking (Price + COT)
-/macro - FRED Macro regime dashboard (7 indicators)
-/signals - COT signal detection (7 types)
+<b>🧠 AI Outlook</b>
+/outlook cot · news · fred · combine · cross
 
-<b>📅 Economic Calendar</b>
-/calendar - Agenda hari ini
-/calendar week - Agenda minggu ini
-<i>Gunakan tombol navigasi untuk pindah hari/minggu</i>
+<b>📈 Backtest</b>
+/backtest — Stats · <code>/backtest signals</code> · <code>/backtest EUR</code>
+/accuracy — Quick accuracy summary
 
-<b>🧠 AI Intelligence Outlook</b>
-/outlook cot - COT Positioning structural analysis
-/outlook news - News catalysts, Storm Days &amp; Central Bank
-/outlook fred - FRED Macro deep-dive (Fed policy, real rates, DXY)
-/outlook combine - Fused COT + News + FRED macro triggers
-/outlook cross - Cross-market correlation (Gold/Oil/Bond/USD)
+<b>🏛 Macro</b>
+/macro — FRED regime dashboard (7 indicators)
 
-<b>📈 Backtest &amp; Accuracy</b>
-/backtest - Signal backtest stats (win rate, Sharpe, drawdown)
-/accuracy - Quick accuracy summary per contract
-
-<b>⚙️ Operations</b>
-/settings - Preference management
-/membership - Tier benefits &amp; upgrade info
-/status - System status
+<b>⚙️ Settings</b>
+/settings · /membership · /status
 
 <b>🔐 Admin</b>
-/users - List registered users &amp; roles
-/setrole - Change user role (e.g. /setrole 123 admin)
-/ban - Ban a user
-/unban - Unban a user
+/users · /setrole · /ban · /unban
 
-<code>ARK Interface v3.1.0</code>`
+<code>ARK v3.2.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
