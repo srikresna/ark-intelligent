@@ -1508,9 +1508,9 @@ func (h *Handler) HandleFreeText(ctx context.Context, chatID string, userID int6
 	}
 
 	// Call chat service with a per-request timeout to prevent unbounded waits.
-	// Claude retry loop can take up to 6 minutes (3 retries × 120s timeout);
-	// cap total time at 90 seconds for acceptable UX.
-	chatCtx, chatCancel := context.WithTimeout(ctx, 90*time.Second)
+	// Extended thinking + server tools (web search, code execution) can take
+	// significantly longer than text-only responses. Allow 120s for full pipeline.
+	chatCtx, chatCancel := context.WithTimeout(ctx, 120*time.Second)
 	defer chatCancel()
 	response, err := h.chatService.HandleMessage(chatCtx, userID, text, role, contentBlocks)
 

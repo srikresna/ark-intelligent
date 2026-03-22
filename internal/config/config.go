@@ -47,10 +47,11 @@ type Config struct {
 	PriceHistoryWeeks   int           // How many weeks of price history to bootstrap
 
 	// Claude Chatbot (optional — graceful degradation without)
-	ClaudeEndpoint  string        // Claude API proxy URL
-	ClaudeModel     string        // Model name (default: claude-opus-4-6)
-	ClaudeMaxTokens int           // Max output tokens (default: 4096)
-	ClaudeTimeout   time.Duration // HTTP timeout (default: 120s)
+	ClaudeEndpoint       string        // Claude API proxy URL
+	ClaudeModel          string        // Model name (default: claude-opus-4-6)
+	ClaudeMaxTokens      int           // Max output tokens (default: 8192)
+	ClaudeTimeout        time.Duration // HTTP timeout (default: 120s)
+	ClaudeThinkingBudget int           // Extended thinking budget_tokens (default: 2048, 0=disabled)
 
 	// Chat history
 	ChatHistoryLimit int           // Max messages per user conversation (default: 50)
@@ -89,10 +90,11 @@ func MustLoad() *Config {
 		AIMaxDaily: getInt("AI_MAX_DAILY", 200),
 
 		// Claude Chatbot
-		ClaudeEndpoint:  getEnv("CLAUDE_ENDPOINT", ""),
-		ClaudeModel:     getEnv("CLAUDE_MODEL", "claude-opus-4-6"),
-		ClaudeMaxTokens: getInt("CLAUDE_MAX_TOKENS", 4096),
-		ClaudeTimeout:   getDuration("CLAUDE_TIMEOUT", 120*time.Second),
+		ClaudeEndpoint:       getEnv("CLAUDE_ENDPOINT", ""),
+		ClaudeModel:          getEnv("CLAUDE_MODEL", "claude-opus-4-6"),
+		ClaudeMaxTokens:      getInt("CLAUDE_MAX_TOKENS", 8192),
+		ClaudeTimeout:        getDuration("CLAUDE_TIMEOUT", 120*time.Second),
+		ClaudeThinkingBudget: getInt("CLAUDE_THINKING_BUDGET", 2048),
 
 		// Chat history
 		ChatHistoryLimit: getInt("CHAT_HISTORY_LIMIT", 50),

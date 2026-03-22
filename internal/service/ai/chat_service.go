@@ -121,14 +121,19 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 		// Success — persist conversation (use effectiveText for multimodal description)
 		cs.saveConversation(ctx, userID, effectiveText, resp.Content)
 
+		logEvent := chatLog.Info().
+			Int64("user_id", userID).
+			Int("input_tokens", resp.InputTokens).
+			Int("output_tokens", resp.OutputTokens)
+
 		if len(resp.ToolsUsed) > 0 {
-			chatLog.Info().
-				Int64("user_id", userID).
-				Strs("tools_used", resp.ToolsUsed).
-				Int("input_tokens", resp.InputTokens).
-				Int("output_tokens", resp.OutputTokens).
-				Msg("Claude response with tools")
+			logEvent.Strs("tools_used", resp.ToolsUsed)
 		}
+		if resp.CacheReadTokens > 0 {
+			logEvent.Int("cache_read", resp.CacheReadTokens)
+		}
+
+		logEvent.Msg("Claude response")
 
 		return resp.Content, nil
 	}

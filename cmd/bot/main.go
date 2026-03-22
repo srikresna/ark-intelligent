@@ -146,6 +146,11 @@ func main() {
 		if cfg.ClaudeModel != "" {
 			claudeClient.SetModel(cfg.ClaudeModel)
 		}
+		if cfg.ClaudeThinkingBudget > 0 {
+			claudeClient.SetThinkingBudget(cfg.ClaudeThinkingBudget)
+		} else {
+			claudeClient.SetThinkingBudget(0) // explicitly disable
+		}
 		convRepo := storage.NewConversationRepo(db, cfg.ChatHistoryLimit, cfg.ChatHistoryTTL)
 		toolConfig := aisvc.NewToolConfig()
 		contextBuilder := aisvc.NewContextBuilder(cotRepo, newsRepo, priceRepo)

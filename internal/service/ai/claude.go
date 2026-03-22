@@ -19,10 +19,12 @@ var claudeLog = logger.Component("claude")
 // ClaudeClient implements ports.ChatEngine using the Anthropic Messages API
 // via a proxy endpoint (marketriskmonitor.com/api/analyze).
 type ClaudeClient struct {
-	endpoint   string
-	httpClient *http.Client
-	model      string
-	maxTokens  int
+	endpoint       string
+	httpClient     *http.Client
+	model          string
+	maxTokens      int
+	thinkingBudget int  // extended thinking budget_tokens (0 = disabled)
+	useCache       bool // enable prompt caching for system prompt
 }
 
 // NewClaudeClient creates a Claude client targeting the given endpoint.
@@ -32,9 +34,17 @@ func NewClaudeClient(endpoint string, timeout time.Duration, maxTokens int) *Cla
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		model:     "claude-opus-4-6",
-		maxTokens: maxTokens,
+		model:          "claude-opus-4-6",
+		maxTokens:      maxTokens,
+		thinkingBudget: 2048, // default thinking budget for extended thinking
+		useCache:       true, // enable prompt caching by default
 	}
+}
+
+// SetThinkingBudget sets the extended thinking budget_tokens.
+// Set to 0 to disable extended thinking.
+func (c *ClaudeClient) SetThinkingBudget(budget int) {
+	c.thinkingBudget = budget
 }
 
 // SetModel overrides the default model name.
@@ -47,11 +57,30 @@ func (c *ClaudeClient) SetModel(model string) {
 // ---------------------------------------------------------------------------
 
 type claudeRequest struct {
-	Model     string               `json:"model"`
-	MaxTokens int                  `json:"max_tokens"`
-	System    string               `json:"system,omitempty"`
-	Messages  []claudeMessage      `json:"messages"`
-	Tools     []claudeToolDef      `json:"tools,omitempty"`
+	Model     string          `json:"model"`
+	MaxTokens int             `json:"max_tokens"`
+	System    interface{}     `json:"system,omitempty"`     // string or []claudeSystemBlock (for cache_control)
+	Messages  []claudeMessage `json:"messages"`
+	Tools     []claudeToolDef `json:"tools,omitempty"`
+	Thinking  *claudeThinking `json:"thinking,omitempty"`   // extended thinking config
+}
+
+// claudeThinking configures extended thinking (chain-of-thought reasoning).
+type claudeThinking struct {
+	Type         string `json:"type"`                    // "enabled" or "disabled"
+	BudgetTokens int    `json:"budget_tokens,omitempty"` // min 1024 for Opus
+}
+
+// claudeSystemBlock supports prompt caching via cache_control on system content.
+type claudeSystemBlock struct {
+	Type         string              `json:"type"`                    // "text"
+	Text         string              `json:"text"`
+	CacheControl *claudeCacheControl `json:"cache_control,omitempty"` // enables prompt caching
+}
+
+// claudeCacheControl enables Anthropic prompt caching.
+type claudeCacheControl struct {
+	Type string `json:"type"` // "ephemeral"
 }
 
 type claudeMessage struct {
@@ -81,27 +110,48 @@ type claudeToolDef struct {
 }
 
 type claudeResponse struct {
-	ID           string              `json:"id"`
-	Type         string              `json:"type"`
-	Model        string              `json:"model"`
-	Role         string              `json:"role"`
-	Content      []claudeContentBlock `json:"content"`
-	StopReason   string              `json:"stop_reason"`
-	Usage        *claudeUsage        `json:"usage,omitempty"`
-	Error        *claudeError        `json:"error,omitempty"`
+	ID             string               `json:"id"`
+	Type           string               `json:"type"`
+	Model          string               `json:"model"`
+	Role           string               `json:"role"`
+	Content        []claudeContentBlock `json:"content"`
+	StopReason     string               `json:"stop_reason"`
+	Usage          *claudeUsage         `json:"usage,omitempty"`
+	Error          *claudeError         `json:"error,omitempty"`
+	AnthropicError *claudeError         `json:"anthropic_error,omitempty"` // proxy error format
 }
 
 type claudeContentBlock struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Thinking string `json:"thinking,omitempty"` // for type="thinking" (extended thinking)
-	Name     string `json:"name,omitempty"`     // for tool_use blocks
-	ID       string `json:"id,omitempty"`
+	Type      string            `json:"type"`
+	Text      string            `json:"text,omitempty"`
+	Thinking  string            `json:"thinking,omitempty"`  // for type="thinking" (extended thinking)
+	Signature string            `json:"signature,omitempty"` // thinking block signature
+	Name      string            `json:"name,omitempty"`      // for tool_use blocks
+	ID        string            `json:"id,omitempty"`
+	Citations []claudeCitation  `json:"citations,omitempty"` // document citations
+}
+
+// claudeCitation represents a citation reference from a Claude response.
+type claudeCitation struct {
+	Type           string `json:"type"`             // "char_location"
+	CitedText      string `json:"cited_text"`       // the cited passage
+	DocumentIndex  int    `json:"document_index"`
+	StartCharIndex int    `json:"start_char_index"`
+	EndCharIndex   int    `json:"end_char_index"`
 }
 
 type claudeUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int                `json:"input_tokens"`
+	OutputTokens             int                `json:"output_tokens"`
+	CacheCreationInputTokens int                `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int                `json:"cache_read_input_tokens"`
+	ServerToolUse            *claudeToolUsage   `json:"server_tool_use,omitempty"`
+}
+
+// claudeToolUsage tracks server-side tool invocations.
+type claudeToolUsage struct {
+	WebSearchRequests int `json:"web_search_requests"`
+	WebFetchRequests  int `json:"web_fetch_requests"`
 }
 
 type claudeError struct {
@@ -127,7 +177,6 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 	for _, t := range req.Tools {
 		name := t.Name
 		if name == "" {
-			// Derive name from type: "web_search_20250305" -> "web_search"
 			name = deriveToolName(t.Type)
 		}
 		tools = append(tools, claudeToolDef{
@@ -142,12 +191,45 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		maxTokens = c.maxTokens
 	}
 
+	// Build system prompt (with or without prompt caching)
+	var system interface{}
+	if req.SystemPrompt != "" {
+		if c.useCache {
+			// Use array format with cache_control for prompt caching.
+			// Anthropic caches system prompts with cache_control: ephemeral,
+			// saving tokens on repeated calls with the same system prompt.
+			system = []claudeSystemBlock{{
+				Type: "text",
+				Text: req.SystemPrompt,
+				CacheControl: &claudeCacheControl{
+					Type: "ephemeral",
+				},
+			}}
+		} else {
+			system = req.SystemPrompt
+		}
+	}
+
 	apiReq := claudeRequest{
 		Model:     c.model,
 		MaxTokens: maxTokens,
-		System:    req.SystemPrompt,
+		System:    system,
 		Messages:  messages,
 		Tools:     tools,
+	}
+
+	// Enable extended thinking when budget is configured.
+	// Extended thinking gives Claude a scratchpad for complex reasoning,
+	// producing higher quality analysis for financial/macro questions.
+	if c.thinkingBudget > 0 {
+		apiReq.Thinking = &claudeThinking{
+			Type:         "enabled",
+			BudgetTokens: c.thinkingBudget,
+		}
+		// Extended thinking requires max_tokens > budget_tokens
+		if apiReq.MaxTokens <= c.thinkingBudget {
+			apiReq.MaxTokens = c.thinkingBudget + 4096
+		}
 	}
 
 	var lastErr error
@@ -171,10 +253,14 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 			return nil, lastErr
 		}
 
-		// Check for API-level error
-		if resp.Error != nil {
-			lastErr = fmt.Errorf("claude API error: %s: %s", resp.Error.Type, resp.Error.Message)
-			if resp.Error.Type == "overloaded_error" || strings.Contains(resp.Error.Message, "rate") {
+		// Check for API-level error (handle both standard and proxy error formats)
+		apiErr := resp.Error
+		if apiErr == nil {
+			apiErr = resp.AnthropicError
+		}
+		if apiErr != nil {
+			lastErr = fmt.Errorf("claude API error: %s: %s", apiErr.Type, apiErr.Message)
+			if apiErr.Type == "overloaded_error" || strings.Contains(apiErr.Message, "rate") {
 				continue
 			}
 			return nil, lastErr
@@ -183,7 +269,6 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		// Extract text content and tool usage
 		text, toolsUsed := extractClaudeContent(resp)
 		if text == "" {
-			// Log response metadata for diagnostics (content blocks logged by extractClaudeContent)
 			claudeLog.Warn().
 				Str("stop_reason", resp.StopReason).
 				Str("model", resp.Model).
@@ -200,6 +285,17 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 		if resp.Usage != nil {
 			result.InputTokens = resp.Usage.InputTokens
 			result.OutputTokens = resp.Usage.OutputTokens
+			result.CacheCreationTokens = resp.Usage.CacheCreationInputTokens
+			result.CacheReadTokens = resp.Usage.CacheReadInputTokens
+
+			// Log cache performance for monitoring cost savings
+			if resp.Usage.CacheReadInputTokens > 0 {
+				claudeLog.Info().
+					Int("cache_read", resp.Usage.CacheReadInputTokens).
+					Int("cache_create", resp.Usage.CacheCreationInputTokens).
+					Int("input", resp.Usage.InputTokens).
+					Msg("prompt cache hit")
+			}
 		}
 
 		return result, nil
@@ -260,9 +356,10 @@ func (c *ClaudeClient) doRequest(ctx context.Context, apiReq *claudeRequest) (*c
 }
 
 // extractClaudeContent pulls the text and tool usage from a Claude response.
-// Handles standard text blocks, server tool use blocks, and thinking blocks
-// (from extended thinking). Thinking content is not shown to users but is
-// logged for diagnostics.
+// Handles standard text blocks, server tool use blocks, thinking blocks,
+// web_search_tool_result, web_fetch_tool_result, and code_execution_tool_result.
+// Text blocks with citations are joined seamlessly.
+// Thinking content is not shown to users but is logged for diagnostics.
 func extractClaudeContent(resp *claudeResponse) (string, []string) {
 	var textParts []string
 	var toolsUsed []string
@@ -283,11 +380,14 @@ func extractClaudeContent(resp *claudeResponse) (string, []string) {
 		case "thinking":
 			hasThinking = true
 			// Thinking blocks are internal reasoning — not shown to user.
-			// Log presence for diagnostics.
+		case "web_search_tool_result", "web_fetch_tool_result", "code_execution_tool_result":
+			// Server tool results — the model processes these internally.
+			// No user-visible text to extract; the model will reference results
+			// in its text blocks.
 		}
 	}
 
-	text := strings.Join(textParts, "\n")
+	text := strings.Join(textParts, "")
 
 	// Diagnostic logging when no text was extracted but blocks exist
 	if text == "" && len(resp.Content) > 0 {

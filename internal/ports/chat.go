@@ -66,6 +66,12 @@ type ChatResponse struct {
 	ToolsUsed    []string // names of server tools that were invoked
 	InputTokens  int
 	OutputTokens int
+
+	// Prompt caching metrics (Anthropic-specific).
+	// CacheCreationTokens: tokens written to cache this request.
+	// CacheReadTokens: tokens read from cache (saves cost).
+	CacheCreationTokens int
+	CacheReadTokens     int
 }
 
 // ChatEngine defines the interface for conversational AI.
