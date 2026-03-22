@@ -63,8 +63,9 @@ func (cs *ChatService) SetOwnerNotify(fn OwnerNotifyFunc) {
 // HandleMessage processes a free-text user message through the AI pipeline.
 // contentBlocks is non-nil when the message contains media (images, documents).
 // onProgress is an optional callback for reporting status updates during tool round-trips.
+// preferredModel is the user's model preference: "gemini" uses Gemini as primary, anything else uses Claude.
 // Returns the assistant's response text.
-func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text string, role domain.UserRole, contentBlocks []ports.ContentBlock, onProgress func(string)) (string, error) {
+func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text string, role domain.UserRole, contentBlocks []ports.ContentBlock, onProgress func(string), preferredModel string) (string, error) {
 	// 1. Load conversation history (last 20 messages for context window)
 	history, err := cs.convRepo.GetHistory(ctx, userID, 20)
 	if err != nil {
@@ -109,7 +110,15 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 	// 4. Resolve tools for user's tier
 	tools := cs.toolConfig.ToolsForRole(role)
 
-	// 5. Try Claude (primary)
+	// 5. Route to preferred model
+	if preferredModel == "gemini" {
+		return cs.handleGeminiPrimary(ctx, userID, systemPrompt, effectiveText, onProgress)
+	}
+	return cs.handleClaudePrimary(ctx, userID, messages, systemPrompt, tools, effectiveText, onProgress)
+}
+
+// handleClaudePrimary tries Claude first, then Gemini fallback, then template.
+func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, messages []ports.ChatMessage, systemPrompt string, tools []ports.ServerTool, effectiveText string, onProgress func(string)) (string, error) {
 	req := ports.ChatRequest{
 		UserID:       userID,
 		Messages:     messages,
@@ -120,7 +129,6 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 
 	resp, err := cs.claude.Chat(ctx, req)
 	if err == nil && resp.Content != "" {
-		// Success — persist conversation (use effectiveText for multimodal description)
 		cs.saveConversation(ctx, userID, effectiveText, resp.Content)
 
 		logEvent := chatLog.Info().
@@ -136,12 +144,10 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 		}
 
 		logEvent.Msg("Claude response")
-
 		return resp.Content, nil
 	}
 
-	// Claude failed — log and attempt fallback
-	// Ensure err is always descriptive for owner notifications downstream.
+	// Claude failed — log and attempt Gemini fallback
 	if err != nil {
 		chatLog.Warn().Err(err).Int64("user_id", userID).Msg("Claude failed, attempting Gemini fallback")
 	} else {
@@ -149,27 +155,21 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 		chatLog.Warn().Int64("user_id", userID).Msg("Claude returned empty response, attempting Gemini fallback")
 	}
 
-	// 6. Try Gemini (fallback) — single-turn only (no history or multimodal support)
+	// Try Gemini fallback — single-turn only (no history or multimodal support)
 	if cs.gemini != nil && effectiveText != "" {
 		geminiResp, geminiErr := cs.gemini.GenerateWithSystem(ctx, systemPrompt, effectiveText)
 		if geminiErr == nil && geminiResp != "" {
-			// Prefix with fallback notice
 			fallbackResponse := fmt.Sprintf(
 				"<i>[⚠️ Claude endpoint unreachable — response via Gemini fallback]</i>\n\n%s",
 				geminiResp,
 			)
-
-			// Save to history (but note it's a fallback response)
 			cs.saveConversation(ctx, userID, effectiveText, geminiResp)
-
 			chatLog.Info().Int64("user_id", userID).Msg("Gemini fallback succeeded")
 
-			// Notify owner: Claude down but Gemini handled it
 			cs.notifyOwner(ctx, fmt.Sprintf(
 				"⚠️ <b>Claude Fallback Triggered</b>\nUser: <code>%d</code>\nError: <code>%s</code>\nGemini fallback: ✅ succeeded",
 				userID, truncateErr(err),
 			))
-
 			return fallbackResponse, nil
 		}
 
@@ -178,15 +178,63 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 		}
 	}
 
-	// 7. Template fallback (last resort)
+	// Template fallback (last resort)
 	chatLog.Error().Int64("user_id", userID).Msg("all AI services unavailable — using template fallback")
-
-	// Notify owner: both AI services down
 	cs.notifyOwner(ctx, fmt.Sprintf(
 		"🚨 <b>All AI Services Down</b>\nUser: <code>%d</code>\nClaude: <code>%s</code>\nGemini: unavailable\nFallback: template response sent",
 		userID, truncateErr(err),
 	))
+	return templateFallback(), ErrAIFallback
+}
 
+// handleGeminiPrimary tries Gemini first, then Claude fallback, then template.
+func (cs *ChatService) handleGeminiPrimary(ctx context.Context, userID int64, systemPrompt string, effectiveText string, onProgress func(string)) (string, error) {
+	if cs.gemini != nil && effectiveText != "" {
+		geminiResp, geminiErr := cs.gemini.GenerateWithSystem(ctx, systemPrompt, effectiveText)
+		if geminiErr == nil && geminiResp != "" {
+			cs.saveConversation(ctx, userID, effectiveText, geminiResp)
+			chatLog.Info().Int64("user_id", userID).Msg("Gemini response (user preferred)")
+			return geminiResp, nil
+		}
+
+		if geminiErr != nil {
+			chatLog.Warn().Err(geminiErr).Int64("user_id", userID).Msg("Gemini failed (user preferred), attempting Claude fallback")
+		}
+	}
+
+	// Gemini failed or unavailable — try Claude as fallback
+	if cs.claude != nil && cs.claude.IsAvailable(ctx) {
+		// Build simple single-turn message for fallback
+		messages := []ports.ChatMessage{{Role: "user", Content: effectiveText}}
+		req := ports.ChatRequest{
+			UserID:       userID,
+			Messages:     messages,
+			SystemPrompt: systemPrompt,
+			OnProgress:   onProgress,
+		}
+
+		resp, err := cs.claude.Chat(ctx, req)
+		if err == nil && resp.Content != "" {
+			fallbackResponse := fmt.Sprintf(
+				"<i>[⚠️ Gemini unavailable — response via Claude fallback]</i>\n\n%s",
+				resp.Content,
+			)
+			cs.saveConversation(ctx, userID, effectiveText, resp.Content)
+			chatLog.Info().Int64("user_id", userID).Msg("Claude fallback succeeded (Gemini preferred)")
+			return fallbackResponse, nil
+		}
+
+		if err != nil {
+			chatLog.Error().Err(err).Int64("user_id", userID).Msg("Claude fallback also failed")
+		}
+	}
+
+	// Template fallback
+	chatLog.Error().Int64("user_id", userID).Msg("all AI services unavailable — using template fallback")
+	cs.notifyOwner(ctx, fmt.Sprintf(
+		"🚨 <b>All AI Services Down</b>\nUser: <code>%d</code>\nGemini: preferred, failed\nClaude: fallback, failed\nFallback: template response sent",
+		userID,
+	))
 	return templateFallback(), ErrAIFallback
 }
 

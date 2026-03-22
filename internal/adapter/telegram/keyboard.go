@@ -318,7 +318,23 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:cur_reset",
 	}})
 
-	// Row 8: View Changelog
+	// Row 8: Chat Model selector
+	modelLabel := func(key, label string) string {
+		current := prefs.PreferredModel
+		if current == "" {
+			current = "claude" // default
+		}
+		if current == key {
+			return "✅ " + label
+		}
+		return label
+	}
+	rows = append(rows, []ports.InlineButton{
+		{Text: modelLabel("claude", "🤖 Claude"), CallbackData: "set:model_claude"},
+		{Text: modelLabel("gemini", "✨ Gemini"), CallbackData: "set:model_gemini"},
+	})
+
+	// Row 9: View Changelog
 	rows = append(rows, []ports.InlineButton{{
 		Text:         "📜 View Changelog",
 		CallbackData: "set:changelog_view",

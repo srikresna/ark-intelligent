@@ -499,6 +499,12 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 	}
 	b.WriteString(fmt.Sprintf("<code>[AI] Output Language: %s</code>\n", langDisplay))
 
+	modelDisplay := "Claude 🤖"
+	if prefs.PreferredModel == "gemini" {
+		modelDisplay = "Gemini ✨"
+	}
+	b.WriteString(fmt.Sprintf("<code>[AI] Chat Model    : %s</code>\n", modelDisplay))
+
 	// Alert minutes display
 	if len(prefs.AlertMinutes) > 0 {
 		parts := make([]string, len(prefs.AlertMinutes))

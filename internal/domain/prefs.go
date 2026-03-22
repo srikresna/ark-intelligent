@@ -10,6 +10,9 @@ type UserPrefs struct {
 	CurrencyFilter   []string `json:"currency_filter"`    // If set, only alert for these currencies
 	Language         string   `json:"language"`           // AI output language ("id" or "en")
 
+	// Chat model preference: "claude" (default), "gemini", or "" (= claude)
+	PreferredModel string `json:"preferred_model,omitempty"`
+
 	// Broadcast & UI state
 	ChatID         string `json:"chat_id"`         // Telegram chat ID (set on /start, used for push alerts)
 	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.

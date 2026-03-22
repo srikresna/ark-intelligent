@@ -613,6 +613,10 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 		prefs.COTAlertsEnabled = !prefs.COTAlertsEnabled
 	case "ai_toggle":
 		prefs.AIReportsEnabled = !prefs.AIReportsEnabled
+	case "model_claude":
+		prefs.PreferredModel = "claude"
+	case "model_gemini":
+		prefs.PreferredModel = "gemini"
 	case "impact_high_only":
 		prefs.AlertImpacts = []string{"High"}
 	case "impact_high_med":
@@ -1507,19 +1511,23 @@ func (h *Handler) HandleFreeText(ctx context.Context, chatID string, userID int6
 		}
 	}
 
-	// Get user role for tool resolution
+	// Get user role and preferred model for routing
 	role := domain.RoleFree
+	preferredModel := ""
 	if h.middleware != nil {
 		profile := h.middleware.GetUserProfile(ctx, userID)
 		if profile != nil {
 			role = profile.Role
 		}
 	}
+	if prefs, err := h.prefsRepo.Get(ctx, userID); err == nil {
+		preferredModel = prefs.PreferredModel
+	}
 
 	// Call chat service. No blanket timeout — the Claude HTTP client already has
 	// a per-request timeout (default 120s) that handles hung requests.
 	// As long as Claude keeps responding (tool round-trips), let it work freely.
-	response, err := h.chatService.HandleMessage(ctx, userID, text, role, contentBlocks, onProgress)
+	response, err := h.chatService.HandleMessage(ctx, userID, text, role, contentBlocks, onProgress, preferredModel)
 
 	// Delete "thinking" indicator
 	if thinkMsgID > 0 {
