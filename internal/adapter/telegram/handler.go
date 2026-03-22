@@ -9,11 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	portfoliosvc "github.com/arkcode369/ark-intelligent/internal/service/portfolio"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
@@ -26,6 +28,12 @@ import (
 // the per-currency accumulated surprise sigma from the news scheduler.
 type SurpriseProvider interface {
 	GetSurpriseSigma(currency string) float64
+}
+
+// ImpactProvider exposes event impact data for the /impact command.
+type ImpactProvider interface {
+	GetEventImpactSummary(ctx context.Context, eventTitle string) ([]domain.EventImpactSummary, error)
+	GetTrackedEvents(ctx context.Context) ([]string, error)
 }
 
 // Handler holds all service dependencies and registers commands on the bot.
@@ -48,6 +56,13 @@ type Handler struct {
 	// newsScheduler provides access to per-currency surprise sigma for conviction scoring.
 	// May be nil — all callers guard with a nil check.
 	newsScheduler SurpriseProvider
+
+	// impactProvider exposes event impact data for the /impact command.
+	// May be nil — impact feature disabled if not wired.
+	impactProvider ImpactProvider
+
+	// portfolioRepo stores per-user portfolio positions. May be nil.
+	portfolioRepo *storage.PortfolioRepo
 
 	// changelog is the embedded CHANGELOG.md content, injected at startup.
 	changelog string
@@ -90,6 +105,8 @@ func NewHandler(
 	signalRepo ports.SignalRepository,
 	chatService *aisvc.ChatService,
 	claudeAnalyzer *aisvc.ClaudeAnalyzer,
+	impactProvider ImpactProvider,
+	portfolioRepo *storage.PortfolioRepo,
 ) *Handler {
 	h := &Handler{
 		bot:            bot,
@@ -110,6 +127,8 @@ func NewHandler(
 		signalRepo:     signalRepo,
 		chatService:    chatService,
 		claudeAnalyzer: claudeAnalyzer,
+		impactProvider: impactProvider,
+		portfolioRepo:  portfolioRepo,
 	}
 
 	// Register all commands
@@ -125,6 +144,9 @@ func NewHandler(
 	bot.RegisterCommand("/signals", h.cmdSignals) // COT Signal Detection
 	bot.RegisterCommand("/backtest", h.cmdBacktest)  // Backtest stats
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)  // Quick accuracy summary
+	bot.RegisterCommand("/report", h.cmdReport)      // Weekly performance report
+	bot.RegisterCommand("/impact", h.cmdImpact)      // Event Impact Database
+	bot.RegisterCommand("/portfolio", h.cmdPortfolio) // Portfolio Risk Monitor
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -146,7 +168,7 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 
-	log.Info().Int("commands", 18).Int("callbacks", 6).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 20).Int("callbacks", 6).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -170,6 +192,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /rank — Currency strength ranking
 /signals — COT signal detection (7 types)
 /calendar — Economic calendar · <code>/calendar week</code>
+/impact — Event impact database · <code>/impact NFP</code>
 
 <b>🧠 AI Outlook</b>
 /outlook cot · news · fred · combine · cross
@@ -177,6 +200,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>📈 Backtest</b>
 /backtest — Stats · <code>/backtest signals</code> · <code>/backtest EUR</code>
 /accuracy — Quick accuracy summary
+/report — Weekly signal performance
 
 <b>🏛 Macro</b>
 /macro — FRED regime dashboard (7 indicators)
@@ -356,7 +380,7 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 				rb := pricesvc.NewRiskContextBuilder(h.priceRepo)
 				rCtx, _ = rb.Build(ctx)
 			}
-			signals := recalDet.DetectAll([]domain.COTAnalysis{*analysis}, histMap, rCtx)
+			signals := recalDet.DetectAll([]domain.COTAnalysis{*analysis}, histMap, rCtx, priceCtxMap)
 			if len(signals) > 0 {
 				html += h.fmt.FormatSignalsSummary(signals)
 			}
@@ -787,11 +811,17 @@ func (h *Handler) cmdSignals(ctx context.Context, chatID string, userID int64, a
 		_ = recalDetector.LoadTypeStats(ctx)
 	}
 	var riskCtx *domain.RiskContext
+	var priceCtxsSignals map[string]*domain.PriceContext
 	if h.priceRepo != nil {
 		rb := pricesvc.NewRiskContextBuilder(h.priceRepo)
 		riskCtx, _ = rb.Build(ctx)
+		// Build price contexts for ATR volatility multiplier
+		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+		if pcs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil {
+			priceCtxsSignals = pcs
+		}
 	}
-	signals := recalDetector.DetectAll(analyses, historyMap, riskCtx)
+	signals := recalDetector.DetectAll(analyses, historyMap, riskCtx, priceCtxsSignals)
 
 	// Filter by currency if specified
 	filterCurrency := strings.ToUpper(strings.TrimSpace(args))
@@ -1227,9 +1257,46 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 	}
 
 	regime := fred.ClassifyMacroRegime(data)
-	html := h.fmt.FormatMacroRegime(regime, data)
+	htmlMsg := h.fmt.FormatMacroRegime(regime, data)
 
-	return h.bot.EditMessage(ctx, chatID, placeholderID, html)
+	// Append regime-asset performance insight if price data is available.
+	if h.priceRepo != nil {
+		insight := h.buildRegimeAssetInsight(ctx, data, regime)
+		if formatted := h.fmt.FormatRegimeAssetInsight(insight); formatted != "" {
+			htmlMsg += formatted
+		}
+	}
+
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+}
+
+// buildRegimeAssetInsight computes the regime-asset matrix from stored price
+// history and returns insight for the current regime.
+func (h *Handler) buildRegimeAssetInsight(ctx context.Context, data *fred.MacroData, regime fred.MacroRegime) fred.RegimeInsight {
+	const lookbackWeeks = 52
+
+	// Build regime history from current FRED data.
+	regimeHistory := fred.BuildRegimeHistoryFromCurrent(data, lookbackWeeks)
+	if len(regimeHistory) == 0 {
+		return fred.RegimeInsight{Regime: regime.Name}
+	}
+
+	// Fetch price history for all COT-tracked contracts.
+	priceHistory := make(map[string][]domain.PriceRecord)
+	for _, m := range domain.COTPriceSymbolMappings() {
+		records, err := h.priceRepo.GetHistory(ctx, m.ContractCode, lookbackWeeks)
+		if err != nil || len(records) == 0 {
+			continue
+		}
+		priceHistory[m.ContractCode] = records
+	}
+
+	if len(priceHistory) == 0 {
+		return fred.RegimeInsight{Regime: regime.Name}
+	}
+
+	matrix := fred.ComputeRegimeAssetMatrix(regimeHistory, priceHistory)
+	return fred.GetCurrentRegimeInsight(regime.Name, matrix)
 }
 
 // ---------------------------------------------------------------------------
@@ -1653,4 +1720,240 @@ func (h *Handler) cmdClearChat(ctx context.Context, chatID string, userID int64,
 	_, err := h.bot.SendHTML(ctx, chatID,
 		"\u2705 Chat history cleared. Starting fresh conversation.")
 	return err
+}
+
+// ---------------------------------------------------------------------------
+// /impact — Event Impact Database
+// ---------------------------------------------------------------------------
+
+// cmdImpact handles the /impact command.
+// /impact        — lists all tracked events
+// /impact <name> — shows historical price impact by sigma bucket
+func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args string) error {
+	if h.impactProvider == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Event impact tracking is not available.")
+		return err
+	}
+
+	query := strings.TrimSpace(args)
+
+	// No arguments: show list of tracked events
+	if query == "" {
+		events, err := h.impactProvider.GetTrackedEvents(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("cmdImpact: get tracked events failed")
+			_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load tracked events.")
+			return sendErr
+		}
+		html := h.fmt.FormatTrackedEvents(events)
+		_, err = h.bot.SendHTML(ctx, chatID, html)
+		return err
+	}
+
+	// Argument provided: look up impact summary for that event
+	summaries, err := h.impactProvider.GetEventImpactSummary(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Str("query", query).Msg("cmdImpact: get summary failed")
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load impact data.")
+		return sendErr
+	}
+
+	html := h.fmt.FormatEventImpact(query, summaries)
+	_, err = h.bot.SendHTML(ctx, chatID, html)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// /portfolio — Portfolio Risk Monitor
+// ---------------------------------------------------------------------------
+
+// cmdPortfolio handles the /portfolio command.
+// /portfolio                 — view portfolio with risk analysis
+// /portfolio view            — same as above
+// /portfolio add EUR LONG 1.0 — add a position (optional: 1.08500 entry price)
+// /portfolio remove EUR      — remove a position
+// /portfolio clear           — clear all positions
+func (h *Handler) cmdPortfolio(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.portfolioRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Portfolio feature is not available.")
+		return err
+	}
+
+	parts := strings.Fields(strings.TrimSpace(args))
+
+	// Determine subcommand.
+	subCmd := "view"
+	if len(parts) > 0 {
+		subCmd = strings.ToLower(parts[0])
+	}
+
+	switch subCmd {
+	case "add":
+		return h.portfolioAdd(ctx, chatID, userID, parts[1:])
+	case "remove":
+		return h.portfolioRemove(ctx, chatID, userID, parts[1:])
+	case "clear":
+		return h.portfolioClear(ctx, chatID, userID)
+	case "view", "":
+		return h.portfolioView(ctx, chatID, userID)
+	default:
+		// Treat unknown subcommand as "view"
+		return h.portfolioView(ctx, chatID, userID)
+	}
+}
+
+// portfolioAdd handles /portfolio add EUR LONG 1.0 [entryPrice]
+func (h *Handler) portfolioAdd(ctx context.Context, chatID string, userID int64, args []string) error {
+	if len(args) < 3 {
+		_, err := h.bot.SendHTML(ctx, chatID,
+			"Usage: <code>/portfolio add CURRENCY DIRECTION SIZE [ENTRY_PRICE]</code>\n"+
+				"Example: <code>/portfolio add EUR LONG 1.0</code>\n"+
+				"Example: <code>/portfolio add GBP SHORT 0.5 1.27500</code>")
+		return err
+	}
+
+	currency := strings.ToUpper(args[0])
+
+	// Validate currency exists in our tracked instruments.
+	mapping := domain.FindPriceMappingByCurrency(currency)
+	if mapping == nil {
+		_, err := h.bot.SendHTML(ctx, chatID,
+			fmt.Sprintf("Unknown currency <b>%s</b>. Supported: EUR, GBP, JPY, CHF, AUD, CAD, NZD, USD, XAU, OIL, BOND",
+				html.EscapeString(currency)))
+		return err
+	}
+
+	direction := strings.ToUpper(args[1])
+	if direction != "LONG" && direction != "SHORT" {
+		_, err := h.bot.SendHTML(ctx, chatID, "Direction must be <b>LONG</b> or <b>SHORT</b>.")
+		return err
+	}
+
+	size, err := parseFloat(args[2])
+	if err != nil || size <= 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "Size must be a positive number (e.g. 1.0, 0.5).")
+		return err
+	}
+
+	var entryPrice float64
+	if len(args) >= 4 {
+		ep, err := parseFloat(args[3])
+		if err != nil || ep <= 0 {
+			_, err := h.bot.SendHTML(ctx, chatID, "Entry price must be a positive number.")
+			return err
+		}
+		entryPrice = ep
+	}
+
+	pos := domain.Position{
+		Currency:   currency,
+		Direction:  direction,
+		Size:       size,
+		EntryPrice: entryPrice,
+		AddedAt:    time.Now(),
+	}
+
+	if err := h.portfolioRepo.SavePosition(ctx, userID, pos); err != nil {
+		log.Error().Err(err).Int64("user", userID).Msg("portfolio: save position failed")
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to save position.")
+		return sendErr
+	}
+
+	_, err = h.bot.SendHTML(ctx, chatID,
+		fmt.Sprintf("Added <b>%s %s %.2f lots</b> to portfolio.\nUse /portfolio to view risk analysis.",
+			currency, direction, size))
+	return err
+}
+
+// portfolioRemove handles /portfolio remove EUR
+func (h *Handler) portfolioRemove(ctx context.Context, chatID string, userID int64, args []string) error {
+	if len(args) < 1 {
+		_, err := h.bot.SendHTML(ctx, chatID,
+			"Usage: <code>/portfolio remove CURRENCY</code>\nExample: <code>/portfolio remove EUR</code>")
+		return err
+	}
+
+	currency := strings.ToUpper(args[0])
+	if err := h.portfolioRepo.RemovePosition(ctx, userID, currency); err != nil {
+		log.Error().Err(err).Int64("user", userID).Str("currency", currency).Msg("portfolio: remove failed")
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to remove position.")
+		return sendErr
+	}
+
+	_, err := h.bot.SendHTML(ctx, chatID,
+		fmt.Sprintf("Removed <b>%s</b> from portfolio.", currency))
+	return err
+}
+
+// portfolioClear handles /portfolio clear
+func (h *Handler) portfolioClear(ctx context.Context, chatID string, userID int64) error {
+	if err := h.portfolioRepo.ClearPortfolio(ctx, userID); err != nil {
+		log.Error().Err(err).Int64("user", userID).Msg("portfolio: clear failed")
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to clear portfolio.")
+		return sendErr
+	}
+
+	_, err := h.bot.SendHTML(ctx, chatID, "Portfolio cleared.")
+	return err
+}
+
+// portfolioView handles /portfolio (view) — shows positions + risk analysis.
+func (h *Handler) portfolioView(ctx context.Context, chatID string, userID int64) error {
+	positions, err := h.portfolioRepo.GetPositions(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Int64("user", userID).Msg("portfolio: get positions failed")
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load portfolio.")
+		return sendErr
+	}
+
+	if len(positions) == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID,
+			"📋 <b>PORTFOLIO RISK MONITOR</b>\n\n"+
+				"<i>No positions found.</i>\n\n"+
+				"<code>/portfolio add EUR LONG 1.0</code> — add position\n"+
+				"<code>/portfolio add GBP SHORT 0.5 1.275</code> — with entry price")
+		return err
+	}
+
+	// Build price history for correlation matrix (best-effort, uses price repo).
+	var corrMatrix map[string]map[string]float64
+	if h.priceRepo != nil {
+		priceHistory := make(map[string][]domain.PriceRecord)
+		for _, p := range positions {
+			mapping := domain.FindPriceMappingByCurrency(p.Currency)
+			if mapping == nil {
+				continue
+			}
+			records, err := h.priceRepo.GetHistory(ctx, mapping.ContractCode, 26)
+			if err == nil && len(records) > 0 {
+				priceHistory[p.Currency] = records
+			}
+		}
+		if len(priceHistory) > 1 {
+			corrMatrix = portfoliosvc.ComputeCorrelationMatrix(priceHistory)
+		}
+	}
+	if corrMatrix == nil {
+		corrMatrix = make(map[string]map[string]float64)
+	}
+
+	// Determine current regime (best-effort).
+	currentRegime := ""
+	if md, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && md != nil {
+		r := fred.ClassifyMacroRegime(md)
+		currentRegime = r.Name
+	}
+
+	risk := portfoliosvc.AnalyzePortfolioRisk(positions, corrMatrix, currentRegime)
+	htmlMsg := h.fmt.FormatPortfolioRisk(risk)
+
+	_, err = h.bot.SendHTML(ctx, chatID, htmlMsg)
+	return err
+}
+
+// parseFloat is a small helper for parsing command arguments.
+func parseFloat(s string) (float64, error) {
+	var f float64
+	_, err := fmt.Sscanf(s, "%f", &f)
+	return f, err
 }

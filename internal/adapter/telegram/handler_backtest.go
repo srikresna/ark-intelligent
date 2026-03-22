@@ -10,6 +10,25 @@ import (
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 )
 
+// cmdReport handles /report — weekly signal performance summary.
+func (h *Handler) cmdReport(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.signalRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Report data not available yet. Signal tracking is being initialized.")
+		return err
+	}
+
+	gen := backtestsvc.NewReportGenerator(h.signalRepo)
+	report, err := gen.GenerateWeeklyReport(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error generating report: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	htmlOut := h.fmt.FormatWeeklyReport(report)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
 // knownSignalTypes is the canonical set of signal type names.
 var knownSignalTypes = map[string]bool{
 	"SMART_MONEY":        true,
@@ -36,6 +55,10 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		return h.backtestAll(ctx, chatID, calc)
 	case args == "SIGNALS" || args == "TYPES":
 		return h.backtestBySignalType(ctx, chatID, calc)
+	case args == "TIMING":
+		return h.backtestTiming(ctx, chatID)
+	case args == "WALKFORWARD" || args == "WF":
+		return h.backtestWalkForward(ctx, chatID)
 	case knownSignalTypes[args]:
 		// e.g. /backtest SMART_MONEY
 		return h.backtestOneSignalType(ctx, chatID, calc, args)
@@ -50,6 +73,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 			"<b>Options:</b>\n" +
 			"<code>/backtest</code> — aggregate summary\n" +
 			"<code>/backtest signals</code> — breakdown by signal type\n" +
+			"<code>/backtest timing</code> — optimal horizon per signal type\n" +
+			"<code>/backtest walkforward</code> — walk-forward overfit detection\n" +
 			"<code>/backtest SMART_MONEY</code> — specific signal type\n" +
 			"<code>/backtest EUR</code> — specific currency\n\n" +
 			"<b>Signal types:</b> SMART_MONEY · EXTREME_POSITIONING · DIVERGENCE · MOMENTUM_SHIFT · CONCENTRATION · CROWD_CONTRARIAN · THIN_MARKET"
@@ -196,5 +221,43 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 	)
 
 	_, err = h.bot.SendHTML(ctx, chatID, html)
+	return err
+}
+
+// backtestTiming shows per-signal-type timing analysis with optimal horizons.
+func (h *Handler) backtestTiming(ctx context.Context, chatID string) error {
+	analyzer := backtestsvc.NewTimingAnalyzer(h.signalRepo)
+	analyses, err := analyzer.Analyze(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	if len(analyses) == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "No signal data available yet for timing analysis.")
+		return err
+	}
+
+	htmlOut := h.fmt.FormatSignalTiming(analyses)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
+// backtestWalkForward shows walk-forward overfit analysis.
+func (h *Handler) backtestWalkForward(ctx context.Context, chatID string) error {
+	analyzer := backtestsvc.NewWalkForwardAnalyzer(h.signalRepo)
+	result, err := analyzer.Analyze(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	if len(result.Windows) == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "Not enough data for walk-forward analysis. Need at least 39 weeks of evaluated signals (26w train + 13w test).")
+		return err
+	}
+
+	htmlOut := h.fmt.FormatWalkForward(result)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }

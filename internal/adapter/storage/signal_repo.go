@@ -222,6 +222,24 @@ func (r *SignalRepo) PurgeInvalidSignals(_ context.Context) (int, error) {
 	return len(deleteKeys), nil
 }
 
+// GetRecentSignals retrieves all signals detected within the last N days, newest-first.
+func (r *SignalRepo) GetRecentSignals(_ context.Context, days int) ([]domain.PersistedSignal, error) {
+	all, err := r.scanSignals(signalAllPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("get recent signals: %w", err)
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -days)
+	var recent []domain.PersistedSignal
+	for i := range all {
+		if all[i].DetectedAt.After(cutoff) || all[i].DetectedAt.Equal(cutoff) {
+			recent = append(recent, all[i])
+		}
+	}
+	reverseSignals(recent)
+	return recent, nil
+}
+
 // SignalExists checks if a signal with the given key already exists.
 // Used by the bootstrapper to avoid duplicate inserts.
 func (r *SignalRepo) SignalExists(_ context.Context, contractCode string, reportDate time.Time, signalType string) (bool, error) {

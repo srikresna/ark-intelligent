@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"sort"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
@@ -1097,6 +1099,43 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 	return b.String()
 }
 
+// FormatRegimeAssetInsight formats the historical regime-asset performance
+// section for the macro dashboard. Shows top 3 best and worst assets.
+func (f *Formatter) FormatRegimeAssetInsight(insight fred.RegimeInsight) string {
+	if len(insight.BestAssets) == 0 && len(insight.WorstAssets) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\n📊 <b>Historical Performance in %s Regime</b>\n", insight.Regime))
+
+	if len(insight.BestAssets) > 0 {
+		b.WriteString("<code>Best performers:</code>\n")
+		for _, a := range insight.BestAssets {
+			arrow := "🟢"
+			if a.AnnualizedReturn < 0 {
+				arrow = "🔴"
+			}
+			b.WriteString(fmt.Sprintf("<code>  %s %s  %+.1f%% ann. (%dw)</code>\n",
+				arrow, a.Currency, a.AnnualizedReturn, a.Occurrences))
+		}
+	}
+
+	if len(insight.WorstAssets) > 0 {
+		b.WriteString("<code>Worst performers:</code>\n")
+		for _, a := range insight.WorstAssets {
+			arrow := "🟢"
+			if a.AnnualizedReturn < 0 {
+				arrow = "🔴"
+			}
+			b.WriteString(fmt.Sprintf("<code>  %s %s  %+.1f%% ann. (%dw)</code>\n",
+				arrow, a.Currency, a.AnnualizedReturn, a.Occurrences))
+		}
+	}
+
+	return b.String()
+}
+
 // FormatFREDContext formats a compact FRED macro context block for COT detail view.
 // Shows the most tradable macro filters relevant to currency positioning.
 func (f *Formatter) FormatFREDContext(data *fred.MacroData, regime fred.MacroRegime) string {
@@ -1281,6 +1320,42 @@ func (f *Formatter) FormatBacktestStats(stats *domain.BacktestStats) string {
 		b.WriteString(fmt.Sprintf("<code>Avg Loss :</code> %.2f%%\n\n", stats.AvgLossReturn1W))
 	}
 
+	// Risk-adjusted performance metrics
+	if stats.SharpeRatio != 0 || stats.MaxDrawdown != 0 || stats.ProfitFactor != 0 {
+		b.WriteString("<b>Risk-Adjusted Metrics</b>\n")
+		if stats.SharpeRatio != 0 {
+			sharpeIcon := "\xE2\x9C\x85" // checkmark
+			if stats.SharpeRatio < 0.5 {
+				sharpeIcon = "\xE2\x9A\xA0\xEF\xB8\x8F" // warning
+			}
+			b.WriteString(fmt.Sprintf("<code>Sharpe   :</code> %.2f %s\n", stats.SharpeRatio, sharpeIcon))
+		}
+		if stats.MaxDrawdown != 0 {
+			ddIcon := "\xE2\x9C\x85"
+			if stats.MaxDrawdown > 10 {
+				ddIcon = "\xE2\x9A\xA0\xEF\xB8\x8F"
+			}
+			b.WriteString(fmt.Sprintf("<code>Max DD   :</code> -%.2f%% %s\n", stats.MaxDrawdown, ddIcon))
+		}
+		if stats.CalmarRatio != 0 {
+			b.WriteString(fmt.Sprintf("<code>Calmar   :</code> %.2f\n", stats.CalmarRatio))
+		}
+		if stats.ProfitFactor != 0 {
+			pfIcon := "\xE2\x9C\x85"
+			if stats.ProfitFactor < 1.0 {
+				pfIcon = "\xF0\x9F\x94\xB4" // red circle
+			}
+			b.WriteString(fmt.Sprintf("<code>Profit F :</code> %.2f %s\n", stats.ProfitFactor, pfIcon))
+		}
+		if stats.ExpectedValue != 0 {
+			b.WriteString(fmt.Sprintf("<code>Exp Value:</code> %.4f%%\n", stats.ExpectedValue))
+		}
+		if stats.KellyFraction != 0 {
+			b.WriteString(fmt.Sprintf("<code>Kelly %%  :</code> %.1f%%\n", stats.KellyFraction*100))
+		}
+		b.WriteString("\n")
+	}
+
 	b.WriteString("<b>Strength Breakdown</b>\n")
 	b.WriteString(fmt.Sprintf("<code>High (4-5):</code> %d signals, %.1f%% win\n", stats.HighStrengthCount, stats.HighStrengthWinRate))
 	b.WriteString(fmt.Sprintf("<code>Low (1-3) :</code> %d signals, %.1f%% win\n\n", stats.LowStrengthCount, stats.LowStrengthWinRate))
@@ -1294,6 +1369,43 @@ func (f *Formatter) FormatBacktestStats(stats *domain.BacktestStats) string {
 		calIcon = "\xE2\x9A\xA0\xEF\xB8\x8F"
 	}
 	b.WriteString(fmt.Sprintf("<code>Error    :</code> %.1f%% %s\n", stats.CalibrationError, calIcon))
+
+	// Brier score — lower is better
+	if stats.BrierScore > 0 {
+		brierIcon := "\xE2\x9C\x85" // checkmark — excellent (<0.15)
+		if stats.BrierScore >= 0.25 {
+			brierIcon = "\xF0\x9F\x94\xB4" // red circle — worse than random
+		} else if stats.BrierScore >= 0.15 {
+			brierIcon = "\xE2\x9A\xA0\xEF\xB8\x8F" // warning — decent but not great
+		}
+		b.WriteString(fmt.Sprintf("<code>Brier    :</code> %.4f %s\n", stats.BrierScore, brierIcon))
+	}
+
+	// Calibration method
+	if stats.CalibrationMethod != "" {
+		b.WriteString(fmt.Sprintf("<code>Method   :</code> %s\n", stats.CalibrationMethod))
+	}
+
+	// Statistical significance
+	b.WriteString("\n<b>Statistical Significance</b>\n")
+	if stats.Evaluated1W > 0 {
+		if stats.IsStatisticallySignificant {
+			b.WriteString("\xE2\x9C\x93 <b>Statistically Significant</b>\n")
+		} else {
+			b.WriteString("\xE2\x9A\xA0 <b>Insufficient Data</b>\n")
+		}
+		b.WriteString(fmt.Sprintf("<code>WR p-val :</code> %.4f\n", stats.WinRatePValue))
+		b.WriteString(fmt.Sprintf("<code>WR 95%% CI:</code> [%.1f%%, %.1f%%]\n", stats.WinRateCI[0], stats.WinRateCI[1]))
+		if stats.ReturnPValue < 1 {
+			b.WriteString(fmt.Sprintf("<code>Ret t-stat:</code> %.2f (p=%.4f)\n", stats.ReturnTStat, stats.ReturnPValue))
+		}
+		if stats.Evaluated1W < stats.MinSamplesNeeded {
+			b.WriteString(fmt.Sprintf("<code>Samples  :</code> %d / %d needed\n", stats.Evaluated1W, stats.MinSamplesNeeded))
+		}
+	} else {
+		b.WriteString("\xE2\x9A\xA0 <b>Insufficient Data</b>\n")
+		b.WriteString(fmt.Sprintf("<code>Need     :</code> %d+ evaluated signals\n", stats.MinSamplesNeeded))
+	}
 
 	return b.String()
 }
@@ -1324,6 +1436,117 @@ func (f *Formatter) FormatBacktestSummary(statsMap map[string]*domain.BacktestSt
 			label, s.Evaluated, s.WinRate1W, s.WinRate2W, s.WinRate4W))
 	}
 	b.WriteString("</pre>")
+
+	return b.String()
+}
+
+// FormatSignalTiming formats per-signal-type timing analysis into Telegram HTML.
+func (f *Formatter) FormatSignalTiming(analyses []backtestsvc.SignalTimingAnalysis) string {
+	var b strings.Builder
+
+	b.WriteString("\xE2\x8F\xB1 <b>Signal Timing Analysis</b>\n")
+	b.WriteString("<i>Optimal horizon per signal type</i>\n\n")
+
+	for _, a := range analyses {
+		b.WriteString(fmt.Sprintf("<b>%s</b>\n", a.SignalType))
+		b.WriteString("<pre>")
+		b.WriteString(fmt.Sprintf("%-8s %5s %7s %6s %5s\n", "Horizon", "Win%", "AvgRet", "MaxDD", "R:R"))
+		b.WriteString(strings.Repeat("\xe2\x94\x80", 36) + "\n")
+
+		for _, h := range a.HorizonStats {
+			marker := "  "
+			if h.Horizon == a.OptimalHorizon {
+				marker = "\xe2\x9e\xa4 "
+			}
+			rrStr := " -"
+			if h.RiskRewardRatio > 0 {
+				rrStr = fmt.Sprintf("%.1f", h.RiskRewardRatio)
+			}
+			ddStr := " -"
+			if h.MaxDrawdown > 0 {
+				ddStr = fmt.Sprintf("%.1f%%", h.MaxDrawdown)
+			}
+			if h.Evaluated == 0 {
+				b.WriteString(fmt.Sprintf("%s%-5s %5s %7s %6s %5s\n",
+					marker, h.Horizon, "-", "-", "-", "-"))
+			} else {
+				b.WriteString(fmt.Sprintf("%s%-5s %4.0f%% %+6.2f%% %6s %5s\n",
+					marker, h.Horizon, h.WinRate, h.AvgReturn, ddStr, rrStr))
+			}
+		}
+		b.WriteString("</pre>")
+
+		// Recommendation line
+		icon := "\xf0\x9f\x93\x8c" // pushpin
+		if a.Degrading {
+			icon = "\xe2\x9a\xa0\xef\xb8\x8f" // warning
+		}
+		b.WriteString(fmt.Sprintf("%s <i>%s</i>\n\n", icon, a.Recommendation))
+	}
+
+	return b.String()
+}
+
+// FormatWalkForward formats walk-forward analysis results into Telegram HTML.
+func (f *Formatter) FormatWalkForward(result *backtestsvc.WalkForwardResult) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x94\xAC <b>Walk-Forward Analysis</b>\n")
+	b.WriteString("<i>Train/test split to detect overfitting</i>\n\n")
+
+	// Per-window table.
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-5s %6s %6s %6s %6s\n", "Win#", "Train", "Test", "Degr", "n(T/O)"))
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 36) + "\n")
+
+	for i, w := range result.Windows {
+		degSign := "+"
+		if w.Degradation >= 0 {
+			degSign = "+"
+		} else {
+			degSign = ""
+		}
+		b.WriteString(fmt.Sprintf(" %2d   %5.1f%% %5.1f%% %s%.1f %3d/%-3d\n",
+			i+1, w.InSampleWinRate, w.OutOfSampleWinRate,
+			degSign, w.Degradation, w.InSampleCount, w.OutOfSampleCount))
+	}
+	b.WriteString("</pre>\n")
+
+	// Window date ranges.
+	b.WriteString("<i>Window periods:</i>\n")
+	for i, w := range result.Windows {
+		b.WriteString(fmt.Sprintf("<code>%d:</code> %s \xe2\x86\x92 %s | %s \xe2\x86\x92 %s\n",
+			i+1,
+			w.TrainStart.Format("02 Jan"),
+			w.TrainEnd.Format("02 Jan"),
+			w.TestStart.Format("02 Jan"),
+			w.TestEnd.Format("02 Jan")))
+	}
+
+	b.WriteString("\n")
+
+	// Overall summary.
+	b.WriteString("<b>Overall</b>\n")
+	b.WriteString(fmt.Sprintf("<code>In-Sample WR  :</code> %.1f%%\n", result.OverallInSampleWinRate))
+	b.WriteString(fmt.Sprintf("<code>Out-of-Sample :</code> %.1f%%\n", result.OverallOutOfSampleWinRate))
+
+	// Traffic light for overfit score.
+	var light string
+	switch {
+	case result.OverfitScore < 3:
+		light = "\xF0\x9F\x9F\xA2" // green
+	case result.OverfitScore <= 10:
+		light = "\xF0\x9F\x9F\xA1" // yellow
+	default:
+		light = "\xF0\x9F\x94\xB4" // red
+	}
+	b.WriteString(fmt.Sprintf("<code>Overfit Score :</code> %s %.1fpp\n", light, result.OverfitScore))
+
+	if result.IsOverfit {
+		b.WriteString("\n\xE2\x9A\xA0\xEF\xB8\x8F <b>OVERFITTING DETECTED</b>\n")
+	}
+
+	b.WriteString(fmt.Sprintf("\n\xF0\x9F\x93\x8C <i>%s</i>", result.Recommendation))
 
 	return b.String()
 }
@@ -1369,6 +1592,19 @@ func (f *Formatter) FormatPriceContext(pc *domain.PriceContext) string {
 	b.WriteString(fmt.Sprintf("<code>MA4W     :</code> %.5f (%s)\n", pc.PriceMA4W, ma4wStatus))
 	b.WriteString(fmt.Sprintf("<code>MA13W    :</code> %.5f (%s)\n", pc.PriceMA13W, ma13wStatus))
 
+	// ATR-based volatility regime
+	if pc.VolatilityRegime != "" {
+		volIcon := "\xF0\x9F\x9F\xA1" // yellow circle for NORMAL
+		switch pc.VolatilityRegime {
+		case "EXPANDING":
+			volIcon = "\xF0\x9F\x94\xB4" // red — high volatility
+		case "CONTRACTING":
+			volIcon = "\xF0\x9F\x9F\xA2" // green — low volatility
+		}
+		b.WriteString(fmt.Sprintf("<code>ATR Vol  :</code> %s %s (ATR: %.5f, %.2f%%)\n",
+			volIcon, pc.VolatilityRegime, pc.ATR, pc.NormalizedATR))
+	}
+
 	return b.String()
 }
 
@@ -1412,3 +1648,270 @@ func (f *Formatter) FormatStrengthRanking(strengths []pricesvc.CurrencyStrength)
 
 	return b.String()
 }
+
+// ---------------------------------------------------------------------------
+// Weekly Report Formatting
+// ---------------------------------------------------------------------------
+
+// FormatWeeklyReport formats a WeeklyReport into Telegram HTML.
+func (f *Formatter) FormatWeeklyReport(r *domain.WeeklyReport) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x8B <b>Weekly Performance Report</b>\n"))
+	b.WriteString(fmt.Sprintf("<i>%s \xe2\x80\x94 %s</i>\n\n",
+		r.WeekStart.Format("02 Jan"),
+		r.WeekEnd.Format("02 Jan 2006"),
+	))
+
+	if len(r.Signals) == 0 {
+		b.WriteString("No signals generated this week.\n")
+	} else {
+		// Cap displayed signals to avoid exceeding Telegram's 4096-char limit
+		// when the <pre> block is too large (each row ~60 chars; 50 rows = 3000).
+		maxDisplay := 50
+		b.WriteString("<pre>")
+		b.WriteString(fmt.Sprintf("%-5s %-14s %-8s %7s  %s\n", "CCY", "SIGNAL", "DIR", "MOVE", ""))
+		b.WriteString(fmt.Sprintf("%-5s %-14s %-8s %7s  %s\n", "---", "-----------", "------", "------", "---"))
+		for i, s := range r.Signals {
+			if i >= maxDisplay {
+				break
+			}
+			dir := shortDirection(s.Direction)
+			result := resultBadge(s.Result)
+			move := fmt.Sprintf("%+.2f%%", s.PipsChange)
+			if s.Result == domain.OutcomePending {
+				move = "   ---"
+			}
+			sigLabel := truncateStr(s.SignalType, 14)
+			b.WriteString(fmt.Sprintf("%-5s %-14s %-8s %7s  %s\n",
+				truncateStr(s.Contract, 5), sigLabel, dir, move, result))
+		}
+		b.WriteString("</pre>")
+		if len(r.Signals) > maxDisplay {
+			b.WriteString(fmt.Sprintf("\n<i>... +%d more signals (showing top %d)</i>\n", len(r.Signals)-maxDisplay, maxDisplay))
+		} else {
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("<b>Weekly Score:</b> %s\n", r.WeeklyScore))
+
+	if r.RunningAverage52W > 0 {
+		b.WriteString(fmt.Sprintf("<b>52W Average:</b>  %.1f%%\n", r.RunningAverage52W))
+	}
+
+	b.WriteString(fmt.Sprintf("<b>Current Streak:</b> %d wins\n", r.CurrentStreak))
+	b.WriteString(fmt.Sprintf("<b>Best Streak:</b>    %d wins\n", r.BestStreak))
+
+	b.WriteString("\n<i>Use /backtest for full historical stats</i>")
+	return b.String()
+}
+
+// shortDirection returns a compact direction label.
+func shortDirection(d string) string {
+	switch d {
+	case "BULLISH":
+		return "\xF0\x9F\x9F\xA2 BULL"
+	case "BEARISH":
+		return "\xF0\x9F\x94\xB4 BEAR"
+	default:
+		return d
+	}
+}
+
+// resultBadge returns an emoji badge for a signal outcome.
+func resultBadge(r string) string {
+	switch r {
+	case domain.OutcomeWin:
+		return "\xE2\x9C\x85"
+	case domain.OutcomeLoss:
+		return "\xE2\x9D\x8C"
+	default:
+		return "\xE2\x8F\xB3"
+	}
+}
+
+// truncateStr shortens a string to maxLen, adding ".." if truncated.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-2] + ".."
+}
+
+// ---------------------------------------------------------------------------
+// Event Impact Formatting
+// ---------------------------------------------------------------------------
+
+// FormatEventImpact formats event impact summaries into a clean Telegram HTML message.
+func (f *Formatter) FormatEventImpact(eventTitle string, summaries []domain.EventImpactSummary) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x8A <b>EVENT IMPACT: %s</b>\n", strings.ToUpper(html.EscapeString(eventTitle))))
+	b.WriteString("<i>Historical price reaction by surprise magnitude (1h horizon)</i>\n\n")
+
+	if len(summaries) == 0 {
+		b.WriteString("No impact data recorded yet for this event.\n")
+		b.WriteString("<i>Data builds automatically after each release.</i>")
+		return b.String()
+	}
+
+	// Group by currency
+	byCurrency := make(map[string][]domain.EventImpactSummary)
+	var currencies []string
+	for _, s := range summaries {
+		if _, exists := byCurrency[s.Currency]; !exists {
+			currencies = append(currencies, s.Currency)
+		}
+		byCurrency[s.Currency] = append(byCurrency[s.Currency], s)
+	}
+	sort.Strings(currencies)
+
+	for _, ccy := range currencies {
+		items := byCurrency[ccy]
+		b.WriteString(fmt.Sprintf("<b>%s</b>\n", ccy))
+		b.WriteString("<pre>")
+		b.WriteString(fmt.Sprintf("%-14s %7s %7s %4s\n", "Sigma", "AvgPip", "Median", "N"))
+		b.WriteString(strings.Repeat("\xE2\x94\x80", 36) + "\n")
+
+		for _, item := range items {
+			direction := " "
+			if item.AvgPriceImpactPips > 0 {
+				direction = "+"
+			}
+			b.WriteString(fmt.Sprintf("%-14s %s%6.1f %+7.1f %4d\n",
+				item.SigmaBucket, direction, math.Abs(item.AvgPriceImpactPips), item.MedianImpact, item.Occurrences))
+		}
+		b.WriteString("</pre>\n")
+	}
+
+	b.WriteString("<i>Positive = currency strengthened</i>")
+	return b.String()
+}
+
+// FormatTrackedEvents formats a list of tracked event names for the /impact help message.
+func (f *Formatter) FormatTrackedEvents(events []string) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x93\x8B <b>EVENT IMPACT DATABASE</b>\n")
+	b.WriteString("<i>Historical price reaction tracking</i>\n\n")
+
+	if len(events) == 0 {
+		b.WriteString("No events tracked yet. Impact data builds automatically\n")
+		b.WriteString("after each economic release with price data available.\n\n")
+		b.WriteString("Usage: <code>/impact NFP</code> or <code>/impact CPI</code>")
+		return b.String()
+	}
+
+	b.WriteString("<b>Tracked Events:</b>\n")
+	for i, ev := range events {
+		if i >= 20 {
+			b.WriteString(fmt.Sprintf("\n<i>... and %d more</i>", len(events)-20))
+			break
+		}
+		b.WriteString(fmt.Sprintf("\xE2\x80\xA2 %s\n", ev))
+	}
+
+	b.WriteString("\nUsage: <code>/impact Event Name</code>\n")
+	b.WriteString("Example: <code>/impact Non-Farm Employment Change</code>")
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio Risk Formatting
+// ---------------------------------------------------------------------------
+
+// FormatPortfolioRisk formats a portfolio risk analysis into a Telegram HTML message.
+func (f *Formatter) FormatPortfolioRisk(risk *domain.PortfolioRisk) string {
+	var b strings.Builder
+
+	riskIcon := "🟢"
+	switch risk.OverallRiskLevel {
+	case "MEDIUM":
+		riskIcon = "🟡"
+	case "HIGH":
+		riskIcon = "🟠"
+	case "CRITICAL":
+		riskIcon = "🔴"
+	}
+
+	b.WriteString("📋 <b>PORTFOLIO RISK MONITOR</b>\n")
+	b.WriteString(fmt.Sprintf("%s Overall Risk: <b>%s</b>\n\n", riskIcon, risk.OverallRiskLevel))
+
+	// --- Positions table ---
+	if len(risk.Positions) == 0 {
+		b.WriteString("<i>No positions. Use /portfolio add to start.</i>\n")
+		return b.String()
+	}
+
+	b.WriteString("<b>Positions:</b>\n<pre>")
+	b.WriteString(fmt.Sprintf("%-6s %-6s %8s %12s\n", "CCY", "DIR", "SIZE", "ENTRY"))
+	b.WriteString(strings.Repeat("-", 36) + "\n")
+	for _, p := range risk.Positions {
+		dirArrow := "▲"
+		if p.Direction == "SHORT" {
+			dirArrow = "▼"
+		}
+		b.WriteString(fmt.Sprintf("%-6s %s%-4s %8.2f %12.5f\n",
+			p.Currency, dirArrow, p.Direction, p.Size, p.EntryPrice))
+	}
+	b.WriteString("</pre>\n")
+
+	// --- Correlation warnings ---
+	if len(risk.HighCorrelationWarnings) > 0 {
+		b.WriteString("\n⚠️ <b>Correlation Warnings:</b>\n")
+		for _, w := range risk.HighCorrelationWarnings {
+			b.WriteString(fmt.Sprintf("• %s\n", w))
+		}
+	}
+
+	// --- Risk scores ---
+	b.WriteString("\n<b>Risk Scores:</b>\n")
+	concBar := buildRiskBar(int(risk.ConcentrationScore), 10)
+	b.WriteString(fmt.Sprintf("<code>Concentration: [%s] %.0f/100</code>\n", concBar, risk.ConcentrationScore))
+
+	regimeBar := buildRiskBar(int(risk.RegimeRiskScore), 10)
+	b.WriteString(fmt.Sprintf("<code>Regime Risk  : [%s] %.0f/100</code>\n", regimeBar, risk.RegimeRiskScore))
+
+	// --- Correlation matrix (compact, only if <= 6 currencies) ---
+	if len(risk.CorrelationMatrix) > 1 && len(risk.CorrelationMatrix) <= 6 {
+		b.WriteString("\n<b>Correlation Matrix:</b>\n<pre>")
+
+		// Collect sorted currencies from positions.
+		seen := make(map[string]bool)
+		var currencies []string
+		for _, p := range risk.Positions {
+			if !seen[p.Currency] {
+				seen[p.Currency] = true
+				currencies = append(currencies, p.Currency)
+			}
+		}
+		sort.Strings(currencies)
+
+		// Header row.
+		b.WriteString(fmt.Sprintf("%-5s", ""))
+		for _, c := range currencies {
+			b.WriteString(fmt.Sprintf(" %5s", c))
+		}
+		b.WriteString("\n")
+
+		for _, c1 := range currencies {
+			b.WriteString(fmt.Sprintf("%-5s", c1))
+			for _, c2 := range currencies {
+				val := 0.0
+				if row, ok := risk.CorrelationMatrix[c1]; ok {
+					if v, ok := row[c2]; ok {
+						val = v
+					}
+				}
+				b.WriteString(fmt.Sprintf(" %5.2f", val))
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("</pre>")
+	}
+
+	b.WriteString("\n<i>Use /portfolio add, /portfolio remove, /portfolio clear</i>")
+	return b.String()
+}
+

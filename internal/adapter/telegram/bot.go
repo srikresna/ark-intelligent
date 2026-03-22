@@ -742,6 +742,8 @@ func (b *Bot) rateLimit() {
 
 // splitMessage splits a long message into chunks that fit Telegram's 4096 char limit.
 // Splits on newlines when possible to preserve formatting.
+// Handles unclosed <pre>, <b>, <i>, <code> tags at split boundaries by closing them
+// in the current chunk and reopening them in the next chunk.
 func splitMessage(text string, maxLen int) []string {
 	if len(text) <= maxLen {
 		return []string{text}
@@ -760,11 +762,68 @@ func splitMessage(text string, maxLen int) []string {
 			splitAt = idx + 1 // Include the newline in the first chunk
 		}
 
-		chunks = append(chunks, text[:splitAt])
+		chunk := text[:splitAt]
 		text = text[splitAt:]
+
+		// Detect unclosed HTML tags and fix them at the split boundary.
+		// We track <pre>, <b>, <i>, <code> — the tags Telegram supports.
+		openTags := detectUnclosedTags(chunk)
+		if len(openTags) > 0 {
+			// Close open tags in reverse order at end of this chunk
+			for i := len(openTags) - 1; i >= 0; i-- {
+				chunk += "</" + openTags[i] + ">"
+			}
+			// Reopen tags at start of next chunk
+			var reopen string
+			for _, tag := range openTags {
+				reopen += "<" + tag + ">"
+			}
+			text = reopen + text
+		}
+
+		chunks = append(chunks, chunk)
 	}
 
 	return chunks
+}
+
+// detectUnclosedTags returns a list of HTML tag names that are opened but not
+// closed in the given text. Only tracks tags that Telegram's HTML parser supports.
+func detectUnclosedTags(text string) []string {
+	tracked := map[string]bool{"pre": true, "b": true, "i": true, "code": true}
+	var stack []string
+
+	for i := 0; i < len(text); i++ {
+		if text[i] != '<' {
+			continue
+		}
+		end := strings.IndexByte(text[i:], '>')
+		if end < 0 {
+			break
+		}
+		tag := text[i+1 : i+end]
+
+		if strings.HasPrefix(tag, "/") {
+			// Closing tag: pop from stack if it matches
+			name := tag[1:]
+			if tracked[name] && len(stack) > 0 && stack[len(stack)-1] == name {
+				stack = stack[:len(stack)-1]
+			}
+		} else {
+			// Opening tag (strip attributes, though Telegram tags rarely have them)
+			name := tag
+			if spIdx := strings.IndexByte(name, ' '); spIdx > 0 {
+				name = name[:spIdx]
+			}
+			if tracked[name] {
+				stack = append(stack, name)
+			}
+		}
+
+		i += end // advance past '>'
+	}
+
+	return stack
 }
 
 // SendWithKeyboardChunked sends a potentially long HTML message with a keyboard.

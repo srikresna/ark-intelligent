@@ -68,4 +68,7 @@ type SignalRepository interface {
 
 	// UpdateSignal overwrites a single persisted signal (for outcome evaluation).
 	UpdateSignal(ctx context.Context, signal domain.PersistedSignal) error
+
+	// GetRecentSignals retrieves all signals from the last N days, newest-first.
+	GetRecentSignals(ctx context.Context, days int) ([]domain.PersistedSignal, error)
 }

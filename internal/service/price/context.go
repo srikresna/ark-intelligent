@@ -22,8 +22,8 @@ func NewContextBuilder(priceRepo ports.PriceRepository) *ContextBuilder {
 
 // Build computes price context for a single contract.
 func (cb *ContextBuilder) Build(ctx context.Context, contractCode, currency string) (*domain.PriceContext, error) {
-	// Get 13 weeks of history for MA calculations
-	records, err := cb.priceRepo.GetHistory(ctx, contractCode, 13)
+	// Get 21 weeks of history for MA (13W) and ATR (20W) calculations
+	records, err := cb.priceRepo.GetHistory(ctx, contractCode, 21)
 	if err != nil {
 		return nil, fmt.Errorf("get price history: %w", err)
 	}
@@ -76,6 +76,14 @@ func (cb *ContextBuilder) Build(ctx context.Context, contractCode, currency stri
 	// 13-week trend
 	if len(records) >= 13 {
 		pc.Trend13W = computeTrend(records[:13])
+	}
+
+	// ATR-based volatility context (requires at least 2 bars for True Range)
+	if vc := ComputeVolatilityContext(records); vc != nil {
+		pc.VolatilityRegime = vc.Regime
+		pc.ATR = vc.ATR20W
+		pc.NormalizedATR = vc.NormalizedATR
+		pc.VolatilityMultiplier = vc.ConfidenceMultiplier
 	}
 
 	return pc, nil

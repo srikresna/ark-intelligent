@@ -52,6 +52,12 @@ type PriceContext struct {
 	PriceMA13W    float64 `json:"price_ma_13w"`     // 13-week simple moving average
 	AboveMA4W     bool    `json:"above_ma_4w"`      // Price above 4W MA
 	AboveMA13W    bool    `json:"above_ma_13w"`     // Price above 13W MA
+
+	// ATR-based volatility context (nil if insufficient price data).
+	VolatilityRegime     string  `json:"volatility_regime,omitempty"`      // EXPANDING, CONTRACTING, NORMAL
+	ATR                  float64 `json:"atr,omitempty"`                    // 20-week Average True Range
+	NormalizedATR        float64 `json:"normalized_atr,omitempty"`         // ATR / Close * 100
+	VolatilityMultiplier float64 `json:"volatility_multiplier,omitempty"`  // Confidence multiplier from ATR regime
 }
 
 // MATrend returns a summary of MA alignment.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
+	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 )
 
 // StatsCalculator computes aggregate backtest statistics from persisted signals.
@@ -112,6 +113,11 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 		sumConfidenceAll             float64 // for reference (all signals including pending)
 		highStrengthWins, highTotal  int
 		lowStrengthWins, lowTotal    int
+		weeklyReturns                []float64
+		winReturns1W                 []float64
+		lossReturns1W                []float64
+		brierConfidences             []float64 // raw confidences for Brier score
+		brierOutcomes                []bool    // outcomes for Brier score
 	)
 
 	for _, s := range signals {
@@ -137,13 +143,18 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 			eval1W++
 			sumConfidenceEval += s.Confidence // BUG-H2: accumulate confidence for evaluated-only population
 			sumReturn1W += s.Return1W
+			weeklyReturns = append(weeklyReturns, s.Return1W)
+			brierConfidences = append(brierConfidences, s.Confidence)
+			brierOutcomes = append(brierOutcomes, s.Outcome1W == domain.OutcomeWin)
 			if s.Outcome1W == domain.OutcomeWin {
 				wins1W++
 				sumWinReturn1W += s.Return1W
 				winCount1W++
+				winReturns1W = append(winReturns1W, s.Return1W)
 			} else {
 				sumLossReturn1W += s.Return1W
 				lossCount1W++
+				lossReturns1W = append(lossReturns1W, s.Return1W)
 			}
 		}
 
@@ -220,6 +231,26 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 		stats.CalibrationError = 0
 	}
 
+	// Brier score — measures calibration quality of raw confidence predictions.
+	// Uses raw confidence / 100 as probability prediction vs actual outcome.
+	if len(brierConfidences) > 0 {
+		preds := make([]float64, len(brierConfidences))
+		for i, c := range brierConfidences {
+			preds[i] = c / 100.0 // convert 0-100 to 0-1 probability
+		}
+		stats.BrierScore = round4(mathutil.BrierScore(preds, brierOutcomes))
+	}
+
+	// Calibration method — indicates which recalibration approach is used
+	// for this group based on sample size thresholds.
+	if eval1W >= 20 {
+		// Platt scaling requires sufficient data for logistic regression
+		stats.CalibrationMethod = "Platt"
+	} else if eval1W >= 5 {
+		// Simple win-rate replacement with smaller samples
+		stats.CalibrationMethod = "WinRate"
+	}
+
 	// Strength breakdown
 	stats.HighStrengthCount = highTotal
 	stats.LowStrengthCount = lowTotal
@@ -228,6 +259,58 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 	}
 	if lowTotal > 0 {
 		stats.LowStrengthWinRate = round2(float64(lowStrengthWins) / float64(lowTotal) * 100)
+	}
+
+	// Statistical significance testing
+	if eval1W > 0 {
+		// Binomial test: is win rate significantly > 50%?
+		stats.WinRatePValue = round4(mathutil.WinRatePValue(wins1W, eval1W))
+		stats.IsStatisticallySignificant = stats.WinRatePValue < 0.05
+
+		// 95% confidence interval for win rate (using normal approx for proportion)
+		winRateFrac := float64(wins1W) / float64(eval1W)
+		// Pass the population stddev (not SE) — ConfidenceInterval divides by sqrt(n) internally.
+		winRateSD := math.Sqrt(winRateFrac * (1 - winRateFrac))
+		ciLower, ciUpper := mathutil.ConfidenceInterval(winRateFrac*100, winRateSD*100, eval1W, 0.95)
+		stats.WinRateCI = [2]float64{round2(ciLower), round2(ciUpper)}
+	}
+
+	if len(weeklyReturns) >= 2 {
+		// One-sample t-test: are returns significantly different from 0?
+		tStat, pVal := mathutil.TTestOneSample(weeklyReturns, 0)
+		stats.ReturnTStat = round4(tStat)
+		stats.ReturnPValue = round4(pVal)
+	} else {
+		stats.ReturnPValue = 1
+	}
+
+	// Minimum sample size for ±5 percentage points precision at 95% CI
+	stats.MinSamplesNeeded = mathutil.MinSampleSize(0.05, 0.95)
+
+	// Risk-adjusted performance metrics (require evaluated 1W data)
+	stats.WeeklyReturns = weeklyReturns
+	if len(weeklyReturns) >= 2 {
+		// Sharpe ratio: assume 0 risk-free rate for simplicity (weekly)
+		stats.SharpeRatio = round2(mathutil.SharpeRatio(weeklyReturns, 0))
+
+		// Max drawdown
+		maxDD, _, _ := mathutil.MaxDrawdown(weeklyReturns)
+		stats.MaxDrawdown = round2(maxDD)
+
+		// Calmar ratio: annualize the average weekly return (* 52) and compare to max drawdown
+		avgAnnualReturn := stats.AvgReturn1W * 52
+		stats.CalmarRatio = round2(mathutil.CalmarRatio(avgAnnualReturn, stats.MaxDrawdown))
+	}
+
+	// Profit factor, expected value, Kelly criterion
+	if len(winReturns1W) > 0 && len(lossReturns1W) > 0 {
+		stats.ProfitFactor = round2(mathutil.ProfitFactor(winReturns1W, lossReturns1W))
+
+		winRate := float64(winCount1W) / float64(eval1W)
+		stats.ExpectedValue = round4(mathutil.ExpectedValue(winRate, stats.AvgWinReturn1W, stats.AvgLossReturn1W))
+
+		winLossRatio := stats.AvgWinReturn1W / math.Abs(stats.AvgLossReturn1W)
+		stats.KellyFraction = round4(mathutil.KellyCriterion(winRate, winLossRatio))
 	}
 
 	return stats

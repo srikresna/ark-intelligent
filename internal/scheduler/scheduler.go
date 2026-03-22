@@ -307,12 +307,18 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	// Build VIX/SPX risk context (nil-safe — no adjustment if unavailable)
 	var riskCtx *domain.RiskContext
+	var priceCtxsSched map[string]*domain.PriceContext
 	if s.deps.PriceRepo != nil {
 		rcBuilder := pricesvc.NewRiskContextBuilder(s.deps.PriceRepo)
 		riskCtx, _ = rcBuilder.Build(ctx) // ignore error — nil means no adjustment
+		// Build price contexts for ATR volatility multiplier
+		ctxBuilder := pricesvc.NewContextBuilder(s.deps.PriceRepo)
+		if pcs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil {
+			priceCtxsSched = pcs
+		}
 	}
 
-	signals := recalDetector.DetectAll(analyses, historyMap, riskCtx)
+	signals := recalDetector.DetectAll(analyses, historyMap, riskCtx, priceCtxsSched)
 
 	var strongSignals []cotsvc.Signal
 	for _, sig := range signals {

@@ -59,6 +59,10 @@ type Scheduler struct {
 	// isBanned checks if a user is banned. May be nil (no ban check).
 	// When set, all broadcast loops explicitly skip banned users.
 	isBanned func(ctx context.Context, userID int64) bool
+
+	// impactRecorder captures price impact after event releases.
+	// May be nil — impact recording disabled if price data unavailable.
+	impactRecorder *ImpactRecorder
 }
 
 // NewScheduler creates a new background scheduler.
@@ -97,6 +101,11 @@ func (s *Scheduler) SetIsBannedFunc(fn func(ctx context.Context, userID int64) b
 	s.isBanned = fn
 }
 
+// SetImpactRecorder sets the impact recorder for capturing price impact after releases.
+func (s *Scheduler) SetImpactRecorder(recorder *ImpactRecorder) {
+	s.impactRecorder = recorder
+}
+
 // Start begins the background monitoring loop.
 func (s *Scheduler) Start(ctx context.Context) {
 	schedLog.Info().Msg("starting background monitors")
@@ -122,6 +131,12 @@ func (s *Scheduler) Start(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			schedLog.Error().Interface("panic", r).Msg("PANIC in runWeeklySyncLoop")
+		}
+	}()
+
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -153,6 +168,12 @@ func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			schedLog.Error().Interface("panic", r).Msg("PANIC in runDailyReminderLoop")
+		}
+	}()
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -362,6 +383,12 @@ func buildVolatilePairs(currencySet map[string]bool) []string {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runPreEventReminderLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			schedLog.Error().Interface("panic", r).Msg("PANIC in runPreEventReminderLoop")
+		}
+	}()
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -468,6 +495,12 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runMicroScrapeLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			schedLog.Error().Interface("panic", r).Msg("PANIC in runMicroScrapeLoop")
+		}
+	}()
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -623,6 +656,18 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		if saveErr := s.repo.SaveRevision(ctx, revRecord); saveErr != nil {
 			schedLog.Error().Str("currency", ev.Currency).Str("event", ev.Event).Err(saveErr).Msg("failed to save revision")
 		}
+	}
+
+	// Record price impact for the Event Impact Database (non-blocking)
+	if s.impactRecorder != nil && hasActual {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					schedLog.Error().Interface("panic", r).Str("event", ev.Event).Msg("PANIC in RecordImpact goroutine")
+				}
+			}()
+			s.impactRecorder.RecordImpact(ctx, ev, ev.SurpriseScore, []string{"1h", "4h"})
+		}()
 	}
 
 	for userID, prefs := range activeUsers {
@@ -944,6 +989,12 @@ func (s *Scheduler) GetSurpriseSigma(currency string) float64 {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runInitialSync(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			schedLog.Error().Interface("panic", r).Msg("PANIC in runInitialSync")
+		}
+	}()
+
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
 

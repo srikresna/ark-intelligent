@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -20,6 +21,10 @@ const minSampleForSuppression = 10
 // before replacing hardcoded confidence with historical win rate.
 const minSampleForRecalibration = 5
 
+// minSampleForPlatt is the minimum number of evaluated signals needed
+// before using Platt scaling instead of simple win-rate replacement.
+const minSampleForPlatt = 20
+
 // SignalTypeStats holds computed win rate and sample size for a signal type.
 type SignalTypeStats struct {
 	WinRate    float64 // 0-100
@@ -27,6 +32,9 @@ type SignalTypeStats struct {
 	AvgReturn  float64 // average % return at 1W (negative = losing)
 	HasEdge    bool    // WinRate >= 50 && SampleSize >= minSampleForSuppression
 	Suppressed bool    // WinRate < 50 && SampleSize >= minSampleForSuppression
+	PlattA     float64 // Platt scaling coefficient a (0 if not fitted)
+	PlattB     float64 // Platt scaling coefficient b (0 if not fitted)
+	UsePlatt   bool    // true if Platt scaling is available (n >= minSampleForPlatt)
 }
 
 // RecalibratedDetector wraps SignalDetector and adds:
@@ -101,6 +109,8 @@ func computeStatsMap(grouped map[string][]domain.PersistedSignal) map[string]*Si
 	for key, signals := range grouped {
 		var wins, evaluated int
 		var sumReturn float64
+		var confidences []float64
+		var outcomes []bool
 
 		for _, s := range signals {
 			if s.Outcome1W == "" || s.Outcome1W == domain.OutcomePending {
@@ -108,9 +118,12 @@ func computeStatsMap(grouped map[string][]domain.PersistedSignal) map[string]*Si
 			}
 			evaluated++
 			sumReturn += s.Return1W
-			if s.Outcome1W == domain.OutcomeWin {
+			isWin := s.Outcome1W == domain.OutcomeWin
+			if isWin {
 				wins++
 			}
+			confidences = append(confidences, s.Confidence)
+			outcomes = append(outcomes, isWin)
 		}
 
 		st := &SignalTypeStats{
@@ -128,6 +141,17 @@ func computeStatsMap(grouped map[string][]domain.PersistedSignal) map[string]*Si
 				st.HasEdge = true
 			} else {
 				st.Suppressed = true
+			}
+		}
+
+		// Fit Platt scaling when sufficient data is available
+		if evaluated >= minSampleForPlatt {
+			a, b := mathutil.PlattScaling(confidences, outcomes)
+			// Only use Platt if fitting succeeded (non-zero coefficients)
+			if a != 0 || b != 0 {
+				st.PlattA = a
+				st.PlattB = b
+				st.UsePlatt = true
 			}
 		}
 
@@ -164,7 +188,7 @@ func (rd *RecalibratedDetector) AllTypeStats() map[string]*SignalTypeStats {
 	return out
 }
 
-// DetectAll runs detection, applies recalibration + suppression + VIX filter.
+// DetectAll runs detection, applies recalibration + suppression + VIX/ATR filter.
 //
 // Lookup order for each signal:
 //  1. Granular stats ("TYPE:CURRENCY") — used if sample size >= threshold.
@@ -172,10 +196,14 @@ func (rd *RecalibratedDetector) AllTypeStats() map[string]*SignalTypeStats {
 //
 // This means suppression/recalibration is per-currency when data allows,
 // preventing cross-currency contamination of signal quality metrics.
+//
+// volCtxMap is optional — keyed by contract code. When present, ATR-based
+// volatility multiplier is combined with VIX to avoid double-penalizing.
 func (rd *RecalibratedDetector) DetectAll(
 	analyses []domain.COTAnalysis,
 	historyMap map[string][]domain.COTRecord,
 	riskCtx *domain.RiskContext,
+	volCtxMap ...map[string]*domain.PriceContext,
 ) []Signal {
 	// Run base detection — all 7 detectors
 	rawSignals := rd.base.DetectAll(analyses, historyMap)
@@ -201,13 +229,24 @@ func (rd *RecalibratedDetector) DetectAll(
 		// --- Confidence Recalibration ---
 		if stats != nil && stats.SampleSize >= minSampleForRecalibration {
 			originalConf := sig.Confidence
-			// Replace rule-based confidence with empirical win rate
-			sig.Confidence = stats.WinRate
+
+			if stats.UsePlatt {
+				// Platt scaling: logistic regression maps raw confidence to calibrated probability
+				sig.Confidence = mathutil.PlattCalibrate(originalConf, stats.PlattA, stats.PlattB)
+			} else {
+				// Fallback: replace rule-based confidence with empirical win rate
+				sig.Confidence = stats.WinRate
+			}
+
 			// BUG-H1 fix: recalculate Strength to stay consistent with new Confidence.
 			sig.Strength = confidenceToStrength(sig.Confidence)
 			// Annotate the change for transparency
 			if math.Abs(originalConf-sig.Confidence) > 5 {
-				label := "📊 Confidence recalibrated"
+				calMethod := "WinRate"
+				if stats.UsePlatt {
+					calMethod = "Platt"
+				}
+				label := "📊 Confidence recalibrated [" + calMethod + "]"
 				// Indicate whether granular or pooled stats were used
 				granularKey := sigTypeKey + ":" + sig.Currency
 				if localGranular != nil && localGranular[granularKey] != nil &&
@@ -221,25 +260,74 @@ func (rd *RecalibratedDetector) DetectAll(
 			}
 		}
 
-		// --- VIX / Risk Context Adjustment ---
-		if riskCtx != nil {
+		// --- VIX / ATR Volatility Adjustment ---
+		// Combine VIX (market-wide) with ATR (per-contract) to avoid double-penalizing.
+		// When both are available, average the two multipliers.
+		atrMult := 1.0
+		var priceCtxs map[string]*domain.PriceContext
+		if len(volCtxMap) > 0 {
+			priceCtxs = volCtxMap[0]
+		}
+		if priceCtxs != nil {
+			if pc := priceCtxs[sig.ContractCode]; pc != nil && pc.VolatilityMultiplier > 0 {
+				atrMult = pc.VolatilityMultiplier
+			}
+		}
+
+		if riskCtx != nil || atrMult != 1.0 {
 			originalConf := sig.Confidence
-			sig.Confidence = riskCtx.AdjustConfidence(sig.Confidence)
+			vixMult := 1.0
+			if riskCtx != nil {
+				vixMult = riskCtx.ConfidenceAdjustment()
+			}
+
+			// Combine: if both are available, average to avoid stacking penalties.
+			// If only one is available, use it directly.
+			combinedMult := 1.0
+			switch {
+			case riskCtx != nil && atrMult != 1.0:
+				combinedMult = (vixMult + atrMult) / 2
+			case riskCtx != nil:
+				combinedMult = vixMult
+			default:
+				combinedMult = atrMult
+			}
+
+			sig.Confidence = mathutil.Clamp(sig.Confidence*combinedMult, 0, 100)
+
 			if math.Abs(originalConf-sig.Confidence) > 1 {
-				adj := riskCtx.ConfidenceAdjustment()
-				adjLabel := ""
-				switch {
-				case adj < 0.80:
-					adjLabel = "🔴 VIX dampened"
-				case adj < 0.95:
-					adjLabel = "🟡 VIX reduced"
-				case adj > 1.10:
-					adjLabel = "🟢 VIX boosted"
+				// Build label describing the adjustment source(s)
+				var parts []string
+				if riskCtx != nil && math.Abs(vixMult-1.0) > 0.01 {
+					adjLabel := ""
+					switch {
+					case vixMult < 0.80:
+						adjLabel = "VIX dampened"
+					case vixMult < 0.95:
+						adjLabel = "VIX reduced"
+					case vixMult > 1.10:
+						adjLabel = "VIX boosted"
+					}
+					if adjLabel != "" {
+						parts = append(parts, "\xF0\x9F\x94\xB4 "+adjLabel+": "+riskCtx.RegimeLabel())
+					}
 				}
-				if adjLabel != "" {
+				if atrMult != 1.0 {
+					atrLabel := ""
+					switch {
+					case atrMult < 1.0:
+						atrLabel = "ATR expanding"
+					case atrMult > 1.0:
+						atrLabel = "ATR contracting"
+					}
+					if atrLabel != "" {
+						parts = append(parts, "\xF0\x9F\x93\x8A "+atrLabel)
+					}
+				}
+				if len(parts) > 0 {
+					label := strings.Join(parts, " + ")
 					sig.Factors = append(sig.Factors,
-						adjLabel+": "+riskCtx.RegimeLabel()+
-							" (conf "+fmtWinRate(originalConf)+" → "+fmtWinRate(sig.Confidence)+")",
+						label+" (conf "+fmtWinRate(originalConf)+" \xE2\x86\x92 "+fmtWinRate(sig.Confidence)+")",
 					)
 				}
 			}

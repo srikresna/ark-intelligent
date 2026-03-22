@@ -89,6 +89,8 @@ func main() {
 	userRepo := storage.NewUserRepo(db)
 	priceRepo := storage.NewPriceRepo(db)
 	signalRepo := storage.NewSignalRepo(db)
+	impactRepo := storage.NewImpactRepo(db)
+	portfolioRepo := storage.NewPortfolioRepo(db)
 
 	log.Info().Msg("Storage layer initialized")
 	logStorageSize(db)
@@ -254,6 +256,10 @@ func main() {
 	// Wire ban check for all news broadcast loops
 	newsSched.SetIsBannedFunc(authMiddleware.IsUserBanned)
 
+	// Wire impact recorder for Event Impact Database
+	impactRecorder := newssvc.NewImpactRecorder(impactRepo, priceRepo)
+	newsSched.SetImpactRecorder(impactRecorder)
+
 	newsSched.Start(ctx)
 	log.Info().Msg("News Background scheduler started")
 
@@ -278,6 +284,8 @@ func main() {
 		signalRepo,      // Signal persistence for backtest (nil-safe)
 		chatService,     // Claude chatbot service (nil-safe)
 		claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
+		impactRepo,      // Event Impact Database (nil-safe)
+		portfolioRepo,   // Portfolio Risk Monitor (nil-safe)
 	)
 
 	// Register free-text handler for chatbot mode
