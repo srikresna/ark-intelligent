@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -60,7 +61,7 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", err))
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
 		return sendErr
 	}
 
@@ -69,15 +70,15 @@ func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtest
 		return err
 	}
 
-	html := h.fmt.FormatBacktestStats(stats)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	htmlOut := h.fmt.FormatBacktestStats(stats)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
 
 func (h *Handler) backtestBySignalType(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	statsMap, err := calc.ComputeAllBySignalType(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", err))
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
 		return sendErr
 	}
 
@@ -95,7 +96,7 @@ func (h *Handler) backtestBySignalType(ctx context.Context, chatID string, calc 
 func (h *Handler) backtestOneSignalType(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator, sigType string) error {
 	stats, err := calc.ComputeBySignalType(ctx, sigType)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", err))
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
 		return sendErr
 	}
 
@@ -147,7 +148,7 @@ func (h *Handler) backtestByContract(ctx context.Context, chatID string, calc *b
 
 	stats, err := calc.ComputeByContract(ctx, mapping.ContractCode)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", err))
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
 		return sendErr
 	}
 
@@ -172,7 +173,7 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 	calc := backtestsvc.NewStatsCalculator(h.signalRepo)
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", err))
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
 		return sendErr
 	}
 

@@ -3,6 +3,8 @@ package cot
 import (
 	"context"
 	"math"
+	"strconv"
+	"sync"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
@@ -34,8 +36,8 @@ type SignalTypeStats struct {
 type RecalibratedDetector struct {
 	base       *SignalDetector
 	signalRepo ports.SignalRepository
-	// cached stats — loaded once per detection run
-	typeStats map[string]*SignalTypeStats
+	mu         sync.RWMutex // protects typeStats
+	typeStats  map[string]*SignalTypeStats
 }
 
 // NewRecalibratedDetector creates a recalibrated detector backed by historical data.
@@ -51,7 +53,9 @@ func NewRecalibratedDetector(signalRepo ports.SignalRepository) *RecalibratedDet
 // Call this once before a detection run to avoid repeated DB reads.
 func (rd *RecalibratedDetector) LoadTypeStats(ctx context.Context) error {
 	if rd.signalRepo == nil {
+		rd.mu.Lock()
 		rd.typeStats = nil
+		rd.mu.Unlock()
 		return nil
 	}
 
@@ -66,7 +70,7 @@ func (rd *RecalibratedDetector) LoadTypeStats(ctx context.Context) error {
 		grouped[s.SignalType] = append(grouped[s.SignalType], s)
 	}
 
-	rd.typeStats = make(map[string]*SignalTypeStats, len(grouped))
+	stats := make(map[string]*SignalTypeStats, len(grouped))
 
 	for sigType, signals := range grouped {
 		var wins, evaluated int
@@ -83,41 +87,56 @@ func (rd *RecalibratedDetector) LoadTypeStats(ctx context.Context) error {
 			}
 		}
 
-		stats := &SignalTypeStats{
+		st := &SignalTypeStats{
 			SampleSize: evaluated,
 		}
 
 		if evaluated > 0 {
-			stats.WinRate = math.Round(float64(wins)/float64(evaluated)*100*100) / 100
-			stats.AvgReturn = math.Round(sumReturn/float64(evaluated)*10000) / 10000
+			st.WinRate = math.Round(float64(wins)/float64(evaluated)*100*100) / 100
+			st.AvgReturn = math.Round(sumReturn/float64(evaluated)*10000) / 10000
 		}
 
 		// Determine edge / suppression status
 		if evaluated >= minSampleForSuppression {
-			if stats.WinRate >= 50 {
-				stats.HasEdge = true
+			if st.WinRate >= 50 {
+				st.HasEdge = true
 			} else {
-				stats.Suppressed = true
+				st.Suppressed = true
 			}
 		}
 
-		rd.typeStats[sigType] = stats
+		stats[sigType] = st
 	}
+
+	rd.mu.Lock()
+	rd.typeStats = stats
+	rd.mu.Unlock()
 
 	return nil
 }
 
 // TypeStats returns the stats for a signal type, or nil if no data yet.
 func (rd *RecalibratedDetector) TypeStats(sigType string) *SignalTypeStats {
+	rd.mu.RLock()
+	defer rd.mu.RUnlock()
 	if rd.typeStats == nil {
 		return nil
 	}
-	return rd.typeStats[string(sigType)]
+	return rd.typeStats[sigType]
 }
 
-// AllTypeStats returns a snapshot of all loaded type stats.
+// AllTypeStats returns a shallow copy of all loaded type stats.
 func (rd *RecalibratedDetector) AllTypeStats() map[string]*SignalTypeStats {
-	return rd.typeStats
+	rd.mu.RLock()
+	defer rd.mu.RUnlock()
+	if rd.typeStats == nil {
+		return nil
+	}
+	out := make(map[string]*SignalTypeStats, len(rd.typeStats))
+	for k, v := range rd.typeStats {
+		out[k] = v
+	}
+	return out
 }
 
 // DetectAll runs detection, applies recalibration + suppression + VIX filter.
@@ -133,11 +152,19 @@ func (rd *RecalibratedDetector) DetectAll(
 	// Run base detection — all 7 detectors
 	rawSignals := rd.base.DetectAll(analyses, historyMap)
 
+	rd.mu.RLock()
+	localStats := rd.typeStats // safe: map reference under read lock
+	rd.mu.RUnlock()
+
 	result := make([]Signal, 0, len(rawSignals))
 
 	for _, sig := range rawSignals {
 		sigTypeKey := string(sig.Type)
-		stats := rd.TypeStats(sigTypeKey)
+
+		var stats *SignalTypeStats
+		if localStats != nil {
+			stats = localStats[sigTypeKey]
+		}
 
 		// --- Signal Suppression ---
 		// SMELL-1 fix: removed dead write to sig.Factors before continue.
@@ -158,7 +185,7 @@ func (rd *RecalibratedDetector) DetectAll(
 			if math.Abs(originalConf-sig.Confidence) > 5 {
 				sig.Factors = append(sig.Factors,
 					"📊 Confidence recalibrated: "+fmtWinRate(originalConf)+" → "+fmtWinRate(sig.Confidence)+
-						" (n="+intToStr(stats.SampleSize)+")",
+						" (n="+strconv.Itoa(stats.SampleSize)+")",
 				)
 			}
 		}
@@ -198,6 +225,8 @@ func (rd *RecalibratedDetector) DetectAll(
 
 // SuppressedTypes returns the list of signal types currently being suppressed.
 func (rd *RecalibratedDetector) SuppressedTypes() []string {
+	rd.mu.RLock()
+	defer rd.mu.RUnlock()
 	var out []string
 	for k, v := range rd.typeStats {
 		if v.Suppressed {
@@ -217,7 +246,7 @@ func fmtWinRate(v float64) string {
 		v = 100
 	}
 	i := int(v*10 + 0.5) // round to nearest tenth
-	return intToStr(i/10) + "." + intToStr(i%10) + "%"
+	return strconv.Itoa(i/10) + "." + strconv.Itoa(i%10) + "%"
 }
 
 // confidenceToStrength maps a confidence value [0,100] to Strength [1,5].
@@ -242,20 +271,4 @@ func confidenceToStrength(conf float64) int {
 	default:
 		return 1
 	}
-}
-
-// intToStr converts a non-negative int to string (avoids strconv import).
-func intToStr(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	if i < 0 {
-		return "-" + intToStr(-i)
-	}
-	digits := ""
-	for i > 0 {
-		digits = string(rune('0'+i%10)) + digits
-		i /= 10
-	}
-	return digits
 }
