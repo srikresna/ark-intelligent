@@ -523,6 +523,16 @@ func (s *Scheduler) jobPriceFetch(ctx context.Context) error {
 			s.notifyOwnerPriceFetch(ctx, report, err)
 			return fmt.Errorf("price fetch: %w", err)
 		}
+
+		// BUG-C1 fix: also fetch VIX + SPX for the risk filter.
+		// Stored under "risk_VIX" / "risk_SPX" keys. Best-effort — non-fatal.
+		riskRecords, riskErr := fetcher.FetchRiskInstruments(ctx, 8)
+		if riskErr != nil {
+			log.Warn().Err(riskErr).Msg("risk instrument fetch failed — VIX filter inactive")
+		} else if len(riskRecords) > 0 {
+			records = append(records, riskRecords...)
+			log.Info().Int("risk_records", len(riskRecords)).Msg("VIX/SPX risk data fetched")
+		}
 	} else {
 		var err error
 		records, err = s.deps.PriceFetcher.FetchAll(ctx, 52)

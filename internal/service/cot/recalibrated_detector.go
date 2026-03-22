@@ -155,6 +155,9 @@ func (rd *RecalibratedDetector) DetectAll(
 			originalConf := sig.Confidence
 			// Replace rule-based confidence with empirical win rate
 			sig.Confidence = stats.WinRate
+			// BUG-H1 fix: recalculate Strength to stay consistent with new Confidence.
+			// Strength must reflect empirical quality, not the stale rule-based estimate.
+			sig.Strength = confidenceToStrength(sig.Confidence)
 			// Annotate the change for transparency
 			if math.Abs(originalConf-sig.Confidence) > 5 {
 				sig.Factors = append(sig.Factors,
@@ -219,6 +222,30 @@ func fmtWinRate(v float64) string {
 	}
 	i := int(v*10 + 0.5) // round to nearest tenth
 	return intToStr(i/10) + "." + intToStr(i%10) + "%"
+}
+
+// confidenceToStrength maps a confidence value [0,100] to Strength [1,5].
+// Mirrors the inverse of the base detector's strength-to-confidence mapping
+// so Strength stays consistent after recalibration.
+//
+//	< 40%  → 1   (weak / noise)
+//	40-54% → 2   (below-average)
+//	55-64% → 3   (moderate)
+//	65-74% → 4   (strong)
+//	≥ 75%  → 5   (very strong)
+func confidenceToStrength(conf float64) int {
+	switch {
+	case conf >= 75:
+		return 5
+	case conf >= 65:
+		return 4
+	case conf >= 55:
+		return 3
+	case conf >= 40:
+		return 2
+	default:
+		return 1
+	}
 }
 
 // intToStr converts a non-negative int to string (avoids strconv import).

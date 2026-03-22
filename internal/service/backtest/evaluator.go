@@ -188,18 +188,21 @@ func computeReturn(entryPrice, exitPrice float64, inverse bool) float64 {
 
 // classifyOutcome determines WIN or LOSS based on direction and return.
 // A BULLISH signal wins if return > 0, BEARISH wins if return < 0.
+// A return of exactly 0.0 is treated as LOSS — the signal produced no movement
+// and offered no value. This avoids false-positive wins on illiquid/holiday weeks
+// where price data shows no change.
 func classifyOutcome(direction string, returnPct float64) string {
 	switch direction {
 	case "BULLISH":
 		if returnPct > 0 {
 			return domain.OutcomeWin
 		}
-		return domain.OutcomeLoss
+		return domain.OutcomeLoss // includes returnPct == 0: no movement = no edge
 	case "BEARISH":
 		if returnPct < 0 {
 			return domain.OutcomeWin
 		}
-		return domain.OutcomeLoss
+		return domain.OutcomeLoss // includes returnPct == 0: no movement = no edge
 	default:
 		return domain.OutcomePending
 	}

@@ -489,7 +489,10 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 		b.WriteString("PLEASE RESPOND IN INDONESIAN (Bahasa Indonesia).\n\n")
 	}
 
-	b.WriteString("=== 1. COT POSITIONING ===\n")
+	// BUG-C3 fix: use dynamic section counter so numbers are always consecutive.
+	section := 1
+	b.WriteString(fmt.Sprintf("=== %d. COT POSITIONING ===\n", section))
+	section++
 	for _, a := range data.COTAnalyses {
 		b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f CommSignal=%s Crowding=%.1f\n",
 			a.Contract.Currency,
@@ -497,7 +500,8 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 			a.COTIndex, a.CommercialSignal, a.CrowdingIndex))
 	}
 
-	b.WriteString("\n=== 2. UPCOMING CATALYSTS (HIGH IMPACT) ===\n")
+	b.WriteString(fmt.Sprintf("\n=== %d. UPCOMING CATALYSTS (HIGH IMPACT) ===\n", section))
+	section++
 	for _, e := range data.NewsEvents {
 		if e.Impact == "high" {
 			line := fmt.Sprintf("%s | %s - %s | Fcast: %s | Act: %s",
@@ -511,7 +515,8 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 
 	// Price context — inject per-currency close, weekly/monthly change, MA position
 	if len(data.PriceContexts) > 0 {
-		b.WriteString("\n=== 3. PRICE CONTEXT (Weekly Closes) ===\n")
+		b.WriteString(fmt.Sprintf("\n=== %d. PRICE CONTEXT (Weekly Closes) ===\n", section))
+		section++
 		for _, a := range data.COTAnalyses {
 			if pc, ok := data.PriceContexts[a.Contract.Code]; ok {
 				b.WriteString(fmt.Sprintf("%s: %.5f | Wk %+.2f%% | Mo %+.2f%% | Trend4W: %s | MA4W: %s MA13W: %s\n",
@@ -523,7 +528,8 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 	}
 
 	if data.MacroData != nil {
-		b.WriteString("\n=== 4. FRED MACRO BACKDROP ===\n")
+		b.WriteString(fmt.Sprintf("\n=== %d. FRED MACRO BACKDROP ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
 		m := data.MacroData
 		b.WriteString(fmt.Sprintf("Macro Regime: %s (Risk-Off Score: %d/100 | Recession Risk: %s)\n",
 			regime.Name, regime.Score, regime.RecessionRisk))

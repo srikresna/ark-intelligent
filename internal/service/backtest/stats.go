@@ -108,13 +108,14 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 		sumWinReturn1W               float64
 		sumLossReturn1W              float64
 		winCount1W, lossCount1W      int
-		sumConfidence                float64
+		sumConfidenceEval            float64 // BUG-H2 fix: only count evaluated signals
+		sumConfidenceAll             float64 // for reference (all signals including pending)
 		highStrengthWins, highTotal  int
 		lowStrengthWins, lowTotal    int
 	)
 
 	for _, s := range signals {
-		sumConfidence += s.Confidence
+		sumConfidenceAll += s.Confidence
 
 		// Strength breakdown (only count evaluated signals)
 		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending {
@@ -134,6 +135,7 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 		// 1W outcomes
 		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending {
 			eval1W++
+			sumConfidenceEval += s.Confidence // BUG-H2: accumulate confidence for evaluated-only population
 			sumReturn1W += s.Return1W
 			if s.Outcome1W == domain.OutcomeWin {
 				wins1W++
@@ -204,10 +206,19 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 		stats.BestWinRate = stats.WinRate4W
 	}
 
-	// Confidence calibration
-	stats.AvgConfidence = round2(sumConfidence / float64(len(signals)))
-	stats.ActualAccuracy = stats.BestWinRate
-	stats.CalibrationError = round2(math.Abs(stats.AvgConfidence - stats.ActualAccuracy))
+	// Confidence calibration — BUG-H2 fix: use consistent evaluated-only population.
+	// AvgConfidence is computed over evaluated signals only (same set as WinRate1W).
+	// This prevents pending signals from diluting/inflating calibration metrics.
+	// ActualAccuracy uses WinRate1W (shortest horizon) for consistency.
+	stats.AvgConfidence = round2(sumConfidenceAll / float64(len(signals))) // kept for display
+	if eval1W > 0 {
+		evalAvgConf := round2(sumConfidenceEval / float64(eval1W))
+		stats.ActualAccuracy = stats.WinRate1W
+		stats.CalibrationError = round2(math.Abs(evalAvgConf - stats.ActualAccuracy))
+	} else {
+		stats.ActualAccuracy = 0
+		stats.CalibrationError = 0
+	}
 
 	// Strength breakdown
 	stats.HighStrengthCount = highTotal

@@ -133,7 +133,14 @@ func TestComputeStatsStrengthBreakdown(t *testing.T) {
 }
 
 func TestComputeStatsCalibration(t *testing.T) {
-	// All signals with 80% confidence, but 50% actual win rate at 1W
+	// Two signals both with 80% confidence.
+	// Signal 1: 1W WIN (bullish, positive return), Signal 2: 1W LOSS (bullish, negative return)
+	// → WinRate1W = 50%, AvgConfidence (all signals) = 80%
+	// → evalAvgConf (evaluated-only) = 80%, ActualAccuracy = WinRate1W = 50%
+	// → CalibrationError = |80 - 50| = 30
+	//
+	// BUG-H2 fix: ActualAccuracy uses WinRate1W (consistent 1W horizon), not cherry-picked BestWinRate.
+	// This makes calibration error a meaningful measure: how wrong is confidence vs actual 1W accuracy.
 	signals := []domain.PersistedSignal{
 		makeSignal("BULLISH", 4, 80, 1.0, 1.5, 2.0),
 		makeSignal("BULLISH", 4, 80, -0.5, -0.3, 0.5),
@@ -145,15 +152,14 @@ func TestComputeStatsCalibration(t *testing.T) {
 		t.Errorf("AvgConfidence = %.2f, want 80", stats.AvgConfidence)
 	}
 
-	// Best win rate is 4W at 100% (both signals have positive 4W returns, both bullish)
-	// Signal 1: ret4w=2.0 → WIN (bullish), Signal 2: ret4w=0.5 → WIN (bullish)
-	if stats.ActualAccuracy != 100 {
-		t.Errorf("ActualAccuracy = %.2f, want 100", stats.ActualAccuracy)
+	// ActualAccuracy = WinRate1W = 1 win / 2 signals = 50%
+	if stats.ActualAccuracy != 50 {
+		t.Errorf("ActualAccuracy = %.2f, want 50 (BUG-H2: uses WinRate1W, not BestWinRate)", stats.ActualAccuracy)
 	}
 
-	// Calibration error = |80 - 100| = 20
-	if stats.CalibrationError != 20 {
-		t.Errorf("CalibrationError = %.2f, want 20", stats.CalibrationError)
+	// CalibrationError = |evalAvgConf - WinRate1W| = |80 - 50| = 30
+	if stats.CalibrationError != 30 {
+		t.Errorf("CalibrationError = %.2f, want 30", stats.CalibrationError)
 	}
 }
 
