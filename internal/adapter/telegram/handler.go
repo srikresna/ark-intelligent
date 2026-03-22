@@ -188,30 +188,38 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <i>Institutional Flow &amp; Macro Analytics</i>
 
 <b>📊 Market Data</b>
-/cot — COT overview · <code>/cot EUR</code> detail · <code>/cot raw EUR</code>
-/rank — Currency strength ranking
-/signals — COT signal detection (7 types)
+/cot — COT overview · <code>/cot EUR</code> detail
+/rank — Currency strength (price + COT)
+/signals — Signal detection (7 types, ATR-adjusted)
 /calendar — Economic calendar · <code>/calendar week</code>
-/impact — Event impact database · <code>/impact NFP</code>
 
 <b>🧠 AI Outlook</b>
 /outlook cot · news · fred · combine · cross
 
-<b>📈 Backtest</b>
-/backtest — Stats · <code>/backtest signals</code> · <code>/backtest EUR</code>
-/accuracy — Quick accuracy summary
+<b>📈 Backtest &amp; Analytics</b>
+/backtest — Stats + significance + risk metrics
+/backtest timing — Optimal horizon per signal type
+/backtest walkforward — Overfit detection
+/backtest weights — Data-driven weight optimization
+/accuracy — Quick win rate summary
 /report — Weekly signal performance
 
-<b>🏛 Macro</b>
-/macro — FRED regime dashboard (7 indicators)
+<b>🏛 Macro &amp; Impact</b>
+/macro — FRED regime + asset performance matrix
+/impact — Event impact DB · <code>/impact NFP</code>
+
+<b>💼 Portfolio</b>
+/portfolio — View positions + risk analysis
+<code>/portfolio add EUR LONG 1.0</code> — Add position
+<code>/portfolio remove EUR</code> — Remove position
 
 <b>⚙️ Settings</b>
-/settings · /membership · /status
+/settings · /membership · /status · /clear
 
 <b>🔐 Admin</b>
 /users · /setrole · /ban · /unban
 
-<code>ARK v3.2.0</code>`
+<code>ARK v3.3.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
