@@ -518,6 +518,13 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 			MacroData:   macroData,
 			Language:    prefs.Language,
 		}
+		// Price contexts (best-effort — non-fatal if unavailable)
+		if h.priceRepo != nil {
+			ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+			if priceCtxs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(priceCtxs) > 0 {
+				weeklyData.PriceContexts = priceCtxs
+			}
+		}
 		result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
 	} else if subcmd == "cross" {
 		cotSlice, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
@@ -534,6 +541,13 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 			COTAnalyses: cotAnalyses,
 			MacroData:   macroData,
 			Language:    prefs.Language,
+		}
+		// Price contexts (best-effort — non-fatal if unavailable)
+		if h.priceRepo != nil {
+			ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+			if priceCtxs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(priceCtxs) > 0 {
+				weeklyData.PriceContexts = priceCtxs
+			}
 		}
 		result, err = h.aiAnalyzer.GenerateWeeklyOutlook(ctx, weeklyData)
 	}

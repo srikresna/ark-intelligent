@@ -125,6 +125,7 @@ func maLabel(above bool) string {
 // Gap E: accepts optional macroRegime — if provided, injects FRED macro regime context
 // so the COT-focused outlook is always regime-aware, without requiring /outlook combine.
 // backtestStats is optional — if provided, includes signal accuracy context.
+// priceContexts is optional — if provided, injects per-currency price lines (close, weekly %, MA position).
 func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *fred.MacroRegime, backtestStats ...*domain.BacktestStats) string {
 	var b strings.Builder
 	now := time.Now().UTC().Add(7 * time.Hour) // WIB
@@ -156,6 +157,20 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 		b.WriteString("\n")
 	}
 
+	// Price context — per-currency close, weekly/monthly change, MA position
+	if len(data.PriceContexts) > 0 {
+		b.WriteString("=== PRICE CONTEXT (Weekly Closes) ===\n")
+		for _, a := range data.COTAnalyses {
+			if pc, ok := data.PriceContexts[a.Contract.Code]; ok {
+				b.WriteString(fmt.Sprintf("%s: %.5f | Wk %+.2f%% | Mo %+.2f%% | Trend4W: %s | MA4W: %s MA13W: %s\n",
+					a.Contract.Currency,
+					pc.CurrentPrice, pc.WeeklyChgPct, pc.MonthlyChgPct,
+					pc.Trend4W, maLabel(pc.AboveMA4W), maLabel(pc.AboveMA13W)))
+			}
+		}
+		b.WriteString("\n")
+	}
+
 	// Gap E: inject FRED regime context when available
 	if macroRegime != nil {
 		b.WriteString("=== FRED MACRO REGIME (CONTEXT) ===\n")
@@ -181,6 +196,7 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 		}
 	}
 
+	hasPriceCtx := len(data.PriceContexts) > 0
 	if lang == "en" {
 		b.WriteString("\nProvide a structured weekly outlook in ENGLISH:\n")
 		b.WriteString("1. MACRO THEME: Key market drivers for this week\n")
@@ -188,6 +204,9 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 		b.WriteString("3. TOP TRADES: 3 highest conviction trade ideas with rationale\n")
 		b.WriteString("4. KEY RISKS: Scenarios that could invalidate the analysis\n")
 		b.WriteString("5. SCALPER INTEL: Intraday/Swing recommendations (Buy Dips/Sell Rallies) based on 4W Momentum & OI Trend data\n")
+		if hasPriceCtx {
+			b.WriteString("6. PRICE-COT DIVERGENCE: Flag any currency where price trend contradicts COT positioning (e.g. price rising but smart money reducing longs) — these are potential reversal setups.\n")
+		}
 	} else {
 		b.WriteString("\nProvide a structured weekly outlook in INDONESIAN:\n")
 		b.WriteString("1. MACRO THEME: Tema utama penggerak pasar minggu ini\n")
@@ -195,6 +214,9 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 		b.WriteString("3. TOP TRADES: 3 ide trading dengan keyakinan tertinggi beserta logikanya\n")
 		b.WriteString("4. KEY RISKS: Skenario yang dapat membatalkan analisis ini\n")
 		b.WriteString("5. SCALPER INTEL: Rekomendasi Intraday/Swing (Buy Dips/Sell Rallies) berdasarkan data 4W Momentum & OI Trend\n")
+		if hasPriceCtx {
+			b.WriteString("6. PRICE-COT DIVERGENCE: Tandai mata uang di mana tren harga bertentangan dengan positioning COT (mis. harga naik tapi smart money mengurangi long) — ini adalah setup reversal potensial.\n")
+		}
 	}
 
 	return b.String()
@@ -487,8 +509,21 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 		}
 	}
 
+	// Price context — inject per-currency close, weekly/monthly change, MA position
+	if len(data.PriceContexts) > 0 {
+		b.WriteString("\n=== 3. PRICE CONTEXT (Weekly Closes) ===\n")
+		for _, a := range data.COTAnalyses {
+			if pc, ok := data.PriceContexts[a.Contract.Code]; ok {
+				b.WriteString(fmt.Sprintf("%s: %.5f | Wk %+.2f%% | Mo %+.2f%% | Trend4W: %s | MA4W: %s MA13W: %s\n",
+					a.Contract.Currency,
+					pc.CurrentPrice, pc.WeeklyChgPct, pc.MonthlyChgPct,
+					pc.Trend4W, maLabel(pc.AboveMA4W), maLabel(pc.AboveMA13W)))
+			}
+		}
+	}
+
 	if data.MacroData != nil {
-		b.WriteString("\n=== 3. FRED MACRO BACKDROP ===\n")
+		b.WriteString("\n=== 4. FRED MACRO BACKDROP ===\n")
 		m := data.MacroData
 		b.WriteString(fmt.Sprintf("Macro Regime: %s (Risk-Off Score: %d/100 | Recession Risk: %s)\n",
 			regime.Name, regime.Score, regime.RecessionRisk))
@@ -560,6 +595,7 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 		b.WriteString(fmt.Sprintf("Implied Bias: %s\n", regime.Bias))
 	}
 
+	hasPriceCtxCombined := len(data.PriceContexts) > 0
 	b.WriteString("\n=== ANALYSIS REQUESTED ===\n")
 	if data.Language == "en" {
 		b.WriteString("Provide a fused trading outlook:\n")
@@ -567,12 +603,18 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 		b.WriteString("2. CATALYST + POSITIONING RISK: For top upcoming events, overlay current COT crowding to identify fragile setups (crowded longs/shorts facing catalyst risk).\n")
 		b.WriteString("3. REGIME-ADJUSTED TRADES: Given the macro regime, which COT-driven trade ideas have the strongest macro tailwind?\n")
 		b.WriteString("4. RISK SCENARIOS: What would change the outlook? (e.g., FOMC surprise, inflation shock, weak NFP)\n")
+		if hasPriceCtxCombined {
+			b.WriteString("5. PRICE-COT DIVERGENCE: Flag any currency where price trend contradicts COT positioning — these are potential reversal or trap setups.\n")
+		}
 	} else {
 		b.WriteString("Berikan outlook trading fusi:\n")
 		b.WriteString("1. MACRO-COT ALIGNMENT: Di mana sinyal makro FRED mengkonfirmasi atau bertentangan dengan positioning COT? Identifikasi setup high-conviction.\n")
 		b.WriteString("2. CATALYST + POSITIONING RISK: Untuk event besar mendatang, overlay crowding COT saat ini untuk identifikasi setup rapuh (crowded longs/shorts menghadapi risiko katalis).\n")
 		b.WriteString("3. REGIME-ADJUSTED TRADES: Berdasarkan regime makro, ide trading COT mana yang memiliki tailwind makro paling kuat?\n")
 		b.WriteString("4. RISK SCENARIOS: Apa yang bisa mengubah outlook? (Contoh: kejutan FOMC, kejutan inflasi, NFP lemah)\n")
+		if hasPriceCtxCombined {
+			b.WriteString("5. PRICE-COT DIVERGENCE: Tandai mata uang di mana tren harga bertentangan dengan positioning COT — ini adalah setup reversal atau jebakan potensial.\n")
+		}
 	}
 
 	return b.String()

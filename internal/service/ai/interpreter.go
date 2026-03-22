@@ -54,7 +54,8 @@ func sanitizeTelegramHTML(s string) string {
 // for generating weekly outlooks. It mirrors ports.WeeklyData but with
 // types that are more convenient for prompt building.
 type WeeklyOutlookData struct {
-	COTAnalyses []domain.COTAnalysis
+	COTAnalyses   []domain.COTAnalysis
+	PriceContexts map[string]*domain.PriceContext
 }
 
 // Interpreter orchestrates AI-powered narrative generation for all analysis types.
@@ -114,9 +115,11 @@ func (ip *Interpreter) AnalyzeCOTWithPrice(ctx context.Context, analyses []domai
 // GenerateWeeklyOutlook creates a comprehensive weekly market outlook.
 // Gap E: if MacroData is provided in WeeklyData, the FRED macro regime is injected
 // into the COT outlook prompt so the COT outlook is always regime-aware.
+// Price-aware: if PriceContexts is provided, per-currency price lines are injected.
 func (ip *Interpreter) GenerateWeeklyOutlook(ctx context.Context, data ports.WeeklyData) (string, error) {
 	outlookData := WeeklyOutlookData{
-		COTAnalyses: data.COTAnalyses,
+		COTAnalyses:   data.COTAnalyses,
+		PriceContexts: data.PriceContexts,
 	}
 
 	// Gap E: derive regime from MacroData when available

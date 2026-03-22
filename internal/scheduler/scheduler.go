@@ -639,6 +639,16 @@ func (s *Scheduler) gatherWeeklyData(ctx context.Context) (ports.WeeklyData, err
 		}
 	}
 
+	// Price contexts (best-effort — nil if price data unavailable)
+	if s.deps.PriceRepo != nil {
+		ctxBuilder := pricesvc.NewContextBuilder(s.deps.PriceRepo)
+		if priceCtxs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(priceCtxs) > 0 {
+			data.PriceContexts = priceCtxs
+		} else if pcErr != nil {
+			log.Debug().Err(pcErr).Msg("price contexts unavailable for weekly outlook")
+		}
+	}
+
 	return data, nil
 }
 
