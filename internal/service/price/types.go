@@ -81,9 +81,10 @@ type yahooChartResponse struct {
 
 type yahooChartResult struct {
 	Meta struct {
-		Symbol         string `json:"symbol"`
-		Currency       string `json:"currency"`
-		InstrumentType string `json:"instrumentType"`
+		Symbol             string  `json:"symbol"`
+		Currency           string  `json:"currency"`
+		InstrumentType     string  `json:"instrumentType"`
+		RegularMarketPrice float64 `json:"regularMarketPrice"`
 	} `json:"meta"`
 	Timestamp  []int64 `json:"timestamp"`
 	Indicators struct {

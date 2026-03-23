@@ -854,6 +854,68 @@ func safeIndex(s []*float64, i int) *float64 {
 	return s[i]
 }
 
+// FetchSpotPrice fetches the current real-time spot price for a contract.
+func (f *Fetcher) FetchSpotPrice(ctx context.Context, contractCode string) (float64, error) {
+	mapping := domain.FindPriceMapping(contractCode)
+	if mapping == nil || mapping.Yahoo == "" {
+		return 0, fmt.Errorf("no Yahoo symbol for contract %s", contractCode)
+	}
+
+	var spotPrice float64
+
+	err := f.cbYahoo.Execute(func() error {
+		url := fmt.Sprintf(
+			"https://query1.finance.yahoo.com/v8/finance/chart/%s?range=1d&interval=1d",
+			mapping.Yahoo,
+		)
+
+		headers := map[string]string{
+			"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+		}
+
+		body, err := f.doGet(ctx, url, headers)
+		if err != nil {
+			return fmt.Errorf("yahoo spot request: %w", err)
+		}
+
+		var resp yahooChartResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return fmt.Errorf("yahoo spot parse: %w", err)
+		}
+
+		if resp.Chart.Error != nil {
+			return fmt.Errorf("yahoo spot error: %s: %s", resp.Chart.Error.Code, resp.Chart.Error.Description)
+		}
+
+		if len(resp.Chart.Result) == 0 {
+			return fmt.Errorf("yahoo spot empty response for %s", mapping.Yahoo)
+		}
+
+		result := resp.Chart.Result[0]
+
+		// Try regularMarketPrice first
+		if result.Meta.RegularMarketPrice > 0 {
+			spotPrice = result.Meta.RegularMarketPrice
+			return nil
+		}
+
+		// Fallback to last close value from indicators
+		if len(result.Indicators.Quote) > 0 {
+			closes := result.Indicators.Quote[0].Close
+			for i := len(closes) - 1; i >= 0; i-- {
+				if closes[i] != nil && *closes[i] > 0 {
+					spotPrice = *closes[i]
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("yahoo spot: no price data for %s", mapping.Yahoo)
+	})
+
+	return spotPrice, err
+}
+
 // sortRecordsByDate sorts price records newest-first.
 func sortRecordsByDate(records []domain.PriceRecord) {
 	sort.Slice(records, func(i, j int) bool {

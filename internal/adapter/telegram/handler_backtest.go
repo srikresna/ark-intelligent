@@ -51,8 +51,10 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 	args = strings.TrimSpace(strings.ToUpper(args))
 
 	switch {
-	case args == "" || args == "ALL":
+	case args == "ALL":
 		return h.backtestAll(ctx, chatID, calc)
+	case args == "":
+		return h.backtestMenu(ctx, chatID, calc)
 	case args == "SIGNALS" || args == "TYPES":
 		return h.backtestBySignalType(ctx, chatID, calc)
 	case args == "TIMING":
@@ -87,6 +89,27 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		_, err := h.bot.SendHTML(ctx, chatID, helpMsg)
 		return err
 	}
+}
+
+func (h *Handler) backtestMenu(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
+	stats, err := calc.ComputeAll(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	summary := "📊 <b>BACKTEST DASHBOARD</b>\n"
+	if stats.TotalSignals > 0 {
+		summary += fmt.Sprintf("<code>Signals: %d | Win 1W: %.1f%% | Win 4W: %.1f%%</code>\n",
+			stats.TotalSignals, stats.WinRate1W, stats.WinRate4W)
+	} else {
+		summary += "<i>No signal data available yet.</i>\n"
+	}
+	summary += "\n<i>Select a view:</i>"
+
+	kb := h.kb.BacktestMenu()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, summary, kb)
+	return err
 }
 
 func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {

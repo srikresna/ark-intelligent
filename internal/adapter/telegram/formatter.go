@@ -1283,7 +1283,7 @@ func (f *Formatter) FormatSignalsSummary(signals []cot.Signal) string {
 
 	for i, s := range signals {
 		if i >= 3 {
-			b.WriteString(fmt.Sprintf("<i>  +%d more \xE2\x80\x94 use /signals %s</i>\n", len(signals)-3, s.Currency))
+			b.WriteString(fmt.Sprintf("<i>  +%d more signals available</i>\n", len(signals)-3))
 			break
 		}
 

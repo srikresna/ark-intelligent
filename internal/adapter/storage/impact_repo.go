@@ -167,12 +167,28 @@ func (r *ImpactRepo) GetEventImpactSummary(_ context.Context, eventTitle string)
 		pctChanges  []float64
 	}
 
-	groups := make(map[groupKey]*groupData)
+	// Priority: use shortest horizon available (15m > 30m > 1h > 4h)
+	horizonPriority := map[string]int{"15m": 0, "30m": 1, "1h": 2, "4h": 3}
 
+	// First pass: find best (shortest) horizon available per currency+sigma
+	type impKey struct {
+		Currency    string
+		SigmaBucket string
+		Date        string
+	}
+	bestHorizon := make(map[impKey]string)
 	for _, imp := range allImpacts {
-		// Only use 1h horizon for summary to keep it concise
-		if imp.TimeHorizon != "1h" {
-			continue
+		k := impKey{imp.Currency, imp.SigmaLevel, imp.Timestamp.Format("20060102")}
+		if existing, ok := bestHorizon[k]; !ok || horizonPriority[imp.TimeHorizon] < horizonPriority[existing] {
+			bestHorizon[k] = imp.TimeHorizon
+		}
+	}
+
+	groups := make(map[groupKey]*groupData)
+	for _, imp := range allImpacts {
+		k := impKey{imp.Currency, imp.SigmaLevel, imp.Timestamp.Format("20060102")}
+		if bestHorizon[k] != imp.TimeHorizon {
+			continue // skip non-best horizons for this date
 		}
 		gk := groupKey{Currency: imp.Currency, SigmaBucket: imp.SigmaLevel}
 		if groups[gk] == nil {

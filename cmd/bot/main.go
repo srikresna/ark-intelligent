@@ -261,7 +261,7 @@ func main() {
 	newsSched.SetIsBannedFunc(authMiddleware.IsUserBanned)
 
 	// Wire impact recorder for Event Impact Database
-	impactRecorder := newssvc.NewImpactRecorder(impactRepo, priceRepo)
+	impactRecorder := newssvc.NewImpactRecorder(impactRepo, priceRepo, priceFetcher)
 	newsSched.SetImpactRecorder(impactRecorder)
 
 	newsSched.Start(ctx)

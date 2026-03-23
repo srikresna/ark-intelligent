@@ -164,8 +164,9 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
+	bot.RegisterCallback("imp:", h.cbImpact)
 
-	log.Info().Int("commands", 22).Int("callbacks", 6).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 22).Int("callbacks", 7).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -1176,6 +1177,8 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdSentiment(ctx, chatID, userID, args)
 	case "seasonal":
 		return h.cmdSeasonal(ctx, chatID, userID, args)
+	case "backtest":
+		return h.cmdBacktest(ctx, chatID, userID, args)
 	default:
 		return nil
 	}
@@ -1868,16 +1871,12 @@ func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args st
 	// Resolve common abbreviations to full event names
 	query = resolveEventAlias(query)
 
-	// No arguments: show list of tracked events
+	// No arguments: show category keyboard
 	if query == "" {
-		events, err := h.impactProvider.GetTrackedEvents(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("cmdImpact: get tracked events failed")
-			_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load tracked events.")
-			return sendErr
-		}
-		html := h.fmt.FormatTrackedEvents(events)
-		_, err = h.bot.SendHTML(ctx, chatID, html)
+		kb := h.kb.ImpactCategoryMenu()
+		_, err := h.bot.SendWithKeyboard(ctx, chatID,
+			"📋 <b>EVENT IMPACT DATABASE</b>\n<i>Select a category to view event impacts:</i>\n\n<i>Or type directly:</i> <code>/impact NFP</code>",
+			kb)
 		return err
 	}
 
@@ -1906,8 +1905,16 @@ func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args st
 		}
 	}
 
-	html := h.fmt.FormatEventImpact(query, summaries)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	if len(summaries) == 0 {
+		kb := h.kb.ImpactCategoryMenu()
+		_, err := h.bot.SendWithKeyboard(ctx, chatID,
+			fmt.Sprintf("❌ Event <b>%s</b> not found in impact database.\n\n<i>Select from categories below or use known aliases:</i>\n<code>NFP, CPI, FOMC, BOE, GDP, PMI...</code>", html.EscapeString(query)),
+			kb)
+		return err
+	}
+
+	htmlOut := h.fmt.FormatEventImpact(query, summaries)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
 
@@ -1936,6 +1943,11 @@ var eventAliases = map[string]string{
 	"ISM":      "ISM Manufacturing PMI",
 	"ADP":      "ADP Non-Farm Employment Change",
 	"WAGES":    "Average Hourly Earnings m/m",
+	"CORE_CPI":    "Core CPI m/m",
+	"CB_CONSUMER": "CB Consumer Confidence Index",
+	"PRICE_EXP":   "Consumer Price Expectations",
+	"HOME_SALES":  "Existing Home Sales",
+	"PERMITS":     "Building Permits",
 }
 
 // resolveEventAlias resolves a known abbreviation to its full event name.
@@ -1958,4 +1970,49 @@ func fuzzyMatchEvent(query string, events []string) string {
 		}
 	}
 	return ""
+}
+
+// cbImpact handles "imp:" prefixed callbacks for event impact navigation.
+func (h *Handler) cbImpact(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	if h.impactProvider == nil {
+		return nil
+	}
+
+	action := strings.TrimPrefix(data, "imp:")
+
+	switch {
+	case strings.HasPrefix(action, "cat:"):
+		// Show events in category
+		category := strings.TrimPrefix(action, "cat:")
+		kb := h.kb.ImpactEventMenu(category)
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID,
+			"📋 <b>EVENT IMPACT DATABASE</b>\n<i>Select an event:</i>",
+			kb)
+
+	case action == "back":
+		// Back to category menu
+		kb := h.kb.ImpactCategoryMenu()
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID,
+			"📋 <b>EVENT IMPACT DATABASE</b>\n<i>Select a category to view event impacts:</i>\n\n<i>Or type directly:</i> <code>/impact NFP</code>",
+			kb)
+
+	case strings.HasPrefix(action, "ev:"):
+		// Show impact for specific event
+		alias := strings.TrimPrefix(action, "ev:")
+		// Resolve alias (need to handle underscores -> spaces for multi-word aliases)
+		query := strings.ReplaceAll(alias, "_", " ")
+		query = resolveEventAlias(query)
+
+		summaries, err := h.impactProvider.GetEventImpactSummary(ctx, query)
+		if err != nil {
+			return err
+		}
+
+		impactHTML := h.fmt.FormatEventImpact(query, summaries)
+		// Send as new message (impact data can be long)
+		_, err = h.bot.SendHTML(ctx, chatID, impactHTML)
+		return err
+	}
+
+	return nil
 }

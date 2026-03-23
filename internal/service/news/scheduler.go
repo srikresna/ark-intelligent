@@ -666,7 +666,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 					schedLog.Error().Interface("panic", r).Str("event", ev.Event).Msg("PANIC in RecordImpact goroutine")
 				}
 			}()
-			s.impactRecorder.RecordImpact(ctx, ev, ev.SurpriseScore, []string{"1h", "4h"})
+			s.impactRecorder.RecordImpact(ctx, ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
 		}()
 	}
 

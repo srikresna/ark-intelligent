@@ -22,19 +22,26 @@ type PriceProvider interface {
 	GetLatest(ctx context.Context, contractCode string) (*domain.PriceRecord, error)
 }
 
+// SpotPriceFetcher fetches real-time spot prices for impact recording.
+type SpotPriceFetcher interface {
+	FetchSpotPrice(ctx context.Context, contractCode string) (float64, error)
+}
+
 // ImpactRecorder captures price impact after economic event releases.
 // It records the price at release time and schedules follow-up checks
-// at 1h and 4h horizons to measure the actual market impact.
+// at various horizons (15m, 30m, 1h, 4h) to measure the actual market impact.
 type ImpactRecorder struct {
 	impactStore ImpactStore
 	priceRepo   PriceProvider
+	spotFetcher SpotPriceFetcher
 }
 
 // NewImpactRecorder creates a new ImpactRecorder.
-func NewImpactRecorder(impactStore ImpactStore, priceRepo PriceProvider) *ImpactRecorder {
+func NewImpactRecorder(impactStore ImpactStore, priceRepo PriceProvider, spotFetcher SpotPriceFetcher) *ImpactRecorder {
 	return &ImpactRecorder{
 		impactStore: impactStore,
 		priceRepo:   priceRepo,
+		spotFetcher: spotFetcher,
 	}
 }
 
@@ -54,24 +61,37 @@ func (r *ImpactRecorder) RecordImpact(ctx context.Context, ev domain.NewsEvent, 
 		return
 	}
 
-	// Get price at release time
+	// Get price at release time — try real-time spot price first
 	releaseTime := ev.TimeWIB
-	priceBefore, err := r.priceRepo.GetPriceAt(ctx, mapping.ContractCode, releaseTime)
-	if err != nil || priceBefore == nil {
-		// Fallback to latest available price
-		priceBefore, err = r.priceRepo.GetLatest(ctx, mapping.ContractCode)
-		if err != nil || priceBefore == nil {
-			impactLog.Debug().Str("currency", ev.Currency).Msg("no price data available for impact recording")
-			return
+	var beforePrice float64
+	if r.spotFetcher != nil {
+		spotPrice, err := r.spotFetcher.FetchSpotPrice(ctx, mapping.ContractCode)
+		if err == nil && spotPrice > 0 {
+			beforePrice = spotPrice
 		}
+	}
+	if beforePrice == 0 {
+		// Fallback to stored price
+		priceBefore, err := r.priceRepo.GetPriceAt(ctx, mapping.ContractCode, releaseTime)
+		if err != nil || priceBefore == nil {
+			priceBefore, err = r.priceRepo.GetLatest(ctx, mapping.ContractCode)
+			if err != nil || priceBefore == nil {
+				impactLog.Debug().Str("currency", ev.Currency).Msg("no price data available for impact recording")
+				return
+			}
+		}
+		beforePrice = priceBefore.Close
 	}
 
 	sigmaBucket := domain.SigmaToBucket(surpriseSigma)
-	beforePrice := priceBefore.Close
 
 	for _, horizon := range horizons {
 		var duration time.Duration
 		switch horizon {
+		case "15m":
+			duration = 15 * time.Minute
+		case "30m":
+			duration = 30 * time.Minute
 		case "1h":
 			duration = 1 * time.Hour
 		case "4h":
@@ -128,7 +148,18 @@ func (r *ImpactRecorder) delayedRecord(
 	case <-timer.C:
 	}
 
-	// Fetch the price after the delay
+	// Try real-time spot price first
+	if r.spotFetcher != nil {
+		spotPrice, spotErr := r.spotFetcher.FetchSpotPrice(ctx, contractCode)
+		if spotErr == nil && spotPrice > 0 {
+			mapping := domain.FindPriceMappingByCurrency(ev.Currency)
+			inverse := mapping != nil && mapping.Inverse
+			r.saveImpactRecord(ctx, ev, beforePrice, spotPrice, sigmaBucket, horizon, ev.TimeWIB, inverse)
+			return
+		}
+	}
+
+	// Fallback to stored price
 	priceAfter, err := r.priceRepo.GetLatest(ctx, contractCode)
 	if err != nil || priceAfter == nil {
 		impactLog.Warn().Str("currency", ev.Currency).Str("horizon", horizon).Msg("delayed impact: no price available")

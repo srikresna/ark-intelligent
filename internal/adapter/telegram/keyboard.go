@@ -384,6 +384,177 @@ func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKe
 	return ports.InlineKeyboard{Rows: rows}
 }
 
+// ---------------------------------------------------------------------------
+// Impact Keyboards
+// ---------------------------------------------------------------------------
+
+// ImpactCategoryMenu builds a categorized event selection keyboard.
+func (kb *KeyboardBuilder) ImpactCategoryMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "🏦 Central Banks", CallbackData: "imp:cat:cb"},
+				{Text: "📊 Inflation", CallbackData: "imp:cat:inf"},
+			},
+			{
+				{Text: "👷 Employment", CallbackData: "imp:cat:emp"},
+				{Text: "📈 Growth & PMI", CallbackData: "imp:cat:growth"},
+			},
+			{
+				{Text: "🛒 Consumer", CallbackData: "imp:cat:consumer"},
+				{Text: "🏠 Housing", CallbackData: "imp:cat:housing"},
+			},
+		},
+	}
+}
+
+// ImpactEventMenu builds event selection buttons for a category.
+func (kb *KeyboardBuilder) ImpactEventMenu(category string) ports.InlineKeyboard {
+	type eventDef struct {
+		Label string
+		Alias string
+	}
+
+	categories := map[string][]eventDef{
+		"cb": {
+			{"🇺🇸 FOMC/Fed Rate", "FOMC"},
+			{"🇬🇧 BOE Rate", "BOE"},
+			{"🇪🇺 ECB Rate", "ECB"},
+			{"🇯🇵 BOJ Rate", "BOJ"},
+			{"🇦🇺 RBA Rate", "RBA"},
+			{"🇨🇦 BOC Rate", "BOC"},
+			{"🇳🇿 RBNZ Rate", "RBNZ"},
+			{"🇨🇭 SNB Rate", "SNB"},
+		},
+		"inf": {
+			{"CPI m/m", "CPI"},
+			{"Core CPI m/m", "CORE_CPI"},
+			{"PPI m/m", "PPI"},
+			{"Core PCE", "PCE"},
+		},
+		"emp": {
+			{"NFP", "NFP"},
+			{"ADP Employment", "ADP"},
+			{"Jobless Claims", "CLAIMS"},
+			{"Avg Hourly Earnings", "WAGES"},
+		},
+		"growth": {
+			{"GDP q/q", "GDP"},
+			{"ISM Mfg PMI", "ISM"},
+		},
+		"consumer": {
+			{"Core Retail Sales", "RETAIL"},
+			{"CB Consumer Conf", "CB_CONSUMER"},
+			{"Consumer Price Exp", "PRICE_EXP"},
+		},
+		"housing": {
+			{"Existing Home Sales", "HOME_SALES"},
+			{"Building Permits", "PERMITS"},
+		},
+	}
+
+	events, ok := categories[category]
+	if !ok {
+		return ports.InlineKeyboard{}
+	}
+
+	var rows [][]ports.InlineButton
+	var currentRow []ports.InlineButton
+	for i, ev := range events {
+		btn := ports.InlineButton{
+			Text:         ev.Label,
+			CallbackData: fmt.Sprintf("imp:ev:%s", ev.Alias),
+		}
+		currentRow = append(currentRow, btn)
+		if len(currentRow) == 2 || i == len(events)-1 {
+			rows = append(rows, currentRow)
+			currentRow = nil
+		}
+	}
+	// Add back button
+	rows = append(rows, []ports.InlineButton{
+		{Text: "<< Back to Categories", CallbackData: "imp:back"},
+	})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// ---------------------------------------------------------------------------
+// Backtest Keyboards
+// ---------------------------------------------------------------------------
+
+// BacktestMenu builds the backtest sub-command selection keyboard.
+func (kb *KeyboardBuilder) BacktestMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Overview", CallbackData: "cmd:backtest:all"},
+				{Text: "📋 By Signal Type", CallbackData: "cmd:backtest:signals"},
+			},
+			{
+				{Text: "⏱ Timing", CallbackData: "cmd:backtest:timing"},
+				{Text: "🔄 Walk-Forward", CallbackData: "cmd:backtest:wf"},
+			},
+			{
+				{Text: "⚖️ Weights", CallbackData: "cmd:backtest:weights"},
+				{Text: "🧠 Smart Money", CallbackData: "cmd:backtest:sm"},
+			},
+			// Currency row
+			{
+				{Text: "EUR", CallbackData: "cmd:backtest:EUR"},
+				{Text: "GBP", CallbackData: "cmd:backtest:GBP"},
+				{Text: "JPY", CallbackData: "cmd:backtest:JPY"},
+				{Text: "AUD", CallbackData: "cmd:backtest:AUD"},
+			},
+			{
+				{Text: "NZD", CallbackData: "cmd:backtest:NZD"},
+				{Text: "CAD", CallbackData: "cmd:backtest:CAD"},
+				{Text: "CHF", CallbackData: "cmd:backtest:CHF"},
+				{Text: "GOLD", CallbackData: "cmd:backtest:XAU"},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Signal Keyboards
+// ---------------------------------------------------------------------------
+
+// COTDetailMenuWithSignals builds a COT detail keyboard with optional signal view button.
+func (kb *KeyboardBuilder) COTDetailMenuWithSignals(code string, isRaw bool, signalCount int, currency string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	if isRaw {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "📊 View Analysis", CallbackData: fmt.Sprintf("cot:analysis:%s", code)},
+		})
+	} else {
+		rows = append(rows, []ports.InlineButton{
+			{Text: "📄 View Raw Data", CallbackData: fmt.Sprintf("cot:raw:%s", code)},
+		})
+	}
+
+	// Signal view button if there are signals
+	if signalCount > 3 {
+		rows = append(rows, []ports.InlineButton{
+			{Text: fmt.Sprintf("🎯 View All %d Signals", signalCount), CallbackData: fmt.Sprintf("cmd:signals:%s", currency)},
+		})
+	}
+
+	// Quick-access buttons
+	currencyLabel := kb.contractLabel(code, code)
+	rows = append(rows, []ports.InlineButton{
+		{Text: "📈 Seasonal", CallbackData: fmt.Sprintf("cmd:seasonal:%s", currencyLabel)},
+		{Text: "💹 Sentiment", CallbackData: "cmd:sentiment"},
+	})
+
+	rows = append(rows, []ports.InlineButton{
+		{Text: "<< Back to Overview", CallbackData: "cot:overview"},
+	})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
+
 // MainMenu builds a quick-access keyboard for the main bot features.
 func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
