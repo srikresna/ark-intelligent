@@ -255,9 +255,9 @@ func (ca *ClaudeAnalyzer) GenerateUnifiedOutlook(ctx context.Context, data Unifi
 	// Each sub-request has minimal context: just a short summary + 1 search query.
 	// This avoids sending the full prompt + phase1 response which would be too large.
 	webSearchQueries := []string{
-		"Search for the latest forex market prices and major moves today for EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD, NZD/USD, USD/CHF, Gold, and Crude Oil. Report current prices and percentage changes.",
-		"Search for the latest central bank news, Fed statements, ECB/BOJ/BOE decisions, and any interest rate expectations changes this week.",
-		"Search for breaking geopolitical news, trade policy developments, and risk events that could impact forex and commodity markets this week.",
+		"Search for the latest forex market prices and major moves today for EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD, NZD/USD, USD/CHF, DXY, Gold, Silver, Copper, Crude Oil, RBOB Gasoline, Heating Oil, Bitcoin, and Ethereum. Report current prices and percentage changes.",
+		"Search for the latest central bank news, Fed statements, ECB/BOJ/BOE decisions, and any interest rate expectations changes this week. Also check for bond market moves in US Treasuries (2Y, 5Y, 10Y, 30Y).",
+		"Search for breaking geopolitical news, trade policy developments, equity index moves (S&P 500, Nasdaq, Dow, Russell 2000), crypto market cap trends, and risk events that could impact forex, commodity, and equity futures markets this week.",
 	}
 
 	var webFindings []string

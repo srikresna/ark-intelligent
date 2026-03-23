@@ -17,6 +17,7 @@ type COTContract struct {
 }
 
 var DefaultCOTContracts = []COTContract{
+	// --- FX Majors (TFF) ---
 	{Code: "099741", Name: "Euro FX", Symbol: "6E", Currency: "EUR", Inverse: false, ReportType: "TFF"},
 	{Code: "096742", Name: "British Pound", Symbol: "6B", Currency: "GBP", Inverse: false, ReportType: "TFF"},
 	{Code: "097741", Name: "Japanese Yen", Symbol: "6J", Currency: "JPY", Inverse: false, ReportType: "TFF"},
@@ -25,9 +26,32 @@ var DefaultCOTContracts = []COTContract{
 	{Code: "090741", Name: "Canadian Dollar", Symbol: "6C", Currency: "CAD", Inverse: false, ReportType: "TFF"},
 	{Code: "112741", Name: "NZ Dollar", Symbol: "6N", Currency: "NZD", Inverse: false, ReportType: "TFF"},
 	{Code: "098662", Name: "US Dollar Index", Symbol: "DX", Currency: "USD", Inverse: true, ReportType: "TFF"},
+
+	// --- Metals (DISAGGREGATED) ---
 	{Code: "088691", Name: "Gold", Symbol: "GC", Currency: "XAU", Inverse: false, ReportType: "DISAGGREGATED"},
+	{Code: "084691", Name: "Silver", Symbol: "SI", Currency: "XAG", Inverse: false, ReportType: "DISAGGREGATED"},
+	{Code: "085692", Name: "Copper", Symbol: "HG", Currency: "COPPER", Inverse: false, ReportType: "DISAGGREGATED"},
+
+	// --- Energy (DISAGGREGATED) ---
 	{Code: "067651", Name: "Crude Oil WTI", Symbol: "CL", Currency: "OIL", Inverse: false, ReportType: "DISAGGREGATED"},
+	{Code: "022651", Name: "NY Harbor ULSD", Symbol: "HO", Currency: "ULSD", Inverse: false, ReportType: "DISAGGREGATED"},
+	{Code: "111659", Name: "RBOB Gasoline", Symbol: "RB", Currency: "RBOB", Inverse: false, ReportType: "DISAGGREGATED"},
+
+	// --- Bonds (TFF) ---
 	{Code: "043602", Name: "10-Year T-Note", Symbol: "ZN", Currency: "BOND", Inverse: false, ReportType: "TFF"},
+	{Code: "020601", Name: "30-Year T-Bond", Symbol: "ZB", Currency: "BOND30", Inverse: false, ReportType: "TFF"},
+	{Code: "044601", Name: "5-Year T-Note", Symbol: "ZF", Currency: "BOND5", Inverse: false, ReportType: "TFF"},
+	{Code: "042601", Name: "2-Year T-Note", Symbol: "TU", Currency: "BOND2", Inverse: false, ReportType: "TFF"},
+
+	// --- Equity Indices (TFF) ---
+	{Code: "13874A", Name: "S&P 500 E-mini", Symbol: "ES", Currency: "SPX500", Inverse: false, ReportType: "TFF"},
+	{Code: "209742", Name: "Nasdaq 100 E-mini", Symbol: "NQ", Currency: "NDX", Inverse: false, ReportType: "TFF"},
+	{Code: "124601", Name: "Dow Jones E-mini", Symbol: "YM", Currency: "DJI", Inverse: false, ReportType: "TFF"},
+	{Code: "239742", Name: "Russell 2000 E-mini", Symbol: "RTY", Currency: "RUT", Inverse: false, ReportType: "TFF"},
+
+	// --- Crypto (TFF) ---
+	{Code: "133741", Name: "Bitcoin", Symbol: "BTC", Currency: "BTC", Inverse: false, ReportType: "TFF"},
+	{Code: "146021", Name: "Ether", Symbol: "ETH", Currency: "ETH", Inverse: false, ReportType: "TFF"},
 }
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,7 @@ type Config struct {
 	// Price APIs (optional — graceful degradation to Yahoo fallback)
 	TwelveDataAPIKey    string        // Twelve Data API key (for forex + gold)
 	AlphaVantageAPIKeys []string      // Alpha Vantage API keys (comma-separated, for oil + treasury)
+	CoinGeckoAPIKey     string        // CoinGecko API key (for TOTAL3 altcoin market cap)
 	PriceFetchInterval  time.Duration // How often to fetch price data
 	PriceHistoryWeeks   int           // How many weeks of price history to bootstrap
 
@@ -106,6 +107,7 @@ func MustLoad() *Config {
 		// Price APIs
 		TwelveDataAPIKey:    getEnv("TWELVE_DATA_API_KEY", ""),
 		AlphaVantageAPIKeys: getStringSlice("ALPHA_VANTAGE_API_KEYS"),
+		CoinGeckoAPIKey:     getEnv("COINGECKO_API_KEY", ""),
 		PriceFetchInterval:  getDuration("PRICE_FETCH_INTERVAL", 6*time.Hour),
 		PriceHistoryWeeks:   getInt("PRICE_HISTORY_WEEKS", 52),
 	}
@@ -132,6 +134,11 @@ func (c *Config) HasTwelveData() bool {
 // HasAlphaVantage returns true if at least one Alpha Vantage API key is configured.
 func (c *Config) HasAlphaVantage() bool {
 	return len(c.AlphaVantageAPIKeys) > 0
+}
+
+// HasCoinGecko returns true if CoinGecko API key is configured.
+func (c *Config) HasCoinGecko() bool {
+	return c.CoinGeckoAPIKey != ""
 }
 
 // validate performs additional validation beyond required env vars.

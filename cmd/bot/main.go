@@ -205,8 +205,12 @@ func main() {
 	// News services (uses MQL5 Economic Calendar API — no API key required)
 	newsFetcher := newssvc.NewMQL5Fetcher()
 
-	// Price fetcher (3-layer resilience: TwelveData → AlphaVantage → Yahoo)
+	// Price fetcher (3-layer resilience: TwelveData → AlphaVantage → Yahoo + CoinGecko)
 	priceFetcher := pricesvc.NewFetcher(cfg.TwelveDataAPIKey, cfg.AlphaVantageAPIKeys)
+	if cfg.CoinGeckoAPIKey != "" {
+		priceFetcher.SetCoinGeckoKey(cfg.CoinGeckoAPIKey)
+		log.Info().Msg("CoinGecko API key configured for TOTAL3 market cap data")
+	}
 
 	// Backtest evaluator
 	signalEvaluator := backtestsvc.NewEvaluator(signalRepo, priceRepo)

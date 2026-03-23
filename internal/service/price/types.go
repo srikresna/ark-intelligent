@@ -103,3 +103,11 @@ type yahooError struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 }
+
+// --- CoinGecko ---
+
+type coinGeckoMarketCapResponse struct {
+	MarketCapChart struct {
+		MarketCap [][]float64 `json:"market_cap"`
+	} `json:"market_cap_chart"`
+}

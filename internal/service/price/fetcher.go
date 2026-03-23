@@ -20,14 +20,17 @@ var log = logger.Component("price")
 
 // Fetcher implements ports.PriceFetcher with 3-layer resilience:
 // Twelve Data (primary) → Alpha Vantage (secondary) → Yahoo Finance (fallback).
+// CoinGecko is used as a dedicated provider for crypto market cap data (TOTAL3).
 type Fetcher struct {
 	httpClient     *http.Client
 	twelveDataKey  string
 	avKeys         []string
 	avKeyIndex     uint64 // atomic counter for round-robin AV key selection
+	coinGeckoKey   string
 	cbTwelveData   *circuitbreaker.Breaker
 	cbAlphaVantage *circuitbreaker.Breaker
 	cbYahoo        *circuitbreaker.Breaker
+	cbCoinGecko    *circuitbreaker.Breaker
 }
 
 // NewFetcher creates a new price fetcher with the given API keys.
@@ -42,7 +45,13 @@ func NewFetcher(twelveDataKey string, avKeys []string) *Fetcher {
 		cbTwelveData:   circuitbreaker.New("twelve-data", 3, 5*time.Minute),
 		cbAlphaVantage: circuitbreaker.New("alpha-vantage", 3, 5*time.Minute),
 		cbYahoo:        circuitbreaker.New("yahoo-finance", 5, 3*time.Minute),
+		cbCoinGecko:    circuitbreaker.New("coingecko", 3, 5*time.Minute),
 	}
+}
+
+// SetCoinGeckoKey sets the CoinGecko API key for TOTAL3 market cap data.
+func (f *Fetcher) SetCoinGeckoKey(key string) {
+	f.coinGeckoKey = key
 }
 
 // ContractFetchResult holds the result of fetching price data for a single contract.
@@ -76,8 +85,7 @@ func (f *Fetcher) FetchAllDetailed(ctx context.Context, weeks int) ([]domain.Pri
 	var lastErr error
 	report := &FetchReport{}
 
-	// Use COTPriceSymbolMappings to exclude RiskOnly instruments (VIX, SPX).
-	// Risk-only instruments are fetched separately via FetchRiskInstruments.
+	// Fetch COT-contract price mappings (excludes risk-only and synthetic instruments).
 	for _, mapping := range domain.COTPriceSymbolMappings() {
 		records, err := f.FetchWeekly(ctx, mapping, weeks)
 		if err != nil {
@@ -105,6 +113,38 @@ func (f *Fetcher) FetchAllDetailed(ctx context.Context, weeks int) ([]domain.Pri
 		report.Success++
 
 		// Rate limit between calls to respect API limits
+		select {
+		case <-ctx.Done():
+			report.Duration = time.Since(start)
+			return allRecords, report, ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+
+	// Fetch price-only instruments (cross pairs, CoinGecko TOTAL3).
+	for _, mapping := range domain.PriceOnlyMappings() {
+		records, err := f.FetchWeekly(ctx, mapping, weeks)
+		if err != nil {
+			log.Warn().Err(err).Str("instrument", mapping.Currency).Msg("Price-only instrument fetch failed — skipping")
+			report.Results = append(report.Results, ContractFetchResult{
+				Currency: mapping.Currency,
+				Error:    err.Error(),
+			})
+			report.Failed++
+			continue
+		}
+		allRecords = append(allRecords, records...)
+		src := ""
+		if len(records) > 0 {
+			src = records[0].Source
+		}
+		report.Results = append(report.Results, ContractFetchResult{
+			Currency: mapping.Currency,
+			Source:   src,
+			Records:  len(records),
+		})
+		report.Success++
+
 		select {
 		case <-ctx.Done():
 			report.Duration = time.Since(start)
@@ -142,8 +182,20 @@ func (f *Fetcher) FetchRiskInstruments(ctx context.Context, weeks int) ([]domain
 }
 
 // FetchWeekly fetches weekly OHLC data for a single contract.
-// Tries: TwelveData → AlphaVantage → Yahoo Finance.
+// Tries: CoinGecko (if applicable) → TwelveData → AlphaVantage → Yahoo Finance → Synthetic cross.
 func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMapping, weeks int) ([]domain.PriceRecord, error) {
+	// CoinGecko-sourced instruments (TOTAL3) — dedicated provider, no fallback chain
+	if mapping.CoinGecko != "" && f.coinGeckoKey != "" {
+		records, err := f.fetchCoinGecko(ctx, mapping, weeks)
+		if err == nil && len(records) > 0 {
+			return records, nil
+		}
+		if err != nil {
+			log.Debug().Err(err).Str("id", mapping.CoinGecko).Msg("CoinGecko failed")
+		}
+		// Fall through to Yahoo if available
+	}
+
 	// Try Twelve Data first (if key configured and symbol available)
 	if f.twelveDataKey != "" && mapping.TwelveData != "" {
 		records, err := f.fetchTwelveData(ctx, mapping, weeks)
@@ -173,7 +225,18 @@ func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMap
 			return records, nil
 		}
 		if err != nil {
-			return nil, fmt.Errorf("all sources failed for %s: yahoo: %w", mapping.Currency, err)
+			log.Debug().Err(err).Str("symbol", mapping.Yahoo).Msg("Yahoo failed")
+		}
+	}
+
+	// Final fallback: synthetic cross pair calculation (e.g. XAU/EUR = XAU/USD ÷ EUR/USD)
+	if cross, ok := syntheticCrossDef(mapping.Currency); ok {
+		records, err := f.fetchSyntheticCross(ctx, mapping, cross, weeks)
+		if err == nil && len(records) > 0 {
+			return records, nil
+		}
+		if err != nil {
+			log.Debug().Err(err).Str("cross", mapping.Currency).Msg("Synthetic cross failed")
 		}
 	}
 
@@ -264,7 +327,7 @@ func (f *Fetcher) fetchAlphaVantage(ctx context.Context, mapping domain.PriceSym
 				"https://www.alphavantage.co/query?function=FX_WEEKLY&from_symbol=%s&to_symbol=%s&apikey=%s",
 				spec.FromSymbol, spec.ToSymbol, key,
 			)
-		case "WTI", "BRENT", "NATURAL_GAS":
+		case "WTI", "BRENT", "NATURAL_GAS", "COPPER":
 			url = fmt.Sprintf(
 				"https://www.alphavantage.co/query?function=%s&interval=weekly&apikey=%s",
 				spec.Function, key,
@@ -274,10 +337,10 @@ func (f *Fetcher) fetchAlphaVantage(ctx context.Context, mapping domain.PriceSym
 				"https://www.alphavantage.co/query?function=TREASURY_YIELD&interval=weekly&maturity=10year&apikey=%s",
 				key,
 			)
-		case "GOLD_SILVER_SPOT":
-			// Gold spot is real-time only, not historical. For historical gold, use FX_WEEKLY XAU/USD
+		case "GOLD_SILVER_SPOT", "SILVER":
+			// Gold/Silver spot is real-time only, not historical. For historical, use FX_WEEKLY XAU/USD
 			// or fall through to Yahoo.
-			return fmt.Errorf("gold spot is real-time only, skipping AV for historical")
+			return fmt.Errorf("gold/silver spot is real-time only, skipping AV for historical")
 		default:
 			return fmt.Errorf("unsupported AV function: %s", spec.Function)
 		}
@@ -471,7 +534,272 @@ func (f *Fetcher) fetchYahoo(ctx context.Context, mapping domain.PriceSymbolMapp
 	return records, err
 }
 
+// --- Synthetic Cross Pairs ---
+
+// crossDef defines components for computing a synthetic cross pair.
+type crossDef struct {
+	numeratorCurrency   string // e.g. "XAU" → fetched as XAU/USD (GC=F)
+	denominatorCurrency string // e.g. "EUR" → fetched as EUR/USD (EURUSD=X)
+}
+
+// syntheticCrossDef returns the cross definition for a synthetic cross pair.
+func syntheticCrossDef(currency string) (crossDef, bool) {
+	defs := map[string]crossDef{
+		"XAUEUR": {numeratorCurrency: "XAU", denominatorCurrency: "EUR"},
+		"XAUGBP": {numeratorCurrency: "XAU", denominatorCurrency: "GBP"},
+		"XAGEUR": {numeratorCurrency: "XAG", denominatorCurrency: "EUR"},
+		"XAGGBP": {numeratorCurrency: "XAG", denominatorCurrency: "GBP"},
+	}
+	d, ok := defs[currency]
+	return d, ok
+}
+
+// fetchSyntheticCross computes a cross pair from two USD-based price series.
+// E.g. XAU/EUR = XAU/USD ÷ EUR/USD
+// Uses ISO-week matching since different Yahoo symbols have slightly different timestamps.
+func (f *Fetcher) fetchSyntheticCross(ctx context.Context, mapping domain.PriceSymbolMapping, cross crossDef, weeks int) ([]domain.PriceRecord, error) {
+	numMapping := domain.FindPriceMappingByCurrency(cross.numeratorCurrency)
+	denMapping := domain.FindPriceMappingByCurrency(cross.denominatorCurrency)
+	if numMapping == nil || denMapping == nil {
+		return nil, fmt.Errorf("synthetic cross: missing mapping for %s or %s", cross.numeratorCurrency, cross.denominatorCurrency)
+	}
+
+	numRecords, err := f.FetchWeekly(ctx, *numMapping, weeks)
+	if err != nil {
+		return nil, fmt.Errorf("synthetic cross numerator %s: %w", cross.numeratorCurrency, err)
+	}
+	denRecords, err := f.FetchWeekly(ctx, *denMapping, weeks)
+	if err != nil {
+		return nil, fmt.Errorf("synthetic cross denominator %s: %w", cross.denominatorCurrency, err)
+	}
+
+	// Build ISO-week-indexed map for denominator (handles different Yahoo timestamps)
+	denMap := make(map[string]domain.PriceRecord)
+	for _, r := range denRecords {
+		y, w := r.Date.ISOWeek()
+		key := fmt.Sprintf("%d-%02d", y, w)
+		denMap[key] = r
+	}
+
+	var records []domain.PriceRecord
+	for _, num := range numRecords {
+		y, w := num.Date.ISOWeek()
+		key := fmt.Sprintf("%d-%02d", y, w)
+		den, ok := denMap[key]
+		if !ok || den.Close == 0 || den.Open == 0 {
+			continue
+		}
+		rec := domain.PriceRecord{
+			ContractCode: mapping.ContractCode,
+			Symbol:       mapping.Currency,
+			Date:         num.Date,
+			Open:         num.Open / den.Open,
+			High:         num.High / den.Low, // max ratio when num is high and den is low
+			Low:          num.Low / den.High,  // min ratio when num is low and den is high
+			Close:        num.Close / den.Close,
+			Source:       "synthetic",
+		}
+		if rec.Close > 0 {
+			records = append(records, rec)
+		}
+	}
+
+	if len(records) == 0 {
+		return nil, fmt.Errorf("synthetic cross: no matching dates for %s", mapping.Currency)
+	}
+
+	sortRecordsByDate(records)
+	if len(records) > weeks {
+		records = records[:weeks]
+	}
+	return records, nil
+}
+
 // --- Helpers ---
+
+// --- CoinGecko ---
+
+// coinGeckoDays maps weeks to the nearest valid CoinGecko days parameter.
+// CoinGecko only accepts: 1, 7, 14, 30, 90, 180, 365, max.
+func coinGeckoDays(weeks int) string {
+	days := weeks * 7
+	switch {
+	case days <= 7:
+		return "7"
+	case days <= 14:
+		return "14"
+	case days <= 30:
+		return "30"
+	case days <= 90:
+		return "90"
+	case days <= 180:
+		return "180"
+	case days <= 365:
+		return "365"
+	default:
+		return "max"
+	}
+}
+
+// fetchCoinGecko fetches TOTAL3 (altcoin market cap excl BTC+ETH) from CoinGecko.
+// Strategy: fetch BTC and ETH market cap charts, then use /global for total, compute TOTAL3 = total - BTC - ETH.
+// Uses demo API (api.coingecko.com) since CG- keys are demo tier.
+func (f *Fetcher) fetchCoinGecko(ctx context.Context, mapping domain.PriceSymbolMapping, weeks int) ([]domain.PriceRecord, error) {
+	var records []domain.PriceRecord
+
+	err := f.cbCoinGecko.Execute(func() error {
+		daysParam := coinGeckoDays(weeks)
+		headers := map[string]string{
+			"x-cg-demo-api-key": f.coinGeckoKey,
+		}
+
+		// Fetch BTC, ETH, and total crypto market cap charts in sequence
+		// (total uses /coins/list with category filter isn't available, so we approximate
+		// by using a stablecoin-excluded total from individual large-cap queries)
+		btcData, err := f.fetchCoinGeckoMarketChart(ctx, "bitcoin", daysParam, headers)
+		if err != nil {
+			return fmt.Errorf("coingecko btc: %w", err)
+		}
+		time.Sleep(300 * time.Millisecond) // Rate limit
+
+		ethData, err := f.fetchCoinGeckoMarketChart(ctx, "ethereum", daysParam, headers)
+		if err != nil {
+			return fmt.Errorf("coingecko eth: %w", err)
+		}
+		time.Sleep(300 * time.Millisecond)
+
+		// Get current total market cap from /global to establish the ratio
+		globalBody, err := f.doGet(ctx, "https://api.coingecko.com/api/v3/global", headers)
+		if err != nil {
+			return fmt.Errorf("coingecko global: %w", err)
+		}
+		var globalResp struct {
+			Data struct {
+				TotalMarketCap      map[string]float64 `json:"total_market_cap"`
+				MarketCapPercentage map[string]float64 `json:"market_cap_percentage"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(globalBody, &globalResp); err != nil {
+			return fmt.Errorf("coingecko global parse: %w", err)
+		}
+
+		totalMcap := globalResp.Data.TotalMarketCap["usd"]
+		btcDom := globalResp.Data.MarketCapPercentage["btc"] / 100.0
+		if totalMcap == 0 {
+			return fmt.Errorf("coingecko: total market cap is zero")
+		}
+
+		// Build time-indexed BTC and ETH market cap maps
+		btcMap := make(map[string]float64)
+		for _, dp := range btcData {
+			if len(dp) >= 2 {
+				t := time.Unix(int64(dp[0])/1000, 0).UTC()
+				btcMap[t.Format("2006-01-02")] = dp[1]
+			}
+		}
+		ethMap := make(map[string]float64)
+		for _, dp := range ethData {
+			if len(dp) >= 2 {
+				t := time.Unix(int64(dp[0])/1000, 0).UTC()
+				ethMap[t.Format("2006-01-02")] = dp[1]
+			}
+		}
+
+		// Estimate historical total market cap from BTC dominance:
+		// total_mcap_t ≈ btc_mcap_t / btc_dominance_current
+		// Then TOTAL3_t = total_mcap_t - btc_mcap_t - eth_mcap_t
+		// This approximation is reasonable for short periods (dominance changes slowly).
+		type dailyPoint struct {
+			date  time.Time
+			value float64
+		}
+
+		var daily []dailyPoint
+		for _, dp := range btcData {
+			if len(dp) < 2 || btcDom == 0 {
+				continue
+			}
+			t := time.Unix(int64(dp[0])/1000, 0).UTC()
+			dateKey := t.Format("2006-01-02")
+			btcMcap := dp[1]
+			estTotal := btcMcap / btcDom
+			ethMcap := ethMap[dateKey]
+			total3 := estTotal - btcMcap - ethMcap
+			if total3 > 0 {
+				daily = append(daily, dailyPoint{date: t, value: total3})
+			}
+		}
+
+		if len(daily) == 0 {
+			return fmt.Errorf("coingecko: no TOTAL3 data computed")
+		}
+
+		// Aggregate into weekly records
+		weekMap := make(map[string]*domain.PriceRecord)
+		for _, d := range daily {
+			year, week := d.date.ISOWeek()
+			key := fmt.Sprintf("%d-%02d", year, week)
+
+			if rec, ok := weekMap[key]; ok {
+				if d.value > rec.High {
+					rec.High = d.value
+				}
+				if d.value < rec.Low {
+					rec.Low = d.value
+				}
+				if d.date.After(rec.Date) {
+					rec.Close = d.value
+					rec.Date = d.date
+				}
+			} else {
+				weekMap[key] = &domain.PriceRecord{
+					ContractCode: mapping.ContractCode,
+					Symbol:       "TOTAL3",
+					Date:         d.date,
+					Open:         d.value,
+					High:         d.value,
+					Low:          d.value,
+					Close:        d.value,
+					Source:       "coingecko",
+				}
+			}
+		}
+
+		records = make([]domain.PriceRecord, 0, len(weekMap))
+		for _, rec := range weekMap {
+			records = append(records, *rec)
+		}
+
+		sortRecordsByDate(records)
+		if len(records) > weeks {
+			records = records[:weeks]
+		}
+		return nil
+	})
+
+	return records, err
+}
+
+// fetchCoinGeckoMarketChart fetches historical market cap for a specific coin (demo API).
+func (f *Fetcher) fetchCoinGeckoMarketChart(ctx context.Context, coinID, days string, headers map[string]string) ([][]float64, error) {
+	url := fmt.Sprintf(
+		"https://api.coingecko.com/api/v3/coins/%s/market_chart?days=%s&vs_currency=usd",
+		coinID, days,
+	)
+	body, err := f.doGet(ctx, url, headers)
+	if err != nil {
+		return nil, fmt.Errorf("coingecko %s chart: %w", coinID, err)
+	}
+	var resp struct {
+		MarketCaps [][]float64 `json:"market_caps"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("coingecko %s parse: %w", coinID, err)
+	}
+	return resp.MarketCaps, nil
+}
+
+// --- Helpers (general) ---
 
 func (f *Fetcher) nextAVKey() string {
 	if len(f.avKeys) == 0 {

@@ -266,9 +266,9 @@ func TestCOTPriceMappings_ExcludesRiskOnly(t *testing.T) {
 			t.Errorf("COTPriceSymbolMappings() should not include RiskOnly mapping %s", m.Currency)
 		}
 	}
-	// Should still have 11 COT contracts
-	if len(cotMappings) != 11 {
-		t.Errorf("expected 11 COT mappings, got %d", len(cotMappings))
+	// Should have 24 COT contracts (11 original + 13 new assets)
+	if len(cotMappings) != 24 {
+		t.Errorf("expected 24 COT mappings, got %d", len(cotMappings))
 	}
 }
 
