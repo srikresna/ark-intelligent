@@ -26,6 +26,7 @@ import (
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
+	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
@@ -54,6 +55,10 @@ type Deps struct {
 	SignalRepo   ports.SignalRepository
 	PriceFetcher ports.PriceFetcher
 	Evaluator    *backtestsvc.Evaluator
+
+	// ImpactBootstrapper backfills historical event impact data on startup.
+	// May be nil (bootstrap is skipped).
+	ImpactBootstrapper *newssvc.ImpactBootstrapper
 
 	// FREDAlertCheck is a callback that returns whether a user should receive FRED alerts.
 	// Free-tier users are excluded. May be nil (all users receive FRED alerts).
@@ -136,6 +141,30 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	if s.deps.Evaluator != nil {
 		s.startJobWithDelay(ctx, "signal-eval", 2*time.Hour, 1*time.Minute, s.jobSignalEval)
 		jobCount++
+	}
+
+	// One-time impact bootstrap (backfills historical event impacts on startup)
+	if s.deps.ImpactBootstrapper != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			// Delay to let price data load first.
+			select {
+			case <-time.After(2 * time.Minute):
+			case <-ctx.Done():
+				return
+			case <-s.stopCh:
+				return
+			}
+			bootstrapCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel()
+			created, err := s.deps.ImpactBootstrapper.Bootstrap(bootstrapCtx)
+			if err != nil {
+				log.Error().Err(err).Msg("impact bootstrap failed")
+			} else if created > 0 {
+				log.Info().Int("created", created).Msg("impact bootstrap completed")
+			}
+		}()
 	}
 
 	log.Info().Int("jobs", jobCount).Msg("started background jobs")

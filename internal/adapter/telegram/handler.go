@@ -9,13 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
-	portfoliosvc "github.com/arkcode369/ark-intelligent/internal/service/portfolio"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
@@ -62,9 +60,6 @@ type Handler struct {
 	// May be nil — impact feature disabled if not wired.
 	impactProvider ImpactProvider
 
-	// portfolioRepo stores per-user portfolio positions. May be nil.
-	portfolioRepo *storage.PortfolioRepo
-
 	// changelog is the embedded CHANGELOG.md content, injected at startup.
 	changelog string
 
@@ -107,7 +102,6 @@ func NewHandler(
 	chatService *aisvc.ChatService,
 	claudeAnalyzer *aisvc.ClaudeAnalyzer,
 	impactProvider ImpactProvider,
-	portfolioRepo *storage.PortfolioRepo,
 ) *Handler {
 	h := &Handler{
 		bot:            bot,
@@ -129,7 +123,6 @@ func NewHandler(
 		chatService:    chatService,
 		claudeAnalyzer: claudeAnalyzer,
 		impactProvider: impactProvider,
-		portfolioRepo:  portfolioRepo,
 	}
 
 	// Register all commands
@@ -147,7 +140,6 @@ func NewHandler(
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)  // Quick accuracy summary
 	bot.RegisterCommand("/report", h.cmdReport)      // Weekly performance report
 	bot.RegisterCommand("/impact", h.cmdImpact)      // Event Impact Database
-	bot.RegisterCommand("/portfolio", h.cmdPortfolio) // Portfolio Risk Monitor
 	bot.RegisterCommand("/sentiment", h.cmdSentiment) // Sentiment Survey Dashboard
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)   // Seasonal Pattern Analysis
 
@@ -172,7 +164,7 @@ func NewHandler(
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
 
-	log.Info().Int("commands", 23).Int("callbacks", 6).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 22).Int("callbacks", 6).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -211,11 +203,6 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>🏛 Macro &amp; Impact</b>
 /macro — FRED regime + asset performance matrix
 /impact — Event impact DB · <code>/impact NFP</code>
-
-<b>💼 Portfolio</b>
-/portfolio — View positions + risk analysis
-<code>/portfolio add EUR LONG 1.0</code> — Add position
-<code>/portfolio remove EUR</code> — Remove position
 
 <b>⚙️ Settings</b>
 /settings · /membership · /status · /clear
@@ -1888,201 +1875,6 @@ func (h *Handler) cmdImpact(ctx context.Context, chatID string, _ int64, args st
 	html := h.fmt.FormatEventImpact(query, summaries)
 	_, err = h.bot.SendHTML(ctx, chatID, html)
 	return err
-}
-
-// ---------------------------------------------------------------------------
-// /portfolio — Portfolio Risk Monitor
-// ---------------------------------------------------------------------------
-
-// cmdPortfolio handles the /portfolio command.
-// /portfolio                 — view portfolio with risk analysis
-// /portfolio view            — same as above
-// /portfolio add EUR LONG 1.0 — add a position (optional: 1.08500 entry price)
-// /portfolio remove EUR      — remove a position
-// /portfolio clear           — clear all positions
-func (h *Handler) cmdPortfolio(ctx context.Context, chatID string, userID int64, args string) error {
-	if h.portfolioRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Portfolio feature is not available.")
-		return err
-	}
-
-	parts := strings.Fields(strings.TrimSpace(args))
-
-	// Determine subcommand.
-	subCmd := "view"
-	if len(parts) > 0 {
-		subCmd = strings.ToLower(parts[0])
-	}
-
-	switch subCmd {
-	case "add":
-		return h.portfolioAdd(ctx, chatID, userID, parts[1:])
-	case "remove":
-		return h.portfolioRemove(ctx, chatID, userID, parts[1:])
-	case "clear":
-		return h.portfolioClear(ctx, chatID, userID)
-	case "view", "":
-		return h.portfolioView(ctx, chatID, userID)
-	default:
-		// Treat unknown subcommand as "view"
-		return h.portfolioView(ctx, chatID, userID)
-	}
-}
-
-// portfolioAdd handles /portfolio add EUR LONG 1.0 [entryPrice]
-func (h *Handler) portfolioAdd(ctx context.Context, chatID string, userID int64, args []string) error {
-	if len(args) < 3 {
-		_, err := h.bot.SendHTML(ctx, chatID,
-			"Usage: <code>/portfolio add CURRENCY DIRECTION SIZE [ENTRY_PRICE]</code>\n"+
-				"Example: <code>/portfolio add EUR LONG 1.0</code>\n"+
-				"Example: <code>/portfolio add GBP SHORT 0.5 1.27500</code>")
-		return err
-	}
-
-	currency := strings.ToUpper(args[0])
-
-	// Validate currency exists in our tracked instruments.
-	mapping := domain.FindPriceMappingByCurrency(currency)
-	if mapping == nil {
-		_, err := h.bot.SendHTML(ctx, chatID,
-			fmt.Sprintf("Unknown currency <b>%s</b>. Supported: EUR, GBP, JPY, CHF, AUD, CAD, NZD, USD, XAU, OIL, BOND",
-				html.EscapeString(currency)))
-		return err
-	}
-
-	direction := strings.ToUpper(args[1])
-	if direction != "LONG" && direction != "SHORT" {
-		_, err := h.bot.SendHTML(ctx, chatID, "Direction must be <b>LONG</b> or <b>SHORT</b>.")
-		return err
-	}
-
-	size, err := parseFloat(args[2])
-	if err != nil || size <= 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "Size must be a positive number (e.g. 1.0, 0.5).")
-		return err
-	}
-
-	var entryPrice float64
-	if len(args) >= 4 {
-		ep, err := parseFloat(args[3])
-		if err != nil || ep <= 0 {
-			_, err := h.bot.SendHTML(ctx, chatID, "Entry price must be a positive number.")
-			return err
-		}
-		entryPrice = ep
-	}
-
-	pos := domain.Position{
-		Currency:   currency,
-		Direction:  direction,
-		Size:       size,
-		EntryPrice: entryPrice,
-		AddedAt:    time.Now(),
-	}
-
-	if err := h.portfolioRepo.SavePosition(ctx, userID, pos); err != nil {
-		log.Error().Err(err).Int64("user", userID).Msg("portfolio: save position failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to save position.")
-		return sendErr
-	}
-
-	_, err = h.bot.SendHTML(ctx, chatID,
-		fmt.Sprintf("Added <b>%s %s %.2f lots</b> to portfolio.\nUse /portfolio to view risk analysis.",
-			currency, direction, size))
-	return err
-}
-
-// portfolioRemove handles /portfolio remove EUR
-func (h *Handler) portfolioRemove(ctx context.Context, chatID string, userID int64, args []string) error {
-	if len(args) < 1 {
-		_, err := h.bot.SendHTML(ctx, chatID,
-			"Usage: <code>/portfolio remove CURRENCY</code>\nExample: <code>/portfolio remove EUR</code>")
-		return err
-	}
-
-	currency := strings.ToUpper(args[0])
-	if err := h.portfolioRepo.RemovePosition(ctx, userID, currency); err != nil {
-		log.Error().Err(err).Int64("user", userID).Str("currency", currency).Msg("portfolio: remove failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to remove position.")
-		return sendErr
-	}
-
-	_, err := h.bot.SendHTML(ctx, chatID,
-		fmt.Sprintf("Removed <b>%s</b> from portfolio.", currency))
-	return err
-}
-
-// portfolioClear handles /portfolio clear
-func (h *Handler) portfolioClear(ctx context.Context, chatID string, userID int64) error {
-	if err := h.portfolioRepo.ClearPortfolio(ctx, userID); err != nil {
-		log.Error().Err(err).Int64("user", userID).Msg("portfolio: clear failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to clear portfolio.")
-		return sendErr
-	}
-
-	_, err := h.bot.SendHTML(ctx, chatID, "Portfolio cleared.")
-	return err
-}
-
-// portfolioView handles /portfolio (view) — shows positions + risk analysis.
-func (h *Handler) portfolioView(ctx context.Context, chatID string, userID int64) error {
-	positions, err := h.portfolioRepo.GetPositions(ctx, userID)
-	if err != nil {
-		log.Error().Err(err).Int64("user", userID).Msg("portfolio: get positions failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "Failed to load portfolio.")
-		return sendErr
-	}
-
-	if len(positions) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID,
-			"📋 <b>PORTFOLIO RISK MONITOR</b>\n\n"+
-				"<i>No positions found.</i>\n\n"+
-				"<code>/portfolio add EUR LONG 1.0</code> — add position\n"+
-				"<code>/portfolio add GBP SHORT 0.5 1.275</code> — with entry price")
-		return err
-	}
-
-	// Build price history for correlation matrix (best-effort, uses price repo).
-	var corrMatrix map[string]map[string]float64
-	if h.priceRepo != nil {
-		priceHistory := make(map[string][]domain.PriceRecord)
-		for _, p := range positions {
-			mapping := domain.FindPriceMappingByCurrency(p.Currency)
-			if mapping == nil {
-				continue
-			}
-			records, err := h.priceRepo.GetHistory(ctx, mapping.ContractCode, 26)
-			if err == nil && len(records) > 0 {
-				priceHistory[p.Currency] = records
-			}
-		}
-		if len(priceHistory) > 1 {
-			corrMatrix = portfoliosvc.ComputeCorrelationMatrix(priceHistory)
-		}
-	}
-	if corrMatrix == nil {
-		corrMatrix = make(map[string]map[string]float64)
-	}
-
-	// Determine current regime (best-effort).
-	currentRegime := ""
-	if md, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && md != nil {
-		r := fred.ClassifyMacroRegime(md)
-		currentRegime = r.Name
-	}
-
-	risk := portfoliosvc.AnalyzePortfolioRisk(positions, corrMatrix, currentRegime)
-	htmlMsg := h.fmt.FormatPortfolioRisk(risk)
-
-	_, err = h.bot.SendHTML(ctx, chatID, htmlMsg)
-	return err
-}
-
-// parseFloat is a small helper for parsing command arguments.
-func parseFloat(s string) (float64, error) {
-	var f float64
-	_, err := fmt.Sscanf(s, "%f", &f)
-	return f, err
 }
 
 // eventAliases maps common abbreviations to full event names.
