@@ -43,13 +43,14 @@ type Handler struct {
 	kb  *KeyboardBuilder
 
 	// Repositories
-	eventRepo   ports.EventRepository
-	cotRepo     ports.COTRepository
-	prefsRepo   ports.PrefsRepository
-	newsRepo    ports.NewsRepository
-	newsFetcher ports.NewsFetcher
-	priceRepo   ports.PriceRepository
-	signalRepo  ports.SignalRepository
+	eventRepo      ports.EventRepository
+	cotRepo        ports.COTRepository
+	prefsRepo      ports.PrefsRepository
+	newsRepo       ports.NewsRepository
+	newsFetcher    ports.NewsFetcher
+	priceRepo      ports.PriceRepository
+	signalRepo     ports.SignalRepository
+	dailyPriceRepo pricesvc.DailyPriceStore
 
 	aiAnalyzer ports.AIAnalyzer
 
@@ -103,6 +104,7 @@ func NewHandler(
 	chatService *aisvc.ChatService,
 	claudeAnalyzer *aisvc.ClaudeAnalyzer,
 	impactProvider ImpactProvider,
+	dailyPriceRepo pricesvc.DailyPriceStore,
 ) *Handler {
 	h := &Handler{
 		bot:            bot,
@@ -124,6 +126,7 @@ func NewHandler(
 		chatService:    chatService,
 		claudeAnalyzer: claudeAnalyzer,
 		impactProvider: impactProvider,
+		dailyPriceRepo: dailyPriceRepo,
 	}
 
 	// Register all commands
@@ -134,15 +137,17 @@ func NewHandler(
 	bot.RegisterCommand("/cot", h.cmdCOT)
 	bot.RegisterCommand("/outlook", h.cmdOutlook)
 	bot.RegisterCommand("/calendar", h.cmdCalendar)
-	bot.RegisterCommand("/rank", h.cmdRank)   // P1.3 — Currency Strength Ranking
-	bot.RegisterCommand("/macro", h.cmdMacro)     // P3.2 — FRED Macro Regime Dashboard
-	bot.RegisterCommand("/signals", h.cmdSignals) // COT Signal Detection
-	bot.RegisterCommand("/backtest", h.cmdBacktest)  // Backtest stats
-	bot.RegisterCommand("/accuracy", h.cmdAccuracy)  // Quick accuracy summary
-	bot.RegisterCommand("/report", h.cmdReport)      // Weekly performance report
-	bot.RegisterCommand("/impact", h.cmdImpact)      // Event Impact Database
-	bot.RegisterCommand("/sentiment", h.cmdSentiment) // Sentiment Survey Dashboard
-	bot.RegisterCommand("/seasonal", h.cmdSeasonal)   // Seasonal Pattern Analysis
+	bot.RegisterCommand("/rank", h.cmdRank)
+	bot.RegisterCommand("/macro", h.cmdMacro)
+	bot.RegisterCommand("/signals", h.cmdSignals)
+	bot.RegisterCommand("/backtest", h.cmdBacktest)
+	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
+	bot.RegisterCommand("/report", h.cmdReport)
+	bot.RegisterCommand("/impact", h.cmdImpact)
+	bot.RegisterCommand("/sentiment", h.cmdSentiment)
+	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
+	bot.RegisterCommand("/price", h.cmdPrice) // Daily price context
+	bot.RegisterCommand("/levels", h.cmdLevels) // Support/resistance levels + position sizing
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -166,7 +171,7 @@ func NewHandler(
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
 	bot.RegisterCallback("imp:", h.cbImpact)
 
-	log.Info().Int("commands", 22).Int("callbacks", 7).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 23).Int("callbacks", 8).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -190,6 +195,8 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /rank — Currency strength (price + COT)
 /signals — Signal detection (7 types, ATR-adjusted)
 /calendar — Economic calendar · <code>/calendar week</code>
+/price — Daily price context · <code>/price EUR</code>
+/levels — Support/resistance levels · <code>/levels EUR</code>
 
 <b>🧠 AI Outlook</b>
 /outlook — Unified analysis (all data + web search)
@@ -577,19 +584,29 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		}
 	}
 
+	// Daily price contexts (for daily technical analysis in outlook)
+	var dailyPriceCtxs map[string]*domain.DailyPriceContext
+	if h.dailyPriceRepo != nil {
+		dailyBuilder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
+		if dpc, dpcErr := dailyBuilder.BuildAll(ctx); dpcErr == nil && len(dpc) > 0 {
+			dailyPriceCtxs = dpc
+		}
+	}
+
 	// ---------- Build unified data ----------
 	unifiedData := aisvc.UnifiedOutlookData{
-		COTAnalyses:      cotAnalyses,
-		NewsEvents:       weekEvts,
-		MacroData:        macroData,
-		MacroRegime:      macroRegime,
-		PriceContexts:    priceCtxs,
-		RiskContext:       riskCtx,
-		SentimentData:    sentimentData,
-		SeasonalData:     seasonalData,
-		BacktestStats:    backtestStats,
-		CurrencyStrength: currencyStrength,
-		Language:         prefs.Language,
+		COTAnalyses:        cotAnalyses,
+		NewsEvents:         weekEvts,
+		MacroData:          macroData,
+		MacroRegime:        macroRegime,
+		PriceContexts:      priceCtxs,
+		DailyPriceContexts: dailyPriceCtxs,
+		RiskContext:         riskCtx,
+		SentimentData:      sentimentData,
+		SeasonalData:       seasonalData,
+		BacktestStats:      backtestStats,
+		CurrencyStrength:   currencyStrength,
+		Language:           prefs.Language,
 	}
 
 	// ---------- Route based on user's PreferredModel setting ----------
@@ -1181,6 +1198,10 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdSeasonal(ctx, chatID, userID, args)
 	case "backtest":
 		return h.cmdBacktest(ctx, chatID, userID, args)
+	case "price":
+		return h.cmdPrice(ctx, chatID, userID, args)
+	case "levels":
+		return h.cmdLevels(ctx, chatID, userID, args)
 	default:
 		return nil
 	}
@@ -1293,6 +1314,14 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 			if len(strengths) > 0 {
 				html += h.fmt.FormatStrengthRanking(strengths)
 			}
+		}
+	}
+
+	// Daily momentum snapshot (best-effort, non-fatal)
+	if h.dailyPriceRepo != nil {
+		dailyBuilder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
+		if dailyCtxs, dErr := dailyBuilder.BuildAll(ctx); dErr == nil && len(dailyCtxs) > 0 {
+			html += h.fmt.FormatDailyMomentumSnapshot(dailyCtxs)
 		}
 	}
 

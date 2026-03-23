@@ -32,6 +32,12 @@ type PersistedSignal struct {
 	ConvictionScore float64 `json:"conviction_score,omitempty"`
 	FREDRegime      string  `json:"fred_regime,omitempty"`
 
+	// Daily trend context at detection (for trend filter analysis)
+	DailyTrend    string  `json:"daily_trend,omitempty"`     // "UP", "DOWN", "FLAT" at detection
+	DailyMATrend  string  `json:"daily_ma_trend,omitempty"`  // "BULLISH", "BEARISH", "MIXED" (MA alignment)
+	DailyTrendAdj float64 `json:"daily_trend_adj,omitempty"` // Confidence adjustment applied (+/- %)
+	RawConfidence float64 `json:"raw_confidence,omitempty"`  // Confidence before daily trend adjustment
+
 	// Outcome (populated later by evaluator)
 	Price1W float64 `json:"price_1w,omitempty"` // Close price +1 week
 	Price2W float64 `json:"price_2w,omitempty"` // Close price +2 weeks

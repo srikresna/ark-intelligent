@@ -65,6 +65,10 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		return h.backtestWeights(ctx, chatID)
 	case args == "SMARTMONEY" || args == "SM":
 		return h.backtestSmartMoney(ctx, chatID)
+	case args == "EXCURSION" || args == "MFE" || args == "MAE":
+		return h.backtestExcursion(ctx, chatID)
+	case args == "TREND" || args == "TRENDFILTER" || args == "DAILY":
+		return h.backtestTrendFilter(ctx, chatID)
 	case knownSignalTypes[args]:
 		// e.g. /backtest SMART_MONEY
 		return h.backtestOneSignalType(ctx, chatID, calc, args)
@@ -83,6 +87,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 			"<code>/backtest walkforward</code> — walk-forward overfit detection\n" +
 			"<code>/backtest weights</code> — factor weight optimization\n" +
 			"<code>/backtest sm</code> — smart money tracking accuracy\n" +
+			"<code>/backtest excursion</code> — MFE/MAE daily price analysis\n" +
+			"<code>/backtest trend</code> — daily trend filter effectiveness\n" +
 			"<code>/backtest SMART_MONEY</code> — specific signal type\n" +
 			"<code>/backtest EUR</code> — specific currency\n\n" +
 			"<b>Signal types:</b> SMART_MONEY · EXTREME_POSITIONING · DIVERGENCE · MOMENTUM_SHIFT · CONCENTRATION · CROWD_CONTRARIAN · THIN_MARKET"
@@ -325,6 +331,54 @@ func (h *Handler) backtestSmartMoney(ctx context.Context, chatID string) error {
 	}
 
 	htmlOut := h.fmt.FormatSmartMoneyAccuracy(results)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
+// backtestExcursion shows MFE/MAE analysis using daily price data.
+func (h *Handler) backtestExcursion(ctx context.Context, chatID string) error {
+	if h.signalRepo == nil || h.dailyPriceRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Excursion analysis requires both signal and daily price data.")
+		return err
+	}
+
+	analyzer := backtestsvc.NewExcursionAnalyzer(h.signalRepo, h.dailyPriceRepo)
+	summary, err := analyzer.Analyze(ctx, 10)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	if summary.TotalSignals == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "Not enough data for excursion analysis. Need evaluated signals + daily price history.")
+		return err
+	}
+
+	htmlOut := h.fmt.FormatExcursionSummary(summary)
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	return err
+}
+
+// backtestTrendFilter shows daily trend filter effectiveness analysis.
+func (h *Handler) backtestTrendFilter(ctx context.Context, chatID string) error {
+	if h.signalRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Trend filter analysis requires signal data.")
+		return err
+	}
+
+	analyzer := backtestsvc.NewTrendFilterAnalyzer(h.signalRepo)
+	stats, err := analyzer.Analyze(ctx)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		return sendErr
+	}
+
+	if stats.TotalSignals == 0 {
+		_, err := h.bot.SendHTML(ctx, chatID, "Not enough evaluated signals with daily trend data yet. The trend filter applies to newly detected signals.")
+		return err
+	}
+
+	htmlOut := h.fmt.FormatTrendFilterStats(stats)
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }

@@ -51,10 +51,11 @@ type Deps struct {
 	DB          *storage.DB
 
 	// Price & Backtest (optional — nil-safe)
-	PriceRepo    ports.PriceRepository
-	SignalRepo   ports.SignalRepository
-	PriceFetcher ports.PriceFetcher
-	Evaluator    *backtestsvc.Evaluator
+	PriceRepo      ports.PriceRepository
+	SignalRepo     ports.SignalRepository
+	PriceFetcher   ports.PriceFetcher
+	Evaluator      *backtestsvc.Evaluator
+	DailyPriceRepo *storage.DailyPriceRepo
 
 	// ImpactBootstrapper backfills historical event impact data on startup.
 	// May be nil (bootstrap is skipped).
@@ -134,6 +135,16 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 			priceFetchInterval = 6 * time.Hour
 		}
 		s.startJobWithDelay(ctx, "price-fetch", priceFetchInterval, 30*time.Second, s.jobPriceFetch)
+		jobCount++
+	}
+
+	// Daily price fetch (if daily price repo and price fetcher are configured)
+	if s.deps.PriceFetcher != nil && s.deps.DailyPriceRepo != nil {
+		priceFetchInterval := intervals.PriceFetch
+		if priceFetchInterval == 0 {
+			priceFetchInterval = 6 * time.Hour
+		}
+		s.startJobWithDelay(ctx, "daily-price-fetch", priceFetchInterval, 45*time.Second, s.jobDailyPriceFetch)
 		jobCount++
 	}
 
@@ -599,6 +610,42 @@ func (s *Scheduler) jobPriceFetch(ctx context.Context) error {
 	return nil
 }
 
+// jobDailyPriceFetch fetches daily OHLCV data for all contracts and stores it.
+func (s *Scheduler) jobDailyPriceFetch(ctx context.Context) error {
+	if s.deps.PriceFetcher == nil || s.deps.DailyPriceRepo == nil {
+		return nil
+	}
+
+	fetcher, ok := s.deps.PriceFetcher.(*pricesvc.Fetcher)
+	if !ok {
+		return fmt.Errorf("daily price fetch requires concrete Fetcher type")
+	}
+
+	// Fetch 365 days of daily data (1 year for 200 DMA computation)
+	records, report, err := fetcher.FetchAllDaily(ctx, 365)
+	if err != nil {
+		log.Warn().Err(err).Msg("daily price fetch failed")
+		return fmt.Errorf("daily price fetch: %w", err)
+	}
+
+	if len(records) > 0 {
+		if err := s.deps.DailyPriceRepo.SaveDailyPrices(ctx, records); err != nil {
+			return fmt.Errorf("save daily prices: %w", err)
+		}
+		log.Info().Int("records", len(records)).Msg("daily price data saved")
+	}
+
+	if report != nil {
+		log.Info().
+			Int("success", report.Success).
+			Int("failed", report.Failed).
+			Dur("duration", report.Duration).
+			Msg("daily price fetch report")
+	}
+
+	return nil
+}
+
 // notifyOwnerPriceFetch sends a debug-level price fetch report to the owner.
 func (s *Scheduler) notifyOwnerPriceFetch(ctx context.Context, report *pricesvc.FetchReport, fetchErr error) {
 	if s.deps.OwnerChatID == "" || s.deps.Bot == nil {
@@ -763,6 +810,34 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		}
 
 		ps.FREDRegime = fredRegime
+
+		// Daily trend filter: adjust confidence based on daily price trend alignment.
+		// This is additive — COT signal is primary, daily trend is secondary confirmation.
+		if s.deps.DailyPriceRepo != nil {
+			dailyBuilder := pricesvc.NewDailyContextBuilder(s.deps.DailyPriceRepo)
+			filter := backtestsvc.NewDailyTrendFilter(dailyBuilder)
+			adj := filter.Adjust(ctx, sig.ContractCode, sig.Currency, sig.Direction, ps.Confidence)
+
+			ps.RawConfidence = adj.RawConfidence
+			ps.Confidence = adj.AdjustedConfidence
+			ps.DailyTrend = adj.DailyTrend
+			ps.DailyMATrend = adj.MATrend
+			ps.DailyTrendAdj = adj.Adjustment
+
+			if adj.Adjustment != 0 {
+				log.Debug().
+					Str("contract", sig.ContractCode).
+					Str("direction", sig.Direction).
+					Float64("raw", adj.RawConfidence).
+					Float64("adj", adj.Adjustment).
+					Float64("final", adj.AdjustedConfidence).
+					Str("daily_trend", adj.DailyTrend).
+					Str("ma_trend", adj.MATrend).
+					Str("reason", adj.Reason).
+					Msg("daily trend filter applied")
+			}
+		}
+
 		toSave = append(toSave, ps)
 	}
 

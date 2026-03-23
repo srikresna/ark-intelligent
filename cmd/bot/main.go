@@ -90,6 +90,7 @@ func main() {
 	priceRepo := storage.NewPriceRepo(db)
 	signalRepo := storage.NewSignalRepo(db)
 	impactRepo := storage.NewImpactRepo(db)
+	dailyPriceRepo := storage.NewDailyPriceRepo(db)
 
 	log.Info().Msg("Storage layer initialized")
 	logStorageSize(db)
@@ -233,6 +234,7 @@ func main() {
 		SignalRepo:         signalRepo,
 		PriceFetcher:       priceFetcher,
 		Evaluator:          signalEvaluator,
+		DailyPriceRepo:     dailyPriceRepo,
 		ImpactBootstrapper: newssvc.NewImpactBootstrapper(newsFetcher, priceRepo, impactRepo, priceFetcher),
 		FREDAlertCheck:     authMiddleware.ShouldReceiveFREDAlerts,
 		IsBanned:           authMiddleware.IsUserBanned,
@@ -289,6 +291,7 @@ func main() {
 		chatService,     // Claude chatbot service (nil-safe)
 		claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
 		impactRepo,      // Event Impact Database (nil-safe)
+		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
 	)
 
 	// Register free-text handler for chatbot mode

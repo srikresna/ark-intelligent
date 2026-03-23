@@ -2265,3 +2265,355 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 	return b.String()
 }
 
+// FormatDailyPrice formats a DailyPriceContext for Telegram display.
+func (f *Formatter) FormatDailyPrice(dc *domain.DailyPriceContext) string {
+	var b strings.Builder
+
+	// Header with price and daily change
+	arrow := "→"
+	if dc.DailyChgPct > 0 {
+		arrow = "▲"
+	} else if dc.DailyChgPct < 0 {
+		arrow = "▼"
+	}
+
+	b.WriteString(fmt.Sprintf("💹 <b>%s — %s %s</b>\n\n",
+		dc.Currency, formatDailyPrice(dc.CurrentPrice, dc.Currency), arrow))
+
+	// Change section
+	b.WriteString("<b>📊 Price Changes</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Daily  : %+.2f%%</code>\n", dc.DailyChgPct))
+	b.WriteString(fmt.Sprintf("<code>5-Day  : %+.2f%%</code>\n", dc.WeeklyChgPct))
+	b.WriteString(fmt.Sprintf("<code>20-Day : %+.2f%%</code>\n", dc.MonthlyChgPct))
+
+	// Consecutive days
+	if dc.ConsecDays >= 2 {
+		dirEmoji := "📈"
+		if dc.ConsecDir == "DOWN" {
+			dirEmoji = "📉"
+		}
+		b.WriteString(fmt.Sprintf("<code>Streak : %d days %s</code> %s\n", dc.ConsecDays, dc.ConsecDir, dirEmoji))
+	}
+
+	// Moving Averages
+	b.WriteString("\n<b>📐 Moving Averages</b>\n")
+
+	maStatus := func(price, ma float64, label string) string {
+		if ma == 0 {
+			return fmt.Sprintf("<code>%s: N/A</code>", label)
+		}
+		icon := "✅"
+		pos := "above"
+		if price < ma {
+			icon = "❌"
+			pos = "below"
+		}
+		return fmt.Sprintf("<code>%s: %s</code> %s (%s)", label, formatDailyPrice(ma, dc.Currency), icon, pos)
+	}
+
+	b.WriteString(maStatus(dc.CurrentPrice, dc.DMA20, "20 DMA ") + "\n")
+	b.WriteString(maStatus(dc.CurrentPrice, dc.DMA50, "50 DMA ") + "\n")
+	b.WriteString(maStatus(dc.CurrentPrice, dc.DMA200, "200 DMA") + "\n")
+
+	// MA Trend alignment
+	maTrend := dc.MATrendDaily()
+	trendEmoji := "⚪"
+	switch maTrend {
+	case "BULLISH":
+		trendEmoji = "🟢"
+	case "BEARISH":
+		trendEmoji = "🔴"
+	}
+	b.WriteString(fmt.Sprintf("<code>Alignment: %s</code> %s\n", maTrend, trendEmoji))
+
+	// Volatility
+	if dc.DailyATR > 0 {
+		b.WriteString("\n<b>📏 Volatility</b>\n")
+		b.WriteString(fmt.Sprintf("<code>Daily ATR : %s (%.2f%%)</code>\n",
+			formatDailyPrice(dc.DailyATR, dc.Currency), dc.NormalizedATR))
+	}
+
+	// Momentum
+	b.WriteString("\n<b>🚀 Momentum</b>\n")
+	b.WriteString(fmt.Sprintf("<code>5D  ROC: %+.2f%%</code>\n", dc.Momentum5D))
+	b.WriteString(fmt.Sprintf("<code>10D ROC: %+.2f%%</code>\n", dc.Momentum10D))
+	b.WriteString(fmt.Sprintf("<code>20D ROC: %+.2f%%</code>\n", dc.Momentum20D))
+
+	// Daily trend
+	trendIcon := "➡️"
+	switch dc.DailyTrend {
+	case "UP":
+		trendIcon = "📈"
+	case "DOWN":
+		trendIcon = "📉"
+	}
+	b.WriteString(fmt.Sprintf("\n<code>Trend: %s</code> %s\n", dc.DailyTrend, trendIcon))
+
+	return b.String()
+}
+
+// formatDailyPrice is a local helper for FormatDailyPrice formatting.
+func formatDailyPrice(price float64, currency string) string {
+	switch {
+	case currency == "JPY":
+		return fmt.Sprintf("%.3f", price)
+	case currency == "XAU" || currency == "XAG":
+		return fmt.Sprintf("%.2f", price)
+	case currency == "BTC" || currency == "ETH":
+		return fmt.Sprintf("%.0f", price)
+	case currency == "OIL" || currency == "COPPER":
+		return fmt.Sprintf("%.2f", price)
+	case strings.HasPrefix(currency, "BOND") || currency == "SPX500" || currency == "NDX" || currency == "DJI" || currency == "RUT":
+		return fmt.Sprintf("%.2f", price)
+	default:
+		if price > 10 {
+			return fmt.Sprintf("%.4f", price)
+		}
+		return fmt.Sprintf("%.5f", price)
+	}
+}
+
+// FormatDailyMomentumSnapshot formats a compact daily momentum view for /rank.
+func (f *Formatter) FormatDailyMomentumSnapshot(dailyCtxs map[string]*domain.DailyPriceContext) string {
+	if len(dailyCtxs) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n📈 <b>Daily Momentum</b>\n<pre>")
+	b.WriteString("Pair   Day%   5D%    MA   Strk\n")
+	b.WriteString("─────────────────────────────\n")
+
+	// Sort by daily change descending
+	type entry struct {
+		currency string
+		dc       *domain.DailyPriceContext
+	}
+	var entries []entry
+	for _, dc := range dailyCtxs {
+		entries = append(entries, entry{dc.Currency, dc})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].dc.DailyChgPct > entries[j].dc.DailyChgPct
+	})
+
+	for _, e := range entries {
+		dc := e.dc
+		// Skip non-core instruments for compact view
+		if strings.HasPrefix(e.currency, "BOND") || e.currency == "ULSD" || e.currency == "RBOB" {
+			continue
+		}
+
+		maTrend := dc.MATrendDaily()
+		maIcon := "·"
+		switch maTrend {
+		case "BULLISH":
+			maIcon = "▲"
+		case "BEARISH":
+			maIcon = "▼"
+		}
+
+		streak := "  "
+		if dc.ConsecDays >= 2 {
+			dir := "↑"
+			if dc.ConsecDir == "DOWN" {
+				dir = "↓"
+			}
+			streak = fmt.Sprintf("%d%s", dc.ConsecDays, dir)
+		}
+
+		b.WriteString(fmt.Sprintf("%-6s %+5.1f%% %+5.1f%%  %s   %s\n",
+			dc.Currency, dc.DailyChgPct, dc.WeeklyChgPct, maIcon, streak))
+	}
+	b.WriteString("</pre>")
+
+	return b.String()
+}
+
+// FormatExcursionSummary formats MFE/MAE analysis results.
+func (f *Formatter) FormatExcursionSummary(s *backtestsvc.ExcursionSummary) string {
+	var b strings.Builder
+
+	b.WriteString("📊 <b>MFE/MAE EXCURSION ANALYSIS</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Signals Analyzed: %d</code>\n\n", s.TotalSignals))
+
+	b.WriteString("<b>📏 Average Excursion</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Avg MFE : %+.2f%%</code> (max favorable move)\n", s.AvgMFEPct))
+	b.WriteString(fmt.Sprintf("<code>Avg MAE : %+.2f%%</code> (max adverse move)\n", s.AvgMAEPct))
+	b.WriteString(fmt.Sprintf("<code>Avg Optimal Return: %+.2f%%</code> (exit at best day)\n", s.AvgOptimalRet))
+	b.WriteString(fmt.Sprintf("<code>Avg Optimal Day   : %.1f</code>\n", s.AvgOptimalDay))
+
+	b.WriteString("\n<b>🎯 Signal Quality Diagnosis</b>\n")
+	if s.MissedWins > 0 {
+		b.WriteString(fmt.Sprintf("🔴 <b>%d missed wins</b> (%.0f%% of losses)\n", s.MissedWins, s.MissedWinPct))
+		b.WriteString("<i>These signals were profitable intraweek but closed as losses.\n")
+		b.WriteString("→ Signals are directionally correct, exit timing needs work.</i>\n")
+	} else {
+		b.WriteString("✅ No significant missed wins detected.\n")
+	}
+
+	dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri"}
+	b.WriteString("\n<b>📅 Best Exit Day Distribution</b>\n<pre>")
+	for i, name := range dayNames {
+		bar := ""
+		for j := 0; j < s.OptimalDayDist[i] && j < 20; j++ {
+			bar += "█"
+		}
+		b.WriteString(fmt.Sprintf("%s %3d %s\n", name, s.OptimalDayDist[i], bar))
+	}
+	b.WriteString("</pre>")
+
+	if len(s.BySignalType) > 0 {
+		b.WriteString("\n<b>📋 By Signal Type</b>\n<pre>")
+		b.WriteString("Type            MFE%  MAE%  MfWR% Day\n")
+		b.WriteString("────────────────────────────────────\n")
+
+		type typeEntry struct {
+			name string
+			ts   *backtestsvc.ExcursionTypeSummary
+		}
+		var entries []typeEntry
+		for name, ts := range s.BySignalType {
+			entries = append(entries, typeEntry{name, ts})
+		}
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].ts.MFEWinRate > entries[j].ts.MFEWinRate
+		})
+
+		for _, e := range entries {
+			ts := e.ts
+			shortName := e.name
+			if len(shortName) > 15 {
+				shortName = shortName[:15]
+			}
+			b.WriteString(fmt.Sprintf("%-15s %+5.1f %+5.1f %5.0f %3.0f\n",
+				shortName, ts.AvgMFEPct, ts.AvgMAEPct, ts.MFEWinRate, ts.AvgOptimalDay))
+		}
+		b.WriteString("</pre>")
+		b.WriteString("<i>MfWR = MFE Win Rate (% that moved >0.3% in signal direction)</i>\n")
+	}
+
+	return b.String()
+}
+
+// FormatTrendFilterStats formats daily trend filter analysis results.
+func (f *Formatter) FormatTrendFilterStats(s *backtestsvc.TrendFilterStats) string {
+	var b strings.Builder
+
+	b.WriteString("\xF0\x9F\x93\x88 <b>DAILY TREND FILTER ANALYSIS</b>\n\n")
+
+	if s.TotalSignals == 0 {
+		b.WriteString("<i>No evaluated signals with daily trend data yet.</i>")
+		return b.String()
+	}
+
+	b.WriteString(fmt.Sprintf("<code>Total Signals :</code> %d\n", s.TotalSignals))
+	b.WriteString(fmt.Sprintf("<code>With Filter   :</code> %d (%.0f%%)\n",
+		s.FilteredSignals, float64(s.FilteredSignals)/float64(s.TotalSignals)*100))
+	b.WriteString(fmt.Sprintf("<code>Avg Adjustment:</code> %+.1f%%\n\n", s.AvgAdjustment))
+
+	// Alignment breakdown
+	b.WriteString("<b>Trend Alignment vs Win Rate</b>\n")
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-10s %5s %7s\n", "Category", "Count", "Win 1W"))
+	b.WriteString(fmt.Sprintf("%-10s %5d %6.1f%%\n", "Aligned", s.AlignedCount, s.AlignedWinRate1W))
+	b.WriteString(fmt.Sprintf("%-10s %5d %6.1f%%\n", "Opposed", s.OpposedCount, s.OpposedWinRate1W))
+	b.WriteString(fmt.Sprintf("%-10s %5d %6.1f%%\n", "Neutral", s.NeutralCount, s.NeutralWinRate1W))
+	b.WriteString("</pre>\n")
+
+	// Edge diagnosis
+	edgeIcon := "\xE2\x9C\x85"
+	if s.EdgeGain <= 0 {
+		edgeIcon = "\xE2\x9A\xA0\xEF\xB8\x8F"
+	}
+	b.WriteString("<b>Edge Analysis</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Baseline 1W  :</code> %.1f%%\n", s.BaselineWinRate1W))
+	b.WriteString(fmt.Sprintf("<code>Filtered Top :</code> %.1f%% (adj \xE2\x89\xA5 10)\n", s.FilteredWinRate1W))
+	b.WriteString(fmt.Sprintf("<code>Edge Gain    :</code> %+.1f%% %s\n\n", s.EdgeGain, edgeIcon))
+
+	// Confidence calibration
+	b.WriteString("<b>Confidence Impact</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Avg Raw      :</code> %.1f%%\n", s.AvgRawConfidence))
+	b.WriteString(fmt.Sprintf("<code>Avg Adjusted :</code> %.1f%%\n\n", s.AvgFinalConfidence))
+
+	// By daily trend
+	trends := s.SortedTrends()
+	if len(trends) > 0 {
+		b.WriteString("<b>By Daily Trend</b>\n")
+		b.WriteString("<pre>")
+		b.WriteString(fmt.Sprintf("%-6s %5s %7s %7s\n", "Trend", "Count", "Win 1W", "AvgAdj"))
+		for _, t := range trends {
+			b.WriteString(fmt.Sprintf("%-6s %5d %6.1f%% %+5.1f%%\n",
+				t.Trend, t.Count, t.WinRate, t.AvgAdj))
+		}
+		b.WriteString("</pre>")
+	}
+
+	// Interpretation
+	b.WriteString("\n<i>Aligned = daily trend confirms COT signal direction\n")
+	b.WriteString("Opposed = daily trend contradicts COT signal\n")
+	b.WriteString("Edge Gain = win rate improvement from filtering</i>")
+
+	return b.String()
+}
+
+// FormatLevels formats support/resistance levels and pivot points.
+func (f *Formatter) FormatLevels(lc *pricesvc.LevelsContext, currency string) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x8F <b>KEY LEVELS: %s</b>\n\n", currency))
+
+	b.WriteString(fmt.Sprintf("<code>Price    :</code> %s\n", formatPrice(lc.CurrentPrice, currency)))
+	if lc.DailyATR > 0 {
+		b.WriteString(fmt.Sprintf("<code>Daily ATR:</code> %s (%.2f%%)\n\n",
+			formatPrice(lc.DailyATR, currency),
+			lc.DailyATR/lc.CurrentPrice*100))
+	}
+
+	// Pivot points
+	b.WriteString("<b>Daily Pivots</b>\n")
+	b.WriteString(fmt.Sprintf("<code>R2    :</code> %s\n", formatPrice(lc.PivotR2, currency)))
+	b.WriteString(fmt.Sprintf("<code>R1    :</code> %s\n", formatPrice(lc.PivotR1, currency)))
+	b.WriteString(fmt.Sprintf("<code>Pivot :</code> %s\n", formatPrice(lc.DailyPivot, currency)))
+	b.WriteString(fmt.Sprintf("<code>S1    :</code> %s\n", formatPrice(lc.PivotS1, currency)))
+	b.WriteString(fmt.Sprintf("<code>S2    :</code> %s\n\n", formatPrice(lc.PivotS2, currency)))
+
+	// Key S/R levels (top 10 by proximity)
+	maxLevels := 10
+	if len(lc.Levels) < maxLevels {
+		maxLevels = len(lc.Levels)
+	}
+
+	if maxLevels > 0 {
+		b.WriteString("<b>Support / Resistance</b>\n")
+		b.WriteString("<pre>")
+		b.WriteString(fmt.Sprintf("%-12s %-5s %7s %s\n", "Level", "Type", "Dist", "Source"))
+		for i := 0; i < maxLevels; i++ {
+			l := lc.Levels[i]
+			typeIcon := "S"
+			if l.Type == "RESISTANCE" {
+				typeIcon = "R"
+			}
+			stars := strings.Repeat("*", l.Strength)
+			b.WriteString(fmt.Sprintf("%-12s %-5s %+6.2f%% %s\n",
+				formatPrice(l.Price, currency), typeIcon+stars, l.Distance, l.Source))
+		}
+		b.WriteString("</pre>\n")
+	}
+
+	// Nearest S/R summary
+	if lc.NearestSupport != nil {
+		b.WriteString(fmt.Sprintf("\xF0\x9F\x9F\xA2 <b>Nearest Support:</b> %s (%+.2f%%) — %s\n",
+			formatPrice(lc.NearestSupport.Price, currency),
+			lc.NearestSupport.Distance,
+			lc.NearestSupport.Source))
+	}
+	if lc.NearestResistance != nil {
+		b.WriteString(fmt.Sprintf("\xF0\x9F\x94\xB4 <b>Nearest Resistance:</b> %s (%+.2f%%) — %s\n",
+			formatPrice(lc.NearestResistance.Price, currency),
+			lc.NearestResistance.Distance,
+			lc.NearestResistance.Source))
+	}
+
+	return b.String()
+}

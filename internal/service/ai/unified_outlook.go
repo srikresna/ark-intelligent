@@ -16,17 +16,18 @@ import (
 // unified outlook prompt. Each field is optional — the prompt builder only
 // includes sections for which data is present.
 type UnifiedOutlookData struct {
-	COTAnalyses      []domain.COTAnalysis
-	NewsEvents       []domain.NewsEvent
-	MacroData        *fred.MacroData
-	MacroRegime      *fred.MacroRegime
-	PriceContexts    map[string]*domain.PriceContext
-	RiskContext       *domain.RiskContext
-	SentimentData    *sentiment.SentimentData
-	SeasonalData     map[string]*pricesvc.SeasonalPattern
-	BacktestStats    *domain.BacktestStats
-	CurrencyStrength []pricesvc.CurrencyStrength
-	Language         string
+	COTAnalyses        []domain.COTAnalysis
+	NewsEvents         []domain.NewsEvent
+	MacroData          *fred.MacroData
+	MacroRegime        *fred.MacroRegime
+	PriceContexts      map[string]*domain.PriceContext
+	DailyPriceContexts map[string]*domain.DailyPriceContext
+	RiskContext         *domain.RiskContext
+	SentimentData      *sentiment.SentimentData
+	SeasonalData       map[string]*pricesvc.SeasonalPattern
+	BacktestStats      *domain.BacktestStats
+	CurrencyStrength   []pricesvc.CurrencyStrength
+	Language           string
 }
 
 // BuildUnifiedOutlookPrompt builds a comprehensive prompt that fuses ALL
@@ -90,6 +91,26 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		} else {
 			for code, pc := range data.PriceContexts {
 				writePriceContextLine(&b, code, pc)
+			}
+		}
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 2b: Daily Price Context (if available)
+	// -----------------------------------------------------------------------
+	if len(data.DailyPriceContexts) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. DAILY PRICE CONTEXT (Technical) ===\n", section))
+		section++
+		if len(data.COTAnalyses) > 0 {
+			for _, a := range data.COTAnalyses {
+				if dc, ok := data.DailyPriceContexts[a.Contract.Code]; ok {
+					writeDailyPriceContextLine(&b, a.Contract.Currency, dc)
+				}
+			}
+		} else {
+			for _, dc := range data.DailyPriceContexts {
+				writeDailyPriceContextLine(&b, dc.Currency, dc)
 			}
 		}
 		b.WriteString("\n")
@@ -366,5 +387,21 @@ func writePriceContextLine(b *strings.Builder, label string, pc *domain.PriceCon
 	if pc.VolatilityRegime != "" {
 		line += fmt.Sprintf(" | Vol: %s", pc.VolatilityRegime)
 	}
+	b.WriteString(line + "\n")
+}
+
+func writeDailyPriceContextLine(b *strings.Builder, label string, dc *domain.DailyPriceContext) {
+	line := fmt.Sprintf("%s: Daily %+.2f%% | 5D %+.2f%% | 20D %+.2f%% | DMA20: %s DMA50: %s DMA200: %s | MA: %s",
+		label,
+		dc.DailyChgPct, dc.WeeklyChgPct, dc.MonthlyChgPct,
+		maLabel(dc.AboveDMA20), maLabel(dc.AboveDMA50), maLabel(dc.AboveDMA200),
+		dc.MATrendDaily())
+	if dc.DailyATR > 0 {
+		line += fmt.Sprintf(" | ATR: %.2f%%", dc.NormalizedATR)
+	}
+	if dc.ConsecDays >= 2 {
+		line += fmt.Sprintf(" | Streak: %d%s", dc.ConsecDays, dc.ConsecDir[:1])
+	}
+	line += fmt.Sprintf(" | Mom5D: %+.2f%%", dc.Momentum5D)
 	b.WriteString(line + "\n")
 }

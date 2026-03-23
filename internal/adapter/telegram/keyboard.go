@@ -499,6 +499,10 @@ func (kb *KeyboardBuilder) BacktestMenu() ports.InlineKeyboard {
 				{Text: "⚖️ Weights", CallbackData: "cmd:backtest:weights"},
 				{Text: "🧠 Smart Money", CallbackData: "cmd:backtest:sm"},
 			},
+			{
+				{Text: "📊 MFE/MAE", CallbackData: "cmd:backtest:excursion"},
+				{Text: "📈 Trend Filter", CallbackData: "cmd:backtest:trend"},
+			},
 			// Currency row
 			{
 				{Text: "EUR", CallbackData: "cmd:backtest:EUR"},
@@ -570,8 +574,34 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 			},
 			{
 				{Text: "📅 Calendar", CallbackData: "cmd:calendar"},
+				{Text: "💹 Price", CallbackData: "cmd:price"},
 				{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
-				{Text: "💹 Sentiment", CallbackData: "cmd:sentiment"},
+			},
+		},
+	}
+}
+
+// PriceMenu builds a currency selection keyboard for the /price command.
+func (kb *KeyboardBuilder) PriceMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "EUR", CallbackData: "cmd:price:EUR"},
+				{Text: "GBP", CallbackData: "cmd:price:GBP"},
+				{Text: "JPY", CallbackData: "cmd:price:JPY"},
+				{Text: "AUD", CallbackData: "cmd:price:AUD"},
+			},
+			{
+				{Text: "NZD", CallbackData: "cmd:price:NZD"},
+				{Text: "CAD", CallbackData: "cmd:price:CAD"},
+				{Text: "CHF", CallbackData: "cmd:price:CHF"},
+				{Text: "USD", CallbackData: "cmd:price:USD"},
+			},
+			{
+				{Text: "🥇 XAU", CallbackData: "cmd:price:XAU"},
+				{Text: "🛢 OIL", CallbackData: "cmd:price:OIL"},
+				{Text: "₿ BTC", CallbackData: "cmd:price:BTC"},
+				{Text: "📈 SPX", CallbackData: "cmd:price:SPX500"},
 			},
 		},
 	}
