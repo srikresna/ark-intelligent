@@ -205,6 +205,8 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>🏛 Macro &amp; Impact</b>
 /macro — FRED regime + asset performance matrix
 /impact — Event impact DB · <code>/impact NFP</code>
+/sentiment — Retail sentiment survey (Forex Factory)
+/seasonal — Seasonal pattern analysis · <code>/seasonal EUR</code>
 
 <b>⚙️ Settings</b>
 /settings · /membership · /status · /clear
@@ -212,7 +214,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>🔐 Admin</b>
 /users · /setrole · /ban · /unban
 
-<code>ARK v3.3.0</code>`
+<code>ARK v3.4.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
