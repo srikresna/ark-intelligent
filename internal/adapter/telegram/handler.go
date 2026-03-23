@@ -12,6 +12,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
+	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
@@ -190,7 +191,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /calendar — Economic calendar · <code>/calendar week</code>
 
 <b>🧠 AI Outlook</b>
-/outlook cot · news · fred · combine · cross
+/outlook — Unified analysis (all data + web search)
 
 <b>📈 Backtest &amp; Analytics</b>
 /backtest — Stats + significance + risk metrics
@@ -447,17 +448,7 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 		return err
 	}
 
-	// Check subcmd first — show menu without consuming AI quota if no args
-	subcmd := strings.ToLower(strings.TrimSpace(args))
-	if subcmd == "" {
-		html := "🦅 <b>ARK Intelligence Outlook</b>\nSelect the type of market analysis you want to generate:\n\n" +
-			"<i>Tip: </i><code>/outlook cot</code> | <code>/outlook news</code> | <code>/outlook fred</code> | <code>/outlook combine</code> | <code>/outlook cross</code>"
-		kb := h.kb.OutlookMenu()
-		_, err := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
-		return err
-	}
-
-	// Per-user AI quota check via middleware (only consumed when AI will actually be invoked)
+	// Per-user AI quota check via middleware
 	if h.middleware != nil {
 		allowed, reason := h.middleware.CheckAIQuota(ctx, userID)
 		if !allowed {
@@ -479,7 +470,7 @@ func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, a
 		}
 	}
 
-	return h.generateOutlook(ctx, chatID, userID, subcmd, 0)
+	return h.generateOutlook(ctx, chatID, userID, 0)
 }
 
 func (h *Handler) cbOutlook(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
@@ -502,101 +493,128 @@ func (h *Handler) cbOutlook(ctx context.Context, chatID string, msgID int, userI
 			return h.bot.EditMessage(ctx, chatID, msgID, "Please wait before requesting another AI analysis.")
 		}
 	}
-	action := strings.TrimPrefix(data, "out:") // cot, news, combine
-	return h.generateOutlook(ctx, chatID, userID, action, msgID)
+	return h.generateOutlook(ctx, chatID, userID, msgID)
 }
 
-func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int64, subcmd string, editMsgID int) error {
+func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int64, editMsgID int) error {
 	prefs, err := h.prefsRepo.Get(ctx, userID)
 	if err != nil {
 		prefs = domain.DefaultPrefs()
 	}
 
-	// Route to Claude if user prefers Claude and ClaudeAnalyzer is available.
-	// WithModel() returns a per-request scoped copy — fully thread-safe, no shared state mutation.
-	activeAnalyzer := h.aiAnalyzer // default: Gemini
-	if prefs.PreferredModel == "claude" && h.claudeAnalyzer != nil && h.claudeAnalyzer.IsAvailable() {
+	placeholderID := 0
+	if editMsgID > 0 {
+		_ = h.bot.EditMessage(ctx, chatID, editMsgID, "Generating unified intelligence report... ⏳\n(collecting all data sources + web search)")
+		placeholderID = editMsgID
+	} else {
+		placeholderID, _ = h.bot.SendHTML(ctx, chatID, "Generating unified intelligence report... ⏳\n(collecting all data sources + web search)")
+	}
+
+	now := timeutil.NowWIB()
+
+	// ---------- Collect ALL data sources (best-effort, non-fatal) ----------
+
+	// COT
+	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
+
+	// News
+	weekEvts, _ := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
+
+	// FRED Macro
+	macroData, _ := fred.GetCachedOrFetch(ctx)
+	var macroRegime *fred.MacroRegime
+	if macroData != nil {
+		r := fred.ClassifyMacroRegime(macroData)
+		macroRegime = &r
+	}
+
+	// Price contexts
+	var priceCtxs map[string]*domain.PriceContext
+	if h.priceRepo != nil {
+		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+		if pc, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(pc) > 0 {
+			priceCtxs = pc
+		}
+	}
+
+	// VIX/SPX risk context
+	var riskCtx *domain.RiskContext
+	if h.priceRepo != nil {
+		riskBuilder := pricesvc.NewRiskContextBuilder(h.priceRepo)
+		riskCtx, _ = riskBuilder.Build(ctx)
+	}
+
+	// Sentiment (CNN Fear & Greed)
+	sentimentData, _ := sentiment.GetCachedOrFetch(ctx)
+
+	// Seasonal patterns
+	var seasonalData map[string]*pricesvc.SeasonalPattern
+	if h.priceRepo != nil {
+		sa := pricesvc.NewSeasonalAnalyzer(h.priceRepo)
+		if patterns, saErr := sa.Analyze(ctx); saErr == nil && len(patterns) > 0 {
+			seasonalData = make(map[string]*pricesvc.SeasonalPattern, len(patterns))
+			for i := range patterns {
+				seasonalData[patterns[i].ContractCode] = &patterns[i]
+			}
+		}
+	}
+
+	// Currency strength
+	var currencyStrength []pricesvc.CurrencyStrength
+	if len(priceCtxs) > 0 && len(cotAnalyses) > 0 {
+		currencyStrength = pricesvc.ComputeCurrencyStrengthIndex(priceCtxs, cotAnalyses)
+	}
+
+	// Backtest stats
+	var backtestStats *domain.BacktestStats
+	if h.signalRepo != nil {
+		sc := backtestsvc.NewStatsCalculator(h.signalRepo)
+		if stats, bErr := sc.ComputeAll(ctx); bErr == nil {
+			backtestStats = stats
+		}
+	}
+
+	// ---------- Build unified data ----------
+	unifiedData := aisvc.UnifiedOutlookData{
+		COTAnalyses:      cotAnalyses,
+		NewsEvents:       weekEvts,
+		MacroData:        macroData,
+		MacroRegime:      macroRegime,
+		PriceContexts:    priceCtxs,
+		RiskContext:       riskCtx,
+		SentimentData:    sentimentData,
+		SeasonalData:     seasonalData,
+		BacktestStats:    backtestStats,
+		CurrencyStrength: currencyStrength,
+		Language:         prefs.Language,
+	}
+
+	// ---------- Route to Claude (unified + web search) or Gemini (fallback) ----------
+	var result string
+
+	if h.claudeAnalyzer != nil && h.claudeAnalyzer.IsAvailable() {
+		// Claude path: unified outlook with web_search + web_fetch
 		modelOverride := ""
 		if prefs.ClaudeModel != "" && domain.IsValidClaudeModel(prefs.ClaudeModel) {
 			modelOverride = string(prefs.ClaudeModel)
 		}
-		activeAnalyzer = h.claudeAnalyzer.WithModel(modelOverride)
+		analyzer := h.claudeAnalyzer.WithModel(modelOverride)
 		log.Info().
 			Str("model", modelOverride).
 			Int64("user_id", userID).
-			Str("subcmd", subcmd).
-			Msg("/outlook routed to Claude")
-	}
-
-	placeholderID := 0
-	if editMsgID > 0 {
-		_ = h.bot.EditMessage(ctx, chatID, editMsgID, "Generating intelligence report... (10-15s) ⏳")
-		placeholderID = editMsgID
+			Msg("/outlook unified routed to Claude with web_search")
+		result, err = analyzer.GenerateUnifiedOutlook(ctx, unifiedData)
 	} else {
-		placeholderID, _ = h.bot.SendHTML(ctx, chatID, "Generating intelligence report... (10-15s) ⏳")
-	}
-
-	now := timeutil.NowWIB()
-	var result string
-
-	if subcmd == "news" {
-		weekEvts, fetchErr := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
-		if fetchErr != nil {
-			_ = h.bot.EditMessage(ctx, chatID, placeholderID, "Failed to load news for analysis.")
-			return fetchErr
-		}
-		result, err = activeAnalyzer.AnalyzeNewsOutlook(ctx, weekEvts, prefs.Language)
-	} else if subcmd == "fred" {
-		// Use cached FRED data (or fetch fresh if stale) then run AI analysis
-		macroData, fredErr := fred.GetCachedOrFetch(ctx)
-		if fredErr != nil || macroData == nil {
-			_ = h.bot.EditMessage(ctx, chatID, placeholderID, "Failed to fetch FRED macro data. Check FRED_API_KEY.")
-			return fredErr
-		}
-		result, err = activeAnalyzer.AnalyzeFREDOutlook(ctx, macroData, prefs.Language)
-	} else if subcmd == "combine" {
-		cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
-		weekEvts, _ := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
-		// Use cached FRED data — non-fatal if it fails
-		macroData, _ := fred.GetCachedOrFetch(ctx)
+		// Gemini fallback: use combined outlook (no web search capability)
 		weeklyData := ports.WeeklyData{
-			COTAnalyses: cotAnalyses,
-			NewsEvents:  weekEvts,
-			MacroData:   macroData,
-			Language:    prefs.Language,
+			COTAnalyses:   cotAnalyses,
+			NewsEvents:    weekEvts,
+			MacroData:     macroData,
+			BacktestStats: backtestStats,
+			PriceContexts: priceCtxs,
+			Language:      prefs.Language,
 		}
-		// Price contexts (best-effort — non-fatal if unavailable)
-		if h.priceRepo != nil {
-			ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
-			if priceCtxs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(priceCtxs) > 0 {
-				weeklyData.PriceContexts = priceCtxs
-			}
-		}
-		result, err = activeAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
-	} else if subcmd == "cross" {
-		cotSlice, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
-		cotMap := make(map[string]*domain.COTAnalysis, len(cotSlice))
-		for i := range cotSlice {
-			cotMap[cotSlice[i].Contract.Code] = &cotSlice[i]
-		}
-		result, err = activeAnalyzer.AnalyzeCrossMarket(ctx, cotMap)
-	} else { // "cot" or default
-		cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
-		// Gap E — pass MacroData so FRED regime context is injected into the /outlook cot prompt
-		macroData, _ := fred.GetCachedOrFetch(ctx)
-		weeklyData := ports.WeeklyData{
-			COTAnalyses: cotAnalyses,
-			MacroData:   macroData,
-			Language:    prefs.Language,
-		}
-		// Price contexts (best-effort — non-fatal if unavailable)
-		if h.priceRepo != nil {
-			ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
-			if priceCtxs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(priceCtxs) > 0 {
-				weeklyData.PriceContexts = priceCtxs
-			}
-		}
-		result, err = activeAnalyzer.GenerateWeeklyOutlook(ctx, weeklyData)
+		result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
 	}
 
 	if err != nil {

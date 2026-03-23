@@ -215,3 +215,58 @@ func (ca *ClaudeAnalyzer) AnalyzeActualRelease(ctx context.Context, event domain
 
 	return result, nil
 }
+
+// GenerateUnifiedOutlook creates a comprehensive unified outlook fusing ALL
+// data sources and enabling Claude's web_search + web_fetch tools for
+// real-time data enrichment. This is the primary /outlook path.
+func (ca *ClaudeAnalyzer) GenerateUnifiedOutlook(ctx context.Context, data UnifiedOutlookData) (string, error) {
+	prompt := BuildUnifiedOutlookPrompt(data)
+
+	// Build request with web_search and web_fetch tools enabled.
+	// These are server-managed tools — Claude's servers execute them automatically.
+	req := ports.ChatRequest{
+		SystemPrompt:  SystemPrompt(),
+		OverrideModel: ca.overrideModel,
+		Messages: []ports.ChatMessage{
+			{Role: "user", Content: prompt},
+		},
+		MaxTokens: 4096,
+		Tools: []ports.ServerTool{
+			{Type: "web_search_20250305", Name: "web_search", MaxUses: 5},
+			{Type: "web_fetch_20260309", Name: "web_fetch", MaxUses: 3},
+		},
+	}
+
+	resp, err := ca.claude.Chat(ctx, req)
+	if err != nil {
+		log.Error().Err(err).Msg("ClaudeAnalyzer: unified outlook failed")
+		return "Unified outlook unavailable.", nil
+	}
+
+	toolInfo := ""
+	if len(resp.ToolsUsed) > 0 {
+		toolInfo = fmt.Sprintf(" [enriched via: %s]", joinUnique(resp.ToolsUsed))
+	}
+
+	return formatResponse("UNIFIED OUTLOOK"+toolInfo, resp.Content), nil
+}
+
+// joinUnique deduplicates and joins string slice.
+func joinUnique(items []string) string {
+	seen := make(map[string]bool, len(items))
+	var unique []string
+	for _, item := range items {
+		if !seen[item] {
+			seen[item] = true
+			unique = append(unique, item)
+		}
+	}
+	result := ""
+	for i, u := range unique {
+		if i > 0 {
+			result += ", "
+		}
+		result += u
+	}
+	return result
+}

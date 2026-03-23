@@ -136,22 +136,12 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 	return ports.InlineKeyboard{Rows: rows}
 }
 
-// OutlookMenu builds a keyboard for choosing the AI Outlook type.
+// OutlookMenu builds a keyboard for the AI Outlook (unified — single action).
 func (kb *KeyboardBuilder) OutlookMenu() ports.InlineKeyboard {
 	var rows [][]ports.InlineButton
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: "📊 COT Positioning", CallbackData: "out:cot"},
-		{Text: "📰 News Catalysts", CallbackData: "out:news"},
-	})
-	rows = append(rows, []ports.InlineButton{
-		{Text: "🏦 FRED Macro", CallbackData: "out:fred"},
-	})
-	rows = append(rows, []ports.InlineButton{
-		{Text: "🔗 Fused (COT + News + FRED)", CallbackData: "out:combine"},
-	})
-	rows = append(rows, []ports.InlineButton{
-		{Text: "🌐 Cross-Market (Gold/Oil/Bond/USD)", CallbackData: "out:cross"},
+		{Text: "🦅 Generate Unified Outlook", CallbackData: "out:unified"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -400,7 +390,7 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 		Rows: [][]ports.InlineButton{
 			{
 				{Text: "COT Analysis", CallbackData: "nav:cot"},
-				{Text: "Weekly Outlook", CallbackData: "nav:outlook"},
+				{Text: "🦅 Unified Outlook", CallbackData: "out:unified"},
 			},
 			{
 				{Text: "📊 Signals", CallbackData: "cmd:signals"},
