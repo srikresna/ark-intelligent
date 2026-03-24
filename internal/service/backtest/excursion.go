@@ -55,7 +55,7 @@ type ExcursionSummary struct {
 	MissedWinPct   float64 `json:"missed_win_pct"`   // % of losses that were actually profitable intraweek
 
 	// Optimal holding period distribution
-	OptimalDayDist [5]int `json:"optimal_day_dist"` // Count per day (Mon=0..Fri=4)
+	OptimalDayDist []int `json:"optimal_day_dist"` // Count per day (index 0 = day 1, index N = day N+1)
 
 	// By signal type
 	BySignalType map[string]*ExcursionTypeSummary `json:"by_signal_type"`
@@ -102,7 +102,8 @@ func (a *ExcursionAnalyzer) Analyze(ctx context.Context, evaluationDays int) (*E
 	}
 
 	summary := &ExcursionSummary{
-		BySignalType: make(map[string]*ExcursionTypeSummary),
+		BySignalType:   make(map[string]*ExcursionTypeSummary),
+		OptimalDayDist: make([]int, evaluationDays),
 	}
 
 	var results []ExcursionResult
@@ -144,8 +145,8 @@ func (a *ExcursionAnalyzer) Analyze(ctx context.Context, evaluationDays int) (*E
 			summary.MissedWins++
 		}
 
-		// Optimal day distribution (map to weekday: 0=Mon..4=Fri)
-		if r.OptimalExitDay >= 1 && r.OptimalExitDay <= 5 {
+		// Optimal day distribution (0-indexed: day 1 → index 0)
+		if r.OptimalExitDay >= 1 && r.OptimalExitDay <= evaluationDays {
 			summary.OptimalDayDist[r.OptimalExitDay-1]++
 		}
 
@@ -263,8 +264,8 @@ func (a *ExcursionAnalyzer) analyzeSignal(ctx context.Context, sig domain.Persis
 			closeMove = -closeMove
 		}
 
-		// MFE: maximum favorable move (using high of the day for bullish, low for bearish)
-		favorableExtreme := highMove // Best case for bullish (after inverse adjustment)
+		// MFE: maximum favorable move (after direction/inverse normalization, highMove = best case)
+		favorableExtreme := highMove
 		if favorableExtreme > maxFavorable {
 			maxFavorable = favorableExtreme
 			result.MFEDay = dayNum

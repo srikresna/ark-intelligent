@@ -110,14 +110,17 @@ func computeTrendAdjustment(dc *domain.DailyPriceContext, bullish bool) float64 
 	}
 
 	// 3. Price vs DMA20 (short-term support/resistance)
-	if bullish && dc.AboveDMA20 {
-		adj += 3
-	} else if bullish && !dc.AboveDMA20 {
-		adj -= 3
-	} else if !bullish && !dc.AboveDMA20 {
-		adj += 3
-	} else if !bullish && dc.AboveDMA20 {
-		adj -= 3
+	// Only apply if DMA20 was actually computed (needs 20+ days of data)
+	if dc.DMA20 > 0 {
+		if bullish && dc.AboveDMA20 {
+			adj += 3
+		} else if bullish && !dc.AboveDMA20 {
+			adj -= 3
+		} else if !bullish && !dc.AboveDMA20 {
+			adj += 3
+		} else if !bullish && dc.AboveDMA20 {
+			adj -= 3
+		}
 	}
 
 	// 4. Momentum confirmation (5-day ROC)

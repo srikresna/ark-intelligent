@@ -163,8 +163,9 @@ func (a *TrendFilterAnalyzer) Analyze(ctx context.Context) (*TrendFilterStats, e
 	}
 	if strongBoostCount > 0 {
 		stats.FilteredWinRate1W = float64(strongBoostWins) / float64(strongBoostCount) * 100
+		stats.EdgeGain = stats.FilteredWinRate1W - stats.BaselineWinRate1W
 	}
-	stats.EdgeGain = stats.FilteredWinRate1W - stats.BaselineWinRate1W
+	// EdgeGain stays 0 when no strong-boost signals exist (insufficient data to compare)
 
 	// Finalize per-trend averages
 	for _, bucket := range stats.ByDailyTrend {

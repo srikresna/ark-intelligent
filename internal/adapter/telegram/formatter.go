@@ -2452,14 +2452,14 @@ func (f *Formatter) FormatExcursionSummary(s *backtestsvc.ExcursionSummary) stri
 		b.WriteString("✅ No significant missed wins detected.\n")
 	}
 
-	dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri"}
 	b.WriteString("\n<b>📅 Best Exit Day Distribution</b>\n<pre>")
-	for i, name := range dayNames {
+	for i := 0; i < len(s.OptimalDayDist); i++ {
+		label := fmt.Sprintf("Day %d", i+1)
 		bar := ""
 		for j := 0; j < s.OptimalDayDist[i] && j < 20; j++ {
 			bar += "█"
 		}
-		b.WriteString(fmt.Sprintf("%s %3d %s\n", name, s.OptimalDayDist[i], bar))
+		b.WriteString(fmt.Sprintf("%-5s %3d %s\n", label, s.OptimalDayDist[i], bar))
 	}
 	b.WriteString("</pre>")
 

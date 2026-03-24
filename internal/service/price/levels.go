@@ -48,7 +48,7 @@ func NewLevelsBuilder(repo DailyPriceStore) *LevelsBuilder {
 
 // Build computes key levels for a single contract.
 func (lb *LevelsBuilder) Build(ctx context.Context, contractCode, currency string) (*LevelsContext, error) {
-	records, err := lb.repo.GetDailyHistory(ctx, contractCode, 120)
+	records, err := lb.repo.GetDailyHistory(ctx, contractCode, 220)
 	if err != nil {
 		return nil, fmt.Errorf("get daily history: %w", err)
 	}
@@ -163,6 +163,13 @@ func (lb *LevelsBuilder) Build(ctx context.Context, contractCode, currency strin
 // --- helpers ---
 
 func classifyLevel(current, level float64) string {
+	if current == 0 {
+		return "SUPPORT"
+	}
+	// Within 0.01% of current price — treat as support (immediate floor)
+	if math.Abs((level-current)/current*100) < 0.01 {
+		return "SUPPORT"
+	}
 	if level < current {
 		return "SUPPORT"
 	}
@@ -281,8 +288,8 @@ func deduplicateLevels(levels []KeyLevel, thresholdPct float64) []KeyLevel {
 				used[j] = true
 				if levels[j].Strength > best.Strength {
 					best = levels[j]
-				} else if levels[j].Strength == best.Strength {
-					// Prefer MAs over swing levels
+				} else if levels[j].Strength == best.Strength && best.Strength < 5 {
+					// Cluster confirmation: bump strength (capped at 5)
 					best.Strength++
 				}
 			}

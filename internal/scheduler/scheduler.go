@@ -770,6 +770,13 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		fredRegime = regime.Name
 	}
 
+	// Build daily trend filter once (reused across all signals to avoid redundant DB reads)
+	var trendFilter *backtestsvc.DailyTrendFilter
+	if s.deps.DailyPriceRepo != nil {
+		dailyBuilder := pricesvc.NewDailyContextBuilder(s.deps.DailyPriceRepo)
+		trendFilter = backtestsvc.NewDailyTrendFilter(dailyBuilder)
+	}
+
 	for _, sig := range signals {
 		analysis := analysisMap[sig.ContractCode]
 		if analysis == nil {
@@ -813,10 +820,8 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 
 		// Daily trend filter: adjust confidence based on daily price trend alignment.
 		// This is additive — COT signal is primary, daily trend is secondary confirmation.
-		if s.deps.DailyPriceRepo != nil {
-			dailyBuilder := pricesvc.NewDailyContextBuilder(s.deps.DailyPriceRepo)
-			filter := backtestsvc.NewDailyTrendFilter(dailyBuilder)
-			adj := filter.Adjust(ctx, sig.ContractCode, sig.Currency, sig.Direction, ps.Confidence)
+		if trendFilter != nil {
+			adj := trendFilter.Adjust(ctx, sig.ContractCode, sig.Currency, sig.Direction, ps.Confidence)
 
 			ps.RawConfidence = adj.RawConfidence
 			ps.Confidence = adj.AdjustedConfidence
