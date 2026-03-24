@@ -218,5 +218,17 @@ func FindPriceMappingByCurrency(currency string) *PriceSymbolMapping {
 			return &DefaultPriceSymbolMappings[i]
 		}
 	}
+
+	// Fallback: match by COT ticker symbol (e.g. "NQ" → NDX, "ES" → SPX500, "GC" → XAU).
+	for _, c := range DefaultCOTContracts {
+		if c.Symbol == currency {
+			for i := range DefaultPriceSymbolMappings {
+				if DefaultPriceSymbolMappings[i].ContractCode == c.Code {
+					return &DefaultPriceSymbolMappings[i]
+				}
+			}
+		}
+	}
+
 	return nil
 }

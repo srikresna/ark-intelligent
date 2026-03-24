@@ -26,55 +26,70 @@ func (h *Handler) cmdPrice(ctx context.Context, chatID string, userID int64, arg
 	// Look up currency
 	mapping := domain.FindPriceMappingByCurrency(args)
 	if mapping == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Unknown currency: <code>%s</code>\n\nUsage: <code>/price [currency]</code>\nExamples: <code>/price EUR</code> · <code>/price XAU</code> · <code>/price BTC</code>",
+		kb := h.kb.PriceMenu()
+		_, err := h.bot.SendWithKeyboard(ctx, chatID, fmt.Sprintf(
+			"Unknown instrument: <code>%s</code>\n\nTap a button below or type e.g. <code>/price EUR</code>",
 			html.EscapeString(args),
-		))
+		), kb)
 		return err
 	}
 
 	return h.priceDetail(ctx, chatID, mapping)
 }
 
-// priceOverview shows a quick snapshot of all major instruments.
+// priceOverview shows a categorized snapshot of all major instruments.
 func (h *Handler) priceOverview(ctx context.Context, chatID string) error {
 	builder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
 
-	// Build for key instruments
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "XAU", "OIL", "BTC", "SPX500"}
-	var lines []string
-
-	for _, cur := range currencies {
-		mapping := domain.FindPriceMappingByCurrency(cur)
-		if mapping == nil {
-			continue
-		}
-		dc, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
-		if err != nil {
-			continue
-		}
-
-		arrow := "→"
-		if dc.DailyChgPct > 0 {
-			arrow = "▲"
-		} else if dc.DailyChgPct < 0 {
-			arrow = "▼"
-		}
-
-		lines = append(lines, fmt.Sprintf(
-			"<code>%-6s %s %+.2f%%</code> %s",
-			dc.Currency, formatPrice(dc.CurrentPrice, dc.Currency), dc.DailyChgPct, arrow,
-		))
+	type section struct {
+		title      string
+		currencies []string
+	}
+	sections := []section{
+		{"💱 FX Majors", []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "USD"}},
+		{"🪙 Metals & Energy", []string{"XAU", "XAG", "OIL", "COPPER"}},
+		{"📈 Indices", []string{"SPX500", "NDX", "DJI", "RUT"}},
+		{"₿ Crypto", []string{"BTC", "ETH"}},
 	}
 
-	if len(lines) == 0 {
+	var blocks []string
+	for _, sec := range sections {
+		var lines []string
+		for _, cur := range sec.currencies {
+			mapping := domain.FindPriceMappingByCurrency(cur)
+			if mapping == nil {
+				continue
+			}
+			dc, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
+			if err != nil {
+				continue
+			}
+
+			arrow := "→"
+			if dc.DailyChgPct > 0 {
+				arrow = "▲"
+			} else if dc.DailyChgPct < 0 {
+				arrow = "▼"
+			}
+
+			lines = append(lines, fmt.Sprintf(
+				"<code>%-7s %s %+.2f%%</code> %s",
+				dc.Currency, formatPrice(dc.CurrentPrice, dc.Currency), dc.DailyChgPct, arrow,
+			))
+		}
+		if len(lines) > 0 {
+			blocks = append(blocks, sec.title+"\n"+strings.Join(lines, "\n"))
+		}
+	}
+
+	if len(blocks) == 0 {
 		_, err := h.bot.SendHTML(ctx, chatID, "No daily price data available yet. Data is fetched every 6 hours.")
 		return err
 	}
 
 	msg := "💹 <b>PRICE OVERVIEW</b>\n\n" +
-		strings.Join(lines, "\n") +
-		"\n\n<i>Use</i> <code>/price EUR</code> <i>for detailed view</i>"
+		strings.Join(blocks, "\n\n") +
+		"\n\n<i>Tap below for detailed view</i>"
 
 	kb := h.kb.PriceMenu()
 	_, err := h.bot.SendWithKeyboard(ctx, chatID, msg, kb)
@@ -94,7 +109,8 @@ func (h *Handler) priceDetail(ctx context.Context, chatID string, mapping *domai
 	}
 
 	htmlOut := h.fmt.FormatDailyPrice(dc)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	kb := h.kb.PriceMenu()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }
 

@@ -581,27 +581,50 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	}
 }
 
-// PriceMenu builds a currency selection keyboard for the /price command.
+// PriceMenu builds a categorized currency selection keyboard for the /price command.
 func (kb *KeyboardBuilder) PriceMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
+			// --- FX Majors ---
 			{
 				{Text: "EUR", CallbackData: "cmd:price:EUR"},
 				{Text: "GBP", CallbackData: "cmd:price:GBP"},
 				{Text: "JPY", CallbackData: "cmd:price:JPY"},
-				{Text: "AUD", CallbackData: "cmd:price:AUD"},
+				{Text: "CHF", CallbackData: "cmd:price:CHF"},
 			},
 			{
+				{Text: "AUD", CallbackData: "cmd:price:AUD"},
 				{Text: "NZD", CallbackData: "cmd:price:NZD"},
 				{Text: "CAD", CallbackData: "cmd:price:CAD"},
-				{Text: "CHF", CallbackData: "cmd:price:CHF"},
-				{Text: "USD", CallbackData: "cmd:price:USD"},
+				{Text: "DXY", CallbackData: "cmd:price:USD"},
 			},
+			// --- Metals & Energy ---
 			{
-				{Text: "🥇 XAU", CallbackData: "cmd:price:XAU"},
-				{Text: "🛢 OIL", CallbackData: "cmd:price:OIL"},
+				{Text: "🥇 Gold", CallbackData: "cmd:price:XAU"},
+				{Text: "🥈 Silver", CallbackData: "cmd:price:XAG"},
+				{Text: "🛢 Oil", CallbackData: "cmd:price:OIL"},
+				{Text: "🔶 Copper", CallbackData: "cmd:price:COPPER"},
+			},
+			// --- Indices ---
+			{
+				{Text: "📈 S&P500", CallbackData: "cmd:price:SPX500"},
+				{Text: "📈 Nasdaq", CallbackData: "cmd:price:NDX"},
+				{Text: "📈 Dow", CallbackData: "cmd:price:DJI"},
+				{Text: "📈 Russell", CallbackData: "cmd:price:RUT"},
+			},
+			// --- Bonds ---
+			{
+				{Text: "🏛 2Y", CallbackData: "cmd:price:BOND2"},
+				{Text: "🏛 5Y", CallbackData: "cmd:price:BOND5"},
+				{Text: "🏛 10Y", CallbackData: "cmd:price:BOND"},
+				{Text: "🏛 30Y", CallbackData: "cmd:price:BOND30"},
+			},
+			// --- Crypto & Energy ---
+			{
 				{Text: "₿ BTC", CallbackData: "cmd:price:BTC"},
-				{Text: "📈 SPX", CallbackData: "cmd:price:SPX500"},
+				{Text: "Ξ ETH", CallbackData: "cmd:price:ETH"},
+				{Text: "⛽ ULSD", CallbackData: "cmd:price:ULSD"},
+				{Text: "⛽ RBOB", CallbackData: "cmd:price:RBOB"},
 			},
 		},
 	}
