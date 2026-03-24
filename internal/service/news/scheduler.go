@@ -187,8 +187,11 @@ func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
 			now := timeutil.NowWIB()
 			dateStr := now.Format("20060102")
 
-			// Condition: 06:00 AM WIB and not already sent today
-			if now.Hour() == 6 && now.Minute() == 0 && lastSentDate != dateStr {
+			// Condition: 06:xx AM WIB and not already sent today
+			// Removed now.Minute() == 0 check — ticker phase depends on
+			// process start time, so the minute-0 window can be missed entirely.
+			// lastSentDate guard already prevents duplicate sends.
+			if now.Hour() == 6 && lastSentDate != dateStr {
 				schedLog.Info().Msg("triggering daily morning reminder")
 				s.broadcastDailyReminder(ctx, now)
 				lastSentDate = dateStr
