@@ -51,6 +51,7 @@ type Handler struct {
 	priceRepo      ports.PriceRepository
 	signalRepo     ports.SignalRepository
 	dailyPriceRepo pricesvc.DailyPriceStore
+	intradayRepo   pricesvc.IntradayStore // 4H intraday — may be nil
 
 	aiAnalyzer ports.AIAnalyzer
 
@@ -105,6 +106,7 @@ func NewHandler(
 	claudeAnalyzer *aisvc.ClaudeAnalyzer,
 	impactProvider ImpactProvider,
 	dailyPriceRepo pricesvc.DailyPriceStore,
+	intradayRepo pricesvc.IntradayStore,
 ) *Handler {
 	h := &Handler{
 		bot:            bot,
@@ -127,6 +129,7 @@ func NewHandler(
 		claudeAnalyzer: claudeAnalyzer,
 		impactProvider: impactProvider,
 		dailyPriceRepo: dailyPriceRepo,
+		intradayRepo:   intradayRepo,
 	}
 
 	// Register all commands
@@ -148,6 +151,11 @@ func NewHandler(
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
 	bot.RegisterCommand("/price", h.cmdPrice) // Daily price context
 	bot.RegisterCommand("/levels", h.cmdLevels) // Support/resistance levels + position sizing
+	bot.RegisterCommand("/intraday", h.cmdIntraday) // 4H intraday context
+	bot.RegisterCommand("/corr", h.cmdCorr)         // Cross-pair correlation matrix
+	bot.RegisterCommand("/carry", h.cmdCarry)       // Interest rate differential / carry trade
+	bot.RegisterCommand("/garch", h.cmdGarch)       // GARCH(1,1) volatility forecast
+	bot.RegisterCommand("/hurst", h.cmdHurst)       // Hurst exponent / regime analysis
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -171,7 +179,7 @@ func NewHandler(
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
 	bot.RegisterCallback("imp:", h.cbImpact)
 
-	log.Info().Int("commands", 23).Int("callbacks", 8).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 28).Int("callbacks", 8).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -214,6 +222,13 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /impact — Event impact DB · <code>/impact NFP</code>
 /sentiment — Retail sentiment survey (Forex Factory)
 /seasonal — Seasonal pattern analysis · <code>/seasonal EUR</code>
+
+<b>🔬 Quantitative</b>
+/intraday — 4H price context · <code>/intraday EUR</code>
+/corr — Cross-pair correlation matrix
+/carry — Interest rate differential / carry trade
+/garch — GARCH(1,1) vol forecast · <code>/garch EUR</code>
+/hurst — Hurst exponent regime · <code>/hurst EUR</code>
 
 <b>⚙️ Settings</b>
 /settings · /membership · /status · /clear

@@ -56,6 +56,7 @@ type Deps struct {
 	PriceFetcher   ports.PriceFetcher
 	Evaluator      *backtestsvc.Evaluator
 	DailyPriceRepo *storage.DailyPriceRepo
+	IntradayRepo   *storage.IntradayRepo // 4H intraday data — may be nil
 
 	// ImpactBootstrapper backfills historical event impact data on startup.
 	// May be nil (bootstrap is skipped).
@@ -145,6 +146,12 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 			priceFetchInterval = 6 * time.Hour
 		}
 		s.startJobWithDelay(ctx, "daily-price-fetch", priceFetchInterval, 45*time.Second, s.jobDailyPriceFetch)
+		jobCount++
+	}
+
+	// Intraday (4H) price fetch
+	if s.deps.PriceFetcher != nil && s.deps.IntradayRepo != nil {
+		s.startJobWithDelay(ctx, "intraday-price-fetch", 4*time.Hour, 90*time.Second, s.jobIntradayPriceFetch)
 		jobCount++
 	}
 
@@ -641,6 +648,42 @@ func (s *Scheduler) jobDailyPriceFetch(ctx context.Context) error {
 			Int("failed", report.Failed).
 			Dur("duration", report.Duration).
 			Msg("daily price fetch report")
+	}
+
+	return nil
+}
+
+// jobIntradayPriceFetch fetches 4H OHLCV data for all contracts and stores it.
+func (s *Scheduler) jobIntradayPriceFetch(ctx context.Context) error {
+	if s.deps.PriceFetcher == nil || s.deps.IntradayRepo == nil {
+		return nil
+	}
+
+	fetcher, ok := s.deps.PriceFetcher.(*pricesvc.Fetcher)
+	if !ok {
+		return fmt.Errorf("intraday price fetch requires concrete Fetcher type")
+	}
+
+	// Fetch 60 bars of 4H data (~10 days, enough for IMA55)
+	bars, report, err := fetcher.FetchAllIntraday(ctx, "4h", 60)
+	if err != nil {
+		log.Warn().Err(err).Msg("intraday price fetch failed")
+		return fmt.Errorf("intraday price fetch: %w", err)
+	}
+
+	if len(bars) > 0 {
+		if err := s.deps.IntradayRepo.SaveBars(ctx, bars); err != nil {
+			return fmt.Errorf("save intraday bars: %w", err)
+		}
+		log.Info().Int("bars", len(bars)).Msg("intraday 4H data saved")
+	}
+
+	if report != nil {
+		log.Info().
+			Int("success", report.Success).
+			Int("failed", report.Failed).
+			Dur("duration", report.Duration).
+			Msg("intraday price fetch report")
 	}
 
 	return nil
