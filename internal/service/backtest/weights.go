@@ -127,7 +127,7 @@ func (wo *WeightOptimizer) OptimizeWeights(ctx context.Context) (*WeightResult, 
 }
 
 // buildDesignMatrix constructs the feature matrix and response vector from signals.
-// Each signal contributes one row with 5 factor scores and the 1W return as response.
+// Each signal contributes one row with 4 factor scores and the 1W return as response.
 func buildDesignMatrix(signals []domain.PersistedSignal) (X [][]float64, y []float64) {
 	X = make([][]float64, 0, len(signals))
 	y = make([]float64, 0, len(signals))

@@ -148,18 +148,16 @@ func (wfo *WalkForwardOptimizer) Optimize(ctx context.Context) (*WFOResult, erro
 		regime := detectDominantRegime(trainSigs)
 
 		// Evaluate on test set with optimized weights
-		oosWinRate, oosReturn := evaluateWithWeights(testSigs, weights)
+		oosWinRate, oosReturn, adaptiveCorrect, adaptiveCount := evaluateWithWeights(testSigs, weights)
 
 		// Evaluate with static weights for comparison
-		staticWR, _ := evaluateWithWeights(testSigs, currentV3Weights)
+		_, _, staticCorrect, staticCount := evaluateWithWeights(testSigs, currentV3Weights)
 
-		// Track adaptive vs static
-		adaptiveCorrect := int(math.Round(oosWinRate / 100 * float64(len(testSigs))))
-		staticCorrect := int(math.Round(staticWR / 100 * float64(len(testSigs))))
+		// Track adaptive vs static using actual counts (no rounding)
 		adaptiveWins += adaptiveCorrect
-		adaptiveTotal += len(testSigs)
+		adaptiveTotal += adaptiveCount
 		staticWins += staticCorrect
-		staticTotal += len(testSigs)
+		staticTotal += staticCount
 
 		win := WFOWindowResult{
 			TrainStart: winStart,
@@ -267,9 +265,9 @@ func optimizeWindowWeights(signals []domain.PersistedSignal) (map[string]float64
 // above a conviction threshold, and computes OOS win rate and return on the
 // selected subset. This allows adaptive weights to produce different results
 // from static weights by changing which signals are considered "high conviction".
-func evaluateWithWeights(signals []domain.PersistedSignal, weights map[string]float64) (winRate, avgReturn float64) {
+func evaluateWithWeights(signals []domain.PersistedSignal, weights map[string]float64) (winRate, avgReturn float64, winCount, totalCount int) {
 	if len(signals) == 0 {
-		return 0, 0
+		return 0, 0, 0, 0
 	}
 
 	// Score every signal with the given weights
@@ -318,7 +316,7 @@ func evaluateWithWeights(signals []domain.PersistedSignal, weights map[string]fl
 
 	winRate = float64(wins) / float64(len(selected)) * 100
 	avgReturn = totalReturn / float64(len(selected))
-	return winRate, avgReturn
+	return winRate, avgReturn, wins, len(selected)
 }
 
 // detectDominantRegime determines the most common FRED regime in a signal set.
