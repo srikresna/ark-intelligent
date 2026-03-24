@@ -88,6 +88,14 @@ func (f *Fetcher) FetchAllDaily(ctx context.Context, days int) ([]domain.DailyPr
 			continue
 		}
 		allRecords = append(allRecords, records...)
+
+		// Rate limit between fetches
+		select {
+		case <-ctx.Done():
+			report.Duration = time.Since(start)
+			return allRecords, report, ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 
 	report.Duration = time.Since(start)

@@ -24,12 +24,10 @@ type ExcursionResult struct {
 	EntryPrice   float64 `json:"entry_price"`
 
 	// Maximum Favorable Excursion — max move in signal direction (positive = favorable)
-	MFE       float64 `json:"mfe"`        // In pips/points
 	MFEPct    float64 `json:"mfe_pct"`    // As percentage
 	MFEDay    int     `json:"mfe_day"`    // Day # when MFE occurred (1-based)
 
 	// Maximum Adverse Excursion — max move against signal direction (positive = adverse)
-	MAE       float64 `json:"mae"`        // In pips/points
 	MAEPct    float64 `json:"mae_pct"`    // As percentage
 	MAEDay    int     `json:"mae_day"`    // Day # when MAE occurred
 
