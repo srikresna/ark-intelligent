@@ -45,7 +45,8 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 		}
 
 		htmlOut := h.fmt.FormatSeasonalSingle(*pattern)
-		_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+		kb := h.kb.SeasonalDetailMenu(mapping.Currency)
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 		return err
 	}
 
@@ -58,7 +59,8 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 	}
 
 	htmlOut := h.fmt.FormatSeasonalPatterns(patterns)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	kb := h.kb.SeasonalMenu()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }
 

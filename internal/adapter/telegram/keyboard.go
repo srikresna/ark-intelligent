@@ -555,6 +555,65 @@ func (kb *KeyboardBuilder) BacktestMenu() ports.InlineKeyboard {
 }
 
 // ---------------------------------------------------------------------------
+// Seasonal Keyboards
+// ---------------------------------------------------------------------------
+
+// SeasonalMenu builds a currency selector keyboard for the /seasonal grid view.
+// Provides quick-access buttons for deep-dive into individual currencies.
+func (kb *KeyboardBuilder) SeasonalMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			// FX Majors
+			{
+				{Text: "EUR", CallbackData: "cmd:seasonal:EUR"},
+				{Text: "GBP", CallbackData: "cmd:seasonal:GBP"},
+				{Text: "JPY", CallbackData: "cmd:seasonal:JPY"},
+				{Text: "CHF", CallbackData: "cmd:seasonal:CHF"},
+			},
+			{
+				{Text: "AUD", CallbackData: "cmd:seasonal:AUD"},
+				{Text: "NZD", CallbackData: "cmd:seasonal:NZD"},
+				{Text: "CAD", CallbackData: "cmd:seasonal:CAD"},
+				{Text: "DXY", CallbackData: "cmd:seasonal:USD"},
+			},
+			// Metals & Energy
+			{
+				{Text: "🥇 Gold", CallbackData: "cmd:seasonal:XAU"},
+				{Text: "🥈 Silver", CallbackData: "cmd:seasonal:XAG"},
+				{Text: "🛢 Oil", CallbackData: "cmd:seasonal:OIL"},
+				{Text: "🔶 Copper", CallbackData: "cmd:seasonal:COPPER"},
+			},
+			// Indices
+			{
+				{Text: "S&P500", CallbackData: "cmd:seasonal:SPX500"},
+				{Text: "Nasdaq", CallbackData: "cmd:seasonal:NDX"},
+				{Text: "Dow", CallbackData: "cmd:seasonal:DJI"},
+				{Text: "Russell", CallbackData: "cmd:seasonal:RUT"},
+			},
+			// Bonds & Crypto
+			{
+				{Text: "🏛 10Y", CallbackData: "cmd:seasonal:BOND"},
+				{Text: "🏛 30Y", CallbackData: "cmd:seasonal:BOND30"},
+				{Text: "₿ BTC", CallbackData: "cmd:seasonal:BTC"},
+				{Text: "Ξ ETH", CallbackData: "cmd:seasonal:ETH"},
+			},
+		},
+	}
+}
+
+// SeasonalDetailMenu builds a navigation keyboard for a single-currency seasonal deep dive.
+func (kb *KeyboardBuilder) SeasonalDetailMenu(currency string) ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "<< Grid Overview", CallbackData: "cmd:seasonal"},
+				{Text: "💹 Price", CallbackData: fmt.Sprintf("cmd:price:%s", currency)},
+			},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Signal Keyboards
 // ---------------------------------------------------------------------------
 
