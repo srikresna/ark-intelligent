@@ -25,36 +25,41 @@ func TestDetectSmartMoney(t *testing.T) {
 		wantStr  int // expected strength
 	}{
 		{
-			name: "bullish_comm_low_index_large_change",
+			// COTIndexComm < 20 = dealers/commercials at extreme LOW = BEARISH signal
+			// (they are net short / reducing exposure heavily)
+			name: "bearish_comm_low_index_large_change",
 			analysis: domain.COTAnalysis{
-				Contract:     baseContract("TFF"),
+				Contract:      baseContract("TFF"),
 				CommNetChange: 8000,
 				COTIndexComm:  15,
 			},
 			wantNil: false,
-			wantDir: "BULLISH",
+			wantDir: "BEARISH",
 			wantStr: 3,
 		},
 		{
-			name: "bearish_comm_high_index",
+			// COTIndexComm > 80 = dealers/commercials at extreme HIGH = BULLISH signal
+			// (they are accumulating net long positions heavily)
+			name: "bullish_comm_high_index",
 			analysis: domain.COTAnalysis{
-				Contract:     baseContract("TFF"),
+				Contract:      baseContract("TFF"),
 				CommNetChange: -12000,
 				COTIndexComm:  85,
 			},
 			wantNil: false,
-			wantDir: "BEARISH",
+			wantDir: "BULLISH",
 			wantStr: 4,
 		},
 		{
-			name: "strength_5_very_large_change",
+			// COTIndexComm = 10 (< 20) = extreme low = BEARISH
+			name: "strength_5_very_large_change_bearish",
 			analysis: domain.COTAnalysis{
-				Contract:     baseContract("TFF"),
+				Contract:      baseContract("TFF"),
 				CommNetChange: 20000,
 				COTIndexComm:  10,
 			},
 			wantNil: false,
-			wantDir: "BULLISH",
+			wantDir: "BEARISH",
 			wantStr: 5,
 		},
 		{
