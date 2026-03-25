@@ -711,24 +711,32 @@ func detectDivergence(specNetChange, commNetChange float64) bool {
 	return specDir != 0 && commDir != 0 && specDir != commDir
 }
 
-// computeCrowding measures how one-sided positioning is (0-100).
+// computeCrowding measures how one-sided speculative positioning is (0-100).
+// It focuses on the speculative trader category (leveraged funds for TFF,
+// managed money for DISAGG) because total market longs always equal shorts
+// in futures markets — making aggregate crowding meaningless.
+//
+// 0 = speculators perfectly balanced (50/50 long/short)
+// 100 = speculators fully one-sided (all long or all short)
 func computeCrowding(r domain.COTRecord, reportType string) float64 {
-	var totalLong, totalShort float64
+	var specLong, specShort float64
 
 	if reportType == "TFF" {
-		totalLong = r.DealerLong + r.AssetMgrLong + r.LevFundLong + r.OtherLong + r.SmallLong
-		totalShort = r.DealerShort + r.AssetMgrShort + r.LevFundShort + r.OtherShort + r.SmallShort
+		// Leveraged funds = speculative/hedge fund positioning
+		specLong = r.LevFundLong
+		specShort = r.LevFundShort
 	} else {
-		totalLong = r.ProdMercLong + r.SwapDealerLong + r.ManagedMoneyLong + r.OtherLong + r.SmallLong
-		totalShort = r.ProdMercShort + r.SwapDealerShort + r.ManagedMoneyShort + r.OtherShort + r.SmallShort
+		// Managed money = speculative/CTA positioning
+		specLong = r.ManagedMoneyLong
+		specShort = r.ManagedMoneyShort
 	}
 
-	total := totalLong + totalShort
-	if total == 0 {
-		return 50.0
+	specTotal := specLong + specShort
+	if specTotal == 0 {
+		return 50.0 // No speculative positions → neutral
 	}
 
-	longPct := totalLong / total * 100
+	longPct := specLong / specTotal * 100
 	deviation := math.Abs(longPct - 50)
 
 	return mathutil.Clamp(deviation*2, 0, 100)
