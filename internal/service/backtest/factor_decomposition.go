@@ -94,68 +94,140 @@ func (fd *FactorDecomposer) Decompose(ctx context.Context) (*DecompositionResult
 	return result, nil
 }
 
+// hasVariance returns true if the data slice has non-trivial variance.
+func hasVariance(data []float64) bool {
+	if len(data) < 2 {
+		return false
+	}
+	m := mean(data)
+	s := stdDev(data, m)
+	return s >= 1e-10
+}
+
 // decomposeSignals performs the actual decomposition on a set of signals.
+// It dynamically excludes factors with zero variance (missing/constant data)
+// and only regresses on factors that carry information.
 func decomposeSignals(signals []domain.PersistedSignal, label string) *DecompositionResult {
 	n := len(signals)
 
 	// Extract factor scores and target (Return1W)
-	cotScores := make([]float64, n)
-	macroScores := make([]float64, n)
-	trendScores := make([]float64, n)
-	volScores := make([]float64, n)
+	allNames := []string{"COT Positioning", "Macro Regime", "Trend Following", "Volatility"}
+	allScores := make([][]float64, 4)
 	returns := make([]float64, n)
 
 	for i, s := range signals {
 		returns[i] = s.Return1W
-		cotScores[i] = extractCOTScore(&s)
-		macroScores[i] = extractMacroScore(&s)
-		trendScores[i] = extractTrendScore(&s)
-		volScores[i] = extractVolScore(&s)
 	}
 
-	// Normalize factors to zero-mean, unit-variance
-	cotNorm := zScoreNormalize(cotScores)
-	macroNorm := zScoreNormalize(macroScores)
-	trendNorm := zScoreNormalize(trendScores)
-	volNorm := zScoreNormalize(volScores)
+	// Extract raw scores for each factor
+	rawCOT := make([]float64, n)
+	rawMacro := make([]float64, n)
+	rawTrend := make([]float64, n)
+	rawVol := make([]float64, n)
+	for i, s := range signals {
+		rawCOT[i] = extractCOTScore(&s)
+		rawMacro[i] = extractMacroScore(&s)
+		rawTrend[i] = extractTrendScore(&s)
+		rawVol[i] = extractVolScore(&s)
+	}
+	allScores[0] = rawCOT
+	allScores[1] = rawMacro
+	allScores[2] = rawTrend
+	allScores[3] = rawVol
 
-	// Build regression: Return1W = β0 + β1*COT + β2*MACRO + β3*TREND + β4*VOL
+	// Determine which factors have variance (i.e., have real data)
+	type activeFactor struct {
+		idx  int      // original index (0-3)
+		name string
+		norm []float64
+		raw  []float64
+	}
+	var active []activeFactor
+	for j := 0; j < 4; j++ {
+		if hasVariance(allScores[j]) {
+			active = append(active, activeFactor{
+				idx:  j,
+				name: allNames[j],
+				norm: zScoreNormalize(allScores[j]),
+				raw:  allScores[j],
+			})
+		}
+	}
+
+	// If no factors have variance, return a result indicating data insufficiency
+	if len(active) == 0 {
+		factors := make([]FactorContribution, 4)
+		for j := 0; j < 4; j++ {
+			factors[j] = FactorContribution{
+				Name:      allNames[j],
+				Direction: "NO DATA",
+				PValue:    1.0,
+			}
+		}
+		return &DecompositionResult{
+			Factors:     factors,
+			RSquared:    0,
+			AdjRSquared: 0,
+			ResidualPct: 100,
+			SampleSize:  n,
+			TopFactor:   "",
+			EdgeSource:  fmt.Sprintf("Insufficient enrichment data — only %d/4 factors have variance", len(active)),
+		}
+	}
+
+	// Build regression matrix with ONLY active factors
+	// Return1W = β0 + β1*Factor1 + β2*Factor2 + ...
+	p := len(active)
 	X := make([][]float64, n)
 	for i := 0; i < n; i++ {
-		X[i] = []float64{1.0, cotNorm[i], macroNorm[i], trendNorm[i], volNorm[i]} // with intercept
+		row := make([]float64, p+1)
+		row[0] = 1.0 // intercept
+		for k, af := range active {
+			row[k+1] = af.norm[i]
+		}
+		X[i] = row
 	}
 
 	// Simple OLS via normal equations
 	betas, rSquared, pValues := simpleOLS(X, returns)
 
-	// Compute average contribution of each factor
-	decompositionFactors := []string{"COT Positioning", "Macro Regime", "Trend Following", "Volatility"}
+	// Build factor contributions — include ALL 4 factors in output,
+	// mark inactive ones as "NO DATA"
 	factors := make([]FactorContribution, 4)
 
+	// First, compute active factor contributions
 	totalAbsBeta := 0.0
-	for j := 0; j < 4; j++ {
-		totalAbsBeta += math.Abs(betas[j+1]) // skip intercept
+	activeBetas := make(map[int]float64) // original factor idx → beta
+	activePVals := make(map[int]float64)
+	activeNorms := make(map[int][]float64)
+	for k, af := range active {
+		beta := betas[k+1] // skip intercept
+		activeBetas[af.idx] = beta
+		activeNorms[af.idx] = af.norm
+		totalAbsBeta += math.Abs(beta)
+		if k+1 < len(pValues) {
+			activePVals[af.idx] = pValues[k+1]
+		}
 	}
 
 	topFactor := ""
 	topContrib := 0.0
 
 	for j := 0; j < 4; j++ {
-		beta := betas[j+1]
-		var norms []float64
-		switch j {
-		case 0:
-			norms = cotNorm
-		case 1:
-			norms = macroNorm
-		case 2:
-			norms = trendNorm
-		case 3:
-			norms = volNorm
+		beta, isActive := activeBetas[j]
+		if !isActive {
+			// Factor had no variance — mark as no data
+			factors[j] = FactorContribution{
+				Name:      allNames[j],
+				Direction: "NO DATA",
+				PValue:    1.0,
+			}
+			continue
 		}
 
+		norms := activeNorms[j]
+
 		// Average absolute contribution = beta * mean(|factor|)
-		// Using mean absolute value since z-scored factors have mean≈0
 		absSum := 0.0
 		for _, v := range norms {
 			absSum += math.Abs(v)
@@ -180,12 +252,12 @@ func decomposeSignals(signals []domain.PersistedSignal, label string) *Decomposi
 		}
 
 		pVal := 1.0
-		if j+1 < len(pValues) {
-			pVal = pValues[j+1]
+		if pv, ok := activePVals[j]; ok {
+			pVal = pv
 		}
 
 		factors[j] = FactorContribution{
-			Name:          decompositionFactors[j],
+			Name:          allNames[j],
 			Coefficient:   roundN(beta, 6),
 			AvgContrib:    roundN(avgContrib, 4),
 			PctExplained:  roundN(pctExplained, 2),
@@ -196,7 +268,7 @@ func decomposeSignals(signals []domain.PersistedSignal, label string) *Decomposi
 
 		if math.Abs(beta) > topContrib {
 			topContrib = math.Abs(beta)
-			topFactor = decompositionFactors[j]
+			topFactor = allNames[j]
 		}
 	}
 
@@ -207,7 +279,15 @@ func decomposeSignals(signals []domain.PersistedSignal, label string) *Decomposi
 
 	// Determine edge source
 	edgeSource := "No clear alpha source"
-	if rSquared > 0.05 {
+	if len(active) < 4 {
+		missing := 4 - len(active)
+		edgeSource = fmt.Sprintf("Partial analysis (%d/4 factors available) — ", len(active))
+		if rSquared > 0.05 {
+			edgeSource += fmt.Sprintf("Primary alpha from %s", factors[0].Name)
+		} else {
+			edgeSource += fmt.Sprintf("%d factors lack enrichment data", missing)
+		}
+	} else if rSquared > 0.05 {
 		sigFactors := 0
 		for _, f := range factors {
 			if f.IsSignificant {
@@ -222,7 +302,7 @@ func decomposeSignals(signals []domain.PersistedSignal, label string) *Decomposi
 	return &DecompositionResult{
 		Factors:     factors,
 		RSquared:    roundN(rSquared, 4),
-		AdjRSquared: roundN(adjustedRSquared(rSquared, n, 4), 4),
+		AdjRSquared: roundN(adjustedRSquared(rSquared, n, p), 4),
 		ResidualPct: roundN((1-rSquared)*100, 2),
 		SampleSize:  n,
 		TopFactor:   topFactor,

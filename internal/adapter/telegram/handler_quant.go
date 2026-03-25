@@ -21,7 +21,11 @@ func (h *Handler) cmdCorr(ctx context.Context, chatID string, userID int64, args
 	engine := pricesvc.NewCorrelationEngine(h.dailyPriceRepo)
 	matrix, err := engine.BuildWithBreakdowns(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Failed to compute correlation: %s", err.Error()))
+		errMsg := fmt.Sprintf(
+			"<b>Correlation matrix unavailable</b>\n\n%s\n\n<i>Daily prices may still be loading. Try again in a few minutes.</i>",
+			err.Error(),
+		)
+		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
 		return sendErr
 	}
 
@@ -82,7 +86,7 @@ func (h *Handler) cmdIntraday(ctx context.Context, chatID string, userID int64, 
 func (h *Handler) intradayOverview(ctx context.Context, chatID string) error {
 	builder := pricesvc.NewIntradayContextBuilder(h.intradayRepo)
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "XAU", "OIL", "BTC", "SPX500"}
+	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
 	var lines []string
 
 	for _, cur := range currencies {
@@ -178,7 +182,7 @@ func (h *Handler) garchOverview(ctx context.Context, chatID string) error {
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "XAU", "OIL", "BTC", "SPX500"}
+	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
 	var lines []string
 
 	for _, cur := range currencies {
@@ -284,7 +288,7 @@ func (h *Handler) hurstOverview(ctx context.Context, chatID string) error {
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "XAU", "OIL", "BTC"}
+	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
 	var lines []string
 
 	for _, cur := range currencies {
@@ -412,7 +416,7 @@ func (h *Handler) regimeOverview(ctx context.Context, chatID string) error {
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "XAU", "OIL", "BTC", "SPX500"}
+	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
 	var lines []string
 
 	for _, cur := range currencies {

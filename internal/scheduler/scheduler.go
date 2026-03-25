@@ -808,9 +808,12 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 
 	// Best-effort: fetch current FRED regime once for all signals.
 	var fredRegime string
+	var macroRegime fred.MacroRegime
+	var macroData *fred.MacroData
 	if md, fredErr := fred.GetCachedOrFetch(ctx); fredErr == nil && md != nil {
-		regime := fred.ClassifyMacroRegime(md)
-		fredRegime = regime.Name
+		macroData = md
+		macroRegime = fred.ClassifyMacroRegime(md)
+		fredRegime = macroRegime.Name
 	}
 
 	// Build daily trend filter once (reused across all signals to avoid redundant DB reads)
@@ -885,6 +888,10 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 					Msg("daily trend filter applied")
 			}
 		}
+
+		// Compute ConvictionScore for factor decomposition
+		cs := cotsvc.ComputeConvictionScore(*analysis, macroRegime, 0, "", macroData)
+		ps.ConvictionScore = cs.Score
 
 		toSave = append(toSave, ps)
 	}

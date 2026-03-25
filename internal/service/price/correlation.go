@@ -27,14 +27,28 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 	// Fetch daily returns for each currency
 	returnsMap := make(map[string][]float64) // currency -> daily returns (oldest-first)
 
+	var skippedNoMapping []string
+	var skippedFetchErr []string
+	var skippedInsufficient []string
+	var succeeded []string
+
 	for _, cur := range currencies {
 		mapping := domain.FindPriceMappingByCurrency(cur)
 		if mapping == nil {
+			fmt.Printf("[correlation] SKIP %s: no price mapping found\n", cur)
+			skippedNoMapping = append(skippedNoMapping, cur)
 			continue
 		}
 
 		records, err := ce.dailyRepo.GetDailyHistory(ctx, mapping.ContractCode, period+5)
-		if err != nil || len(records) < period {
+		if err != nil {
+			fmt.Printf("[correlation] SKIP %s: fetch error: %v\n", cur, err)
+			skippedFetchErr = append(skippedFetchErr, cur)
+			continue
+		}
+		if len(records) < period {
+			fmt.Printf("[correlation] SKIP %s: insufficient records (have %d, need %d)\n", cur, len(records), period)
+			skippedInsufficient = append(skippedInsufficient, cur)
 			continue
 		}
 
@@ -54,8 +68,16 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 
 		if len(returns) >= period-2 { // Allow minor gaps
 			returnsMap[cur] = returns
+			succeeded = append(succeeded, cur)
+		} else {
+			fmt.Printf("[correlation] SKIP %s: insufficient valid returns after gap filter (have %d, need %d)\n", cur, len(returns), period-2)
+			skippedInsufficient = append(skippedInsufficient, cur)
 		}
 	}
+
+	// Summary log
+	fmt.Printf("[correlation] period=%d | succeeded=%v | skipped_no_mapping=%v | skipped_fetch_err=%v | skipped_insufficient=%v\n",
+		period, succeeded, skippedNoMapping, skippedFetchErr, skippedInsufficient)
 
 	// Build valid currencies list (only those with enough data)
 	var validCurrencies []string
@@ -92,12 +114,20 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 }
 
 // BuildWithBreakdowns computes 20-day matrix and detects correlation breakdowns
-// by comparing against 60-day baseline.
+// by comparing against 60-day baseline. If the 20-day window fails, it falls
+// back to a 10-day window before giving up.
 func (ce *CorrelationEngine) BuildWithBreakdowns(ctx context.Context) (*domain.CorrelationMatrix, error) {
-	// Short-term (20-day)
+	// Short-term (20-day) with fallback to 10-day
 	shortMatrix, err := ce.BuildMatrix(ctx, 20)
 	if err != nil {
-		return nil, fmt.Errorf("short-term correlation: %w", err)
+		fmt.Printf("[correlation] 20-day matrix failed (%v), falling back to 10-day\n", err)
+		shortMatrix, err = ce.BuildMatrix(ctx, 10)
+		if err != nil {
+			// Build a diagnostic message showing data availability
+			return nil, fmt.Errorf("correlation matrix unavailable (tried 20-day and 10-day): %w\n%s",
+				err, ce.diagnoseDataAvailability(ctx))
+		}
+		fmt.Printf("[correlation] 10-day fallback succeeded with %d currencies\n", len(shortMatrix.Currencies))
 	}
 
 	// Baseline (60-day)
@@ -152,6 +182,36 @@ func (ce *CorrelationEngine) BuildWithBreakdowns(ctx context.Context) (*domain.C
 
 	shortMatrix.Breakdowns = breakdowns
 	return shortMatrix, nil
+}
+
+// diagnoseDataAvailability checks each currency and returns a human-readable
+// summary of which have data and which don't.
+func (ce *CorrelationEngine) diagnoseDataAvailability(ctx context.Context) string {
+	currencies := domain.DefaultCorrelationCurrencies()
+	var withData []string
+	var withoutData []string
+
+	for _, cur := range currencies {
+		mapping := domain.FindPriceMappingByCurrency(cur)
+		if mapping == nil {
+			withoutData = append(withoutData, cur+" (no mapping)")
+			continue
+		}
+		records, err := ce.dailyRepo.GetDailyHistory(ctx, mapping.ContractCode, 10)
+		if err != nil {
+			withoutData = append(withoutData, cur+fmt.Sprintf(" (error: %v)", err))
+			continue
+		}
+		if len(records) == 0 {
+			withoutData = append(withoutData, cur+" (0 records)")
+		} else {
+			withData = append(withData, fmt.Sprintf("%s (%d records)", cur, len(records)))
+		}
+	}
+
+	msg := fmt.Sprintf("Data available: %v | Missing: %v", withData, withoutData)
+	fmt.Printf("[correlation] diagnosis: %s\n", msg)
+	return msg
 }
 
 // DetectClusters finds groups of highly correlated currencies.
