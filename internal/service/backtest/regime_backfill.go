@@ -93,23 +93,28 @@ func BackfillRegimeLabels(ctx context.Context, signalRepo ports.SignalRepository
 
 // findClosestRegime returns the regime name from the snapshot whose date is
 // closest to (but not after) the target, to avoid look-ahead bias.
+// Only searches BACKWARD: snapshots on or before the target date.
 // Returns "" if no snapshot is within 30 days before the target.
+//
+// Snapshots must be sorted ascending by date.
 func findClosestRegime(snapshots []regimeSnapshot, target time.Time) string {
 	bestRegime := ""
 	bestDist := time.Duration(math.MaxInt64)
 
 	for _, s := range snapshots {
 		if s.date.After(target) {
-			continue // Skip future snapshots to prevent look-ahead bias
+			// Snapshots are sorted ascending — all remaining are in the future.
+			// Stop here to prevent look-ahead bias.
+			break
 		}
-		dist := target.Sub(s.date)
+		dist := target.Sub(s.date) // always >= 0 since s.date <= target
 		if dist < bestDist {
 			bestDist = dist
 			bestRegime = s.regime
 		}
 	}
 
-	// Only match if within 30 days.
+	// Only match if within 30 days backward from the target.
 	if bestDist > 30*24*time.Hour {
 		return ""
 	}

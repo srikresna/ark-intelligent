@@ -2,6 +2,7 @@ package fred
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -22,13 +23,22 @@ var (
 	cacheTTL    = defaultTTL //nolint:gochecknoglobals
 )
 
+// CacheResult wraps MacroData with metadata about whether it came from cache.
+type CacheResult struct {
+	Data      *MacroData
+	FromCache bool
+	CacheAge  time.Duration // How old the cached data is; 0 if freshly fetched
+}
+
 // GetCachedOrFetch returns cached MacroData if still within TTL, else fetches fresh data.
 // Thread-safe. Use this in all handlers instead of FetchMacroData directly.
 func GetCachedOrFetch(ctx context.Context) (*MacroData, error) {
 	cacheMu.RLock()
 	if globalCache != nil && time.Since(globalCache.fetchedAt) < cacheTTL {
 		data := globalCache.data
+		age := time.Since(globalCache.fetchedAt)
 		cacheMu.RUnlock()
+		fmt.Printf("[fred-cache] returning cached data (age: %s)\n", age.Round(time.Second))
 		return data, nil
 	}
 	cacheMu.RUnlock()
@@ -43,7 +53,38 @@ func GetCachedOrFetch(ctx context.Context) (*MacroData, error) {
 	globalCache = &cachedMacroData{data: data, fetchedAt: time.Now()}
 	cacheMu.Unlock()
 
+	fmt.Printf("[fred-cache] fetched fresh data from FRED API\n")
+
 	return data, nil
+}
+
+// GetCachedOrFetchWithMeta is like GetCachedOrFetch but also returns cache metadata.
+func GetCachedOrFetchWithMeta(ctx context.Context) (*CacheResult, error) {
+	cacheMu.RLock()
+	if globalCache != nil && time.Since(globalCache.fetchedAt) < cacheTTL {
+		result := &CacheResult{
+			Data:      globalCache.data,
+			FromCache: true,
+			CacheAge:  time.Since(globalCache.fetchedAt),
+		}
+		cacheMu.RUnlock()
+		fmt.Printf("[fred-cache] returning cached data (age: %s)\n", result.CacheAge.Round(time.Second))
+		return result, nil
+	}
+	cacheMu.RUnlock()
+
+	data, err := FetchMacroData(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cacheMu.Lock()
+	globalCache = &cachedMacroData{data: data, fetchedAt: time.Now()}
+	cacheMu.Unlock()
+
+	fmt.Printf("[fred-cache] fetched fresh data from FRED API\n")
+
+	return &CacheResult{Data: data, FromCache: false, CacheAge: 0}, nil
 }
 
 // InvalidateCache forces the next call to GetCachedOrFetch to re-fetch from FRED.

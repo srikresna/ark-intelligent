@@ -43,9 +43,46 @@ func (e *Evaluator) EvaluatePending(ctx context.Context) (int, error) {
 
 	log.Info().Int("pending", len(pending)).Msg("Evaluating pending signals")
 
+	now := time.Now()
 	evaluated := 0
 	skippedNoPrice := 0
+	expired := 0
+
+	// Expiry threshold: signals older than 60 days that are still PENDING
+	// are unlikely to ever get price data. Mark them EXPIRED to prevent
+	// infinite retry loops.
+	const expiryThreshold = 60 * 24 * time.Hour
+
 	for i := range pending {
+		// Check if signal is too old and should be expired
+		age := now.Sub(pending[i].ReportDate)
+		if age > expiryThreshold {
+			changed := false
+			if pending[i].Outcome1W == "" || pending[i].Outcome1W == domain.OutcomePending {
+				pending[i].Outcome1W = domain.OutcomeExpired
+				changed = true
+			}
+			if pending[i].Outcome2W == "" || pending[i].Outcome2W == domain.OutcomePending {
+				pending[i].Outcome2W = domain.OutcomeExpired
+				changed = true
+			}
+			if pending[i].Outcome4W == "" || pending[i].Outcome4W == domain.OutcomePending {
+				pending[i].Outcome4W = domain.OutcomeExpired
+				changed = true
+			}
+			if changed {
+				pending[i].EvaluatedAt = now
+				if err := e.signalRepo.UpdateSignal(ctx, pending[i]); err != nil {
+					log.Warn().Err(err).
+						Str("contract", pending[i].ContractCode).
+						Msg("Failed to expire stale signal")
+				} else {
+					expired++
+				}
+				continue
+			}
+		}
+
 		updated, err := e.evaluateSignal(ctx, &pending[i])
 		if err != nil {
 			log.Warn().Err(err).
@@ -68,12 +105,13 @@ func (e *Evaluator) EvaluatePending(ctx context.Context) (int, error) {
 
 	log.Info().
 		Int("evaluated", evaluated).
+		Int("expired", expired).
 		Int("pending", len(pending)).
 		Int("skipped_no_price", skippedNoPrice).
 		Int("total_scanned", len(pending)).
 		Msg("Signal evaluation complete")
 
-	if evaluated == 0 && len(pending) > 0 {
+	if evaluated == 0 && expired == 0 && len(pending) > 0 {
 		sample := pending[0]
 		log.Debug().
 			Str("contract", sample.ContractCode).

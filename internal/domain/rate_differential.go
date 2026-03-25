@@ -28,13 +28,13 @@ type CarryRanking struct {
 // These are approximations using available FRED data and market rates.
 var CentralBankRateMapping = map[string]CentralBankRateInfo{
 	"USD": {Currency: "USD", Name: "Federal Reserve", FREDSeries: "FEDFUNDS", FallbackSeries: "SOFR"},
-	"EUR": {Currency: "EUR", Name: "ECB", FREDSeries: "ECBDFR", FallbackSeries: ""},
-	"GBP": {Currency: "GBP", Name: "Bank of England", FREDSeries: "BOERUKM", FallbackSeries: ""},
-	"JPY": {Currency: "JPY", Name: "Bank of Japan", FREDSeries: "IRSTCI01JPM156N", FallbackSeries: ""},
-	"CHF": {Currency: "CHF", Name: "Swiss National Bank", FREDSeries: "IRSTCI01CHM156N", FallbackSeries: ""},
-	"AUD": {Currency: "AUD", Name: "Reserve Bank of Australia", FREDSeries: "IRSTCI01AUM156N", FallbackSeries: ""},
-	"CAD": {Currency: "CAD", Name: "Bank of Canada", FREDSeries: "IRSTCI01CAM156N", FallbackSeries: ""},
-	"NZD": {Currency: "NZD", Name: "Reserve Bank of NZ", FREDSeries: "IRSTCI01NZM156N", FallbackSeries: ""},
+	"EUR": {Currency: "EUR", Name: "ECB", FREDSeries: "ECBDFR", FallbackSeries: "IR3TIB01EUM156N"},
+	"GBP": {Currency: "GBP", Name: "Bank of England", FREDSeries: "IUDSOIA", FallbackSeries: "IR3TIB01GBM156N"},
+	"JPY": {Currency: "JPY", Name: "Bank of Japan", FREDSeries: "IRSTCI01JPM156N", FallbackSeries: "IR3TIB01JPM156N"},
+	"CHF": {Currency: "CHF", Name: "Swiss National Bank", FREDSeries: "IRSTCI01CHM156N", FallbackSeries: "IR3TIB01CHM156N"},
+	"AUD": {Currency: "AUD", Name: "Reserve Bank of Australia", FREDSeries: "IRSTCI01AUM156N", FallbackSeries: "IR3TIB01AUM156N"},
+	"CAD": {Currency: "CAD", Name: "Bank of Canada", FREDSeries: "IRSTCI01CAM156N", FallbackSeries: "IR3TIB01CAM156N"},
+	"NZD": {Currency: "NZD", Name: "Reserve Bank of NZ", FREDSeries: "IRSTCI01NZM156N", FallbackSeries: "IR3TIB01NZM156N"},
 }
 
 // CentralBankRateInfo describes how to look up a currency's policy rate.

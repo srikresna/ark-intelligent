@@ -37,6 +37,23 @@ func (h *Handler) cmdCorr(ctx context.Context, chatID string, userID int64, args
 		htmlOut += fmt.Sprintf("\n<i>Note: Insufficient data for 20-day window; using %d-day fallback.</i>\n", matrix.Period)
 	}
 
+	// Report which currencies are included vs excluded from the matrix
+	allCurrencies := domain.DefaultCorrelationCurrencies()
+	includedSet := make(map[string]bool, len(matrix.Currencies))
+	for _, c := range matrix.Currencies {
+		includedSet[c] = true
+	}
+	var excluded []string
+	for _, c := range allCurrencies {
+		if !includedSet[c] {
+			excluded = append(excluded, c)
+		}
+	}
+	if len(excluded) > 0 {
+		htmlOut += fmt.Sprintf("\n<i>Included: %s</i>", strings.Join(matrix.Currencies, ", "))
+		htmlOut += fmt.Sprintf("\n<i>Excluded (insufficient data): %s</i>\n", strings.Join(excluded, ", "))
+	}
+
 	// Detect clusters
 	clusters := engine.DetectClusters(matrix, 0.70)
 	if len(clusters) > 0 {

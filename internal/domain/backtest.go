@@ -59,6 +59,7 @@ const (
 	OutcomeWin     = "WIN"
 	OutcomeLoss    = "LOSS"
 	OutcomePending = "PENDING"
+	OutcomeExpired = "EXPIRED"
 )
 
 // IsFullyEvaluated returns true if all three time horizons have outcomes.

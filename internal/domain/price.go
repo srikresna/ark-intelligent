@@ -210,16 +210,31 @@ func FindPriceMapping(contractCode string) *PriceSymbolMapping {
 	return nil
 }
 
+// currencyAliases maps common user-facing names to internal currency codes.
+// This allows commands like `/garch GOLD` to resolve to XAU.
+var currencyAliases = map[string]string{
+	"GOLD":   "XAU",
+	"SILVER": "XAG",
+	"CRUDE":  "OIL",
+	"NATGAS": "NG",
+}
+
 // FindPriceMappingByCurrency returns the PriceSymbolMapping for a currency code.
+// Also checks common aliases (e.g. GOLD -> XAU, SILVER -> XAG).
 // Returns nil if not found.
 func FindPriceMappingByCurrency(currency string) *PriceSymbolMapping {
+	// Check aliases first so GOLD, SILVER, etc. resolve correctly
+	if alias, ok := currencyAliases[currency]; ok {
+		currency = alias
+	}
+
 	for i := range DefaultPriceSymbolMappings {
 		if DefaultPriceSymbolMappings[i].Currency == currency {
 			return &DefaultPriceSymbolMappings[i]
 		}
 	}
 
-	// Fallback: match by COT ticker symbol (e.g. "NQ" → NDX, "ES" → SPX500, "GC" → XAU).
+	// Fallback: match by COT ticker symbol (e.g. "NQ" -> NDX, "ES" -> SPX500, "GC" -> XAU).
 	for _, c := range DefaultCOTContracts {
 		if c.Symbol == currency {
 			for i := range DefaultPriceSymbolMappings {
