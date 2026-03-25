@@ -902,6 +902,10 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		}
 
 		// Compute ConvictionScore for factor decomposition
+		// BUG-5: newsScheduler (which holds GetSurpriseSigma) is not wired into
+		// the main scheduler's Deps, so we cannot retrieve the live surprise
+		// accumulator here. Pass 0 until Deps is extended with a NewsScheduler
+		// reference (tracked as a follow-up).
 		cs := cotsvc.ComputeConvictionScore(*analysis, macroRegime, 0, "", macroData)
 		ps.ConvictionScore = cs.Score
 

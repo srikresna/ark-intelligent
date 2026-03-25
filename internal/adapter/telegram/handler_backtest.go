@@ -247,13 +247,18 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 			"<code>Signals  :</code> %d total, %d evaluated\n"+
 			"<code>Win Rate :</code> 1W %.1f%% | 2W %.1f%% | 4W %.1f%%\n"+
 			"<code>Best     :</code> %s at %.1f%%\n"+
-			"<code>Avg Conf :</code> %.0f%% (calibration error: %.1f%%)\n\n"+
-			"<i>Use /backtest for detailed breakdown</i>",
+			"<code>Avg Conf :</code> %.0f%% (calibration error: %.1f%%)\n",
 		stats.TotalSignals, stats.Evaluated,
 		stats.WinRate1W, stats.WinRate2W, stats.WinRate4W,
 		stats.BestPeriod, stats.BestWinRate,
 		stats.AvgConfidence, stats.CalibrationError,
 	)
+
+	if stats.Evaluated < 30 {
+		html += fmt.Sprintf("\n⚠️ <b>Small sample (%d signals) — win rate has high uncertainty</b>\n", stats.Evaluated)
+	}
+
+	html += "\n<i>Use /backtest for detailed breakdown</i>"
 
 	_, err = h.bot.SendHTML(ctx, chatID, html)
 	return err

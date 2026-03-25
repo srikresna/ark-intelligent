@@ -116,7 +116,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome1W = classifyOutcome(sig.Direction, sig.Return1W)
 			updated = true
 		} else {
-			log.Debug().
+			sig.Outcome1W = domain.OutcomePending
+			log.Warn().
 				Str("contract", sig.ContractCode).
 				Time("target", targetDate).
 				Msg("no price record found at +1W")
@@ -136,7 +137,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome2W = classifyOutcome(sig.Direction, sig.Return2W)
 			updated = true
 		} else {
-			log.Debug().
+			sig.Outcome2W = domain.OutcomePending
+			log.Warn().
 				Str("contract", sig.ContractCode).
 				Time("target", targetDate).
 				Msg("no price record found at +2W")
@@ -156,7 +158,8 @@ func (e *Evaluator) evaluateSignal(ctx context.Context, sig *domain.PersistedSig
 			sig.Outcome4W = classifyOutcome(sig.Direction, sig.Return4W)
 			updated = true
 		} else {
-			log.Debug().
+			sig.Outcome4W = domain.OutcomePending
+			log.Warn().
 				Str("contract", sig.ContractCode).
 				Time("target", targetDate).
 				Msg("no price record found at +4W")

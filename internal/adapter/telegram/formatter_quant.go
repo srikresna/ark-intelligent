@@ -282,12 +282,24 @@ func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string
 
 	b.WriteString(fmt.Sprintf("📊 <b>%s — GARCH(1,1) Volatility</b> %s\n\n", currency, fcastIcon))
 
+	// Convergence status
+	if g.Converged {
+		b.WriteString("<code>✓ Converged</code>\n")
+	} else {
+		b.WriteString("<code>⚠ NOT CONVERGED — estimates may be unreliable</code>\n")
+	}
+	if g.SampleSize > 0 {
+		b.WriteString(fmt.Sprintf("<code>Samples       : %d</code>\n", g.SampleSize))
+	}
+	if g.LogLikelihood != 0 {
+		b.WriteString(fmt.Sprintf("<code>Log-Likelihood: %.4f</code>\n", g.LogLikelihood))
+	}
+
 	// Model parameters
-	b.WriteString("<b>🔧 Model Parameters</b>\n")
+	b.WriteString("\n<b>🔧 Model Parameters</b>\n")
 	b.WriteString(fmt.Sprintf("<code>α (shock)     : %.4f</code>\n", g.Alpha))
 	b.WriteString(fmt.Sprintf("<code>β (persistence): %.4f</code>\n", g.Beta))
 	b.WriteString(fmt.Sprintf("<code>α + β         : %.4f</code>\n", g.Persistence))
-	b.WriteString(fmt.Sprintf("<code>Samples       : %d</code>\n", g.SampleSize))
 
 	// Volatility estimates
 	b.WriteString("\n<b>📈 Volatility Estimates</b>\n")

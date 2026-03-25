@@ -62,7 +62,7 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis, priceContexts ...map[
 			fmtutil.FmtNumSigned(a.CommNetChange, 0),
 			fmtutil.FmtNumSigned(a.CommMomentum4W, 0),
 			fmtutil.FmtNum(a.CommLSRatio, 2)))
-		b.WriteString(fmt.Sprintf("COT Index: Spec=%.1f Comm=%.1f\n", a.COTIndex, a.COTIndexComm))
+		b.WriteString(fmt.Sprintf("COT Index: Spec=%.1f [0=extreme bearish, 50=neutral, 100=extreme bullish] Comm=%.1f\n", a.COTIndex, a.COTIndexComm))
 		b.WriteString(fmt.Sprintf("Momentum 4W: Spec=%s Comm=%s | 8W: Spec=%s\n",
 			fmtutil.FmtNumSigned(a.SpecMomentum4W, 0),
 			fmtutil.FmtNumSigned(a.CommMomentum4W, 0),
@@ -75,7 +75,7 @@ func BuildCOTAnalysisPrompt(analyses []domain.COTAnalysis, priceContexts ...map[
 		if a.SpreadPctOfOI > 0 {
 			b.WriteString(fmt.Sprintf("Spread Positions: %.1f%% of OI\n", a.SpreadPctOfOI))
 		}
-		b.WriteString(fmt.Sprintf("Sentiment: %.1f | Crowding: %.1f | Divergence: %v\n",
+		b.WriteString(fmt.Sprintf("Sentiment: %.1f [-100=extremely bearish, +100=extremely bullish] | Crowding: %.1f [0=balanced, 100=extremely one-sided] | Divergence: %v\n",
 			a.SentimentScore, a.CrowdingIndex, a.DivergenceFlag))
 		b.WriteString(fmt.Sprintf("Signals: Comm=%s Spec=%s SmallSpec=%s\n",
 			a.CommercialSignal, a.SpeculatorSignal, a.SmallSpecSignal))
@@ -142,7 +142,7 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 	if len(data.COTAnalyses) > 0 {
 		b.WriteString("=== COT POSITIONING ===\n")
 		for _, a := range data.COTAnalyses {
-			b.WriteString(fmt.Sprintf("%s (Report: %s): SpecNet=%s COTIdx=%.0f CommSignal=%s 4WMom=%s OITrend=%s STBias=%s",
+			b.WriteString(fmt.Sprintf("%s (Report: %s): SpecNet=%s COTIdx=%.0f [0-100] CommSignal=%s 4WMom=%s OITrend=%s STBias=%s",
 				a.Contract.Currency,
 				a.ReportDate.Format("2006-01-02"),
 				fmtutil.FmtNumSigned(a.NetPosition, 0),
@@ -234,7 +234,7 @@ func BuildCrossMarketPrompt(cotData map[string]*domain.COTAnalysis) string {
 		if a == nil {
 			continue
 		}
-		b.WriteString(fmt.Sprintf("%s (%s) | Report: %s: SpecNet=%s COTIdx=%.0f Sentiment=%.0f Crowd=%.0f\n",
+		b.WriteString(fmt.Sprintf("%s (%s) | Report: %s: SpecNet=%s COTIdx=%.0f [0=bearish,100=bullish] Sentiment=%.0f [-100,+100] Crowd=%.0f [0=balanced,100=one-sided]\n",
 			code, a.Contract.Currency,
 			a.ReportDate.Format("2006-01-02"),
 			fmtutil.FmtNumSigned(a.NetPosition, 0),
@@ -326,7 +326,7 @@ func BuildCombinedOutlookPrompt(data ports.WeeklyData) string {
 	b.WriteString(fmt.Sprintf("=== %d. COT POSITIONING ===\n", section))
 	section++
 	for _, a := range data.COTAnalyses {
-		b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f CommSignal=%s Crowding=%.1f\n",
+		b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f [0-100] CommSignal=%s Crowding=%.1f [0-100]\n",
 			a.Contract.Currency,
 			fmtutil.FmtNumSigned(a.NetPosition, 0),
 			a.COTIndex, a.CommercialSignal, a.CrowdingIndex))
@@ -527,7 +527,7 @@ func BuildCombinedWithFREDPrompt(data ports.WeeklyData, regime fred.MacroRegime)
 	b.WriteString(fmt.Sprintf("=== %d. COT POSITIONING ===\n", section))
 	section++
 	for _, a := range data.COTAnalyses {
-		b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f CommSignal=%s Crowding=%.1f\n",
+		b.WriteString(fmt.Sprintf("%s: SpecNet=%s COTIdx=%.0f [0-100] CommSignal=%s Crowding=%.1f [0-100]\n",
 			a.Contract.Currency,
 			fmtutil.FmtNumSigned(a.NetPosition, 0),
 			a.COTIndex, a.CommercialSignal, a.CrowdingIndex))

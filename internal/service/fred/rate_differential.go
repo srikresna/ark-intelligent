@@ -35,6 +35,12 @@ func (e *RateDifferentialEngine) FetchCarryRanking(ctx context.Context) (*domain
 		rate := e.fetchRate(ctx, info)
 		if rate != 0 {
 			rates[cur] = rate
+		} else {
+			log.Warn().
+				Str("currency", cur).
+				Str("fred_series", info.FREDSeries).
+				Str("fallback_series", info.FallbackSeries).
+				Msg("carry rate returned 0 — FRED series may have failed")
 		}
 	}
 

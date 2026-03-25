@@ -32,6 +32,11 @@ func (h *Handler) cmdCorr(ctx context.Context, chatID string, userID int64, args
 
 	htmlOut := h.fmt.FormatCorrelationMatrix(matrix)
 
+	// Note if the matrix fell back to a shorter period than the default 20-day
+	if matrix.Period < 20 {
+		htmlOut += fmt.Sprintf("\n<i>Note: Insufficient data for 20-day window; using %d-day fallback.</i>\n", matrix.Period)
+	}
+
 	// Detect clusters
 	clusters := engine.DetectClusters(matrix, 0.70)
 	if len(clusters) > 0 {

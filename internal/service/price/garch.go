@@ -209,8 +209,12 @@ func estimateGARCHFromReturns(returns []float64) (*GARCHResult, error) {
 	converged := true
 	if math.IsInf(fineLL, -1) || math.IsNaN(fineLL) {
 		converged = false
-	} else if fineLL < -1e10 {
-		// Extremely poor log-likelihood indicates bad fit
+	} else if fineLL-bestLL < 0.1 {
+		// Fine grid didn't meaningfully improve over coarse grid
+		converged = false
+	}
+	if alpha+beta > 0.999 {
+		// Near unit root — non-stationary, estimates unreliable
 		converged = false
 	}
 

@@ -91,7 +91,7 @@ func (wfo *WalkForwardOptimizer) Optimize(ctx context.Context) (*WFOResult, erro
 	// Filter to evaluated signals with returns
 	var evaluated []domain.PersistedSignal
 	for _, s := range signals {
-		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending && s.EntryPrice > 0 {
+		if (s.Outcome1W == domain.OutcomeWin || s.Outcome1W == domain.OutcomeLoss) && s.EntryPrice > 0 {
 			evaluated = append(evaluated, s)
 		}
 	}
