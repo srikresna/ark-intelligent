@@ -213,6 +213,50 @@ func (r *DailyPriceRepo) GetDailyPriceAt(_ context.Context, contractCode string,
 	return record, nil
 }
 
+// GetDailyHistoryBefore returns daily price records for a contract before a specific date.
+// Returns up to `days` records in reverse chronological order (newest first),
+// ending at or before `before`. Used by the bootstrap to get historical daily context.
+func (r *DailyPriceRepo) GetDailyHistoryBefore(_ context.Context, contractCode string, before time.Time, days int) ([]domain.DailyPrice, error) {
+	var records []domain.DailyPrice
+
+	prefix := dailyPricePrefix(contractCode)
+	// Seek to the target date and scan backward
+	seekKey := []byte(fmt.Sprintf("dprice:%s:%s\xff", contractCode, before.Format("20060102")))
+
+	err := r.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = prefix
+		opts.Reverse = true
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 100
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(seekKey); it.ValidForPrefix(prefix) && len(records) < days; it.Next() {
+			item := it.Item()
+			err := item.Value(func(val []byte) error {
+				var rec domain.DailyPrice
+				if err := json.Unmarshal(val, &rec); err != nil {
+					return err
+				}
+				records = append(records, rec)
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("read daily price history before: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get daily price history before %s %s: %w", contractCode, before.Format("20060102"), err)
+	}
+
+	// Already in newest-first order (reverse scan)
+	return records, nil
+}
+
 // CountDailyRecords returns the total number of daily price records for a contract.
 func (r *DailyPriceRepo) CountDailyRecords(_ context.Context, contractCode string) (int, error) {
 	count := 0

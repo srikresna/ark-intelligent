@@ -9,6 +9,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 )
 
 // SignalExistenceChecker is the subset of SignalRepository needed for dedup.
@@ -23,6 +24,25 @@ type COTHistoryProvider interface {
 	GetAnalysisHistory(ctx context.Context, contractCode string, weeks int) ([]domain.COTAnalysis, error)
 }
 
+// HistoricalDailyPriceStore extends DailyPriceStore with date-relative lookups
+// needed for bootstrapping historical signals without look-ahead bias.
+type HistoricalDailyPriceStore interface {
+	pricesvc.DailyPriceStore
+	GetDailyHistoryBefore(ctx context.Context, contractCode string, before time.Time, days int) ([]domain.DailyPrice, error)
+}
+
+// historicalDailyAdapter wraps a HistoricalDailyPriceStore to implement
+// DailyPriceStore with a fixed "as of" date, so DailyContextBuilder returns
+// context for a historical point in time instead of today.
+type historicalDailyAdapter struct {
+	store HistoricalDailyPriceStore
+	asOf  time.Time
+}
+
+func (h *historicalDailyAdapter) GetDailyHistory(ctx context.Context, contractCode string, days int) ([]domain.DailyPrice, error) {
+	return h.store.GetDailyHistoryBefore(ctx, contractCode, h.asOf, days)
+}
+
 // Bootstrapper replays historical COT data against historical prices
 // to create a retroactive backtest dataset. Safe to run multiple times
 // due to key-based deduplication.
@@ -32,6 +52,7 @@ type Bootstrapper struct {
 	signalRepo ports.SignalRepository
 	sigChecker SignalExistenceChecker
 	detector   *cotsvc.SignalDetector
+	dailyRepo  HistoricalDailyPriceStore // optional — enables DailyTrendFilter for bootstrap signals
 }
 
 // NewBootstrapper creates a new backtest bootstrapper.
@@ -40,14 +61,19 @@ func NewBootstrapper(
 	priceRepo ports.PriceRepository,
 	signalRepo ports.SignalRepository,
 	sigChecker SignalExistenceChecker,
+	dailyRepo ...HistoricalDailyPriceStore,
 ) *Bootstrapper {
-	return &Bootstrapper{
+	b := &Bootstrapper{
 		cotRepo:    cotRepo,
 		priceRepo:  priceRepo,
 		signalRepo: signalRepo,
 		sigChecker: sigChecker,
 		detector:   cotsvc.NewSignalDetector(),
 	}
+	if len(dailyRepo) > 0 && dailyRepo[0] != nil {
+		b.dailyRepo = dailyRepo[0]
+	}
+	return b
 }
 
 // Run replays historical COT data to generate and persist signal snapshots.
@@ -175,17 +201,27 @@ func (b *Bootstrapper) bootstrapContract(ctx context.Context, mapping domain.Pri
 			// ConvictionScore: compute simplified score using only COT data.
 			// Bootstrap lacks historical FRED data and calendar surprises,
 			// so we pass neutral regime/calendar — only COT component contributes.
-			cs := cotsvc.ComputeConvictionScore(*analysis, fred.MacroRegime{}, 0, "", nil)
+			cs := cotsvc.ComputeConvictionScoreV3(*analysis, fred.MacroRegime{}, 0, "", nil, nil)
 			ps.ConvictionScore = cs.Score
 
 			// FREDRegime: left empty — the BackfillRegimeLabels() mechanism
 			// retroactively populates this field from stored FRED snapshots.
 
-			// DailyTrend fields (DailyTrend, DailyMATrend, DailyTrendAdj, RawConfidence):
-			// The bootstrapper only has weekly PriceRepository, not a DailyPriceStore,
-			// so we cannot run the DailyTrendFilter here. These fields remain empty
-			// for bootstrap-generated signals. If daily price data becomes available
-			// to the bootstrapper in the future, add a DailyTrendFilter pass here.
+			// DailyTrend fields: apply DailyTrendFilter if daily price data is available.
+			// Uses historicalDailyAdapter to get data as-of the report date (no look-ahead).
+			if b.dailyRepo != nil {
+				adapter := &historicalDailyAdapter{store: b.dailyRepo, asOf: analysis.ReportDate}
+				dailyBuilder := pricesvc.NewDailyContextBuilder(adapter)
+				trendFilter := NewDailyTrendFilter(dailyBuilder)
+				adj := trendFilter.Adjust(ctx, mapping.ContractCode, mapping.Currency, sig.Direction, ps.Confidence)
+				if adj.Adjustment != 0 {
+					ps.RawConfidence = adj.RawConfidence
+					ps.Confidence = adj.AdjustedConfidence
+					ps.DailyTrend = adj.DailyTrend
+					ps.DailyMATrend = adj.MATrend
+					ps.DailyTrendAdj = adj.Adjustment
+				}
+			}
 
 			toSave = append(toSave, ps)
 		}

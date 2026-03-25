@@ -392,7 +392,15 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 			if h.newsScheduler != nil {
 				surpriseSigma2 = h.newsScheduler.GetSurpriseSigma(analysis.Contract.Currency)
 			}
-			cs := cot.ComputeConvictionScore(*analysis, regime2, surpriseSigma2, "", macroData2)
+			// Build price context for V3 conviction scoring (best-effort)
+			var pc *domain.PriceContext
+			if h.priceRepo != nil {
+				ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+				if pcs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil {
+					pc = pcs[contractCode]
+				}
+			}
+			cs := cot.ComputeConvictionScoreV3(*analysis, regime2, surpriseSigma2, "", macroData2, pc)
 			html += h.fmt.FormatConvictionBlock(cs)
 		}
 	}
@@ -1324,7 +1332,16 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		regime = &r
 	}
 
-	// Compute conviction scores for each currency (full 3-source: COT + FRED + Calendar)
+	// Build price contexts for V3 conviction scoring + strength ranking (best-effort)
+	var priceCtxs map[string]*domain.PriceContext
+	if h.priceRepo != nil {
+		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+		if pcs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(pcs) > 0 {
+			priceCtxs = pcs
+		}
+	}
+
+	// Compute conviction scores for each currency (full 5-source V3: COT + Calendar + Stress + FRED + Price)
 	convictions := make([]cot.ConvictionScore, 0, len(analyses))
 	for _, a := range analyses {
 		var r fred.MacroRegime
@@ -1336,7 +1353,11 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		if h.newsScheduler != nil {
 			surpriseSigma = h.newsScheduler.GetSurpriseSigma(a.Contract.Currency)
 		}
-		cs := cot.ComputeConvictionScore(a, r, surpriseSigma, "", macroData)
+		var pc *domain.PriceContext
+		if priceCtxs != nil {
+			pc = priceCtxs[a.Contract.Code]
+		}
+		cs := cot.ComputeConvictionScoreV3(a, r, surpriseSigma, "", macroData, pc)
 		convictions = append(convictions, cs)
 	}
 
@@ -1344,13 +1365,10 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 	html := h.fmt.FormatRankingWithConviction(analyses, convictions, regime, now)
 
 	// Dual price + COT strength ranking (best-effort, non-fatal)
-	if h.priceRepo != nil {
-		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
-		if priceCtxs, err := ctxBuilder.BuildAll(ctx); err == nil && len(priceCtxs) > 0 {
-			strengths := pricesvc.ComputeCurrencyStrengthIndex(priceCtxs, analyses)
-			if len(strengths) > 0 {
-				html += h.fmt.FormatStrengthRanking(strengths)
-			}
+	if priceCtxs != nil {
+		strengths := pricesvc.ComputeCurrencyStrengthIndex(priceCtxs, analyses)
+		if len(strengths) > 0 {
+			html += h.fmt.FormatStrengthRanking(strengths)
 		}
 	}
 

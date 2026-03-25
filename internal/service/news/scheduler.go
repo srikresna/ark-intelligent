@@ -725,7 +725,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 					regime = fred.ClassifyMacroRegime(macroD)
 				}
 				sigmaAcc := s.GetSurpriseSigma(ev.Currency)
-				cs := cot.ComputeConvictionScore(*cotAn, regime, sigmaAcc, ev.Event, macroD)
+				cs := cot.ComputeConvictionScoreV3(*cotAn, regime, sigmaAcc, ev.Event, macroD, nil)
 
 				convHTML := fmt.Sprintf("📊 <b>CONVICTION UPDATE: %s</b>\n", ev.Currency)
 				convHTML += fmt.Sprintf("After: <i>%s</i> (%s)\n", ev.Event, ev.SurpriseLabel)

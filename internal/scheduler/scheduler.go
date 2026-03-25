@@ -30,6 +30,7 @@ import (
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -397,7 +398,16 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	// Persist signals for backtesting (if repos are configured)
 	if s.deps.SignalRepo != nil && s.deps.PriceRepo != nil && len(signals) > 0 {
-		s.persistSignals(ctx, signals, analyses)
+		// Build quant enrichment: price contexts + carry data for signal enrichment.
+		qe := quantEnrichment{priceCtxs: priceCtxsSched}
+
+		// Fetch carry ranking for carry trade adjustment (best-effort).
+		carryEngine := fred.NewRateDifferentialEngine()
+		if cr, crErr := carryEngine.FetchCarryRanking(ctx); crErr == nil {
+			qe.carryRanking = cr
+		}
+
+		s.persistSignals(ctx, signals, analyses, qe)
 	}
 
 	// Thin market and concentration alerts
@@ -795,8 +805,15 @@ func (s *Scheduler) gatherWeeklyData(ctx context.Context) (ports.WeeklyData, err
 	return data, nil
 }
 
+// quantEnrichment holds pre-computed data for signal enrichment during persistence.
+// All fields are optional — nil means the data was unavailable.
+type quantEnrichment struct {
+	priceCtxs    map[string]*domain.PriceContext // For ConvictionScoreV3 price component
+	carryRanking *domain.CarryRanking            // For carry trade confidence adjustment (±5)
+}
+
 // persistSignals saves detected signals with their entry prices for backtesting.
-func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal, analyses []domain.COTAnalysis) {
+func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal, analyses []domain.COTAnalysis, enrich ...quantEnrichment) {
 	// Build a lookup for analyses by contract code
 	analysisMap := make(map[string]*domain.COTAnalysis, len(analyses))
 	for i := range analyses {
@@ -901,13 +918,55 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 			}
 		}
 
-		// Compute ConvictionScore for factor decomposition
+		// Compute ConvictionScore V3 (5-component: COT + Calendar + Stress + FRED + Price)
 		// BUG-5: newsScheduler (which holds GetSurpriseSigma) is not wired into
 		// the main scheduler's Deps, so we cannot retrieve the live surprise
 		// accumulator here. Pass 0 until Deps is extended with a NewsScheduler
 		// reference (tracked as a follow-up).
-		cs := cotsvc.ComputeConvictionScore(*analysis, macroRegime, 0, "", macroData)
+		var priceCtx *domain.PriceContext
+		if len(enrich) > 0 && enrich[0].priceCtxs != nil {
+			priceCtx = enrich[0].priceCtxs[sig.ContractCode]
+		}
+		cs := cotsvc.ComputeConvictionScoreV3(*analysis, macroRegime, 0, "", macroData, priceCtx)
 		ps.ConvictionScore = cs.Score
+
+		// --- Quant Model Enrichment ---
+		// NOTE: GARCH and HMM confidence multipliers are NOT applied here.
+		// RecalibratedDetector already applies VIX (market regime) + ATR (per-contract vol)
+		// multipliers to signal confidence. GARCH (forward vol) overlaps with ATR, and
+		// HMM (crisis/risk-on/risk-off) overlaps with VIX regime classification.
+		// Applying them here would double-count volatility/regime adjustments.
+		//
+		// GARCH/HMM results ARE computed and logged for observability (see broadcastCOTRelease),
+		// and their information feeds into ConvictionScoreV3 via PriceContext indirectly.
+		//
+		// To properly integrate GARCH/HMM into confidence: replace the VIX+ATR pipeline
+		// in RecalibratedDetector with a unified volatility multiplier using
+		// CombineVolatilityWithGARCH() — tracked as a future refactor.
+
+		// Apply carry trade adjustment (±5 additive based on rate differential alignment).
+		// This is genuinely new information — interest rate differentials are independent
+		// of volatility/regime adjustments already applied.
+		if len(enrich) > 0 && enrich[0].carryRanking != nil {
+			for _, pair := range enrich[0].carryRanking.Pairs {
+				if pair.Currency == sig.Currency {
+					carryAdj := fred.CarryAdjustment(pair, sig.Direction)
+					if carryAdj != 0 {
+						preCarryConf := ps.Confidence
+						ps.Confidence = mathutil.Clamp(ps.Confidence+carryAdj, 0, 100)
+						log.Debug().
+							Str("contract", sig.ContractCode).
+							Str("currency", sig.Currency).
+							Float64("diff", pair.Differential).
+							Float64("carry_adj", carryAdj).
+							Float64("pre", preCarryConf).
+							Float64("post", ps.Confidence).
+							Msg("carry trade confidence adjustment")
+					}
+					break
+				}
+			}
+		}
 
 		toSave = append(toSave, ps)
 	}
