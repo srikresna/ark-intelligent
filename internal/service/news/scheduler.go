@@ -787,7 +787,16 @@ func (s *Scheduler) buildConfluenceAlert(ctx context.Context, ev domain.NewsEven
 
 	var dataDirection string
 	var beatMiss string
-	surpriseSigma := 0.0
+
+	// BUG #8 FIX: Use ev.SurpriseScore set by onNewRelease() (stddev-normalized via
+	// GetHistoricalSurprises) instead of re-computing a raw pct diff locally.
+	// The old local formula (diff / abs(forecast)) produces a different scale than
+	// the normalized sigma in ev.SurpriseScore, causing inconsistent labels and
+	// wrong values going into recordSurprise() and the COT confluence classifier.
+	//
+	// We still need to compute `diff` for direction labels (HAWKISH/DOVISH/Beat/Miss),
+	// but the sigma value for all scoring uses ev.SurpriseScore.
+	surpriseSigma := ev.SurpriseScore // already normalized & ImpactDirection-aware
 
 	if hasActual && hasForecast {
 		diff := actualVal - forecastVal
@@ -825,17 +834,22 @@ func (s *Scheduler) buildConfluenceAlert(ctx context.Context, ev domain.NewsEven
 			}
 		}
 
-		if forecastVal != 0 {
-			surpriseSigma = diff / math.Abs(forecastVal)
-		} else {
-			surpriseSigma = diff
+		// If ev.SurpriseScore was not set (e.g. onNewRelease not called, or history empty
+		// and raw diff was zero), fall back to raw pct diff for this function only.
+		if surpriseSigma == 0 && diff != 0 {
+			if forecastVal != 0 {
+				surpriseSigma = diff / math.Abs(forecastVal)
+			} else {
+				surpriseSigma = diff
+			}
 		}
 	} else {
 		dataDirection = "NEUTRAL"
 		beatMiss = "Actual"
 	}
 
-	// Revision tracking: if OldPrevious exists and differs from Previous, compute revision surprise
+	// Revision tracking: if OldPrevious exists and differs from Previous, add revision component.
+	// Note: revision sigma is additive on top of the normalized surprise score.
 	if hasOldPrevious && hasPrevious {
 		revDiff := previousVal - oldPreviousVal
 		if math.Abs(revDiff) > 0.001 {
@@ -850,7 +864,8 @@ func (s *Scheduler) buildConfluenceAlert(ctx context.Context, ev domain.NewsEven
 		}
 	}
 
-	// Record raw surprise sigma in the weekly per-currency accumulator (non-fatal)
+	// Record surprise sigma in the weekly per-currency accumulator.
+	// Now uses the stddev-normalized value from ev.SurpriseScore (BUG #8 fix).
 	if surpriseSigma != 0 {
 		s.recordSurprise(ev.Currency, surpriseSigma)
 	}
@@ -938,12 +953,24 @@ func (s *Scheduler) buildStandardReleaseAlert(ctx context.Context, ev domain.New
 		analysisStr, _ = s.aiAnalyzer.AnalyzeActualRelease(ctx, ev, language)
 	}
 
+	// BUG #7 FIX: Respect ImpactDirection when determining arrow color.
+	// Without this, inverted indicators (unemployment, CPI, trade deficit) show
+	// the wrong color: actual > forecast looks "green" even when it's bearish.
 	direction := "⚪"
 	if ev.Actual != "" && ev.Forecast != "" && ev.Actual != ev.Forecast {
 		actualVal, aOk := ParseNumericValue(ev.Actual)
 		forecastVal, fOk := ParseNumericValue(ev.Forecast)
 		if aOk && fOk {
-			if actualVal > forecastVal {
+			diff := actualVal - forecastVal
+			// Apply ImpactDirection: dir=2 (bearish when higher) → flip sign.
+			// dir=1 (bullish when higher) → also flip if negative (inverted indicator).
+			// dir=0 (neutral) → use raw diff as-is.
+			if ev.ImpactDirection == 2 && diff > 0 {
+				diff = -diff
+			} else if ev.ImpactDirection == 1 && diff < 0 {
+				diff = -diff
+			}
+			if diff > 0 {
 				direction = "🟢"
 			} else {
 				direction = "🔴"

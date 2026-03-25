@@ -1157,7 +1157,10 @@ func (h *Handler) cbNewsFilter(ctx context.Context, chatID string, msgID int, us
 		return h.bot.EditMessage(ctx, chatID, msgID, "Failed to refresh calendar")
 	}
 
-	t, _ := time.Parse("20060102", dateStr)
+	// BUG #6 FIX: parse dateStr in WIB timezone so the label matches the user's date.
+	// time.Parse() returns UTC — on a WIB system the formatted label can be off by 1 day
+	// at midnight boundary (e.g. 00:30 WIB = 17:30 UTC prev day).
+	t, _ := time.ParseInLocation("20060102", dateStr, timeutil.WIB)
 	var html string
 	if isWeek {
 		html = h.fmt.FormatCalendarWeek(t.Format("Jan 02, 2006"), events, filter)
@@ -1183,7 +1186,8 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 		return h.handleMonthNav(ctx, chatID, msgID, navType, dateStr)
 	}
 
-	t, err := time.Parse("20060102", dateStr)
+	// BUG #6 FIX: parse with WIB timezone to keep label consistent with WIB date boundary.
+	t, err := time.ParseInLocation("20060102", dateStr, timeutil.WIB)
 	if err != nil {
 		return nil
 	}
@@ -1312,7 +1316,8 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 // dateStr is the reference date from the callback (e.g. "20260301") to compute relative months.
 func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, navType, dateStr string) error {
 	// Parse the reference date from the callback; fall back to "now" if invalid.
-	refDate, parseErr := time.Parse("20060102", dateStr)
+	// BUG #6 FIX: parse with WIB timezone for consistency with month boundary in WIB.
+	refDate, parseErr := time.ParseInLocation("20060102", dateStr, timeutil.WIB)
 	if parseErr != nil {
 		refDate = timeutil.NowWIB()
 	}

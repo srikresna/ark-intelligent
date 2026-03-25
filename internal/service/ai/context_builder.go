@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
 // ContextBuilder constructs system prompts for chatbot conversations
@@ -130,17 +130,25 @@ When the user asks for something a command handles better, suggest the command i
 // BuildSystemPrompt constructs the system prompt for a chat message.
 // If the message is forex-related, live market data is injected.
 func (cb *ContextBuilder) BuildSystemPrompt(ctx context.Context, userMessage string) string {
+	// BUG #9 FIX: Use timeutil.NowWIB() instead of time.Now().UTC().Add(7h).
+	// The manual UTC+7 offset is functionally equivalent most of the time but is
+	// inconsistent with the rest of the codebase and does not use the proper
+	// Asia/Jakarta timezone location, which can diverge if the system clock or
+	// timezone DB changes. Using timeutil.NowWIB() ensures all date/time logic
+	// in the system uses the same canonical WIB source.
+	nowWIB := timeutil.NowWIB()
+
 	if !isForexRelated(userMessage) {
 		return fmt.Sprintf("%s\n\nToday's date: %s (UTC+7 WIB).",
 			basePersona,
-			time.Now().UTC().Add(7*time.Hour).Format("Monday, 02 January 2006"),
+			nowWIB.Format("Monday, 02 January 2006"),
 		)
 	}
 
 	var b strings.Builder
 	b.WriteString(basePersona)
 	b.WriteString(fmt.Sprintf("\n\nToday's date: %s (UTC+7 WIB).\n",
-		time.Now().UTC().Add(7*time.Hour).Format("Monday, 02 January 2006")))
+		nowWIB.Format("Monday, 02 January 2006")))
 
 	// Inject COT data
 	cb.injectCOTContext(ctx, &b)
@@ -205,14 +213,11 @@ func (cb *ContextBuilder) injectCalendarContext(ctx context.Context, b *strings.
 		return
 	}
 
-	// Get events for the current week using weekStart format
-	now := time.Now().UTC().Add(7 * time.Hour)
-	// Calculate Monday of current week
-	weekday := now.Weekday()
-	if weekday == time.Sunday {
-		weekday = 7
-	}
-	monday := now.AddDate(0, 0, -int(weekday-time.Monday))
+	// BUG #9 FIX: Use timeutil.StartOfWeekWIB() instead of manual UTC+7 arithmetic.
+	// The old code used time.Now().UTC().Add(7h) which is not a proper timezone location
+	// and can produce wrong week boundaries near midnight WIB. StartOfWeekWIB() correctly
+	// computes Monday 00:00:00 WIB using the Asia/Jakarta location.
+	monday := timeutil.StartOfWeekWIB(timeutil.NowWIB())
 	weekStart := monday.Format("20060102")
 
 	events, err := cb.newsRepo.GetByWeek(ctx, weekStart)
