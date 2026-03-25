@@ -1887,6 +1887,11 @@ func macroEconomyLabel(regime fred.MacroRegime, data *fred.MacroData) string {
 			return "Ideal — pertumbuhan kuat, inflasi terjaga ✅"
 		}
 		return "Cukup baik — stabil ✅"
+	case "NEUTRAL":
+		if data.CorePCETrend.Direction == "DOWN" {
+			return "Inflasi masih tinggi tapi mulai turun ⚠️"
+		}
+		return "Inflasi di atas target, pertumbuhan campuran ⚠️"
 	case "DISINFLATIONARY":
 		if data.GDPGrowth > 1.5 {
 			return "Melambat tapi masih tumbuh ✅"

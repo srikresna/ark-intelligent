@@ -1457,7 +1457,7 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 
 	// Subcommand routing
 	if upper == "MATRIX" || upper == "PERFORMANCE" {
-		return h.macroRegimePerformance(ctx, chatID)
+		return h.macroRegimePerformance(ctx, chatID, 0)
 	}
 
 	forceRefresh := upper == "REFRESH"
@@ -1555,7 +1555,7 @@ func (h *Handler) cbMacro(ctx context.Context, chatID string, msgID int, userID 
 		return h.macroSendSummary(ctx, chatID, msgID, userID, regime, macroData)
 
 	case "performance":
-		return h.macroRegimePerformance(ctx, chatID)
+		return h.macroRegimePerformance(ctx, chatID, msgID)
 
 	case "refresh":
 		if !h.requireAdmin(ctx, chatID, userID) {
@@ -1604,21 +1604,35 @@ func (h *Handler) buildRegimeAssetInsight(ctx context.Context, data *fred.MacroD
 
 // macroRegimePerformance builds and sends the regime-asset performance matrix
 // from historical persisted signals with FRED regime labels.
-func (h *Handler) macroRegimePerformance(ctx context.Context, chatID string) error {
+// If msgID > 0, edits the existing message; otherwise sends a new message.
+func (h *Handler) macroRegimePerformance(ctx context.Context, chatID string, msgID int) error {
 	if h.signalRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Regime performance requires signal history with FRED regime data.")
+		msg := "Regime performance requires signal history with FRED regime data."
+		if msgID > 0 {
+			return h.bot.EditWithKeyboard(ctx, chatID, msgID, msg, h.kb.MacroDetailMenu())
+		}
+		_, err := h.bot.SendHTML(ctx, chatID, msg)
 		return err
 	}
 
 	builder := fred.NewRegimePerformanceBuilder(h.signalRepo)
 	matrix, err := builder.Build(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
+		errMsg := fmt.Sprintf("Error: %s", html.EscapeString(err.Error()))
+		if msgID > 0 {
+			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.MacroDetailMenu())
+		}
+		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
 		return sendErr
 	}
 
 	htmlOut := h.fmt.FormatRegimePerformance(matrix)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	kb := h.kb.MacroDetailMenu()
+	if msgID > 0 {
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlOut, kb)
+	}
+	// Fallback: send as new message with keyboard
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }
 
