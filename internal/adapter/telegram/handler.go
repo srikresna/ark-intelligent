@@ -378,10 +378,12 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 			priceCtxMap = map[string]*domain.PriceContext{contractCode: pc}
 			html += h.fmt.FormatPriceContext(pc)
 
-			// Price-COT divergence detection
+			// Always show price-COT relationship — divergence warning OR alignment confirmation
 			divs := pricesvc.DetectPriceCOTDivergences(priceCtxMap, []domain.COTAnalysis{*analysis})
 			if len(divs) > 0 {
 				html += h.fmt.FormatPriceCOTDivergence(divs[0])
+			} else {
+				html += h.fmt.FormatPriceCOTAlignment(pc, *analysis)
 			}
 		} else if pcErr != nil {
 			// Notify owner about price context failure (non-blocking)
@@ -409,24 +411,27 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 		}
 	}
 
-	// Gap D — Conviction Score for this currency (COT + FRED + Calendar fused)
+	// Conviction Score — always shown, uses whatever data is available (FRED optional)
 	if editMsgID == 0 && analysis != nil {
+		surpriseSigma2 := 0.0
+		if h.newsScheduler != nil {
+			surpriseSigma2 = h.newsScheduler.GetSurpriseSigma(analysis.Contract.Currency)
+		}
+		var pc2 *domain.PriceContext
+		if h.priceRepo != nil {
+			ctxBuilder2 := pricesvc.NewContextBuilder(h.priceRepo)
+			if pcs2, pcErr2 := ctxBuilder2.BuildAll(ctx); pcErr2 == nil {
+				pc2 = pcs2[contractCode]
+			}
+		}
 		macroData2, fredErr2 := fred.GetCachedOrFetch(ctx)
 		if fredErr2 == nil && macroData2 != nil {
 			regime2 := fred.ClassifyMacroRegime(macroData2)
-			surpriseSigma2 := 0.0
-			if h.newsScheduler != nil {
-				surpriseSigma2 = h.newsScheduler.GetSurpriseSigma(analysis.Contract.Currency)
-			}
-			// Build price context for V3 conviction scoring (best-effort)
-			var pc *domain.PriceContext
-			if h.priceRepo != nil {
-				ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
-				if pcs, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil {
-					pc = pcs[contractCode]
-				}
-			}
-			cs := cot.ComputeConvictionScoreV3(*analysis, regime2, surpriseSigma2, "", macroData2, pc)
+			cs := cot.ComputeConvictionScoreV3(*analysis, regime2, surpriseSigma2, "", macroData2, pc2)
+			html += h.fmt.FormatConvictionBlock(cs)
+		} else {
+			// FRED unavailable — compute conviction with COT + price only (regime = zero value)
+			cs := cot.ComputeConvictionScoreV3(*analysis, fred.MacroRegime{}, surpriseSigma2, "", nil, pc2)
 			html += h.fmt.FormatConvictionBlock(cs)
 		}
 	}

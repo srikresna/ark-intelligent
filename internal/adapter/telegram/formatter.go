@@ -521,9 +521,11 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 	b.WriteString(fmt.Sprintf("<code>  Crowding:       %.0f/100</code>\n", a.CrowdingIndex))
 	b.WriteString(fmt.Sprintf("<code>  Divergence:     %v</code>\n", a.DivergenceFlag))
 
-	// Quick copy commands
+	// Quick copy commands — prefer currency code (e.g. GOLD, EUR) over contract code
 	if displayCode != "" {
-		b.WriteString(fmt.Sprintf("\n<i>Quick commands:</i>\n<code>/cot %s</code> | <code>/cot raw %s</code>", displayCode, displayCode))
+		// Map known contract codes back to friendly currency shortcuts
+		friendlyCode := contractCodeToFriendly(displayCode)
+		b.WriteString(fmt.Sprintf("\n<i>Quick commands:</i>\n<code>/cot %s</code> | <code>/cot raw %s</code>", friendlyCode, friendlyCode))
 	}
 
 	return b.String()
@@ -725,6 +727,41 @@ func (f *Formatter) momentumLabel(m domain.MomentumDirection) string {
 	default:
 		return string(m)
 	}
+}
+
+// contractCodeToFriendly maps CFTC numeric contract codes to user-friendly currency shortcuts.
+// Returns the input unchanged if no mapping exists.
+func contractCodeToFriendly(code string) string {
+	m := map[string]string{
+		"099741": "EUR",
+		"096742": "GBP",
+		"097741": "JPY",
+		"092741": "CHF",
+		"232741": "AUD",
+		"090741": "CAD",
+		"112741": "NZD",
+		"098662": "USD",
+		"088691": "GOLD",
+		"084691": "SILVER",
+		"085692": "COPPER",
+		"067651": "OIL",
+		"022651": "ULSD",
+		"111659": "RBOB",
+		"043602": "BOND10",
+		"020601": "BOND30",
+		"044601": "BOND5",
+		"042601": "BOND2",
+		"13874A": "SPX",
+		"209742": "NDX",
+		"124601": "DJI",
+		"239742": "RUT",
+		"133741": "BTC",
+		"146021": "ETH",
+	}
+	if friendly, ok := m[code]; ok {
+		return friendly
+	}
+	return code
 }
 
 // matchesFilter checks if a NewsEvent passes the given filter string.
@@ -958,25 +995,101 @@ func regimeAdvisory(regimeName string) string {
 	}
 }
 
-// FormatConvictionBlock renders a compact conviction score block for the /cot detail view.
-// Gap D — shows the unified 0-100 conviction score (COT + FRED + Calendar).
+// FormatConvictionBlock renders a detailed conviction score block for the /cot detail view.
+// Uses plain language so non-finance users can immediately understand the signal.
 func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
+	var b strings.Builder
+
+	// Determine icon and plain-language verdict
 	icon := "⚪"
+	var verdict, explanation string
+	score := cs.Score
+
 	switch {
-	case cs.Score >= 65 && cs.Direction == "LONG":
+	case score >= 75 && cs.Direction == "LONG":
 		icon = "🟢"
-	case cs.Score >= 65 && cs.Direction == "SHORT":
-		icon = "🔴"
-	case cs.Score >= 55:
+		verdict = "STRONG BUY SIGNAL"
+		explanation = "Hampir semua indikator sepakat: harga kemungkinan besar naik."
+	case score >= 65 && cs.Direction == "LONG":
+		icon = "🟢"
+		verdict = "BUY SIGNAL"
+		explanation = "Mayoritas indikator menunjukkan potensi kenaikan harga."
+	case score >= 55 && cs.Direction == "LONG":
 		icon = "🟡"
+		verdict = "LEMAH BUY"
+		explanation = "Ada sinyal naik tapi belum cukup kuat. Lebih baik tunggu konfirmasi."
+	case score >= 75 && cs.Direction == "SHORT":
+		icon = "🔴"
+		verdict = "STRONG SELL SIGNAL"
+		explanation = "Hampir semua indikator sepakat: harga kemungkinan besar turun."
+	case score >= 65 && cs.Direction == "SHORT":
+		icon = "🔴"
+		verdict = "SELL SIGNAL"
+		explanation = "Mayoritas indikator menunjukkan potensi penurunan harga."
+	case score >= 55 && cs.Direction == "SHORT":
+		icon = "🟡"
+		verdict = "LEMAH SELL"
+		explanation = "Ada sinyal turun tapi belum kuat. Perlu konfirmasi lebih lanjut."
+	default:
+		icon = "⚪"
+		verdict = "NETRAL / TIDAK JELAS"
+		explanation = "Indikator saling bertentangan. Tidak ada sinyal yang cukup jelas saat ini."
 	}
 
-	return fmt.Sprintf(
-		"\n<b>🎯 Conviction Score</b>\n"+
-			"<code>%s %s %.0f/100 — %s</code>\n"+
-			"<i>COT+FRED+Calendar fused signal</i>\n",
-		icon, cs.Direction, cs.Score, cs.Label,
-	)
+	// Build conviction bar: 10 blocks
+	filled := int(score / 10)
+	if filled > 10 {
+		filled = 10
+	}
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", 10-filled)
+
+	b.WriteString("\n🎯 <b>KESIMPULAN SINYAL</b>\n")
+	b.WriteString(fmt.Sprintf("<code>[%s] %.0f/100</code>\n", bar, score))
+	b.WriteString(fmt.Sprintf("%s <b>%s</b>\n", icon, verdict))
+	b.WriteString(fmt.Sprintf("<i>%s</i>\n", explanation))
+
+	// Component breakdown — plain language
+	b.WriteString("\n<b>Komponen Penilaian:</b>\n")
+
+	cotIcon := "⚪"
+	cotDesc := "Netral"
+	switch cs.COTBias {
+	case "BULLISH":
+		cotIcon = "🟢"
+		cotDesc = "Institusi besar sedang beli (bullish)"
+	case "BEARISH":
+		cotIcon = "🔴"
+		cotDesc = "Institusi besar sedang jual (bearish)"
+	}
+	b.WriteString(fmt.Sprintf("<code>  COT Positioning : </code>%s %s\n", cotIcon, cotDesc))
+
+	fredIcon := "⚪"
+	fredDesc := "Kondisi makro netral"
+	switch cs.FREDRegime {
+	case "GOLDILOCKS":
+		fredIcon = "🟢"
+		fredDesc = "Ekonomi AS sehat, risk-on (GOLDILOCKS)"
+	case "DISINFLATIONARY":
+		fredIcon = "🟢"
+		fredDesc = "Inflasi mereda, kondisi positif (DISINFLATIONARY)"
+	case "INFLATIONARY":
+		fredIcon = "🟡"
+		fredDesc = "Inflasi masih tinggi, hati-hati (INFLATIONARY)"
+	case "STRESS":
+		fredIcon = "🔴"
+		fredDesc = "Pasar dalam tekanan/stres (STRESS)"
+	case "RECESSION":
+		fredIcon = "🔴"
+		fredDesc = "Risiko resesi tinggi (RECESSION)"
+	case "STAGFLATION":
+		fredIcon = "🔴"
+		fredDesc = "Stagflasi: inflasi tinggi + ekonomi lemah"
+	}
+	b.WriteString(fmt.Sprintf("<code>  Kondisi Ekonomi  : </code>%s %s\n", fredIcon, fredDesc))
+
+	b.WriteString(fmt.Sprintf("<i>  Data: COT (35%%) + Ekonomi (30%%) + Harga (30%%) + Kalender (5%%)</i>\n"))
+
+	return b.String()
 }
 
 // scoreArrow returns directional arrows for a sentiment score.
@@ -1772,69 +1885,182 @@ func (f *Formatter) FormatWeightOptimization(result *backtestsvc.WeightResult) s
 }
 
 // FormatPriceContext formats price context for a single contract.
+// Uses plain language so non-finance users can understand each metric.
 func (f *Formatter) FormatPriceContext(pc *domain.PriceContext) string {
 	if pc == nil {
 		return ""
 	}
 
 	var b strings.Builder
-	b.WriteString("\n\xF0\x9F\x92\xB0 <b>Price Context</b>\n")
-	b.WriteString(fmt.Sprintf("<code>Price    :</code> %.5f\n", pc.CurrentPrice))
+	b.WriteString("\n💰 <b>KONDISI HARGA SAAT INI</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Harga       : %.5f</code>\n", pc.CurrentPrice))
 
-	wIcon := "\xF0\x9F\x9F\xA2"
+	// Weekly change with plain explanation
+	wIcon := "🟢"
+	wDesc := "naik minggu ini"
 	if pc.WeeklyChgPct < 0 {
-		wIcon = "\xF0\x9F\x94\xB4"
+		wIcon = "🔴"
+		wDesc = "turun minggu ini"
+	} else if pc.WeeklyChgPct == 0 {
+		wIcon = "⚪"
+		wDesc = "flat minggu ini"
 	}
-	b.WriteString(fmt.Sprintf("<code>Weekly   :</code> %s %.2f%%\n", wIcon, pc.WeeklyChgPct))
+	b.WriteString(fmt.Sprintf("<code>Perubahan 1W: </code>%s <b>%+.2f%%</b> <i>(%s)</i>\n", wIcon, pc.WeeklyChgPct, wDesc))
 
-	mIcon := "\xF0\x9F\x9F\xA2"
+	// Monthly change
+	mIcon := "🟢"
+	mDesc := "naik sebulan terakhir"
 	if pc.MonthlyChgPct < 0 {
-		mIcon = "\xF0\x9F\x94\xB4"
+		mIcon = "🔴"
+		mDesc = "turun sebulan terakhir"
+	} else if pc.MonthlyChgPct == 0 {
+		mIcon = "⚪"
+		mDesc = "flat sebulan terakhir"
 	}
-	b.WriteString(fmt.Sprintf("<code>Monthly  :</code> %s %.2f%%\n", mIcon, pc.MonthlyChgPct))
+	b.WriteString(fmt.Sprintf("<code>Perubahan 1M: </code>%s <b>%+.2f%%</b> <i>(%s)</i>\n", mIcon, pc.MonthlyChgPct, mDesc))
 
-	trendIcon := "\xE2\x9E\xA1\xEF\xB8\x8F"
+	// 4-week trend with plain explanation
+	trendIcon := "➡️"
+	trendDesc := "bergerak sideways (tidak ada arah jelas)"
 	if pc.Trend4W == "UP" {
-		trendIcon = "\xE2\xAC\x86\xEF\xB8\x8F"
+		trendIcon = "⬆️"
+		trendDesc = "tren 4 minggu ke ATAS"
 	} else if pc.Trend4W == "DOWN" {
-		trendIcon = "\xE2\xAC\x87\xEF\xB8\x8F"
+		trendIcon = "⬇️"
+		trendDesc = "tren 4 minggu ke BAWAH"
 	}
-	b.WriteString(fmt.Sprintf("<code>Trend 4W :</code> %s %s\n", trendIcon, pc.Trend4W))
+	b.WriteString(fmt.Sprintf("<code>Tren 4 Minggu:</code> %s <i>%s</i>\n", trendIcon, trendDesc))
 
-	ma4wStatus := "below"
+	// MA explanation — simplified
+	b.WriteString("\n<b>Posisi vs Rata-rata Harga:</b>\n")
+
+	ma4wPos := "di BAWAH"
+	ma4wIcon := "🔴"
+	ma4wMeaning := "bearish jangka pendek"
 	if pc.AboveMA4W {
-		ma4wStatus = "above"
+		ma4wPos = "di ATAS"
+		ma4wIcon = "🟢"
+		ma4wMeaning = "bullish jangka pendek"
 	}
-	ma13wStatus := "below"
-	if pc.AboveMA13W {
-		ma13wStatus = "above"
-	}
-	b.WriteString(fmt.Sprintf("<code>MA4W     :</code> %.5f (%s)\n", pc.PriceMA4W, ma4wStatus))
-	b.WriteString(fmt.Sprintf("<code>MA13W    :</code> %.5f (%s)\n", pc.PriceMA13W, ma13wStatus))
+	b.WriteString(fmt.Sprintf("<code>  Rata2 4-minggu : </code>%s %s (%.5f) — <i>%s</i>\n",
+		ma4wIcon, ma4wPos, pc.PriceMA4W, ma4wMeaning))
 
-	// ATR-based volatility regime
+	ma13wPos := "di BAWAH"
+	ma13wIcon := "🔴"
+	ma13wMeaning := "tren besar masih turun"
+	if pc.AboveMA13W {
+		ma13wPos = "di ATAS"
+		ma13wIcon = "🟢"
+		ma13wMeaning = "tren besar masih naik"
+	}
+	b.WriteString(fmt.Sprintf("<code>  Rata2 13-minggu: </code>%s %s (%.5f) — <i>%s</i>\n",
+		ma13wIcon, ma13wPos, pc.PriceMA13W, ma13wMeaning))
+
+	// MA alignment summary
+	if pc.AboveMA4W && pc.AboveMA13W {
+		b.WriteString("<i>  → Harga di atas kedua rata-rata = sinyal naik kuat</i>\n")
+	} else if !pc.AboveMA4W && !pc.AboveMA13W {
+		b.WriteString("<i>  → Harga di bawah kedua rata-rata = sinyal turun kuat</i>\n")
+	} else if pc.AboveMA4W && !pc.AboveMA13W {
+		b.WriteString("<i>  → Baru mulai rebound, tapi tren besar masih bearish</i>\n")
+	} else {
+		b.WriteString("<i>  → Mulai melemah dari tren naik, perlu waspada</i>\n")
+	}
+
+	// Volatility with plain explanation
 	if pc.VolatilityRegime != "" {
-		volIcon := "\xF0\x9F\x9F\xA1" // yellow circle for NORMAL
+		volIcon := "🟡"
+		volDesc := "volatilitas normal — pergerakan harga wajar"
 		switch pc.VolatilityRegime {
 		case "EXPANDING":
-			volIcon = "\xF0\x9F\x94\xB4" // red — high volatility
+			volIcon = "🔴"
+			volDesc = "volatilitas TINGGI — harga sedang bergerak liar, risiko lebih besar"
 		case "CONTRACTING":
-			volIcon = "\xF0\x9F\x9F\xA2" // green — low volatility
+			volIcon = "🟢"
+			volDesc = "volatilitas RENDAH — harga sedang tenang, breakout mungkin segera terjadi"
 		}
-		b.WriteString(fmt.Sprintf("<code>ATR Vol  :</code> %s %s (ATR: %.5f, %.2f%%)\n",
-			volIcon, pc.VolatilityRegime, pc.ATR, pc.NormalizedATR))
+		b.WriteString(fmt.Sprintf("\n<code>Volatilitas: </code>%s <i>%s</i>\n", volIcon, volDesc))
+		b.WriteString(fmt.Sprintf("<code>  ATR: %.5f (%.2f%% dari harga)</code>\n", pc.ATR, pc.NormalizedATR))
 	}
 
 	return b.String()
 }
 
-// FormatPriceCOTDivergence formats a price-COT divergence alert.
+// FormatPriceCOTDivergence formats a price-COT divergence alert in plain language.
 func (f *Formatter) FormatPriceCOTDivergence(div pricesvc.PriceCOTDivergence) string {
-	icon := "\xE2\x9A\xA0\xEF\xB8\x8F" // ⚠️
+	var b strings.Builder
+
+	icon := "⚠️"
+	severityLabel := "Perlu Perhatian"
 	if div.Severity == "HIGH" {
-		icon = "\xF0\x9F\x94\xB4" // 🔴
+		icon = "🚨"
+		severityLabel = "PERINGATAN KERAS"
 	}
-	return fmt.Sprintf("\n%s <b>DIVERGENCE: %s</b>\n<i>%s</i>\n", icon, div.Severity, div.Description)
+
+	b.WriteString(fmt.Sprintf("\n%s <b>SINYAL BERTENTANGAN (%s)</b>\n", icon, severityLabel))
+
+	// Plain language explanation based on divergence type
+	if div.PriceTrend == "UP" && div.COTDirection == "BEARISH" {
+		b.WriteString("<b>Situasi:</b> Harga naik, tapi institusi besar justru JUAL\n")
+		b.WriteString("<i>Artinya: Kenaikan harga ini mungkin tidak didukung oleh pemain besar.\n")
+		b.WriteString("Bisa jadi ini \"rally palsu\" atau harga akan berbalik turun.\n")
+		b.WriteString("Hati-hati beli di sini — tunggu konfirmasi lebih lanjut.</i>\n")
+		if div.Severity == "HIGH" {
+			b.WriteString("🚨 <b>COT Index di zona ekstrem SHORT — sinyal reversal kuat!</b>\n")
+		}
+	} else if div.PriceTrend == "DOWN" && div.COTDirection == "BULLISH" {
+		b.WriteString("<b>Situasi:</b> Harga turun, tapi institusi besar justru BELI\n")
+		b.WriteString("<i>Artinya: Penurunan harga ini mungkin sementara.\n")
+		b.WriteString("Institusi besar melihat nilai di sini dan mulai akumulasi.\n")
+		b.WriteString("Ini bisa menjadi kesempatan beli — tapi tunggu harga stabilisasi dulu.</i>\n")
+		if div.Severity == "HIGH" {
+			b.WriteString("🚨 <b>COT Index di zona ekstrem LONG — potensi reversal naik kuat!</b>\n")
+		}
+	} else {
+		// Generic fallback
+		b.WriteString(fmt.Sprintf("<i>%s</i>\n", div.Description))
+	}
+
+	b.WriteString(fmt.Sprintf("<code>  COT Index: %.0f%% | Tren Harga: %s</code>\n", div.COTIndex, div.PriceTrend))
+	return b.String()
+}
+
+// FormatPriceCOTAlignment formats a confirmation when price and COT agree (no divergence).
+// This replaces the silent "no divergence" gap — user always gets a price-COT verdict.
+func (f *Formatter) FormatPriceCOTAlignment(pc *domain.PriceContext, a domain.COTAnalysis) string {
+	if pc == nil {
+		return ""
+	}
+
+	var b strings.Builder
+
+	cotDir := "netral"
+	if a.COTIndex > 60 {
+		cotDir = "bullish (beli)"
+	} else if a.COTIndex < 40 {
+		cotDir = "bearish (jual)"
+	}
+
+	priceTrend := "sideways"
+	if pc.Trend4W == "UP" {
+		priceTrend = "naik"
+	} else if pc.Trend4W == "DOWN" {
+		priceTrend = "turun"
+	}
+
+	b.WriteString("\n🔗 <b>KONFIRMASI HARGA vs COT</b>\n")
+
+	// Both agree
+	if (pc.Trend4W == "UP" && a.COTIndex > 60) || (pc.Trend4W == "DOWN" && a.COTIndex < 40) {
+		b.WriteString("✅ <b>Harga dan posisi institusi SELARAS</b>\n")
+		b.WriteString(fmt.Sprintf("<i>Tren harga %s, dan institusi besar juga %s.\n", priceTrend, cotDir))
+		b.WriteString("Ini adalah sinyal yang lebih dapat dipercaya.</i>\n")
+	} else if pc.Trend4W == "FLAT" || (a.COTIndex >= 40 && a.COTIndex <= 60) {
+		b.WriteString("⚪ <b>Tidak ada sinyal jelas saat ini</b>\n")
+		b.WriteString(fmt.Sprintf("<i>Tren harga %s, posisi institusi %s. Lebih baik tunggu.</i>\n", priceTrend, cotDir))
+	}
+
+	return b.String()
 }
 
 // FormatStrengthRanking formats the dual price+COT currency strength ranking.
