@@ -82,8 +82,14 @@ func (sd *SignalDetector) DetectAll(analyses []domain.COTAnalysis, historyMap ma
 }
 
 // detectSmartMoney identifies when commercial hedgers are making significant moves.
-// Commercials are considered "smart money" — they have physical exposure and
-// tend to be right at extremes.
+//
+// Interpretation differs by report type:
+//   - DISAGGREGATED (commodities): Prod/Swap are true hedgers — contrarian signal.
+//     High COTIndexComm (>80) = they are heavily long = BULLISH for price.
+//     Low COTIndexComm (<20)  = they are net short/hedging = BEARISH for price.
+//   - TFF (forex/indices): Dealers are market makers, not true hedgers.
+//     High COTIndexComm (>80) = dealers accumulating long = BULLISH (directional).
+//     Low COTIndexComm (<20)  = dealers net short = BEARISH (directional).
 func (sd *SignalDetector) detectSmartMoney(a domain.COTAnalysis, history []domain.COTRecord) *Signal {
 	// Need significant commercial position change
 	commChangeAbs := math.Abs(a.CommNetChange)
@@ -93,11 +99,12 @@ func (sd *SignalDetector) detectSmartMoney(a domain.COTAnalysis, history []domai
 
 	// Check if commercial index is at extreme
 	if a.COTIndexComm < 20 || a.COTIndexComm > 80 {
-		// Smart money at extreme = high conviction signal
+		// Direction logic:
+		// For DISAGGREGATED: high COTIndexComm = commercials net long = BULLISH (producers know value)
+		// For TFF: high COTIndexComm = dealers net long = BULLISH (directional accumulation)
+		// Both cases: COTIndexComm > 80 = BULLISH, < 20 = BEARISH
 		direction := "BULLISH"
-		if a.COTIndexComm > 80 {
-			// Commercials extremely long = they're hedging heavy short exposure
-			// = underlying asset likely to fall (contrarian)
+		if a.COTIndexComm < 20 {
 			direction = "BEARISH"
 		}
 
@@ -116,6 +123,10 @@ func (sd *SignalDetector) detectSmartMoney(a domain.COTAnalysis, history []domai
 			fmt.Sprintf("Commercial signal: %s", a.CommercialSignal),
 		}
 
+		hedgerLabel := "Commercials"
+		if a.Contract.ReportType == "TFF" {
+			hedgerLabel = "Dealers"
+		}
 		return &Signal{
 			ContractCode: a.Contract.Code,
 			Currency:     a.Contract.Currency,
@@ -123,7 +134,7 @@ func (sd *SignalDetector) detectSmartMoney(a domain.COTAnalysis, history []domai
 			Direction:    direction,
 			Strength:     strength,
 			Confidence:   confidence,
-			Description:  fmt.Sprintf("Smart money %s: Commercials at extreme (%.0f) with large position change", direction, a.COTIndexComm),
+			Description:  fmt.Sprintf("%s at extreme COT Index (%.0f) with large position change → %s", hedgerLabel, a.COTIndexComm, direction),
 			Factors:      factors,
 		}
 	}

@@ -565,9 +565,20 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 	b.WriteString(fmt.Sprintf("<code>  Total: %s kontrak</code>\n", fmtutil.FmtNum(r.OpenInterest, 0)))
 	b.WriteString("<i>  → Semakin besar = semakin banyak uang yang aktif di pasar ini</i>\n\n")
 
-	isDisagg := r.ContractName == "Gold" || r.ContractName == "Crude Oil WTI" ||
-		r.ContractName == "Silver" || r.ContractName == "Copper" ||
-		r.ContractName == "NY Harbor ULSD" || r.ContractName == "RBOB Gasoline"
+	// Determine report type from contract code (reliable) instead of contract name (fragile).
+	// Lookup DefaultCOTContracts to find the ReportType for this contract.
+	isDisagg := false
+	for _, c := range domain.DefaultCOTContracts {
+		if c.Code == r.ContractCode {
+			isDisagg = c.ReportType == "DISAGGREGATED"
+			break
+		}
+	}
+	// Fallback: if contract code not found, infer from field presence
+	// (DISAGGREGATED records populate ManagedMoneyLong; TFF records populate LevFundLong)
+	if r.ContractCode == "" {
+		isDisagg = r.ManagedMoneyLong > 0 || r.ManagedMoneyShort > 0
+	}
 
 	if isDisagg {
 		// ── DISAGGREGATED (Komoditas fisik: Gold, Oil, dll) ──
