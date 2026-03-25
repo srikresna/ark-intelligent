@@ -1037,7 +1037,7 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 
 	// --- Yield Curve ---
 	b.WriteString("<code>━━━ Treasury Yield Curve ━━━</code>\n")
-	b.WriteString(fmt.Sprintf("<code> 3M    2Y    5Y   10Y   30Y</code>\n"))
+	b.WriteString("<code> 3M    2Y    5Y   10Y   30Y</code>\n")
 	b.WriteString(fmt.Sprintf("<code>%4.2f  %4.2f  %4.2f  %4.2f  %4.2f</code>\n",
 		data.Yield3M, data.Yield2Y, data.Yield5Y, data.Yield10Y, data.Yield30Y))
 	b.WriteString(fmt.Sprintf("<code>2Y-10Y Spread: %s</code>\n", regime.YieldCurve))
@@ -1799,7 +1799,7 @@ func (f *Formatter) FormatRegimePerformance(matrix *fred.RegimePerformanceMatrix
 func (f *Formatter) FormatWeeklyReport(r *domain.WeeklyReport) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x8B <b>Weekly Performance Report</b>\n"))
+	b.WriteString("📋 <b>Weekly Performance Report</b>\n")
 	b.WriteString(fmt.Sprintf("<i>%s \xe2\x80\x94 %s</i>\n\n",
 		r.WeekStart.Format("02 Jan"),
 		r.WeekEnd.Format("02 Jan 2006"),

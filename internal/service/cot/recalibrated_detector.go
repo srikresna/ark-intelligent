@@ -330,7 +330,7 @@ func (rd *RecalibratedDetector) DetectAll(
 
 			// Combine: if both are available, average to avoid stacking penalties.
 			// If only one is available, use it directly.
-			combinedMult := 1.0
+			var combinedMult float64
 			switch {
 			case riskCtx != nil && atrMult != 1.0:
 				combinedMult = (vixMult + atrMult) / 2

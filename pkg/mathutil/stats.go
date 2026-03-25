@@ -562,14 +562,13 @@ func regIncBeta(a, b, x float64) float64 {
 	// Lentz's continued fraction.
 	const maxIter = 200
 	const epsilon = 1e-14
-	f := 1.0
 	c := 1.0
 	d := 1 - (a+b)*x/(a+1)
 	if math.Abs(d) < epsilon {
 		d = epsilon
 	}
 	d = 1 / d
-	f = d
+	f := d
 
 	for i := 1; i <= maxIter; i++ {
 		m := float64(i)

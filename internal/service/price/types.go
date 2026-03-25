@@ -60,16 +60,6 @@ type avCommodityData struct {
 	Value string `json:"value"`
 }
 
-// --- Alpha Vantage Gold/Silver Spot ---
-
-type avGoldSpotResponse struct {
-	Symbol    string `json:"symbol"`
-	Timestamp string `json:"timestamp"`
-	Price     string `json:"price"`
-	Note      string `json:"Note,omitempty"`
-	Info      string `json:"Information,omitempty"`
-}
-
 // --- Yahoo Finance ---
 
 type yahooChartResponse struct {
@@ -105,10 +95,3 @@ type yahooError struct {
 	Description string `json:"description"`
 }
 
-// --- CoinGecko ---
-
-type coinGeckoMarketCapResponse struct {
-	MarketCapChart struct {
-		MarketCap [][]float64 `json:"market_cap"`
-	} `json:"market_cap_chart"`
-}

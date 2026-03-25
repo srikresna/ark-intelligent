@@ -226,7 +226,7 @@ func BuildWeeklyOutlookPrompt(data WeeklyOutlookData, lang string, macroRegime *
 func BuildCrossMarketPrompt(cotData map[string]*domain.COTAnalysis) string {
 	var b strings.Builder
 	now := time.Now().UTC().Add(7 * time.Hour) // WIB
-	b.WriteString(fmt.Sprintf("Analyze cross-market COT positioning for intermarket signals.\n"))
+	b.WriteString("Analyze cross-market COT positioning for intermarket signals.\n")
 	b.WriteString(fmt.Sprintf("Analysis date: %s (WIB).\n", now.Format("02 January 2006")))
 	b.WriteString("Look for correlations, divergences, and risk-on/risk-off signals.\n\n")
 

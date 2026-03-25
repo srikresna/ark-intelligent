@@ -9,10 +9,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
-	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
-
-var ctxLog = logger.Component("context-builder")
 
 // ContextBuilder constructs system prompts for chatbot conversations
 // by injecting live market data when the query is forex-related.
