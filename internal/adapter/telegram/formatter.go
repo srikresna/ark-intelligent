@@ -1296,7 +1296,7 @@ func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
 	var b strings.Builder
 
 	// Determine icon and plain-language verdict
-	icon := "⚪"
+	var icon string
 	var verdict, explanation string
 	score := cs.Score
 
@@ -2047,7 +2047,7 @@ func (f *Formatter) FormatMacroExplain(regime fred.MacroRegime, data *fred.Macro
 
 	// VIX
 	if data.VIX > 0 {
-		vixStatus := "Rendah ✅"
+		var vixStatus string
 		switch {
 		case data.VIX > 30:
 			vixStatus = fmt.Sprintf("Tinggi (%.0f) 🔴 — pasar takut", data.VIX)
@@ -3172,56 +3172,74 @@ func sentimentBar(pct float64, emoji string) string {
 // ---------------------------------------------------------------------------
 
 // FormatSeasonalPatterns formats seasonal analysis results as a compact HTML table.
+// Enhanced: shows confidence bar for current month and regime context header.
 func (f *Formatter) FormatSeasonalPatterns(patterns []pricesvc.SeasonalPattern) string {
 	var b strings.Builder
 
-	b.WriteString("\xF0\x9F\x93\x85 <b>SEASONAL PATTERN ANALYSIS</b>\n")
-	b.WriteString("<i>Historical monthly bias (up to 5 years)</i>\n\n")
+	b.WriteString("\xF0\x9F\x93\x85 <b>ADVANCED SEASONAL ANALYSIS</b>\n")
+	b.WriteString("<i>Statistical monthly bias (up to 5 years, min n\xe2\x89\xa53)</i>\n")
 
-	// Compact table: currency + 12 months with emoji bias indicators
-	b.WriteString("<pre>")
-	b.WriteString(fmt.Sprintf("%-5s", "CCY"))
-	shortMonths := [12]string{"J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"}
-	for _, m := range shortMonths {
-		b.WriteString(fmt.Sprintf(" %s", m))
+	// Show regime context if available
+	if len(patterns) > 0 && patterns[0].RegimeStats != nil {
+		b.WriteString(fmt.Sprintf("<i>Regime: %s</i>\n", patterns[0].RegimeStats.RegimeName))
 	}
 	b.WriteString("\n")
-	b.WriteString(strings.Repeat("\xe2\x94\x80", 30) + "\n")
+
+	// Compact grid: currency + 12 months + confluence
+	b.WriteString("<pre>")
+	shortMonths := [12]string{"J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"}
+	// Determine current month for header alignment (bracket current month to match data rows)
+	curMonth := 0
+	if len(patterns) > 0 {
+		curMonth = patterns[0].CurrentMonth
+	}
+	b.WriteString(fmt.Sprintf("%-6s", "CCY"))
+	for i, m := range shortMonths {
+		if i+1 == curMonth {
+			b.WriteString(fmt.Sprintf("[%s]", m))
+		} else {
+			b.WriteString(fmt.Sprintf(" %s", m))
+		}
+	}
+	b.WriteString(" Cf\n")
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 35) + "\n")
 
 	for _, p := range patterns {
-		b.WriteString(fmt.Sprintf("%-5s", p.Currency))
+		b.WriteString(fmt.Sprintf("%-6s", p.Currency))
 		for i := 0; i < 12; i++ {
-			icon := "\xc2\xb7" // middle dot for NEUTRAL
+			icon := "\xc2\xb7"
 			switch p.Monthly[i].Bias {
 			case "BULLISH":
-				icon = "\xe2\x96\xb2" // triangle up
+				icon = "\xe2\x96\xb2"
 			case "BEARISH":
-				icon = "\xe2\x96\xbc" // triangle down
+				icon = "\xe2\x96\xbc"
 			}
 			if i+1 == p.CurrentMonth {
-				b.WriteString(fmt.Sprintf("[%s", icon))
+				b.WriteString(fmt.Sprintf("[%s]", icon))
 			} else {
 				b.WriteString(fmt.Sprintf(" %s", icon))
 			}
-			if i+1 == p.CurrentMonth {
-				b.WriteString("]")
-			}
+		}
+		// Confluence score for current month
+		if p.Confluence != nil {
+			b.WriteString(fmt.Sprintf(" %d/%d", p.Confluence.Score, p.Confluence.MaxScore))
+		} else {
+			b.WriteString("  -")
 		}
 		b.WriteString("\n")
 	}
 	b.WriteString("</pre>\n")
 
-	// Legend
-	b.WriteString("<i>\xe2\x96\xb2 = Bullish (avg&gt;0, WR&gt;55%%)  \xe2\x96\xbc = Bearish  \xc2\xb7 = Neutral</i>\n")
-	b.WriteString("<i>[x] = current month</i>\n")
+	b.WriteString("<i>\xe2\x96\xb2=Bullish \xe2\x96\xbc=Bearish \xc2\xb7=Neutral [x]=now Cf=confluence</i>\n")
 
-	// Strongest tendencies
+	// Strongest tendencies with confidence
 	type tendency struct {
-		currency string
-		month    string
-		avgRet   float64
-		winRate  float64
-		bias     string
+		currency   string
+		month      string
+		avgRet     float64
+		winRate    float64
+		bias       string
+		confidence pricesvc.ConfidenceTier
 	}
 	var strong []tendency
 	for _, p := range patterns {
@@ -3229,27 +3247,16 @@ func (f *Formatter) FormatSeasonalPatterns(patterns []pricesvc.SeasonalPattern) 
 			ms := p.Monthly[i]
 			if ms.Bias != "NEUTRAL" && ms.SampleSize >= 3 {
 				strong = append(strong, tendency{
-					currency: p.Currency,
-					month:    ms.Month,
-					avgRet:   ms.AvgReturn,
-					winRate:  ms.WinRate,
-					bias:     ms.Bias,
+					currency: p.Currency, month: ms.Month,
+					avgRet: ms.AvgReturn, winRate: ms.WinRate,
+					bias: ms.Bias, confidence: ms.Confidence,
 				})
 			}
 		}
 	}
 
-	// Sort by absolute avg return descending to find strongest
 	sort.Slice(strong, func(i, j int) bool {
-		ai := strong[i].avgRet
-		if ai < 0 {
-			ai = -ai
-		}
-		aj := strong[j].avgRet
-		if aj < 0 {
-			aj = -aj
-		}
-		return ai > aj
+		return math.Abs(strong[i].avgRet) > math.Abs(strong[j].avgRet)
 	})
 
 	if len(strong) > 0 {
@@ -3263,30 +3270,38 @@ func (f *Formatter) FormatSeasonalPatterns(patterns []pricesvc.SeasonalPattern) 
 			if t.bias == "BEARISH" {
 				icon = "\xF0\x9F\x94\xB4"
 			}
-			b.WriteString(fmt.Sprintf("%s %s %s: %+.2f%% (%.0f%% WR)\n",
-				icon, t.currency, t.month, t.avgRet, t.winRate))
+			confTag := ""
+			if t.confidence == pricesvc.ConfidenceStrong {
+				confTag = " \xe2\x9c\xa8"
+			}
+			b.WriteString(fmt.Sprintf("%s %s %s: %+.2f%% (%.0f%% WR)%s\n",
+				icon, t.currency, t.month, t.avgRet, t.winRate, confTag))
 		}
+		b.WriteString("<i>\xe2\x9c\xa8 = STRONG confidence</i>\n")
 	}
+
+	b.WriteString("\n<i>Use <code>/seasonal CCY</code> for deep dive</i>")
 
 	return b.String()
 }
 
-// FormatSeasonalSingle formats seasonal analysis for a single contract in detail.
+// FormatSeasonalSingle formats the advanced seasonal deep-dive for a single contract.
 func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x85 <b>SEASONAL PATTERNS: %s</b>\n", html.EscapeString(p.Currency)))
-	b.WriteString("<i>Historical monthly return statistics (up to 5 years)</i>\n\n")
+	b.WriteString(fmt.Sprintf("\xF0\x9F\x93\x85 <b>%s \xe2\x80\x94 SEASONAL DEEP DIVE</b>\n", html.EscapeString(p.Currency)))
+	b.WriteString("<i>Up to 5 years, regime-aware, multi-factor</i>\n\n")
 
-	b.WriteString("<pre>")
-	b.WriteString(fmt.Sprintf("%-5s %7s %5s %3s %s\n", "Month", "AvgRet", "WR", "N", "Bias"))
-	b.WriteString(strings.Repeat("\xe2\x94\x80", 32) + "\n")
+	// --- STATISTICAL SUMMARY TABLE ---
+	b.WriteString("<b>MONTHLY STATISTICS</b>\n<pre>")
+	b.WriteString(fmt.Sprintf("%-4s %6s %6s %5s %4s %3s %s\n", "Mon", "Avg", "Med", "WR", "Wgt", "N", ""))
+	b.WriteString(strings.Repeat("\xe2\x94\x80", 38) + "\n")
 
 	for i := 0; i < 12; i++ {
 		ms := p.Monthly[i]
 		marker := " "
 		if i+1 == p.CurrentMonth {
-			marker = "\xe2\x96\xb6" // current month indicator
+			marker = "\xe2\x96\xb6"
 		}
 
 		biasIcon := "\xc2\xb7"
@@ -3297,22 +3312,173 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 			biasIcon = "\xe2\x96\xbc"
 		}
 
-		b.WriteString(fmt.Sprintf("%s%-4s %+6.2f%% %4.0f%% %2d  %s\n",
-			marker, ms.Month, ms.AvgReturn, ms.WinRate, ms.SampleSize, biasIcon))
+		wrStr := fmt.Sprintf("%.0f%%", ms.WinRate)
+		wgtStr := fmt.Sprintf("%.0f%%", ms.WeightedWR)
+		if ms.SampleSize == 0 {
+			wrStr = "  -"
+			wgtStr = "  -"
+		}
+
+		b.WriteString(fmt.Sprintf("%s%-3s %+5.1f%% %+5.1f%% %4s %4s %2d %s\n",
+			marker, ms.Month, ms.AvgReturn, ms.MedianRet, wrStr, wgtStr, ms.SampleSize, biasIcon))
 	}
 	b.WriteString("</pre>\n")
 
-	// Current month summary
 	curMs := p.Monthly[p.CurrentMonth-1]
-	biasEmoji := "\xe2\x9a\xaa" // white circle
+
+	// --- CURRENT MONTH SUMMARY ---
+	biasEmoji := "\xe2\x9a\xaa"
 	switch p.CurrentBias {
 	case "BULLISH":
 		biasEmoji = "\xF0\x9F\x9F\xA2"
 	case "BEARISH":
 		biasEmoji = "\xF0\x9F\x94\xB4"
 	}
-	b.WriteString(fmt.Sprintf("\n%s <b>Current Month (%s):</b> %s \xe2\x80\x94 Avg %+.2f%%, WR %.0f%% (n=%d)\n",
-		biasEmoji, curMs.Month, p.CurrentBias, curMs.AvgReturn, curMs.WinRate, curMs.SampleSize))
+	b.WriteString(fmt.Sprintf("\n%s <b>%s (%s):</b> %+.2f%% avg, %.0f%% WR",
+		biasEmoji, curMs.Month, p.CurrentBias, curMs.AvgReturn, curMs.WinRate))
+	if curMs.StdDev > 0 {
+		b.WriteString(fmt.Sprintf(", \xcf\x83=%.1f%%", curMs.StdDev))
+	}
+	b.WriteString(fmt.Sprintf(" (n=%d)\n", curMs.SampleSize))
+	if curMs.WeightedAvg != 0 {
+		b.WriteString(fmt.Sprintf("<i>Recency-weighted: %+.2f%% avg, %.0f%% WR</i>\n", curMs.WeightedAvg, curMs.WeightedWR))
+	}
+
+	// Year-by-year returns
+	if len(curMs.YearReturns) > 0 {
+		b.WriteString("<pre>")
+		for _, yr := range curMs.YearReturns {
+			icon := "\xe2\x96\xb2"
+			if yr.Return < 0 {
+				icon = "\xe2\x96\xbc"
+			}
+			b.WriteString(fmt.Sprintf("  %d: %+6.2f%% %s\n", yr.Year, yr.Return, icon))
+		}
+		b.WriteString("</pre>\n")
+	}
+
+	// --- REGIME CONTEXT (Phase 2) ---
+	if p.RegimeStats != nil {
+		b.WriteString("\n\xF0\x9F\x8F\x9B <b>REGIME CONTEXT</b>\n")
+		b.WriteString(fmt.Sprintf("<code>Current : %s</code>\n", p.RegimeStats.RegimeName))
+		if p.RegimeStats.SampleSize > 0 {
+			b.WriteString(fmt.Sprintf("<code>In regime: %+.1f%% avg, %.0f%% WR (n=%d)</code>\n",
+				p.RegimeStats.AvgReturn, p.RegimeStats.WinRate, p.RegimeStats.SampleSize))
+		} else {
+			b.WriteString("<code>In regime: no historical data in same regime</code>\n")
+		}
+		b.WriteString(fmt.Sprintf("<code>Driver  : %s</code>\n", p.RegimeStats.PrimaryFREDDriver))
+		driverIcon := "\xe2\x9e\x96"
+		switch p.RegimeStats.DriverAlignment {
+		case "SUPPORTIVE":
+			driverIcon = "\xe2\x9c\x85"
+		case "HEADWIND":
+			driverIcon = "\xe2\x9d\x8c"
+		}
+		b.WriteString(fmt.Sprintf("<code>Outlook : %s %s</code>\n", p.RegimeStats.DriverAlignment, driverIcon))
+	}
+
+	// --- COT ALIGNMENT (Phase 3a) ---
+	if p.COTAlignment != nil {
+		b.WriteString("\n\xF0\x9F\x93\x8A <b>COT ALIGNMENT</b>\n")
+		alignIcon := "\xe2\x9d\x8c"
+		if p.COTAlignment.CurrentAligned {
+			alignIcon = "\xe2\x9c\x85"
+		}
+		b.WriteString(fmt.Sprintf("<code>Current : COT %s %s</code>\n", p.COTAlignment.CurrentCOTBias, alignIcon))
+		b.WriteString(fmt.Sprintf("<code>Interp  : %s</code>\n", p.COTAlignment.Interpretation))
+	}
+
+	// --- EVENT DENSITY (Phase 3b) ---
+	if p.EventDensity != nil {
+		b.WriteString("\n\xF0\x9F\x93\x86 <b>EVENT DENSITY</b>\n")
+		evIcon := "\xF0\x9F\x9F\xA2"
+		if p.EventDensity.Rating == "HIGH" {
+			evIcon = "\xF0\x9F\x94\xB4"
+		} else if p.EventDensity.Rating == "MEDIUM" {
+			evIcon = "\xF0\x9F\x9F\xA1"
+		}
+		b.WriteString(fmt.Sprintf("<code>Rating  : %s %s (%d high-impact)</code>\n",
+			p.EventDensity.Rating, evIcon, p.EventDensity.HighImpactEvents))
+		if p.EventDensity.KeyEvents != "" {
+			b.WriteString(fmt.Sprintf("<code>Events  : %s</code>\n", html.EscapeString(p.EventDensity.KeyEvents)))
+		}
+	}
+
+	// --- VOLATILITY CONTEXT (Phase 3c) ---
+	if p.VolContext != nil && p.VolContext.AvgATR > 0 {
+		b.WriteString("\n\xF0\x9F\x93\x89 <b>VOLATILITY</b>\n")
+		b.WriteString(fmt.Sprintf("<code>Month vol: %.1f%% (%.1fx avg)</code>\n",
+			p.VolContext.HistoricalATR, p.VolContext.VolRatio))
+		if p.VolContext.CurrentVIXRegime != "N/A" {
+			b.WriteString(fmt.Sprintf("<code>VIX     : %s (sensitivity: %s)</code>\n",
+				p.VolContext.CurrentVIXRegime, p.VolContext.VIXSensitivity))
+		}
+		if p.VolContext.Assessment != "" {
+			b.WriteString(fmt.Sprintf("<i>%s</i>\n", p.VolContext.Assessment))
+		}
+	}
+
+	// --- CROSS-ASSET (Phase 3d) ---
+	if p.CrossAsset != nil && len(p.CrossAsset.Correlations) > 0 {
+		b.WriteString("\n\xF0\x9F\x94\x97 <b>CROSS-ASSET</b>\n")
+		for _, cc := range p.CrossAsset.Correlations {
+			checkIcon := "\xe2\x9c\x85"
+			if !cc.IsAligned {
+				checkIcon = "\xe2\x9a\xa0\xef\xb8\x8f"
+			}
+			b.WriteString(fmt.Sprintf("<code>%-6s %s seasonal %s</code> %s\n",
+				cc.Asset, cc.Relation, cc.TheirBias, checkIcon))
+		}
+		b.WriteString(fmt.Sprintf("<code>Assessment: %s</code>\n", p.CrossAsset.Assessment))
+	}
+
+	// --- EIA ENERGY CONTEXT (Phase 4) ---
+	if p.EIACtx != nil {
+		b.WriteString("\n\xF0\x9F\x9B\xA2 <b>EIA ENERGY CONTEXT</b>\n")
+		if p.EIACtx.InventoryTrend != "" {
+			trendIcon := "\xe2\x9e\x96"
+			switch p.EIACtx.InventoryTrend {
+			case "BUILD":
+				trendIcon = "\xF0\x9F\x93\x88"
+			case "DRAW":
+				trendIcon = "\xF0\x9F\x93\x89"
+			}
+			b.WriteString(fmt.Sprintf("<code>Inventory: %s %s (avg %+.1fM bbl/wk)</code>\n",
+				p.EIACtx.InventoryTrend, trendIcon, p.EIACtx.AvgWeeklyChange))
+		}
+		if p.EIACtx.RefineryUtil > 0 {
+			b.WriteString(fmt.Sprintf("<code>Refinery : %.1f%% utilization</code>\n", p.EIACtx.RefineryUtil))
+		}
+		if p.EIACtx.CurrentVs5YrAvg != "" {
+			b.WriteString(fmt.Sprintf("<code>vs 5yr   : %s seasonal average</code>\n", p.EIACtx.CurrentVs5YrAvg))
+		}
+		if p.EIACtx.Assessment != "" {
+			b.WriteString(fmt.Sprintf("<i>%s</i>\n", p.EIACtx.Assessment))
+		}
+	}
+
+	// --- CONFLUENCE SCORE (Phase 5) ---
+	if p.Confluence != nil {
+		b.WriteString("\n\xF0\x9F\x8E\xAF <b>CONFLUENCE SCORE</b>\n")
+
+		// Visual bar
+		filled := p.Confluence.Score
+		empty := p.Confluence.MaxScore - filled
+		bar := strings.Repeat("\xe2\x96\x88", filled) + strings.Repeat("\xe2\x96\x91", empty)
+		b.WriteString(fmt.Sprintf("<code>%s %d/%d</code>\n", bar, p.Confluence.Score, p.Confluence.MaxScore))
+
+		// Factor details
+		for _, factor := range p.Confluence.Factors {
+			checkIcon := "\xe2\x9c\x97"
+			if factor.Aligned {
+				checkIcon = "\xe2\x9c\x93"
+			}
+			b.WriteString(fmt.Sprintf("<code>%s %-11s %s</code>\n", checkIcon, factor.Name, html.EscapeString(factor.Detail)))
+		}
+
+		b.WriteString(fmt.Sprintf("\n<b>Verdict: %s</b>\n", p.Confluence.Verdict))
+	}
 
 	return b.String()
 }
