@@ -439,7 +439,14 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 		b.WriteString(fmt.Sprintf("🚨 <b>THIN MARKET:</b> %s\n", a.ThinMarketDesc))
 	}
 	if a.SmartDumbDivergence {
-		b.WriteString("🔀 <b>Divergence:</b> Smart money vs commercials moving opposite\n")
+		if rt == "DISAGGREGATED" {
+			// Untuk komoditas, divergence antara Managed Money dan Prod/Swap adalah NORMAL
+			// karena produsen selalu hedge (net short) sementara spekulan beli
+			b.WriteString("🔀 <b>Divergence:</b> Spekulan vs produsen posisi berlawanan\n")
+			b.WriteString("<i>  ℹ️ Untuk komoditas, ini NORMAL — produsen biasanya selalu hedge net short</i>\n")
+		} else {
+			b.WriteString("🔀 <b>Divergence:</b> Smart money vs commercials moving opposite\n")
+		}
 	}
 	if a.CommExtremeBull {
 		b.WriteString("🟢 <b>Commercial COT Extreme LONG</b> (contrarian bullish signal)\n")
@@ -576,23 +583,16 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 				return ""
 			}(),
 			fmtutil.FmtNum(mmNet, 0), mmNetDesc))
-		if mmRatio > 0 {
-			b.WriteString(fmt.Sprintf("<code>  Rasio L/S   : %.2fx lebih banyak %s</code>\n",
-				func() float64 {
-					if mmRatio >= 1 {
-						return mmRatio
-					}
-					if mmShort > 0 && mmLong > 0 {
-						return mmShort / mmLong
-					}
-					return mmRatio
-				}(),
-				func() string {
-					if mmRatio >= 1 {
-						return "beli vs jual"
-					}
-					return "jual vs beli"
-				}()))
+		if mmShort > 0 || mmLong > 0 {
+			if mmRatio >= 1 {
+				b.WriteString(fmt.Sprintf("<code>  Rasio L/S   : %.2fx lebih banyak BELI dari jual</code>\n", mmRatio))
+			} else if mmShort > 0 && mmLong > 0 {
+				b.WriteString(fmt.Sprintf("<code>  Rasio L/S   : %.2fx lebih banyak JUAL dari beli</code>\n", mmShort/mmLong))
+			} else if mmLong == 0 && mmShort > 0 {
+				b.WriteString("<code>  Rasio L/S   : seluruhnya posisi JUAL</code>\n")
+			} else if mmShort == 0 && mmLong > 0 {
+				b.WriteString("<code>  Rasio L/S   : seluruhnya posisi BELI</code>\n")
+			}
 		}
 		b.WriteString(fmt.Sprintf("<i>  → Spekulan sedang %s %s — mereka %s harga naik</i>\n\n",
 			mmNetIcon, mmNetDesc,
@@ -727,8 +727,14 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 		b.WriteString("⚡ <b>BACAAN CEPAT</b>\n")
 		if lfNet > 0 && amNet > 0 {
 			b.WriteString("  🟢 Hedge fund DAN asset manager sama-sama beli — sinyal naik kuat\n")
+			if dlrNet < -50000 {
+				b.WriteString("  ⚠️ Tapi bank/dealer net jual besar — mereka di sisi berlawanan, waspadai reversal\n")
+			}
 		} else if lfNet < 0 && amNet < 0 {
 			b.WriteString("  🔴 Hedge fund DAN asset manager sama-sama jual — sinyal turun kuat\n")
+			if dlrNet > 50000 {
+				b.WriteString("  ⚠️ Tapi bank/dealer net beli besar — mereka di sisi berlawanan, waspadai reversal\n")
+			}
 		} else if lfNet > 0 && amNet < 0 {
 			b.WriteString("  🟡 Hedge fund beli tapi asset manager jual — sinyal campur\n")
 		} else if lfNet < 0 && amNet > 0 {
@@ -2262,14 +2268,43 @@ func (f *Formatter) FormatPriceCOTAlignment(pc *domain.PriceContext, a domain.CO
 
 	b.WriteString("\n🔗 <b>KONFIRMASI HARGA vs COT</b>\n")
 
-	// Both agree
-	if (pc.Trend4W == "UP" && a.COTIndex > 60) || (pc.Trend4W == "DOWN" && a.COTIndex < 40) {
+	cotNeutral := a.COTIndex >= 40 && a.COTIndex <= 60
+	priceFlat := pc.Trend4W == "FLAT"
+
+	switch {
+	// ✅ Harga dan COT sama-sama searah
+	case (pc.Trend4W == "UP" && a.COTIndex > 60) || (pc.Trend4W == "DOWN" && a.COTIndex < 40):
 		b.WriteString("✅ <b>Harga dan posisi institusi SELARAS</b>\n")
 		b.WriteString(fmt.Sprintf("<i>Tren harga %s, dan institusi besar juga %s.\n", priceTrend, cotDir))
-		b.WriteString("Ini adalah sinyal yang lebih dapat dipercaya.</i>\n")
-	} else if pc.Trend4W == "FLAT" || (a.COTIndex >= 40 && a.COTIndex <= 60) {
+		b.WriteString("Ini sinyal lebih dapat dipercaya — momentum kemungkinan berlanjut.</i>\n")
+
+	// ⚪ Harga naik/turun tapi COT netral — sinyal lemah
+	case pc.Trend4W == "UP" && cotNeutral:
+		b.WriteString("🟡 <b>Harga naik tapi institusi masih netral</b>\n")
+		b.WriteString("<i>Harga sedang naik, tapi posisi institusi belum memihak ke atas.\n")
+		b.WriteString("Bisa jadi pergerakan ini belum dikonfirmasi — tunggu COT bergerak ke atas dulu.</i>\n")
+
+	case pc.Trend4W == "DOWN" && cotNeutral:
+		b.WriteString("🟡 <b>Harga turun tapi institusi masih netral</b>\n")
+		b.WriteString("<i>Harga sedang turun, tapi posisi institusi belum memihak ke bawah.\n")
+		b.WriteString("Penurunan belum dikonfirmasi oleh data COT — hati-hati dengan false breakdown.</i>\n")
+
+	// ⚪ COT punya arah tapi harga sideways — institusi menunggu
+	case priceFlat && a.COTIndex > 60:
+		b.WriteString("🟡 <b>Institusi bullish tapi harga masih sideways</b>\n")
+		b.WriteString("<i>Dana besar sudah akumulasi posisi beli, tapi harga belum bergerak naik.\n")
+		b.WriteString("Ini bisa jadi setup sebelum breakout — pantau level resistance.</i>\n")
+
+	case priceFlat && a.COTIndex < 40:
+		b.WriteString("🟡 <b>Institusi bearish tapi harga masih sideways</b>\n")
+		b.WriteString("<i>Dana besar sudah akumulasi posisi jual, tapi harga belum turun.\n")
+		b.WriteString("Bisa jadi distribusi diam-diam — waspadai breakdown ke bawah.</i>\n")
+
+	// ⚪ Semua netral — tidak ada sinyal
+	default:
 		b.WriteString("⚪ <b>Tidak ada sinyal jelas saat ini</b>\n")
-		b.WriteString(fmt.Sprintf("<i>Tren harga %s, posisi institusi %s. Lebih baik tunggu.</i>\n", priceTrend, cotDir))
+		b.WriteString(fmt.Sprintf("<i>Tren harga %s, posisi institusi %s.\n", priceTrend, cotDir))
+		b.WriteString("Sebaiknya tunggu sampai salah satu pihak menunjukkan arah yang jelas.</i>\n")
 	}
 
 	return b.String()
