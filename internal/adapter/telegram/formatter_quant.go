@@ -104,53 +104,114 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 // ---------------------------------------------------------------------------
 
 // FormatCorrelationMatrix formats a correlation matrix for Telegram display.
+// Splits output into FX grid, cross-asset vs FX, and inter-asset correlations.
 func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string {
 	var b strings.Builder
 
 	b.WriteString(fmt.Sprintf("🔗 <b>CORRELATION MATRIX (%d-day)</b>\n\n", m.Period))
 
-	// Show compact matrix for first 8 currencies (FX)
-	maxShow := 8
-	if len(m.Currencies) < maxShow {
-		maxShow = len(m.Currencies)
+	// Categorise currencies into FX vs non-FX.
+	fxSet := map[string]bool{
+		"EUR": true, "GBP": true, "JPY": true, "AUD": true,
+		"NZD": true, "CAD": true, "CHF": true, "USD": true,
 	}
-	shown := m.Currencies[:maxShow]
-
-	// Header row
-	b.WriteString("<code>       ")
-	for _, cur := range shown {
-		b.WriteString(fmt.Sprintf("%-5s", truncLabel(cur, 3)))
+	var fxCurrencies, crossAssets []string
+	for _, cur := range m.Currencies {
+		if fxSet[cur] {
+			fxCurrencies = append(fxCurrencies, cur)
+		} else {
+			crossAssets = append(crossAssets, cur)
+		}
 	}
-	b.WriteString("</code>\n")
 
-	// Matrix rows
-	for _, a := range shown {
-		b.WriteString(fmt.Sprintf("<code>%-6s ", truncLabel(a, 3)))
-		for _, c := range shown {
-			corr := m.Matrix[a][c]
-			b.WriteString(fmt.Sprintf("%+.1f ", corr))
+	// --- FX NxN Grid ---
+	if len(fxCurrencies) > 0 {
+		b.WriteString("<code>       ")
+		for _, cur := range fxCurrencies {
+			b.WriteString(fmt.Sprintf("%-5s", truncLabel(cur, 3)))
 		}
 		b.WriteString("</code>\n")
+		for _, a := range fxCurrencies {
+			b.WriteString(fmt.Sprintf("<code>%-6s ", truncLabel(a, 3)))
+			for _, c := range fxCurrencies {
+				corr := m.Matrix[a][c]
+				b.WriteString(fmt.Sprintf("%+.1f ", corr))
+			}
+			b.WriteString("</code>\n")
+		}
 	}
 
-	// Cross-asset correlations (if more than 8 currencies)
-	if len(m.Currencies) > 8 {
+	// --- Cross-Asset vs FX (top 4 FX pairs) ---
+	if len(crossAssets) > 0 && len(fxCurrencies) >= 4 {
+		topFX := fxCurrencies[:4]
+
+		// Group cross-assets by category for readability.
+		type assetGroup struct {
+			label  string
+			assets []string
+		}
+		groups := []assetGroup{
+			{"Metals", filterPresent(crossAssets, []string{"XAU", "XAG", "COPPER"})},
+			{"Energy", filterPresent(crossAssets, []string{"OIL", "ULSD", "RBOB"})},
+			{"Bonds", filterPresent(crossAssets, []string{"BOND", "BOND30", "BOND5", "BOND2"})},
+			{"Indices", filterPresent(crossAssets, []string{"SPX500", "NDX", "DJI", "RUT"})},
+			{"Crypto", filterPresent(crossAssets, []string{"BTC", "ETH"})},
+		}
+
 		b.WriteString("\n<b>📊 Cross-Asset vs FX</b>\n")
-		for _, asset := range m.Currencies[8:] {
-			var pairs []string
-			for _, fx := range shown[:4] { // Show against top 4 FX
-				if corr, ok := m.Matrix[asset][fx]; ok {
-					icon := corrIcon(corr)
-					pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", fx[:3], corr, icon))
-				}
+		for _, g := range groups {
+			if len(g.assets) == 0 {
+				continue
 			}
-			if len(pairs) > 0 {
-				b.WriteString(fmt.Sprintf("<code>%-7s %s</code>\n", asset, strings.Join(pairs, " ")))
+			b.WriteString(fmt.Sprintf("<i>%s</i>\n", g.label))
+			for _, asset := range g.assets {
+				var pairs []string
+				for _, fx := range topFX {
+					if corr, ok := m.Matrix[asset][fx]; ok {
+						icon := corrIcon(corr)
+						pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", truncLabel(fx, 3), corr, icon))
+					}
+				}
+				if len(pairs) > 0 {
+					b.WriteString(fmt.Sprintf("<code>%-7s %s</code>\n", asset, strings.Join(pairs, " ")))
+				}
 			}
 		}
 	}
 
-	// Breakdowns
+	// --- Inter-Asset Correlations (notable non-FX pairs) ---
+	if len(crossAssets) >= 2 {
+		type corrPair struct {
+			a, b string
+			r    float64
+		}
+		var notable []corrPair
+		for i := 0; i < len(crossAssets); i++ {
+			for j := i + 1; j < len(crossAssets); j++ {
+				a, bb := crossAssets[i], crossAssets[j]
+				if corr, ok := m.Matrix[a][bb]; ok && math.Abs(corr) >= 0.40 {
+					notable = append(notable, corrPair{a, bb, corr})
+				}
+			}
+		}
+		// Sort by absolute correlation descending.
+		sort.Slice(notable, func(i, j int) bool {
+			return math.Abs(notable[i].r) > math.Abs(notable[j].r)
+		})
+		if len(notable) > 0 {
+			b.WriteString("\n<b>🔗 Inter-Asset Correlations (|r| ≥ 0.40)</b>\n")
+			limit := 10
+			if len(notable) < limit {
+				limit = len(notable)
+			}
+			for _, p := range notable[:limit] {
+				icon := corrIcon(p.r)
+				b.WriteString(fmt.Sprintf("<code>%s/%s: %+.2f</code>%s\n", p.a, p.b, p.r, icon))
+			}
+		}
+	}
+
+	// --- Breakdowns ---
 	if len(m.Breakdowns) > 0 {
 		b.WriteString("\n<b>⚠️ Correlation Breakdowns</b>\n")
 		limit := 5
@@ -168,6 +229,21 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 	}
 
 	return b.String()
+}
+
+// filterPresent returns the subset of candidates that exist in available.
+func filterPresent(available, candidates []string) []string {
+	set := make(map[string]bool, len(available))
+	for _, a := range available {
+		set[a] = true
+	}
+	var out []string
+	for _, c := range candidates {
+		if set[c] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // FormatCorrelationClusters formats correlation clusters for display.

@@ -289,23 +289,30 @@ func (ce *CorrelationEngine) DetectClusters(matrix *domain.CorrelationMatrix, th
 
 // clusterName generates a descriptive name based on cluster members.
 func clusterName(members []string) string {
-	hasRisk := false
-	hasSafe := false
+	counts := map[string]int{}
 	for _, m := range members {
 		switch m {
-		case "AUD", "NZD", "CAD", "BTC", "SPX500":
-			hasRisk = true
-		case "JPY", "CHF", "XAU", "BOND":
-			hasSafe = true
+		case "AUD", "NZD", "CAD", "BTC", "ETH", "SPX500", "NDX", "DJI", "RUT":
+			counts["risk"]++
+		case "JPY", "CHF", "XAU", "XAG", "BOND", "BOND30", "BOND5", "BOND2":
+			counts["safe"]++
+		case "OIL", "ULSD", "RBOB":
+			counts["energy"]++
+		case "COPPER":
+			counts["risk"]++ // Copper is a growth/risk proxy
 		}
 	}
-	if hasRisk && !hasSafe {
-		return "Risk-On"
+
+	// Pick dominant theme.
+	best, bestN := "Cluster", 0
+	labels := map[string]string{"risk": "Risk-On", "safe": "Safe-Haven", "energy": "Energy"}
+	for key, n := range counts {
+		if n > bestN {
+			bestN = n
+			best = labels[key]
+		}
 	}
-	if hasSafe && !hasRisk {
-		return "Safe-Haven"
-	}
-	return "Cluster"
+	return best
 }
 
 // --- Math ---

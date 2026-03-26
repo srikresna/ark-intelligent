@@ -37,12 +37,21 @@ type CorrelationCluster struct {
 	AvgCorr    float64  `json:"avg_corr"`   // Average intra-cluster correlation
 }
 
-// DefaultCorrelationCurrencies returns the currencies used for correlation analysis.
-// Includes FX majors + key cross-asset for inter-market correlation.
+// DefaultCorrelationCurrencies returns all monitored assets for correlation analysis.
+// Covers FX majors, metals, energy, bonds, equity indices, and crypto.
 func DefaultCorrelationCurrencies() []string {
 	return []string{
+		// FX Majors
 		"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "USD",
-		"XAU", "OIL", "BTC",
-		"SPX500", "BOND",
+		// Metals
+		"XAU", "XAG", "COPPER",
+		// Energy
+		"OIL", "ULSD", "RBOB",
+		// Bonds (full curve)
+		"BOND", "BOND30", "BOND5", "BOND2",
+		// Equity Indices
+		"SPX500", "NDX", "DJI", "RUT",
+		// Crypto
+		"BTC", "ETH",
 	}
 }
