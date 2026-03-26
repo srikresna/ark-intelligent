@@ -14,8 +14,8 @@ import (
 var bootstrapLog = logger.Component("impact-bootstrap")
 
 // ImpactBootstrapper backfills calendar impact data from MQL5 historical
-// events combined with stored weekly price data.  It fetches up to 3 months
-// of events (previous + current month), filters for HIGH-impact releases
+// events combined with stored weekly price data.  It scrapes up to N months
+// of history (configurable, default 12), filters for HIGH-impact releases
 // that already have an Actual value, and computes a weekly close-to-close
 // price change around each event date.
 //
@@ -27,6 +27,7 @@ type ImpactBootstrapper struct {
 	priceRepo    ports.PriceRepository
 	priceFetcher ports.PriceFetcher
 	impactRepo   *storage.ImpactRepo
+	months       int // how many months to backfill (default 12)
 }
 
 // NewImpactBootstrapper creates a new ImpactBootstrapper.
@@ -38,47 +39,121 @@ func NewImpactBootstrapper(fetcher *MQL5Fetcher, priceRepo ports.PriceRepository
 		priceRepo:    priceRepo,
 		priceFetcher: priceFetcher,
 		impactRepo:   impactRepo,
+		months:       12,
 	}
 }
 
+// SetMonths configures how many months of history to backfill.
+func (ib *ImpactBootstrapper) SetMonths(m int) {
+	if m < 1 {
+		m = 1
+	}
+	if m > 24 {
+		m = 24
+	}
+	ib.months = m
+}
+
 // Bootstrap fetches historical events and backfills impact records.
-// It returns the number of new impact records created.
+// It scrapes MQL5 month by month going back ib.months months,
+// then matches each HIGH-impact event with weekly price data to
+// compute the price reaction. Returns the number of new impact records created.
 func (ib *ImpactBootstrapper) Bootstrap(ctx context.Context) (int, error) {
 	if ib.fetcher == nil || ib.priceRepo == nil || ib.impactRepo == nil {
 		return 0, nil
 	}
 
-	// Collect events from previous and current month.
-	var allEvents []domain.NewsEvent
+	bootstrapLog.Info().Int("months", ib.months).Msg("starting impact bootstrap")
 
-	for _, monthType := range []string{"prev", "current"} {
-		events, err := ib.fetcher.ScrapeMonth(ctx, monthType)
+	// Pre-fetch price data for all contracts to cover the full backfill window.
+	// Add a few extra weeks as buffer for surrounding-price lookup.
+	priceWeeks := ib.months*5 + 4 // ~5 weeks per month + buffer
+	ib.ensurePriceHistory(ctx, priceWeeks)
+
+	// Scrape events month by month, newest first.
+	var totalCreated int
+	now := time.Now().In(wibLocation)
+
+	for i := 0; i < ib.months; i++ {
+		if ctx.Err() != nil {
+			bootstrapLog.Warn().Int("created_so_far", totalCreated).Msg("bootstrap cancelled")
+			break
+		}
+
+		targetMonth := now.AddDate(0, -i, 0)
+		from, to := monthBounds(targetMonth)
+
+		bootstrapLog.Info().
+			Int("month_offset", i).
+			Str("from", from).
+			Str("to", to).
+			Msg("scraping month for impact backfill")
+
+		events, err := ib.fetcher.ScrapeRange(ctx, "1", from, to)
 		if err != nil {
-			bootstrapLog.Warn().Str("month", monthType).Err(err).Msg("failed to scrape month, continuing")
+			bootstrapLog.Warn().Err(err).Int("offset", i).Msg("failed to scrape month, continuing")
+			// Brief pause before retrying next month to avoid hammering MQL5.
+			sleepCtx(ctx, 2*time.Second)
 			continue
 		}
-		allEvents = append(allEvents, events...)
+
+		bootstrapLog.Debug().Int("events", len(events)).Int("offset", i).Msg("month scraped")
+
+		for _, ev := range events {
+			n, procErr := ib.processEvent(ctx, ev)
+			if procErr != nil {
+				bootstrapLog.Warn().Str("event", ev.Event).Str("currency", ev.Currency).Err(procErr).Msg("failed to process event")
+				continue
+			}
+			totalCreated += n
+		}
+
+		// Be respectful to MQL5 — brief pause between months.
+		sleepCtx(ctx, 1*time.Second)
 	}
 
-	if len(allEvents) == 0 {
-		bootstrapLog.Info().Msg("no historical events fetched, nothing to bootstrap")
-		return 0, nil
+	bootstrapLog.Info().Int("impacts_created", totalCreated).Msg("impact bootstrap complete")
+	return totalCreated, nil
+}
+
+// ensurePriceHistory pre-fetches weekly price data for all contracts
+// so that processEvent doesn't need to fetch on-demand for each event.
+func (ib *ImpactBootstrapper) ensurePriceHistory(ctx context.Context, weeks int) {
+	if ib.priceFetcher == nil {
+		return
 	}
 
-	bootstrapLog.Info().Int("total_events", len(allEvents)).Msg("historical events fetched")
+	for _, mapping := range domain.DefaultPriceSymbolMappings {
+		if ctx.Err() != nil {
+			return
+		}
 
-	created := 0
-	for _, ev := range allEvents {
-		n, err := ib.processEvent(ctx, ev)
-		if err != nil {
-			bootstrapLog.Warn().Str("event", ev.Event).Str("currency", ev.Currency).Err(err).Msg("failed to process event")
+		// Check if we already have enough data.
+		existing, err := ib.priceRepo.GetHistory(ctx, mapping.ContractCode, weeks)
+		if err == nil && len(existing) >= weeks/2 {
+			continue // sufficient data already stored
+		}
+
+		bootstrapLog.Debug().
+			Str("contract", mapping.ContractCode).
+			Str("currency", mapping.Currency).
+			Int("weeks", weeks).
+			Msg("fetching historical prices for backfill")
+
+		fetched, fetchErr := ib.priceFetcher.FetchWeekly(ctx, mapping, weeks)
+		if fetchErr != nil {
+			bootstrapLog.Warn().Err(fetchErr).Str("contract", mapping.ContractCode).Msg("price fetch failed, will try on-demand")
 			continue
 		}
-		created += n
-	}
+		if len(fetched) > 0 {
+			if saveErr := ib.priceRepo.SavePrices(ctx, fetched); saveErr != nil {
+				bootstrapLog.Warn().Err(saveErr).Str("contract", mapping.ContractCode).Msg("failed to persist prices")
+			}
+		}
 
-	bootstrapLog.Info().Int("impacts_created", created).Msg("impact bootstrap complete")
-	return created, nil
+		// Brief pause between price API calls.
+		sleepCtx(ctx, 500*time.Millisecond)
+	}
 }
 
 // processEvent handles a single event: filters, checks for duplicates,
@@ -114,23 +189,24 @@ func (ib *ImpactBootstrapper) processEvent(ctx context.Context, ev domain.NewsEv
 		}
 	}
 
-	// Get price history — 12 weeks should cover the window around any event
-	// in the previous/current month.
-	records, err := ib.priceRepo.GetHistory(ctx, mapping.ContractCode, 12)
+	// Get price history — use enough weeks to cover the event's date.
+	weeksNeeded := int(time.Since(ev.TimeWIB).Hours()/168) + 4 // weeks since event + buffer
+	if weeksNeeded < 12 {
+		weeksNeeded = 12
+	}
+
+	records, err := ib.priceRepo.GetHistory(ctx, mapping.ContractCode, weeksNeeded)
 	if err != nil || len(records) < 2 {
-		// Fallback: fetch historical prices on-demand if repo is empty
-		// (common on first boot before the price job has populated the DB).
+		// Fallback: fetch historical prices on-demand if repo is empty.
 		if ib.priceFetcher != nil {
 			bootstrapLog.Debug().
 				Str("contract", mapping.ContractCode).
 				Str("currency", mapping.Currency).
 				Msg("stored price data insufficient, fetching on-demand")
-			fetched, fetchErr := ib.priceFetcher.FetchWeekly(ctx, *mapping, 12)
+			fetched, fetchErr := ib.priceFetcher.FetchWeekly(ctx, *mapping, weeksNeeded)
 			if fetchErr != nil || len(fetched) < 2 {
 				return 0, nil
 			}
-			// Persist fetched prices so subsequent events for the same
-			// contract don't need another API call.
 			if saveErr := ib.priceRepo.SavePrices(ctx, fetched); saveErr != nil {
 				bootstrapLog.Warn().Err(saveErr).Str("contract", mapping.ContractCode).Msg("failed to persist on-demand prices")
 			}
@@ -221,4 +297,31 @@ func (ib *ImpactBootstrapper) findSurroundingPrices(records []domain.PriceRecord
 		}
 	}
 	return
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// monthBounds returns the first and last second of a given month in WIB,
+// formatted as UTC ISO strings for ScrapeRange.
+func monthBounds(t time.Time) (from, to string) {
+	y, m, _ := t.In(wibLocation).Date()
+	firstDay := time.Date(y, m, 1, 0, 0, 0, 0, wibLocation)
+	lastDay := firstDay.AddDate(0, 1, -1)
+	endOfDay := time.Date(lastDay.Year(), lastDay.Month(), lastDay.Day(), 23, 59, 59, 0, wibLocation)
+
+	from = firstDay.UTC().Format("2006-01-02T15:04:05")
+	to = endOfDay.UTC().Format("2006-01-02T15:04:05")
+	return
+}
+
+// sleepCtx sleeps for the given duration, aborting early if ctx is cancelled.
+func sleepCtx(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }

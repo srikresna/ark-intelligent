@@ -237,7 +237,7 @@ func main() {
 		Evaluator:          signalEvaluator,
 		DailyPriceRepo:     dailyPriceRepo,
 		IntradayRepo:       intradayRepo,
-		ImpactBootstrapper: newssvc.NewImpactBootstrapper(newsFetcher, priceRepo, impactRepo, priceFetcher),
+		ImpactBootstrapper: newImpactBootstrapper(newsFetcher, priceRepo, impactRepo, priceFetcher, cfg.ImpactBootstrapMonths),
 		FREDAlertCheck:     authMiddleware.ShouldReceiveFREDAlerts,
 		IsBanned:           authMiddleware.IsUserBanned,
 		OwnerChatID:        ownerChatIDForScheduler(bot.OwnerID()),
@@ -516,4 +516,18 @@ func ownerChatIDForScheduler(ownerID int64) string {
 		return ""
 	}
 	return fmt.Sprintf("%d", ownerID)
+}
+
+// newImpactBootstrapper creates a configured ImpactBootstrapper with the
+// specified number of months to backfill.
+func newImpactBootstrapper(
+	fetcher *newssvc.MQL5Fetcher,
+	priceRepo ports.PriceRepository,
+	impactRepo *storage.ImpactRepo,
+	priceFetcher ports.PriceFetcher,
+	months int,
+) *newssvc.ImpactBootstrapper {
+	ib := newssvc.NewImpactBootstrapper(fetcher, priceRepo, impactRepo, priceFetcher)
+	ib.SetMonths(months)
+	return ib
 }

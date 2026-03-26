@@ -60,6 +60,9 @@ type Config struct {
 
 	// Logging
 	LogLevel string // "debug", "info", "warn", "error"
+
+	// Impact Bootstrap
+	ImpactBootstrapMonths int // How many months of historical events to backfill (default: 12)
 }
 
 // MustLoad loads configuration from environment variables.
@@ -110,6 +113,9 @@ func MustLoad() *Config {
 		CoinGeckoAPIKey:     getEnv("COINGECKO_API_KEY", ""),
 		PriceFetchInterval:  getDuration("PRICE_FETCH_INTERVAL", 6*time.Hour),
 		PriceHistoryWeeks:   getInt("PRICE_HISTORY_WEEKS", 52),
+
+		// Impact Bootstrap
+		ImpactBootstrapMonths: getInt("IMPACT_BOOTSTRAP_MONTHS", 12),
 	}
 
 	cfg.validate()

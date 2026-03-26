@@ -175,7 +175,7 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 			case <-s.stopCh:
 				return
 			}
-			bootstrapCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			bootstrapCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 			defer cancel()
 			created, err := s.deps.ImpactBootstrapper.Bootstrap(bootstrapCtx)
 			if err != nil {
