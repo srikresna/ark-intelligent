@@ -16,9 +16,14 @@ const (
 	AlertSahmClear      AlertType = "SAHM_CLEAR"        // Sahm Rule drops below 0.3
 	AlertFedBalExpand   AlertType = "FED_BAL_EXPAND"    // Fed balance sheet expanding (QE signal)
 	AlertFedBalContract AlertType = "FED_BAL_CONTRACT"  // Fed balance sheet contracting (QT)
-	AlertVIXSpike       AlertType = "VIX_SPIKE"        // VIX crosses above 30
-	AlertVIXCalm        AlertType = "VIX_CALM"         // VIX drops below 15
-	AlertNFPNegative    AlertType = "NFP_NEGATIVE"     // NFP MoM change turns negative
+	AlertVIXSpike         AlertType = "VIX_SPIKE"          // VIX crosses above 30
+	AlertVIXCalm          AlertType = "VIX_CALM"           // VIX drops below 15
+	AlertNFPNegative      AlertType = "NFP_NEGATIVE"       // NFP MoM change turns negative
+	AlertVIXBackwardation AlertType = "VIX_BACKWARDATION"  // VIX term structure enters backwardation
+	AlertVIXContango      AlertType = "VIX_CONTANGO"       // VIX term structure returns to contango
+	AlertLaborWeakening   AlertType = "LABOR_WEAKENING"    // Initial claims or Sahm Rule deterioration
+	AlertCreditStress     AlertType = "CREDIT_STRESS"      // HY OAS (TedSpread) crosses stress threshold
+	AlertCurveUninversion AlertType = "CURVE_UNINVERSION"  // Yield spread crosses from negative to positive
 )
 
 // MacroAlert represents a single triggered macro regime change event.
@@ -236,6 +241,116 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 				Previous: previous.NFPChange,
 			})
 		}
+	}
+
+	// --- 8. VIX Backwardation (term structure stress) ---
+	if current.VIXTermRatio > 0 && previous.VIXTermRatio > 0 {
+		if previous.VIXTermRatio <= 1.0 && current.VIXTermRatio > 1.0 {
+			alerts = append(alerts, MacroAlert{
+				Type:  AlertVIXBackwardation,
+				Title: "🔴 VIX BACKWARDATION — Near-Term Fear Elevated",
+				Description: fmt.Sprintf(
+					"VIX term ratio crossed above 1.0: %.3f (was %.3f). "+
+						"Near-term VIX exceeds longer-term VIX3M, signaling acute market stress. "+
+						"Historically associated with sharp selloffs — risk-off positioning advised.",
+					current.VIXTermRatio, previous.VIXTermRatio),
+				Severity: "HIGH",
+				Value:    current.VIXTermRatio,
+				Previous: previous.VIXTermRatio,
+			})
+		}
+	}
+
+	// --- 9. VIX Contango restored (stress easing) ---
+	if current.VIXTermRatio > 0 && previous.VIXTermRatio > 0 {
+		if previous.VIXTermRatio >= 0.9 && current.VIXTermRatio < 0.9 {
+			alerts = append(alerts, MacroAlert{
+				Type:  AlertVIXContango,
+				Title: "🟢 VIX CONTANGO RESTORED — Stress Easing",
+				Description: fmt.Sprintf(
+					"VIX term ratio dropped below 0.9: %.3f (was %.3f). "+
+						"Normal contango restored — near-term fear subsiding. "+
+						"Risk appetite may recover; constructive for equities and risk FX.",
+					current.VIXTermRatio, previous.VIXTermRatio),
+				Severity: "MEDIUM",
+				Value:    current.VIXTermRatio,
+				Previous: previous.VIXTermRatio,
+			})
+		}
+	}
+
+	// --- 10. Labor Weakening (initial claims surge OR Sahm Rule early warning) ---
+	if current.InitialClaims > 0 && previous.InitialClaims > 0 {
+		// Initial claims crossing above 280K (thousands)
+		if previous.InitialClaims <= 280_000 && current.InitialClaims > 280_000 {
+			alerts = append(alerts, MacroAlert{
+				Type:  AlertLaborWeakening,
+				Title: "🟡 LABOR WEAKENING — Initial Claims Above 280K",
+				Description: fmt.Sprintf(
+					"Initial jobless claims rose above 280K: %.0f (was %.0f). "+
+						"Elevated claims suggest softening labor demand. "+
+						"Monitor for sustained trend — Fed may shift to dovish guidance.",
+					current.InitialClaims, previous.InitialClaims),
+				Severity: "MEDIUM",
+				Value:    current.InitialClaims,
+				Previous: previous.InitialClaims,
+			})
+		}
+	}
+	// Sahm Rule early warning at 0.3 (before the 0.5 recession trigger)
+	if current.SahmRule > 0 && previous.SahmRule > 0 {
+		if previous.SahmRule < 0.3 && current.SahmRule >= 0.3 {
+			alerts = append(alerts, MacroAlert{
+				Type:  AlertLaborWeakening,
+				Title: "🟡 SAHM RULE WARNING — Approaching Recession Threshold",
+				Description: fmt.Sprintf(
+					"Sahm Rule crossed 0.3: %.2f (was %.2f). "+
+						"Approaching the 0.5 recession trigger. "+
+						"Early labor deterioration signal — defensive hedges warranted.",
+					current.SahmRule, previous.SahmRule),
+				Severity: "MEDIUM",
+				Value:    current.SahmRule,
+				Previous: previous.SahmRule,
+			})
+		}
+	}
+
+	// --- 11. Credit Stress (HY OAS crossing above 5.0%) ---
+	if current.TedSpread > 0 && previous.TedSpread > 0 {
+		if previous.TedSpread <= 5.0 && current.TedSpread > 5.0 {
+			alerts = append(alerts, MacroAlert{
+				Type:  AlertCreditStress,
+				Title: "🔴 CREDIT STRESS — HY Spreads Widening",
+				Description: fmt.Sprintf(
+					"High-yield OAS crossed above 5.0%%: %.2f%% (was %.2f%%). "+
+						"Credit markets pricing in rising default risk. "+
+						"Risk-off — safe havens (UST, Gold, JPY) favored over credit and equities.",
+					current.TedSpread, previous.TedSpread),
+				Severity: "HIGH",
+				Value:    current.TedSpread,
+				Previous: previous.TedSpread,
+			})
+		}
+	}
+
+	// --- 12. Curve Un-inversion (yield spread crosses from negative to positive) ---
+	// This is distinct from alert #1 (AlertYieldUninvert) which uses the same crossing
+	// but is framed as a yield curve event. This alert uses AlertCurveUninversion type
+	// and emphasizes the regime-change implications for broader asset allocation.
+	if previous.YieldSpread < 0 && current.YieldSpread > 0 {
+		alerts = append(alerts, MacroAlert{
+			Type:  AlertCurveUninversion,
+			Title: "🟡 CURVE UN-INVERTED — Regime Shift Watch",
+			Description: fmt.Sprintf(
+				"2Y-10Y spread crossed from negative to positive: %.2f%% (was %.2f%%). "+
+					"Un-inversion historically precedes recession onset by 3-6 months. "+
+					"Paradoxically bearish for equities near-term despite positive spread. "+
+					"Monitor labor data and credit spreads for confirmation.",
+				current.YieldSpread, previous.YieldSpread),
+			Severity: "MEDIUM",
+			Value:    current.YieldSpread,
+			Previous: previous.YieldSpread,
+		})
 	}
 
 	return alerts

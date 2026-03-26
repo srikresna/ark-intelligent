@@ -1491,6 +1491,16 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 		htmlMsg := h.fmt.FormatMacroExplain(regime, data)
 		kb := h.kb.MacroDetailMenu()
 		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
+	case "COMPOSITES":
+		composites := fred.ComputeComposites(data)
+		htmlMsg := h.fmt.FormatMacroComposites(composites, data)
+		kb := h.kb.MacroDetailMenu()
+		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
+	case "GLOBAL":
+		composites := fred.ComputeComposites(data)
+		htmlMsg := h.fmt.FormatMacroGlobal(composites, data)
+		kb := h.kb.MacroDetailMenu()
+		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 	}
 
 	// Default: plain-language summary with inline keyboard
@@ -1556,6 +1566,28 @@ func (h *Handler) cbMacro(ctx context.Context, chatID string, msgID int, userID 
 
 	case "performance":
 		return h.macroRegimePerformance(ctx, chatID, msgID)
+
+	case "composites":
+		composites := fred.ComputeComposites(macroData)
+		htmlMsg := h.fmt.FormatMacroComposites(composites, macroData)
+		kb := h.kb.MacroDetailMenu()
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlMsg, kb)
+
+	case "global":
+		composites := fred.ComputeComposites(macroData)
+		htmlMsg := h.fmt.FormatMacroGlobal(composites, macroData)
+		kb := h.kb.MacroDetailMenu()
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlMsg, kb)
+
+	case "labor":
+		// Future: drill-down for labor market depth
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID,
+			"🚧 Labor market deep-dive coming soon.", h.kb.MacroDetailMenu())
+
+	case "inflation":
+		// Future: drill-down for inflation depth
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID,
+			"🚧 Inflation deep-dive coming soon.", h.kb.MacroDetailMenu())
 
 	case "refresh":
 		if !h.requireAdmin(ctx, chatID, userID) {

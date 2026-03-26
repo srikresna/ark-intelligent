@@ -231,8 +231,13 @@ func ComputeConvictionScore(
 // Components:
 //   - COT positioning    (30%) — based on SentimentScore (-100..+100)
 //   - Calendar surprise   (15%) — based on recent sigma surprise
-//   - Macro conditions    (25%) — unified FRED score (replaces separate stress + FRED)
+//   - Macro conditions    (25%) — per-currency macro differential (US vs counterpart)
 //   - Price momentum      (30%) — volatility-normalized MA alignment + momentum + concordance
+//
+// The macro component uses per-country differentials when composite data is available:
+// for non-USD currencies, macro = (US score - counterpart score) / 2, so a positive
+// differential (US stronger) is bullish for USD vs that currency.
+// Falls back to the unified US-centric macro score if composites cannot be computed.
 //
 // Returns a score in [-100, +100]. Positive = bullish bias, negative = bearish bias.
 func ConfluenceScoreV3(
@@ -244,6 +249,24 @@ func ConfluenceScoreV3(
 	cotScore := mathutil.Clamp(analysis.SentimentScore, -100, 100)
 	surpriseScore := mathutil.Clamp(surpriseSigma*20, -100, 100)
 	macroScore := computeMacroComponentScore(macroData)
+
+	// Enhanced macro component: use per-currency differential if composites available
+	if macroData != nil {
+		composites := fred.ComputeComposites(macroData)
+		if composites != nil {
+			currency := analysis.Contract.Currency
+			countryScore := getCountryMacroScore(currency, composites)
+			if currency == "USD" || currency == "DXY" {
+				// For USD index, use US score directly
+				macroScore = mathutil.Clamp(composites.USScore, -100, 100)
+			} else {
+				// Differential: positive = USD stronger than counterpart = bullish for USD pair
+				differential := composites.USScore - countryScore
+				// Normalize differential (-200..+200 range) to -100..+100
+				macroScore = mathutil.Clamp(differential/2, -100, 100)
+			}
+		}
+	}
 
 	// Price momentum component (30%)
 	priceScore := 0.0
@@ -337,6 +360,21 @@ func ComputeConvictionScoreV3(
 	cs.COTComponent = mathutil.Clamp(analysis.SentimentScore, -100, 100)
 	cs.CalendarComponent = mathutil.Clamp(surpriseSigma*20, -100, 100)
 	cs.MacroComponent = computeMacroComponentScore(macroData)
+
+	// Enhanced macro breakdown: use per-currency differential if composites available
+	if macroData != nil {
+		composites := fred.ComputeComposites(macroData)
+		if composites != nil {
+			currency := analysis.Contract.Currency
+			countryScore := getCountryMacroScore(currency, composites)
+			if currency == "USD" || currency == "DXY" {
+				cs.MacroComponent = mathutil.Clamp(composites.USScore, -100, 100)
+			} else {
+				differential := composites.USScore - countryScore
+				cs.MacroComponent = mathutil.Clamp(differential/2, -100, 100)
+			}
+		}
+	}
 	if priceContext != nil {
 		// Recompute price component for breakdown (same logic as V3)
 		maScore := 0.0
@@ -476,6 +514,29 @@ func ConfluenceScoreWithWeights(
 		return mathutil.Clamp(total, -100, 100)
 	}
 	return 0
+}
+
+// getCountryMacroScore returns the macro score for the country associated with
+// a given currency. Used by the per-currency macro differential in V3.
+func getCountryMacroScore(currency string, c *domain.MacroComposites) float64 {
+	switch currency {
+	case "EUR":
+		return c.EZScore
+	case "GBP":
+		return c.UKScore
+	case "JPY":
+		return c.JPScore
+	case "AUD":
+		return c.AUScore
+	case "CAD":
+		return c.CAScore
+	case "NZD":
+		return c.NZScore
+	case "CHF":
+		return c.EZScore // CHF closely tied to Eurozone
+	default:
+		return c.USScore // fallback: no differential
+	}
 }
 
 // buildConvictionResult creates a ConvictionScore from a normalized 0-100 conviction value.

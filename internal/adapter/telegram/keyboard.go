@@ -158,14 +158,20 @@ func (kb *KeyboardBuilder) MacroMenu(isAdmin bool) ports.InlineKeyboard {
 		{Text: "📖 Panduan Indikator", CallbackData: "macro:explain"},
 	})
 
-	// Row 2: Additional views
-	row2 := []ports.InlineButton{
+	// Row 2: Composite scores & global view
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🧮 Composites", CallbackData: "macro:composites"},
+		{Text: "🌍 Global", CallbackData: "macro:global"},
+	})
+
+	// Row 3: Additional views
+	row3 := []ports.InlineButton{
 		{Text: "📈 Performance", CallbackData: "macro:performance"},
 	}
 	if isAdmin {
-		row2 = append(row2, ports.InlineButton{Text: "🔄 Refresh Data", CallbackData: "macro:refresh"})
+		row3 = append(row3, ports.InlineButton{Text: "🔄 Refresh Data", CallbackData: "macro:refresh"})
 	}
-	rows = append(rows, row2)
+	rows = append(rows, row3)
 
 	return ports.InlineKeyboard{Rows: rows}
 }

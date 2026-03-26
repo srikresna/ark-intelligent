@@ -1816,6 +1816,237 @@ func buildRiskBar(score, width int) string {
 	return strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + label
 }
 
+// compositeIcon returns an emoji based on score thresholds.
+// For scores where higher = worse (like credit stress), swap good/bad thresholds.
+func compositeIcon(score, badThreshold, warnThreshold float64) string {
+	if score >= badThreshold {
+		return "🔴"
+	}
+	if score >= warnThreshold {
+		return "⚠️"
+	}
+	return "✅"
+}
+
+// FormatMacroComposites formats the composite scores section for /macro COMPOSITES view.
+func (f *Formatter) FormatMacroComposites(composites *domain.MacroComposites, data *fred.MacroData) string {
+	if composites == nil {
+		return "<b>Composite Scores</b>\n\nNo composite data available. Run /macro to fetch first."
+	}
+
+	var b strings.Builder
+	b.WriteString("<b>📊 MACRO COMPOSITE SCORES</b>\n")
+	b.WriteString(fmt.Sprintf("<i>Computed: %s</i>\n\n", composites.ComputedAt.Format("02 Jan 15:04 WIB")))
+
+	// Labor Health
+	laborIcon := compositeIcon(composites.LaborHealth, 60, 40)
+	b.WriteString(fmt.Sprintf("👷 <b>Labor Health:</b> %.0f/100 %s %s\n", composites.LaborHealth, composites.LaborLabel, laborIcon))
+
+	// Inflation Momentum
+	inflIcon := "→"
+	if composites.InflationMomentum > 0.2 {
+		inflIcon = "↑"
+	} else if composites.InflationMomentum < -0.2 {
+		inflIcon = "↓"
+	}
+	inflEmoji := "✅"
+	if composites.InflationMomentum > 0.5 {
+		inflEmoji = "🔴"
+	} else if composites.InflationMomentum > 0.2 {
+		inflEmoji = "⚠️"
+	}
+	b.WriteString(fmt.Sprintf("🔥 <b>Inflation:</b> %+.2f %s %s %s\n", composites.InflationMomentum, composites.InflationLabel, inflIcon, inflEmoji))
+
+	// Yield Curve
+	curveEmoji := "✅"
+	switch composites.YieldCurveSignal {
+	case "DEEP_INVERSION":
+		curveEmoji = "🔴"
+	case "INVERTED":
+		curveEmoji = "🔴"
+	case "FLAT":
+		curveEmoji = "⚠️"
+	case "STEEP":
+		curveEmoji = "🟢"
+	}
+	b.WriteString(fmt.Sprintf("📈 <b>Yield Curve:</b> %s %s\n", composites.YieldCurveSignal, curveEmoji))
+
+	// Credit Stress
+	creditIcon := compositeIcon(composites.CreditStress, 60, 40)
+	b.WriteString(fmt.Sprintf("💳 <b>Credit Stress:</b> %.0f/100 %s %s\n", composites.CreditStress, composites.CreditLabel, creditIcon))
+
+	// Housing Pulse
+	housingEmoji := "→"
+	switch composites.HousingPulse {
+	case "EXPANDING":
+		housingEmoji = "🟢"
+	case "CONTRACTING":
+		housingEmoji = "⚠️"
+	case "COLLAPSING":
+		housingEmoji = "🔴"
+	case "N/A":
+		housingEmoji = "—"
+	}
+	b.WriteString(fmt.Sprintf("🏠 <b>Housing:</b> %s %s\n", composites.HousingPulse, housingEmoji))
+
+	// Financial Conditions
+	finLabel := "NEUTRAL"
+	finEmoji := "→"
+	if composites.FinConditions > 0.3 {
+		finLabel = "LOOSE"
+		finEmoji = "🟢"
+	} else if composites.FinConditions < -0.3 {
+		finLabel = "TIGHT"
+		finEmoji = "🔴"
+	}
+	b.WriteString(fmt.Sprintf("🏦 <b>Fin. Conditions:</b> %+.2f %s %s\n", composites.FinConditions, finLabel, finEmoji))
+
+	// VIX Term Structure
+	vixEmoji := "✅"
+	if composites.VIXTermRegime == "BACKWARDATION" {
+		vixEmoji = "🔴"
+	} else if composites.VIXTermRegime == "FLAT" {
+		vixEmoji = "⚠️"
+	}
+	if composites.VIXTermRatio > 0 {
+		b.WriteString(fmt.Sprintf("📉 <b>VIX Term:</b> %s (%.2f) %s\n", composites.VIXTermRegime, composites.VIXTermRatio, vixEmoji))
+	} else {
+		b.WriteString(fmt.Sprintf("📉 <b>VIX Term:</b> %s %s\n", composites.VIXTermRegime, vixEmoji))
+	}
+
+	// Sentiment
+	sentEmoji := "🟡"
+	if composites.SentimentComposite > 30 {
+		sentEmoji = "🟢" // fear = contrarian bullish
+	} else if composites.SentimentComposite < -30 {
+		sentEmoji = "🔴" // greed = contrarian bearish
+	}
+	b.WriteString(fmt.Sprintf("🧭 <b>Sentiment:</b> %+.0f %s %s\n", composites.SentimentComposite, composites.SentimentLabel, sentEmoji))
+
+	// Global Macro Comparison
+	b.WriteString("\n<b>🌍 RELATIVE MACRO STRENGTH</b>\n")
+
+	type countryEntry struct {
+		code  string
+		score float64
+	}
+	countries := []countryEntry{
+		{"USD", composites.USScore},
+		{"EUR", composites.EZScore},
+		{"GBP", composites.UKScore},
+		{"JPY", composites.JPScore},
+		{"AUD", composites.AUScore},
+		{"CAD", composites.CAScore},
+		{"NZD", composites.NZScore},
+	}
+
+	// Sort by score descending
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i].score > countries[j].score
+	})
+
+	for i, c := range countries {
+		icon := "🟡"
+		if c.score > 20 {
+			icon = "🟢"
+		} else if c.score < -20 {
+			icon = "🔴"
+		}
+		rank := i + 1
+		b.WriteString(fmt.Sprintf(" %d. %s %s %+.0f\n", rank, icon, c.code, c.score))
+	}
+
+	return b.String()
+}
+
+// FormatMacroGlobal formats the global macro comparison table.
+func (f *Formatter) FormatMacroGlobal(composites *domain.MacroComposites, data *fred.MacroData) string {
+	if composites == nil || data == nil {
+		return "<b>Global Macro</b>\n\nNo data available."
+	}
+
+	var b strings.Builder
+	b.WriteString("<b>🌍 GLOBAL MACRO COMPARISON</b>\n\n")
+
+	type row struct {
+		code  string
+		score float64
+		cpi   float64
+		gdp   float64
+		unemp float64
+		rate  float64
+	}
+
+	rows := []row{
+		{"USD", composites.USScore, data.CorePCE, data.GDPGrowth, data.UnemployRate, data.FedFundsRate},
+		{"EUR", composites.EZScore, data.EZ_CPI, data.EZ_GDP, data.EZ_Unemployment, data.EZ_Rate},
+		{"GBP", composites.UKScore, data.UK_CPI, 0, data.UK_Unemployment, 0},
+		{"JPY", composites.JPScore, data.JP_CPI, 0, data.JP_Unemployment, data.JP_10Y},
+		{"AUD", composites.AUScore, data.AU_CPI, 0, data.AU_Unemployment, 0},
+		{"CAD", composites.CAScore, data.CA_CPI, 0, data.CA_Unemployment, 0},
+		{"NZD", composites.NZScore, data.NZ_CPI, 0, 0, 0},
+	}
+
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-4s %5s  %5s %5s %5s %5s\n", "", "Score", "CPI", "GDP", "Jobs", "Rate"))
+	b.WriteString("─────────────────────────────────\n")
+
+	for _, r := range rows {
+		icon := "🟡"
+		if r.score > 20 {
+			icon = "🟢"
+		} else if r.score < -20 {
+			icon = "🔴"
+		}
+
+		cpiStr := "  — "
+		if r.cpi > 0 {
+			cpiStr = fmt.Sprintf("%4.1f%%", r.cpi)
+		}
+		gdpStr := "  — "
+		if r.gdp != 0 {
+			gdpStr = fmt.Sprintf("%+4.1f%%", r.gdp)
+		}
+		unempStr := "  — "
+		if r.unemp > 0 {
+			unempStr = fmt.Sprintf("%4.1f%%", r.unemp)
+		}
+		rateStr := "  — "
+		if r.rate > 0 {
+			rateStr = fmt.Sprintf("%4.2f", r.rate)
+		}
+
+		b.WriteString(fmt.Sprintf("%s%-3s %+4.0f  %s %s %s %s\n", icon, r.code, r.score, cpiStr, gdpStr, unempStr, rateStr))
+	}
+	b.WriteString("</pre>")
+
+	// Relative strength insight
+	strongest := rows[0]
+	weakest := rows[0]
+	for _, r := range rows {
+		if r.score > strongest.score {
+			strongest = r
+		}
+		if r.score < weakest.score {
+			weakest = r
+		}
+	}
+
+	if strongest.code != weakest.code && strongest.score-weakest.score > 20 {
+		b.WriteString(fmt.Sprintf("\n💡 <b>Relative Strength:</b>\n"))
+		b.WriteString(fmt.Sprintf("%s strongest (%+.0f), %s weakest (%+.0f)\n", strongest.code, strongest.score, weakest.code, weakest.score))
+		if strongest.code == "USD" {
+			b.WriteString(fmt.Sprintf("Supports: %s/%s bearish bias\n", weakest.code, strongest.code))
+		} else if weakest.code == "USD" {
+			b.WriteString(fmt.Sprintf("Supports: %s/%s bullish bias\n", strongest.code, weakest.code))
+		} else {
+			b.WriteString(fmt.Sprintf("Supports: %s strength vs %s\n", strongest.code, weakest.code))
+		}
+	}
+
+	return b.String()
+}
+
 // ---------------------------------------------------------------------------
 // /macro Summary — plain-language narrative for non-finance users
 // ---------------------------------------------------------------------------
