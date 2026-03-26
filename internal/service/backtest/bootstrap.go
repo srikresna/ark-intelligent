@@ -292,10 +292,12 @@ func BackfillCalibration(ctx context.Context, signalRepo ports.SignalRepository)
 		return 0, fmt.Errorf("get all signals: %w", err)
 	}
 
-	// Group evaluated signals by type for Platt fitting
+	// Group evaluated signals by type for Platt fitting.
+	// Exclude EXPIRED — they have no real outcome and would bias calibration
+	// (all EXPIRED would be counted as losses since Outcome1W != OutcomeWin).
 	byType := make(map[string][]domain.PersistedSignal)
 	for _, s := range allSignals {
-		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending {
+		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending && s.Outcome1W != domain.OutcomeExpired {
 			byType[s.SignalType] = append(byType[s.SignalType], s)
 		}
 	}
