@@ -344,71 +344,59 @@ func truncLabel(s string, maxLen int) string {
 // GARCH(1,1) Volatility Forecast Formatter
 // ---------------------------------------------------------------------------
 
-// FormatGARCH formats a GARCH(1,1) result for Telegram display.
+// FormatGARCH formats a GARCH(1,1) result for Telegram display (human-friendly).
 func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string {
 	var b strings.Builder
 
 	fcastIcon := "⚪"
+	fcastLabel := "Stable"
 	switch g.VolForecast {
 	case "INCREASING":
 		fcastIcon = "🔴"
+		fcastLabel = "Getting wilder"
 	case "DECREASING":
 		fcastIcon = "🟢"
+		fcastLabel = "Calming down"
 	}
 
-	b.WriteString(fmt.Sprintf("📊 <b>%s — GARCH(1,1) Volatility</b> %s\n\n", currency, fcastIcon))
+	b.WriteString(fmt.Sprintf("📊 <b>%s — Volatility Forecast</b> %s\n\n", currency, fcastIcon))
 
-	// Convergence status
-	if g.Converged {
-		b.WriteString("<code>✓ Converged</code>\n")
-	} else {
-		b.WriteString("<code>⚠ NOT CONVERGED — estimates may be unreliable</code>\n")
-	}
-	if g.SampleSize > 0 {
-		b.WriteString(fmt.Sprintf("<code>Samples       : %d</code>\n", g.SampleSize))
-	}
-	if g.LogLikelihood != 0 {
-		b.WriteString(fmt.Sprintf("<code>Log-Likelihood: %.4f</code>\n", g.LogLikelihood))
+	// Convergence
+	if !g.Converged {
+		b.WriteString("<code>⚠ Model did not fully converge — take with a grain of salt</code>\n\n")
 	}
 
-	// Model parameters
-	b.WriteString("\n<b>🔧 Model Parameters</b>\n")
-	b.WriteString(fmt.Sprintf("<code>α (shock)     : %.4f</code>\n", g.Alpha))
-	b.WriteString(fmt.Sprintf("<code>β (persistence): %.4f</code>\n", g.Beta))
-	b.WriteString(fmt.Sprintf("<code>α + β         : %.4f</code>\n", g.Persistence))
+	// Main summary (human-readable)
+	b.WriteString("<b>📈 What's happening</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Daily swing    : ±%.2f%%</code>\n", g.CurrentVol*100))
+	b.WriteString(fmt.Sprintf("<code>Normal swing   : ±%.2f%%</code>\n", g.LongRunVol*100))
 
-	// Volatility estimates
-	b.WriteString("\n<b>📈 Volatility Estimates</b>\n")
-	b.WriteString(fmt.Sprintf("<code>Current Vol   : %.4f%% (daily)</code>\n", g.CurrentVol*100))
-	b.WriteString(fmt.Sprintf("<code>Long-Run Vol  : %.4f%% (daily)</code>\n", g.LongRunVol*100))
-	b.WriteString(fmt.Sprintf("<code>Vol Ratio     : %.2fx</code>\n", g.VolRatio))
-
-	// Interpretation
-	ratioText := "at long-run average"
+	ratioText := "around normal"
 	if g.VolRatio > 1.25 {
-		ratioText = "ABOVE average — elevated risk"
+		ratioText = "ABOVE normal — extra caution"
 	} else if g.VolRatio < 0.75 {
-		ratioText = "BELOW average — calm market"
+		ratioText = "BELOW normal — calm market"
 	}
-	b.WriteString(fmt.Sprintf("<code>              → %s</code>\n", ratioText))
+	b.WriteString(fmt.Sprintf("<code>Current vs norm: %.1fx (%s)</code>\n", g.VolRatio, ratioText))
 
 	// Forecast
-	b.WriteString("\n<b>🔮 Forward Forecast</b>\n")
-	b.WriteString(fmt.Sprintf("<code>1-step Vol    : %.4f%%</code>\n", g.ForecastVol1*100))
-	b.WriteString(fmt.Sprintf("<code>5-step Vol    : %.4f%%</code>\n", g.ForecastVol5*100))
-	b.WriteString(fmt.Sprintf("<code>Direction     : %s</code> %s\n", g.VolForecast, fcastIcon))
+	b.WriteString(fmt.Sprintf("\n<b>🔮 Prediction: %s</b> %s\n", fcastLabel, fcastIcon))
+	b.WriteString(fmt.Sprintf("<code>Tomorrow       : ±%.2f%%</code>\n", g.ForecastVol1*100))
+	b.WriteString(fmt.Sprintf("<code>Next week      : ±%.2f%%</code>\n", g.ForecastVol5*100))
 
-	// Confidence impact
+	// Signal impact
 	mult := pricesvc.GARCHConfidenceMultiplier(g)
-	multText := "neutral"
 	if mult < 1.0 {
-		multText = fmt.Sprintf("reduce confidence by %d%%", int((1-mult)*100))
+		b.WriteString(fmt.Sprintf("\n<code>⚠️ High volatility → reduce confidence by %d%%</code>\n", int((1-mult)*100)))
 	} else if mult > 1.0 {
-		multText = fmt.Sprintf("boost confidence by %d%%", int((mult-1)*100))
+		b.WriteString(fmt.Sprintf("\n<code>✅ Low volatility → boost confidence by %d%%</code>\n", int((mult-1)*100)))
+	} else {
+		b.WriteString("\n<code>→ No impact on signal confidence</code>\n")
 	}
-	b.WriteString(fmt.Sprintf("\n<code>Signal Impact : %.2fx (%s)</code>\n", mult, multText))
 
-	b.WriteString("\n<i>GARCH provides forward-looking vol, complementing backward ATR</i>")
+	// Technical details (collapsed feel)
+	b.WriteString(fmt.Sprintf("\n<i>Model: α=%.3f β=%.3f persistence=%.3f | %d samples</i>",
+		g.Alpha, g.Beta, g.Persistence, g.SampleSize))
 
 	return b.String()
 }
@@ -417,62 +405,60 @@ func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string
 // Hurst Exponent Formatter
 // ---------------------------------------------------------------------------
 
-// FormatHurst formats a Hurst exponent result for Telegram display.
+// FormatHurst formats a Hurst exponent result for Telegram display (human-friendly).
 func (f *Formatter) FormatHurst(currency string, h *pricesvc.HurstResult, regime *pricesvc.HurstRegimeContext) string {
 	var b strings.Builder
 
 	icon := "⚪"
+	label := "Random (no clear pattern)"
 	switch h.Classification {
 	case "TRENDING":
 		icon = "📈"
+		label = "Trending — momentum carries forward"
 	case "MEAN_REVERTING":
 		icon = "🔄"
+		label = "Mean-reverting — extremes snap back"
 	}
 
-	b.WriteString(fmt.Sprintf("📐 <b>%s — Hurst Exponent</b> %s\n\n", currency, icon))
+	b.WriteString(fmt.Sprintf("📐 <b>%s — Market Behaviour</b> %s\n\n", currency, icon))
 
-	// Core result
-	b.WriteString("<b>📊 R/S Analysis</b>\n")
-	b.WriteString(fmt.Sprintf("<code>H Exponent    : %.4f</code>\n", h.H))
-	b.WriteString(fmt.Sprintf("<code>Classification: %s</code> %s\n", h.Classification, icon))
-	b.WriteString(fmt.Sprintf("<code>Confidence    : %.1f%%</code>\n", h.Confidence))
-	b.WriteString(fmt.Sprintf("<code>R²            : %.4f</code>\n", h.RSquared))
-	b.WriteString(fmt.Sprintf("<code>Samples       : %d</code>\n", h.SampleSize))
+	// Main result
+	b.WriteString(fmt.Sprintf("<b>Result: %s</b>\n", label))
+	b.WriteString(fmt.Sprintf("<code>Hurst H       : %.3f</code>\n", h.H))
+	b.WriteString(fmt.Sprintf("<code>Confidence    : %.0f%%</code>\n", h.Confidence))
+	b.WriteString(fmt.Sprintf("<code>Fit quality   : %.0f%%</code>\n", h.RSquared*100))
 
-	// Interpretation
-	b.WriteString(fmt.Sprintf("\n<code>%s</code>\n", h.Description))
-
-	// Trading implications
-	b.WriteString("\n<b>💡 Trading Implications</b>\n")
+	// What it means
+	b.WriteString("\n<b>💡 What this means</b>\n")
 	switch h.Classification {
 	case "TRENDING":
-		b.WriteString("<code>→ Momentum/trend-following strategies favored</code>\n")
-		b.WriteString("<code>→ Breakouts more likely to sustain</code>\n")
-		b.WriteString("<code>→ Mean-reversion entries risky</code>\n")
+		b.WriteString("<code>→ Price moves tend to continue in same direction</code>\n")
+		b.WriteString("<code>→ Good for: momentum & trend-following</code>\n")
+		b.WriteString("<code>→ Bad for: buying dips / fading moves</code>\n")
 	case "MEAN_REVERTING":
-		b.WriteString("<code>→ Range-trading & reversion strategies favored</code>\n")
-		b.WriteString("<code>→ Extremes tend to snap back</code>\n")
-		b.WriteString("<code>→ Breakout trades have lower edge</code>\n")
+		b.WriteString("<code>→ Price moves tend to reverse / snap back</code>\n")
+		b.WriteString("<code>→ Good for: range-trading & buying dips</code>\n")
+		b.WriteString("<code>→ Bad for: chasing breakouts</code>\n")
 	default:
-		b.WriteString("<code>→ No clear statistical edge from regime</code>\n")
-		b.WriteString("<code>→ Rely on other signal sources</code>\n")
+		b.WriteString("<code>→ No reliable pattern detected</code>\n")
+		b.WriteString("<code>→ Rely on other signal sources instead</code>\n")
 	}
 
 	// Combined regime (if available)
 	if regime != nil {
-		b.WriteString("\n<b>🔄 Combined Regime (ADX + Hurst)</b>\n")
-		b.WriteString(fmt.Sprintf("<code>ADX Regime    : %s (ADX %.1f)</code>\n", regime.PriceRegime.Regime, regime.PriceRegime.ADX))
-		b.WriteString(fmt.Sprintf("<code>Hurst Regime  : %s</code>\n", regime.HurstRegime))
+		b.WriteString("\n<b>🔄 Cross-check with Price Trend (ADX)</b>\n")
+		b.WriteString(fmt.Sprintf("<code>ADX says      : %s (ADX %.1f)</code>\n", regime.PriceRegime.Regime, regime.PriceRegime.ADX))
+		b.WriteString(fmt.Sprintf("<code>Hurst says    : %s</code>\n", regime.HurstRegime))
 
-		agreeIcon := "✅"
-		agreeText := "AGREE"
-		if !regime.RegimeAgreement {
-			agreeIcon = "⚠️"
-			agreeText = "DISAGREE"
+		if regime.RegimeAgreement {
+			b.WriteString("<code>Agreement     : ✅ Both agree — high confidence</code>\n")
+		} else {
+			b.WriteString("<code>Agreement     : ⚠️ Disagree — mixed signals</code>\n")
 		}
-		b.WriteString(fmt.Sprintf("<code>Agreement     : %s</code> %s\n", agreeText, agreeIcon))
-		b.WriteString(fmt.Sprintf("<code>Combined Conf : %.1f%%</code>\n", regime.CombinedConfidence))
+		b.WriteString(fmt.Sprintf("<code>Combined conf : %.0f%%</code>\n", regime.CombinedConfidence))
 	}
+
+	b.WriteString(fmt.Sprintf("\n<i>Based on %d daily samples</i>", h.SampleSize))
 
 	return b.String()
 }
@@ -481,58 +467,69 @@ func (f *Formatter) FormatHurst(currency string, h *pricesvc.HurstResult, regime
 // HMM Regime-Switching Formatter
 // ---------------------------------------------------------------------------
 
-// FormatHMMRegime formats an HMM regime result for Telegram display.
+// FormatHMMRegime formats an HMM regime result for Telegram display (human-friendly).
 func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) string {
 	var b strings.Builder
 
 	if h == nil {
-		b.WriteString(fmt.Sprintf("🔀 <b>%s — HMM Regime Model</b>\n\n", currency))
-		b.WriteString("<code>Transition matrix unavailable</code>\n")
+		b.WriteString(fmt.Sprintf("🔀 <b>%s — Market Regime</b>\n\n", currency))
+		b.WriteString("<code>Not enough data to detect regime</code>\n")
 		return b.String()
 	}
 
 	icon := "⚪"
+	label := "Unknown"
+	desc := ""
 	switch h.CurrentState {
 	case pricesvc.HMMRiskOn:
 		icon = "🟢"
+		label = "Risk-On (Calm)"
+		desc = "Market is in a calm, confident phase. Trends tend to be reliable."
 	case pricesvc.HMMRiskOff:
 		icon = "🟡"
+		label = "Risk-Off (Cautious)"
+		desc = "Market is getting defensive. Expect choppy action, reduce exposure."
 	case pricesvc.HMMCrisis:
 		icon = "🔴"
+		label = "Crisis (Panic)"
+		desc = "Market is in stress mode. Correlations spike, safe havens outperform."
 	}
 
-	b.WriteString(fmt.Sprintf("🔀 <b>%s — HMM Regime Model</b> %s\n\n", currency, icon))
+	b.WriteString(fmt.Sprintf("🔀 <b>%s — Market Regime</b> %s\n\n", currency, icon))
 
-	// Current state
-	b.WriteString("<b>📊 Current Regime</b>\n")
-	b.WriteString(fmt.Sprintf("<code>State     : %s</code> %s\n", h.CurrentState, icon))
-	b.WriteString(fmt.Sprintf("<code>P(Risk-On): %.1f%%</code>\n", h.StateProbabilities[0]*100))
-	b.WriteString(fmt.Sprintf("<code>P(Risk-Of): %.1f%%</code>\n", h.StateProbabilities[1]*100))
-	b.WriteString(fmt.Sprintf("<code>P(Crisis) : %.1f%%</code>\n", h.StateProbabilities[2]*100))
-	b.WriteString(fmt.Sprintf("<code>Samples   : %d</code>\n", h.SampleSize))
-	b.WriteString(fmt.Sprintf("<code>Converged : %v (%d iter)</code>\n", h.Converged, h.Iterations))
+	// Main result
+	b.WriteString(fmt.Sprintf("<b>Current: %s</b>\n", label))
+	b.WriteString(fmt.Sprintf("<code>%s</code>\n", desc))
+
+	// Probabilities in plain language
+	b.WriteString("\n<b>📊 How certain?</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Calm   : %.0f%%</code>\n", h.StateProbabilities[0]*100))
+	b.WriteString(fmt.Sprintf("<code>Cautious: %.0f%%</code>\n", h.StateProbabilities[1]*100))
+	b.WriteString(fmt.Sprintf("<code>Panic  : %.0f%%</code>\n", h.StateProbabilities[2]*100))
 
 	// Transition warning
 	if h.TransitionWarning != "" {
 		b.WriteString(fmt.Sprintf("\n⚠️ <b>%s</b>\n", h.TransitionWarning))
 	}
 
-	// Transition matrix
-	b.WriteString("\n<b>🔄 Transition Probabilities</b>\n")
-	labels := []string{"R_ON", "R_OF", "CRIS"}
-	b.WriteString("<code>        R_ON  R_OF  CRIS</code>\n")
-	for i, label := range labels {
-		b.WriteString(fmt.Sprintf("<code>%-5s  %.2f  %.2f  %.2f</code>\n",
-			label,
-			h.TransitionMatrix[i][0],
-			h.TransitionMatrix[i][1],
-			h.TransitionMatrix[i][2],
-		))
+	// Trading impact
+	b.WriteString("\n<b>💡 What to do</b>\n")
+	mult := pricesvc.HMMConfidenceMultiplier(h)
+	switch h.CurrentState {
+	case pricesvc.HMMRiskOn:
+		b.WriteString("<code>→ Trade normally, trends are reliable</code>\n")
+	case pricesvc.HMMRiskOff:
+		b.WriteString("<code>→ Reduce position sizes by 10%</code>\n")
+		b.WriteString("<code>→ Prefer defensive signals</code>\n")
+	case pricesvc.HMMCrisis:
+		b.WriteString("<code>→ Reduce position sizes by 30%</code>\n")
+		b.WriteString("<code>→ Focus on safe havens (JPY, CHF, XAU)</code>\n")
 	}
+	b.WriteString(fmt.Sprintf("<code>Signal multiplier: %.2fx</code>\n", mult))
 
-	// Recent Viterbi path
+	// Recent state path (visual)
 	if len(h.ViterbiPath) > 0 {
-		b.WriteString("\n<b>📈 Recent State Path</b>\n<code>")
+		b.WriteString("\n<b>📈 Recent Path</b>\n<code>")
 		for i, state := range h.ViterbiPath {
 			if i > 0 && i%5 == 0 {
 				b.WriteString(" ")
@@ -549,24 +546,14 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 			}
 		}
 		b.WriteString("</code>\n")
-		b.WriteString("<code>● Risk-On  ○ Risk-Off  ✕ Crisis</code>\n")
+		b.WriteString("<code>● Calm  ○ Cautious  ✕ Panic</code>\n")
 	}
 
-	// Trading implications
-	b.WriteString("\n<b>💡 Trading Implications</b>\n")
-	mult := pricesvc.HMMConfidenceMultiplier(h)
-	switch h.CurrentState {
-	case pricesvc.HMMRiskOn:
-		b.WriteString("<code>→ Trend-following signals more reliable</code>\n")
-		b.WriteString("<code>→ Wider position sizing acceptable</code>\n")
-	case pricesvc.HMMRiskOff:
-		b.WriteString("<code>→ Reduce position sizes by 10%</code>\n")
-		b.WriteString("<code>→ Prefer defensive/hedge signals</code>\n")
-	case pricesvc.HMMCrisis:
-		b.WriteString("<code>→ Reduce position sizes by 30%</code>\n")
-		b.WriteString("<code>→ Avoid trend trades, prefer safe havens</code>\n")
+	// Technical footnote
+	if !h.Converged {
+		b.WriteString("\n<i>⚠ Model not fully converged — take with caution</i>")
 	}
-	b.WriteString(fmt.Sprintf("<code>Signal multiplier: %.2fx</code>\n", mult))
+	b.WriteString(fmt.Sprintf("\n<i>%d samples, %d iterations</i>", h.SampleSize, h.Iterations))
 
 	return b.String()
 }

@@ -12,6 +12,24 @@ import (
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 )
 
+// overviewAssetGroup defines a labelled group of assets for overview displays.
+type overviewAssetGroup struct {
+	label  string
+	assets []string
+}
+
+// overviewGroups returns all monitored assets grouped by category.
+func overviewGroups() []overviewAssetGroup {
+	return []overviewAssetGroup{
+		{"FX Majors", []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"}},
+		{"Metals", []string{"XAU", "XAG", "COPPER"}},
+		{"Energy", []string{"OIL", "ULSD", "RBOB"}},
+		{"Bonds", []string{"BOND", "BOND30", "BOND5", "BOND2"}},
+		{"Indices", []string{"SPX500", "NDX", "DJI", "RUT"}},
+		{"Crypto", []string{"BTC", "ETH"}},
+	}
+}
+
 // cmdCorr handles /corr — cross-pair correlation matrix.
 func (h *Handler) cmdCorr(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.dailyPriceRepo == nil {
@@ -105,58 +123,63 @@ func (h *Handler) cmdIntraday(ctx context.Context, chatID string, userID int64, 
 	return h.intradayDetail(ctx, chatID, mapping)
 }
 
-// intradayOverview shows a quick 4H snapshot of key instruments.
+// intradayOverview shows a quick 4H snapshot of all monitored instruments.
 func (h *Handler) intradayOverview(ctx context.Context, chatID string) error {
 	builder := pricesvc.NewIntradayContextBuilder(h.intradayRepo)
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
-	var lines []string
+	var sections []string
 	skipped := 0
 
-	for _, cur := range currencies {
-		mapping := domain.FindPriceMappingByCurrency(cur)
-		if mapping == nil {
-			skipped++
-			continue
-		}
-		ic, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
-		if err != nil {
-			skipped++
-			continue
-		}
+	for _, group := range overviewGroups() {
+		var lines []string
+		for _, cur := range group.assets {
+			mapping := domain.FindPriceMappingByCurrency(cur)
+			if mapping == nil {
+				skipped++
+				continue
+			}
+			ic, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
+			if err != nil {
+				skipped++
+				continue
+			}
 
-		arrow := "→"
-		if ic.Chg4H > 0 {
-			arrow = "▲"
-		} else if ic.Chg4H < 0 {
-			arrow = "▼"
-		}
+			arrow := "→"
+			if ic.Chg4H > 0 {
+				arrow = "▲"
+			} else if ic.Chg4H < 0 {
+				arrow = "▼"
+			}
 
-		trend := ic.IntradayMATrend()
-		trendIcon := "⚪"
-		switch trend {
-		case "BULLISH":
-			trendIcon = "🟢"
-		case "BEARISH":
-			trendIcon = "🔴"
-		}
+			trend := ic.IntradayMATrend()
+			trendIcon := "⚪"
+			switch trend {
+			case "BULLISH":
+				trendIcon = "🟢"
+			case "BEARISH":
+				trendIcon = "🔴"
+			}
 
-		lines = append(lines, fmt.Sprintf(
-			"<code>%-6s %+.2f%% 24h:%+.2f%%</code> %s %s",
-			ic.Currency, ic.Chg4H, ic.Chg24H, arrow, trendIcon,
-		))
+			lines = append(lines, fmt.Sprintf(
+				"<code>%-7s %+.2f%% 24h:%+.2f%%</code> %s %s",
+				ic.Currency, ic.Chg4H, ic.Chg24H, arrow, trendIcon,
+			))
+		}
+		if len(lines) > 0 {
+			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+		}
 	}
 
-	if len(lines) == 0 {
+	if len(sections) == 0 {
 		_, err := h.bot.SendHTML(ctx, chatID, "No intraday data available yet. 4H data is fetched every 4 hours.")
 		return err
 	}
 
 	msg := "⏰ <b>4H INTRADAY OVERVIEW</b>\n\n" +
-		strings.Join(lines, "\n") +
+		strings.Join(sections, "\n\n") +
 		"\n\n<i>Use</i> <code>/intraday EUR</code> <i>for detailed view</i>"
 	if skipped > 0 {
-		msg += fmt.Sprintf("\n\n⚠️ %d instruments unavailable (insufficient data)", skipped)
+		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
 	}
 
 	_, err := h.bot.SendHTML(ctx, chatID, msg)
@@ -204,61 +227,75 @@ func (h *Handler) cmdGarch(ctx context.Context, chatID string, userID int64, arg
 	return h.garchDetail(ctx, chatID, mapping)
 }
 
-// garchOverview shows GARCH vol forecast for key instruments.
+// garchOverview shows GARCH vol forecast for all monitored instruments.
 func (h *Handler) garchOverview(ctx context.Context, chatID string) error {
 	if h.dailyPriceRepo == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
-	var lines []string
+	var sections []string
 	skipped := 0
 
-	for _, cur := range currencies {
-		mapping := domain.FindPriceMappingByCurrency(cur)
-		if mapping == nil {
-			skipped++
-			continue
-		}
-		prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-		if err != nil || len(prices) < 30 {
-			skipped++
-			continue
-		}
+	for _, group := range overviewGroups() {
+		var lines []string
+		for _, cur := range group.assets {
+			mapping := domain.FindPriceMappingByCurrency(cur)
+			if mapping == nil {
+				skipped++
+				continue
+			}
+			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
+			if err != nil || len(prices) < 30 {
+				skipped++
+				continue
+			}
 
-		records := dailyToPriceRecords(prices)
-		garch, err := pricesvc.EstimateGARCH(records)
-		if err != nil {
-			skipped++
-			continue
-		}
+			records := dailyToPriceRecords(prices)
+			garch, err := pricesvc.EstimateGARCH(records)
+			if err != nil {
+				skipped++
+				continue
+			}
 
-		icon := "⚪"
-		switch garch.VolForecast {
-		case "INCREASING":
-			icon = "🔴"
-		case "DECREASING":
-			icon = "🟢"
-		}
+			icon := "⚪"
+			switch garch.VolForecast {
+			case "INCREASING":
+				icon = "🔴"
+			case "DECREASING":
+				icon = "🟢"
+			}
 
-		lines = append(lines, fmt.Sprintf(
-			"<code>%-6s Vol:%.4f%% Fwd:%.4f%% R:%.2f</code> %s",
-			cur, garch.CurrentVol*100, garch.ForecastVol1*100, garch.VolRatio, icon,
-		))
+			// Human-friendly: show daily vol %, forecast direction, and ratio vs average
+			ratioLabel := "avg"
+			if garch.VolRatio > 1.25 {
+				ratioLabel = "HIGH"
+			} else if garch.VolRatio < 0.75 {
+				ratioLabel = "LOW"
+			}
+
+			lines = append(lines, fmt.Sprintf(
+				"<code>%-7s %.2f%%/day → %.2f%% (%s)</code> %s",
+				cur, garch.CurrentVol*100, garch.ForecastVol1*100, ratioLabel, icon,
+			))
+		}
+		if len(lines) > 0 {
+			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+		}
 	}
 
-	if len(lines) == 0 {
+	if len(sections) == 0 {
 		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for GARCH estimation (need ≥30 daily bars).")
 		return err
 	}
 
-	msg := "📊 <b>GARCH(1,1) VOLATILITY FORECAST</b>\n\n" +
-		strings.Join(lines, "\n") +
-		"\n\n🔴 Increasing  ⚪ Stable  🟢 Decreasing\n" +
+	msg := "📊 <b>VOLATILITY FORECAST</b>\n" +
+		"<i>How wild prices move today → predicted tomorrow</i>\n\n" +
+		strings.Join(sections, "\n\n") +
+		"\n\n🔴 Getting wilder  ⚪ Stable  🟢 Calming down\n" +
 		"<i>Use</i> <code>/garch EUR</code> <i>for detailed view</i>"
 	if skipped > 0 {
-		msg += fmt.Sprintf("\n\n⚠️ %d instruments unavailable (insufficient data)", skipped)
+		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
 	}
 
 	_, err := h.bot.SendHTML(ctx, chatID, msg)
@@ -317,61 +354,70 @@ func (h *Handler) cmdHurst(ctx context.Context, chatID string, userID int64, arg
 	return h.hurstDetail(ctx, chatID, mapping)
 }
 
-// hurstOverview shows Hurst exponent for key instruments.
+// hurstOverview shows Hurst exponent for all monitored instruments.
 func (h *Handler) hurstOverview(ctx context.Context, chatID string) error {
 	if h.dailyPriceRepo == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
-	var lines []string
+	var sections []string
 	skipped := 0
 
-	for _, cur := range currencies {
-		mapping := domain.FindPriceMappingByCurrency(cur)
-		if mapping == nil {
-			skipped++
-			continue
-		}
-		prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 200)
-		if err != nil || len(prices) < 50 {
-			skipped++
-			continue
-		}
+	for _, group := range overviewGroups() {
+		var lines []string
+		for _, cur := range group.assets {
+			mapping := domain.FindPriceMappingByCurrency(cur)
+			if mapping == nil {
+				skipped++
+				continue
+			}
+			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 200)
+			if err != nil || len(prices) < 50 {
+				skipped++
+				continue
+			}
 
-		records := dailyToPriceRecords(prices)
-		hurst, err := pricesvc.ComputeHurstExponent(records)
-		if err != nil {
-			skipped++
-			continue
-		}
+			records := dailyToPriceRecords(prices)
+			hurst, err := pricesvc.ComputeHurstExponent(records)
+			if err != nil {
+				skipped++
+				continue
+			}
 
-		icon := "⚪"
-		switch hurst.Classification {
-		case "TRENDING":
-			icon = "📈"
-		case "MEAN_REVERTING":
-			icon = "🔄"
-		}
+			icon := "⚪"
+			label := "Random"
+			switch hurst.Classification {
+			case "TRENDING":
+				icon = "📈"
+				label = "Trending"
+			case "MEAN_REVERTING":
+				icon = "🔄"
+				label = "Reverting"
+			}
 
-		lines = append(lines, fmt.Sprintf(
-			"<code>%-6s H=%.3f %-15s R²=%.2f</code> %s",
-			cur, hurst.H, hurst.Classification, hurst.RSquared, icon,
-		))
+			lines = append(lines, fmt.Sprintf(
+				"<code>%-7s H=%.2f %-9s</code> %s",
+				cur, hurst.H, label, icon,
+			))
+		}
+		if len(lines) > 0 {
+			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+		}
 	}
 
-	if len(lines) == 0 {
+	if len(sections) == 0 {
 		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for Hurst estimation (need ≥50 daily bars).")
 		return err
 	}
 
-	msg := "📐 <b>HURST EXPONENT — REGIME ANALYSIS</b>\n\n" +
-		strings.Join(lines, "\n") +
-		"\n\n📈 Trending  ⚪ Random Walk  🔄 Mean-Reverting\n" +
+	msg := "📐 <b>MARKET BEHAVIOUR</b>\n" +
+		"<i>Is each market trending or bouncing back?</i>\n\n" +
+		strings.Join(sections, "\n\n") +
+		"\n\n📈 Trending (follow momentum)  🔄 Reverting (fades back)  ⚪ Random\n" +
 		"<i>Use</i> <code>/hurst EUR</code> <i>for detailed view</i>"
 	if skipped > 0 {
-		msg += fmt.Sprintf("\n\n⚠️ %d instruments unavailable (insufficient data)", skipped)
+		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
 	}
 
 	_, err := h.bot.SendHTML(ctx, chatID, msg)
@@ -452,70 +498,80 @@ func (h *Handler) cmdRegime(ctx context.Context, chatID string, userID int64, ar
 	return h.regimeDetail(ctx, chatID, mapping)
 }
 
-// regimeOverview shows HMM regime for key instruments.
+// regimeOverview shows HMM regime for all monitored instruments.
 func (h *Handler) regimeOverview(ctx context.Context, chatID string) error {
 	if h.dailyPriceRepo == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
 		return err
 	}
 
-	currencies := []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "XAU", "XAG", "OIL", "BTC", "ETH", "SPX500"}
-	var lines []string
+	var sections []string
 	skipped := 0
 
-	for _, cur := range currencies {
-		mapping := domain.FindPriceMappingByCurrency(cur)
-		if mapping == nil {
-			skipped++
-			continue
-		}
-		prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-		if err != nil || len(prices) < 60 {
-			skipped++
-			continue
-		}
+	for _, group := range overviewGroups() {
+		var lines []string
+		for _, cur := range group.assets {
+			mapping := domain.FindPriceMappingByCurrency(cur)
+			if mapping == nil {
+				skipped++
+				continue
+			}
+			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
+			if err != nil || len(prices) < 60 {
+				skipped++
+				continue
+			}
 
-		records := dailyToPriceRecords(prices)
-		hmm, err := pricesvc.EstimateHMMRegime(records)
-		if err != nil {
-			skipped++
-			continue
-		}
+			records := dailyToPriceRecords(prices)
+			hmm, err := pricesvc.EstimateHMMRegime(records)
+			if err != nil {
+				skipped++
+				continue
+			}
 
-		icon := "⚪"
-		switch hmm.CurrentState {
-		case pricesvc.HMMRiskOn:
-			icon = "🟢"
-		case pricesvc.HMMRiskOff:
-			icon = "🟡"
-		case pricesvc.HMMCrisis:
-			icon = "🔴"
-		}
+			icon := "⚪"
+			label := "Unknown"
+			switch hmm.CurrentState {
+			case pricesvc.HMMRiskOn:
+				icon = "🟢"
+				label = "Risk-On"
+			case pricesvc.HMMRiskOff:
+				icon = "🟡"
+				label = "Risk-Off"
+			case pricesvc.HMMCrisis:
+				icon = "🔴"
+				label = "Crisis"
+			}
 
-		warning := ""
-		if hmm.TransitionWarning != "" {
-			warning = " ⚠️"
-		}
+			warning := ""
+			if hmm.TransitionWarning != "" {
+				warning = " ⚠️"
+			}
 
-		lines = append(lines, fmt.Sprintf(
-			"<code>%-6s %-9s P:%.0f%%</code> %s%s",
-			cur, hmm.CurrentState,
-			hmm.StateProbabilities[stateIndex(hmm.CurrentState)]*100,
-			icon, warning,
-		))
+			lines = append(lines, fmt.Sprintf(
+				"<code>%-7s %-8s P:%.0f%%</code> %s%s",
+				cur, label,
+				hmm.StateProbabilities[stateIndex(hmm.CurrentState)]*100,
+				icon, warning,
+			))
+		}
+		if len(lines) > 0 {
+			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+		}
 	}
 
-	if len(lines) == 0 {
+	if len(sections) == 0 {
 		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for HMM regime estimation (need ≥60 daily bars).")
 		return err
 	}
 
-	msg := "🔀 <b>HMM REGIME-SWITCHING MODEL</b>\n\n" +
-		strings.Join(lines, "\n") +
-		"\n\n🟢 Risk-On  🟡 Risk-Off  🔴 Crisis  ⚠️ Transition\n" +
+	msg := "🔀 <b>MARKET REGIME</b>\n" +
+		"<i>Is each market in calm, cautious, or panic mode?</i>\n\n" +
+		strings.Join(sections, "\n\n") +
+		"\n\n🟢 Risk-On (calm)  🟡 Risk-Off (cautious)  🔴 Crisis (panic)  ⚠️ Shifting\n" +
 		"<i>Use</i> <code>/regime EUR</code> <i>for detailed view</i>"
 	if skipped > 0 {
-		msg += fmt.Sprintf("\n\n⚠️ %d instruments unavailable (insufficient data)", skipped)
+		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
 	}
 
 	_, err := h.bot.SendHTML(ctx, chatID, msg)
