@@ -2033,7 +2033,7 @@ func (f *Formatter) FormatMacroGlobal(composites *domain.MacroComposites, data *
 	}
 
 	if strongest.code != weakest.code && strongest.score-weakest.score > 20 {
-		b.WriteString(fmt.Sprintf("\n💡 <b>Relative Strength:</b>\n"))
+		b.WriteString("\n💡 <b>Relative Strength:</b>\n")
 		b.WriteString(fmt.Sprintf("%s strongest (%+.0f), %s weakest (%+.0f)\n", strongest.code, strongest.score, weakest.code, weakest.score))
 		if strongest.code == "USD" {
 			b.WriteString(fmt.Sprintf("Supports: %s/%s bearish bias\n", weakest.code, strongest.code))

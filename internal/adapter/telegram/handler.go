@@ -85,6 +85,10 @@ type Handler struct {
 	// Used by /outlook when the user's PreferredModel is "claude".
 	// May be nil if Claude is not configured.
 	claudeAnalyzer *aisvc.ClaudeAnalyzer
+
+	// alpha holds optional Factor/Strategy/Microstructure engine services.
+	// May be nil — all alpha commands degrade gracefully.
+	alpha *AlphaServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.

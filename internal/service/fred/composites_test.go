@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// tolerance for float comparison
-const eps = 1e-6
-
 func approxEqual(a, b, tolerance float64) bool {
 	return math.Abs(a-b) <= tolerance
 }

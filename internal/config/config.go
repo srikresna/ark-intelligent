@@ -67,6 +67,28 @@ type Config struct {
 
 	// Impact Bootstrap
 	ImpactBootstrapMonths int // How many months of historical events to backfill (default: 12)
+
+	// Massive API (formerly Polygon.io) — multiple keys for rotation (free tier)
+	MassiveAPIKeys     []string // rotating REST API keys (comma-separated: MASSIVE_API_KEYS)
+	MassiveWSBase      string   // WebSocket base URL (default: wss://socket.massive.com)
+	MassiveRestBase    string   // REST base URL (default: https://api.massive.com)
+	MassiveS3Endpoint  string   // Flat Files S3 endpoint (default: https://files.massive.com)
+	MassiveS3AccessKey string   // Flat Files S3 access key
+	MassiveS3SecretKey string   // Flat Files S3 secret key
+
+	// Bybit API (crypto microstructure)
+	BybitAPIKey    string // Bybit API key (optional - some endpoints are public)
+	BybitAPISecret string // Bybit API secret
+	BybitTestnet   bool   // Use testnet (default: false)
+	BybitRestBase  string // REST base URL (derived from BybitTestnet; default: https://api.bybit.com)
+	BybitWSBase    string // WebSocket base URL (default: wss://stream.bybit.com/v5/public/linear)
+
+	// Feature flags
+	EnableBybitMicrostructure bool // Enable Bybit crypto microstructure module (default: true if BybitAPIKey set)
+	EnableMassiveResearch     bool // Enable Massive historical research layer (default: true if MassiveAPIKeys set)
+	EnableFactorEngine        bool // Enable cross-sectional factor ranking engine (default: true)
+	EnableStrategyPlaybook    bool // Enable regime playbook + conviction engine (default: true)
+	EnablePortfolioHeat       bool // Enable portfolio exposure heat engine (default: true)
 }
 
 // MustLoad loads configuration from environment variables.
@@ -124,6 +146,19 @@ func MustLoad() *Config {
 
 		// Impact Bootstrap
 		ImpactBootstrapMonths: getInt("IMPACT_BOOTSTRAP_MONTHS", 12),
+
+		// Massive API
+		MassiveAPIKeys:     getStringSlice("MASSIVE_API_KEYS"),
+		MassiveWSBase:      getEnv("MASSIVE_WS_BASE", "wss://socket.massive.com"),
+		MassiveRestBase:    getEnv("MASSIVE_REST_BASE", "https://api.massive.com"),
+		MassiveS3Endpoint:  getEnv("MASSIVE_S3_ENDPOINT", "https://files.massive.com"),
+		MassiveS3AccessKey: getEnv("MASSIVE_S3_ACCESS_KEY", ""),
+		MassiveS3SecretKey: getEnv("MASSIVE_S3_SECRET_KEY", ""),
+
+		// Bybit API
+		BybitAPIKey:    getEnv("BYBIT_API_KEY", ""),
+		BybitAPISecret: getEnv("BYBIT_API_SECRET", ""),
+		BybitTestnet:   getBool("BYBIT_TESTNET", false),
 	}
 
 	// Backward compat: TWELVE_DATA_API_KEY (singular) works for single key
@@ -132,6 +167,29 @@ func MustLoad() *Config {
 			cfg.TwelveDataAPIKeys = []string{single}
 		}
 	}
+
+	// Backward compat: MASSIVE_API_KEY (singular) works too
+	if len(cfg.MassiveAPIKeys) == 0 {
+		if single := getEnv("MASSIVE_API_KEY", ""); single != "" {
+			cfg.MassiveAPIKeys = []string{single}
+		}
+	}
+
+	// Compute Bybit base URLs from testnet flag
+	if cfg.BybitTestnet {
+		cfg.BybitRestBase = "https://api-testnet.bybit.com"
+		cfg.BybitWSBase = "wss://stream-testnet.bybit.com/v5/public/linear"
+	} else {
+		cfg.BybitRestBase = "https://api.bybit.com"
+		cfg.BybitWSBase = "wss://stream.bybit.com/v5/public/linear"
+	}
+
+	// Feature flags (auto-detect from API key presence, overridable via env)
+	cfg.EnableBybitMicrostructure = cfg.BybitAPIKey != "" || getEnv("ENABLE_BYBIT_MICROSTRUCTURE", "") == "true"
+	cfg.EnableMassiveResearch = len(cfg.MassiveAPIKeys) > 0 || getEnv("ENABLE_MASSIVE_RESEARCH", "") == "true"
+	cfg.EnableFactorEngine = getBool("ENABLE_FACTOR_ENGINE", true)
+	cfg.EnableStrategyPlaybook = getBool("ENABLE_STRATEGY_PLAYBOOK", true)
+	cfg.EnablePortfolioHeat = getBool("ENABLE_PORTFOLIO_HEAT", true)
 
 	cfg.validate()
 	return cfg
@@ -160,6 +218,17 @@ func (c *Config) HasAlphaVantage() bool {
 // HasCoinGecko returns true if CoinGecko API key is configured.
 func (c *Config) HasCoinGecko() bool {
 	return c.CoinGeckoAPIKey != ""
+}
+
+// HasMassive returns true if at least one Massive API key is configured.
+func (c *Config) HasMassive() bool { return len(c.MassiveAPIKeys) > 0 }
+
+// HasBybit returns true if Bybit API key is configured.
+func (c *Config) HasBybit() bool { return c.BybitAPIKey != "" }
+
+// HasMassiveS3 returns true if Massive S3 credentials are configured.
+func (c *Config) HasMassiveS3() bool {
+	return c.MassiveS3AccessKey != "" && c.MassiveS3SecretKey != ""
 }
 
 // validate performs additional validation beyond required env vars.
@@ -239,6 +308,18 @@ func getStringSlice(key string) []string {
 	return result
 }
 
+func getBool(key string, defaultVal bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return defaultVal
+	}
+	return b
+}
+
 // String returns a redacted configuration summary for logging.
 func (c *Config) String() string {
 	geminiStatus := "NOT CONFIGURED"
@@ -257,8 +338,19 @@ func (c *Config) String() string {
 	} else if c.HasAlphaVantage() {
 		priceStatus = "ALPHAVANTAGE+YAHOO"
 	}
+	massiveStatus := "NOT CONFIGURED"
+	if c.HasMassive() {
+		massiveStatus = fmt.Sprintf("CONFIGURED (%d keys)", len(c.MassiveAPIKeys))
+	}
+	bybitStatus := "NOT CONFIGURED"
+	if c.HasBybit() {
+		bybitStatus = "CONFIGURED"
+		if c.BybitTestnet {
+			bybitStatus = "CONFIGURED (TESTNET)"
+		}
+	}
 	return fmt.Sprintf(
-		"Config{DataDir=%s, COTInterval=%v, Gemini=%s, Claude=%s, Price=%s, LogLevel=%s}",
-		c.DataDir, c.COTFetchInterval, geminiStatus, claudeStatus, priceStatus, c.LogLevel,
+		"Config{DataDir=%s, COTInterval=%v, Gemini=%s, Claude=%s, Price=%s, Massive=%s, Bybit=%s, LogLevel=%s}",
+		c.DataDir, c.COTFetchInterval, geminiStatus, claudeStatus, priceStatus, massiveStatus, bybitStatus, c.LogLevel,
 	)
 }

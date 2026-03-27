@@ -27,8 +27,12 @@ import (
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
+	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
+	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -228,6 +232,33 @@ func main() {
 	log.Info().Msg("Service layer initialized")
 
 	// -----------------------------------------------------------------------
+	// 6b. Alpha layer — Factor Engine, Strategy Engine, Microstructure Engine
+	//     All optional: gracefully disabled if not configured.
+	// -----------------------------------------------------------------------
+	var alphaServices *tgbot.AlphaServices
+	if cfg.EnableFactorEngine {
+		profileSvc := factorsvc.NewProfileService(dailyPriceRepo, cotRepo)
+		factorEng := factorsvc.NewEngine(factorsvc.DefaultWeights())
+		stratEng := strategysvc.NewEngine()
+
+		as := &tgbot.AlphaServices{
+			FactorEngine:   factorEng,
+			StrategyEngine: stratEng,
+			ProfileBuilder: profileSvc,
+		}
+		// Microstructure: enable only if Bybit is configured
+		if cfg.EnableBybitMicrostructure {
+			bybitCli := bybitpkg.NewClient(cfg.BybitAPIKey, cfg.BybitAPISecret, cfg.BybitRestBase)
+			as.MicroEngine = microsvc.NewEngine(bybitCli)
+			log.Info().Msg("Bybit microstructure engine initialized")
+		}
+		alphaServices = as
+		log.Info().Msg("Factor + Strategy engines initialized")
+	} else {
+		log.Info().Msg("Factor Engine disabled (ENABLE_FACTOR_ENGINE=false)")
+	}
+
+	// -----------------------------------------------------------------------
 	// 7. Background schedulers
 	// -----------------------------------------------------------------------
 	sched := scheduler.New(&scheduler.Deps{
@@ -305,6 +336,12 @@ func main() {
 		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
 		intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
 	)
+
+	// Wire alpha services (Factor + Strategy + Microstructure engines)
+	if alphaServices != nil {
+		handler.WithAlpha(alphaServices)
+		log.Info().Msg("Alpha commands registered (/xfactors /playbook /heat /rankx /transition /cryptoalpha)")
+	}
 
 	// Register free-text handler for chatbot mode
 	if chatService != nil {
