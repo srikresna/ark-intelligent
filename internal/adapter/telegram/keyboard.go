@@ -713,18 +713,23 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "COT Analysis", CallbackData: "nav:cot"},
+				{Text: "📊 COT Analysis", CallbackData: "nav:cot"},
 				{Text: "🦅 Unified Outlook", CallbackData: "out:unified"},
 			},
 			{
-				{Text: "📊 Bias", CallbackData: "cmd:bias"},
 				{Text: "🏦 Macro", CallbackData: "cmd:macro"},
-				{Text: "📈 Rank", CallbackData: "cmd:rank"},
-			},
-			{
 				{Text: "📅 Calendar", CallbackData: "cmd:calendar"},
 				{Text: "💹 Price", CallbackData: "cmd:price"},
+			},
+			{
+				{Text: "📈 Rank", CallbackData: "cmd:rank"},
+				{Text: "📊 Bias", CallbackData: "cmd:bias"},
 				{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
+			},
+			{
+				{Text: "⚡ xfactors", CallbackData: "cmd:xfactors"},
+				{Text: "🎯 Playbook", CallbackData: "cmd:playbook"},
+				{Text: "🌡 Heat", CallbackData: "cmd:heat"},
 			},
 		},
 	}

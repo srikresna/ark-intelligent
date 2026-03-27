@@ -187,7 +187,7 @@ func NewHandler(
 	bot.RegisterCallback("macro:", h.cbMacro)
 	bot.RegisterCallback("imp:", h.cbImpact)
 
-	log.Info().Int("commands", 31).Int("callbacks", 9).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 37).Int("callbacks", 9).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -235,8 +235,14 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 /garch — GARCH(1,1) vol forecast · <code>/garch EUR</code>
 /hurst — Hurst exponent regime · <code>/hurst EUR</code>
 /regime — HMM regime-switching · <code>/regime EUR</code>
-/factors — Factor return decomposition
-/wfopt — Walk-forward weight optimization
+
+<b>⚡ Alpha Engine</b>
+/xfactors — Cross-sectional factor ranking
+/playbook — Strategy playbook (top long/short + conviction)
+/heat — Portfolio exposure heat level
+/rankx — Compact rank leaderboard
+/transition — Regime transition warning
+/cryptoalpha — Crypto microstructure · <code>/cryptoalpha BTC</code>
 
 <b>⚙️ Settings</b>
 /settings · /membership · /status · /clear
@@ -244,7 +250,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <b>🔐 Admin</b>
 /users · /setrole · /ban · /unban
 
-<code>ARK v3.5.0</code>`
+<code>ARK v3.6.0</code>`
 
 	_, err := h.bot.SendHTML(ctx, chatID, html)
 	return err
