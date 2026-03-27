@@ -162,8 +162,12 @@ func (b *Bootstrapper) bootstrapContract(ctx context.Context, mapping domain.Pri
 			continue
 		}
 
-		// Get the entry price for this report date — skip if unavailable
-		entryPrice, err := b.priceRepo.GetPriceAt(ctx, mapping.ContractCode, analysis.ReportDate)
+		// Get the entry price at the COT release date (Friday), not the report date (Tuesday).
+		// COT data reflects positioning as of Tuesday but is published Friday after market close.
+		// Using Tuesday's price would be look-ahead bias — traders cannot act on the data until Friday.
+		// We use Friday's close as the entry price (first price after data becomes available).
+		releaseDate := cotReleaseDate(analysis.ReportDate)
+		entryPrice, err := b.priceRepo.GetPriceAt(ctx, mapping.ContractCode, releaseDate)
 		if err != nil {
 			log.Debug().Err(err).Str("contract", mapping.ContractCode).Msg("No price data for bootstrap")
 			continue
@@ -346,4 +350,18 @@ func BackfillCalibration(ctx context.Context, signalRepo ports.SignalRepository)
 	}
 
 	return updated, nil
+}
+
+// cotReleaseDate returns the Friday following a COT report date (Tuesday).
+// CFTC reports are as-of Tuesday but published Friday at 3:30 PM ET.
+// If the report date is not a Tuesday (e.g., holiday-shifted), it still
+// advances to the nearest following Friday.
+func cotReleaseDate(reportDate time.Time) time.Time {
+	// Tuesday = weekday 2, Friday = weekday 5. Normal offset = 3 days.
+	wd := reportDate.Weekday()
+	daysToFriday := (5 - int(wd) + 7) % 7
+	if daysToFriday == 0 {
+		daysToFriday = 7 // if already Friday, go to next Friday
+	}
+	return reportDate.AddDate(0, 0, daysToFriday)
 }

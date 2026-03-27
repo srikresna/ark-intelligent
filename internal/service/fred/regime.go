@@ -456,6 +456,7 @@ func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites)
 	}
 
 	// --- Regime Override Rules ---
+	// Priority: RECESSION > STRESS > STAGFLATION > DETERIORATING > base classification.
 	if r.SahmAlert {
 		r.Name = "RECESSION"
 	} else if data.NFCI > 0.7 || data.VIX > 35 {
@@ -466,6 +467,12 @@ func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites)
 	} else if data.GDPGrowth < 0 && data.GDPGrowth != 0 {
 		r.Name = "RECESSION"
 		riskScore += 30
+	} else if (r.Name == "GOLDILOCKS" || r.Name == "DISINFLATIONARY") &&
+		(data.YieldSpread < 0 || data.Spread3M10Y < 0) && data.NFCI > 0.3 {
+		// Yield curve inverted + financial conditions tightening = NOT goldilocks.
+		// The label would mislead traders into risk-on positioning despite structural warnings.
+		r.Name = "DETERIORATING"
+		riskScore += 10
 	}
 
 	// --- Composite Score Enhancements (when available) ---
@@ -548,6 +555,10 @@ func deriveBias(data *MacroData, r MacroRegime) (string, string) {
 		return "Gold BULLISH | USD complex | Equities BEARISH",
 			"Stagflation: high inflation + weak growth = gold/commodities preferred, risk assets under pressure."
 
+	case "DETERIORATING":
+		return "CAUTION — Selective risk, favor safe havens",
+			"Inflation controlled but yield curve inverted + conditions tightening. Historically precedes recession. Reduce risk exposure."
+
 	case "INFLATIONARY":
 		if restrictivePolicy {
 			return "USD BULLISH bias, Risk FX BEARISH",
@@ -585,6 +596,8 @@ func DeriveTradingImplications(regime MacroRegime, data *MacroData) []TradingImp
 	switch {
 	case regime.Name == "RECESSION" || regime.Name == "STRESS" || regime.Name == "STAGFLATION":
 		implications = append(implications, TradingImplication{"Gold", "BULLISH", "🟢", "Safe haven demand tinggi di kondisi " + regimePlainName(regime.Name)})
+	case regime.Name == "DETERIORATING":
+		implications = append(implications, TradingImplication{"Gold", "BULLISH", "🟢", "Kurva yield terbalik + kondisi ketat — lindung nilai disarankan"})
 	case regime.Name == "INFLATIONARY" && data.FedFundsRate > 0 && (data.FedFundsRate-data.Breakeven5Y) < 0:
 		implications = append(implications, TradingImplication{"Gold", "BULLISH", "🟢", "Real yield negatif — gold sebagai lindung inflasi"})
 	case regime.Name == "GOLDILOCKS" || regime.Name == "DISINFLATIONARY":
@@ -661,6 +674,8 @@ func regimePlainName(name string) string {
 		return "ekonomi ideal"
 	case "NEUTRAL":
 		return "netral"
+	case "DETERIORATING":
+		return "memburuk"
 	default:
 		return strings.ToLower(name)
 	}

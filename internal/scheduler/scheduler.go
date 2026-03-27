@@ -893,10 +893,11 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 			}
 		}
 
-		// Look up entry price at report date — not latest price, to avoid look-ahead bias.
-		// COT data reflects positioning as of Tuesday, released Friday. Use the report
-		// date's close price so the entry price matches the signal's information set.
-		priceRec, err := s.deps.PriceRepo.GetPriceAt(ctx, sig.ContractCode, analysis.ReportDate)
+		// Look up entry price at COT release date (Friday), not report date (Tuesday).
+		// COT data reflects positioning as of Tuesday but is published Friday after market close.
+		// Using Tuesday's price would be look-ahead bias — traders cannot act until Friday.
+		releaseDate := cotReleaseDate(analysis.ReportDate)
+		priceRec, err := s.deps.PriceRepo.GetPriceAt(ctx, sig.ContractCode, releaseDate)
 		if err != nil || priceRec == nil || priceRec.Close <= 0 {
 			log.Debug().
 				Str("contract", sig.ContractCode).
@@ -1015,4 +1016,15 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 			log.Info().Int("persisted", len(toSave)).Msg("signals persisted for backtesting")
 		}
 	}
+}
+
+// cotReleaseDate returns the Friday following a COT report date (Tuesday).
+// CFTC reports are as-of Tuesday but published Friday at 3:30 PM ET.
+func cotReleaseDate(reportDate time.Time) time.Time {
+	wd := reportDate.Weekday()
+	daysToFriday := (5 - int(wd) + 7) % 7
+	if daysToFriday == 0 {
+		daysToFriday = 7
+	}
+	return reportDate.AddDate(0, 0, daysToFriday)
 }
