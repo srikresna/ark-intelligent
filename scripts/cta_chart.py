@@ -226,7 +226,7 @@ def render_chart(data: dict, output_path: str):
     # Only include RSI panel if we have RSI data
     has_rsi = rsi is not None
     has_macd = macd is not None
-    has_volume = df["Volume"].sum() > 0
+    has_volume = bool(df["Volume"].sum() > 0)
 
     # -----------------------------------------------------------------------
     # Plot
