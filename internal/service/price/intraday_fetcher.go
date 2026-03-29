@@ -187,18 +187,18 @@ func (f *Fetcher) fetchYahooIntraday(ctx context.Context, mapping domain.PriceSy
 	}
 
 	// Calculate days needed based on interval granularity.
-	// Yahoo limits: 15m/30m max 60 days, 1h up to 730 days.
+	// Yahoo limits: 15m/30m max range=1mo (30 days works reliably; 3mo gets rejected).
 	var daysNeeded int
 	switch yahooInterval {
 	case "15m":
 		daysNeeded = (fetchBars * 15 / 1440) + 2 // 1440 min/day, with margin
-		if daysNeeded > 59 {
-			daysNeeded = 59 // Yahoo 15m limit
+		if daysNeeded > 30 {
+			daysNeeded = 30 // Yahoo 15m: range=1mo is the safe max
 		}
 	case "30m":
 		daysNeeded = (fetchBars * 30 / 1440) + 2
-		if daysNeeded > 59 {
-			daysNeeded = 59 // Yahoo 30m limit
+		if daysNeeded > 30 {
+			daysNeeded = 30
 		}
 	default: // 1h
 		daysNeeded = (fetchBars / 6) + 2 // ~6 bars per day for 1h
