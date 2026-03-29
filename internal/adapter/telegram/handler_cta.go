@@ -169,7 +169,18 @@ func (h *Handler) cmdCTA(ctx context.Context, chatID string, _ int64, args strin
 	// Send photo with keyboard if chart available, otherwise text
 	if chartPNG != nil && len(chartPNG) > 0 {
 		state.chartData["daily"] = chartPNG
-		_, err = h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, summary, kb)
+
+		// Photo caption limited to 1024 chars by Telegram.
+		// Send chart with short caption, then full analysis as separate message.
+		shortCaption := fmt.Sprintf("⚡ <b>CTA: %s</b> — Daily", html.EscapeString(mapping.Currency))
+		_, photoErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, shortCaption, kb)
+		if photoErr != nil {
+			log.Warn().Err(photoErr).Msg("send CTA photo failed, falling back to text")
+			_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
+			return err
+		}
+		// Send full analysis as text
+		_, err = h.bot.SendHTML(ctx, chatID, summary)
 		return err
 	}
 
@@ -260,7 +271,13 @@ func (h *Handler) ctaShowSummaryChart(ctx context.Context, chatID string, msgID 
 	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 	summary := formatCTASummary(state)
 	kb := h.kb.CTAMenu()
-	_, sendErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, summary, kb)
+	shortCaption := fmt.Sprintf("⚡ <b>CTA: %s</b> — Daily", html.EscapeString(state.symbol))
+	_, photoErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, shortCaption, kb)
+	if photoErr != nil {
+		_, sendErr := h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
+		return sendErr
+	}
+	_, sendErr := h.bot.SendHTML(ctx, chatID, summary)
 	return sendErr
 }
 
@@ -277,9 +294,15 @@ func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int
 	kb := h.kb.CTATimeframeMenu()
 
 	if chartPNG != nil && len(chartPNG) > 0 {
-		// Delete old and send photo
+		// Delete old and send photo with short caption + full text separately
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-		_, err := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, txt, kb)
+		shortCaption := fmt.Sprintf("⚡ <b>CTA: %s</b> — %s", html.EscapeString(state.symbol), strings.ToUpper(tf))
+		_, photoErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, shortCaption, kb)
+		if photoErr != nil {
+			_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+			return err
+		}
+		_, err := h.bot.SendHTML(ctx, chatID, txt)
 		return err
 	}
 
