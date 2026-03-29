@@ -207,61 +207,71 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 		_ = h.prefsRepo.Set(ctx, userID, prefs)
 	}
 
-	html := `🦅 <b>ARK Intelligence Terminal</b>
+	return h.sendHelp(ctx, chatID, userID)
+}
+
+func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {
+	return h.sendHelp(ctx, chatID, userID)
+}
+
+// sendHelp sends a role-aware help menu. Admin/Settings only shown to admin+.
+func (h *Handler) sendHelp(ctx context.Context, chatID string, userID int64) error {
+	// Determine user role
+	isAdmin := h.bot.isOwner(userID)
+	if !isAdmin && h.middleware != nil {
+		role := h.middleware.GetUserRole(ctx, userID)
+		isAdmin = domain.RoleHierarchy(role) >= domain.RoleHierarchy(domain.RoleAdmin)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(`🦅 <b>ARK Intelligence Terminal</b>
 <i>Institutional Flow &amp; Macro Analytics</i>
 
+<b>⚡ Alpha Engine</b>
+/alpha — Dashboard lengkap (ringkasan + navigasi detail)
+
 <b>📊 Market Data</b>
-/cot — COT overview · <code>/cot EUR</code> detail
-/rank — Currency strength (price + COT)
-/bias — Directional bias (COT positioning, 7 types)
+/cot — COT positioning · <code>/cot EUR</code>
+/rank — Currency strength
+/bias — Directional bias
 /calendar — Economic calendar · <code>/calendar week</code>
-/price — Daily price context · <code>/price EUR</code>
-/levels — Support/resistance levels · <code>/levels EUR</code>
+/price — Daily price · <code>/price EUR</code>
+/levels — Support/resistance · <code>/levels EUR</code>
 
 <b>🧠 AI Outlook</b>
 /outlook — Unified analysis (all data + web search)
 
-<b>📈 Backtest &amp; Analytics</b>
-/backtest — Dashboard (17 sub-views via menu)
-/accuracy — Quick win rate summary
+<b>📈 Analytics</b>
+/backtest — Backtest dashboard (17 sub-views)
+/accuracy — Win rate summary
 /report — Weekly signal performance
 
-<b>🏛 Macro &amp; Impact</b>
-/macro — FRED regime + asset performance matrix
+<b>🏛 Macro</b>
+/macro — FRED regime + asset performance
 /impact — Event impact DB · <code>/impact NFP</code>
-/sentiment — Sentiment surveys (CNN Fear &amp; Greed + AAII)
-/seasonal — Seasonal pattern analysis · <code>/seasonal EUR</code>
+/sentiment — Sentiment surveys
+/seasonal — Seasonal patterns · <code>/seasonal EUR</code>
 
 <b>🔬 Quantitative</b>
-/intraday — 4H price context · <code>/intraday EUR</code>
-/corr — Cross-pair correlation matrix
-/carry — Interest rate differential / carry trade
-/garch — GARCH(1,1) vol forecast · <code>/garch EUR</code>
-/hurst — Hurst exponent regime · <code>/hurst EUR</code>
-/regime — HMM regime-switching · <code>/regime EUR</code>
-
-<b>⚡ Alpha Engine</b>
-/xfactors — Cross-sectional factor ranking
-/playbook — Strategy playbook (top long/short + conviction)
-/heat — Portfolio exposure heat level
-/rankx — Compact rank leaderboard
-/transition — Regime transition warning
-/cryptoalpha — Crypto microstructure · <code>/cryptoalpha BTC</code>
+/intraday · /corr · /carry · /garch · /hurst · /regime
+<i>Gunakan dengan kode aset, misal: <code>/garch EUR</code></i>
 
 <b>⚙️ Settings</b>
-/settings · /membership · /status · /clear
+/settings · /membership · /clear
+`)
 
+	if isAdmin {
+		sb.WriteString(`
 <b>🔐 Admin</b>
 /users · /setrole · /ban · /unban
+`)
+	}
 
-<code>ARK v3.6.0</code>`
+	sb.WriteString(`
+<code>ARK v3.6.0</code>`)
 
-	_, err := h.bot.SendHTML(ctx, chatID, html)
+	_, err := h.bot.SendHTML(ctx, chatID, sb.String())
 	return err
-}
-
-func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {
-	return h.cmdStart(ctx, chatID, userID, args)
 }
 
 // ---------------------------------------------------------------------------
