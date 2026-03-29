@@ -727,9 +727,59 @@ func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
 				{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
 			},
 			{
-				{Text: "⚡ xfactors", CallbackData: "cmd:xfactors"},
-				{Text: "🎯 Playbook", CallbackData: "cmd:playbook"},
-				{Text: "🌡 Heat", CallbackData: "cmd:heat"},
+				{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
+			},
+		},
+	}
+}
+
+// AlphaMenu builds the inline keyboard for the unified /alpha dashboard.
+func (kb *KeyboardBuilder) AlphaMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Factor Ranking", CallbackData: "alpha:factors"},
+				{Text: "🎯 Playbook", CallbackData: "alpha:playbook"},
+			},
+			{
+				{Text: "🌡 Portfolio Heat", CallbackData: "alpha:heat"},
+				{Text: "📈 RankX", CallbackData: "alpha:rankx"},
+			},
+			{
+				{Text: "🔄 Regime & Transisi", CallbackData: "alpha:transition"},
+				{Text: "⚡ Crypto Alpha", CallbackData: "alpha:crypto"},
+			},
+			{
+				{Text: "🔄 Refresh Data", CallbackData: "alpha:refresh"},
+			},
+		},
+	}
+}
+
+// AlphaDetailMenu builds the back-navigation keyboard for alpha detail views.
+func (kb *KeyboardBuilder) AlphaDetailMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "<< Kembali ke Ringkasan", CallbackData: "alpha:back"},
+			},
+		},
+	}
+}
+
+// AlphaCryptoDetailMenu builds the back-navigation keyboard for alpha crypto detail views
+// with individual crypto symbol buttons.
+func (kb *KeyboardBuilder) AlphaCryptoDetailMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "₿ BTC", CallbackData: "alpha:crypto:BTC"},
+				{Text: "Ξ ETH", CallbackData: "alpha:crypto:ETH"},
+				{Text: "◎ SOL", CallbackData: "alpha:crypto:SOL"},
+				{Text: "🔶 BNB", CallbackData: "alpha:crypto:BNB"},
+			},
+			{
+				{Text: "<< Kembali ke Ringkasan", CallbackData: "alpha:back"},
 			},
 		},
 	}
