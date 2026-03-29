@@ -199,7 +199,9 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 	// Get or recompute state
 	state := h.ctaCache.get(chatID)
 	if state == nil {
-		return h.bot.EditMessage(ctx, chatID, msgID, "⏳ Data expired. Gunakan /cta untuk refresh.")
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendHTML(ctx, chatID, "⏳ Data expired. Gunakan /cta untuk refresh.")
+		return err
 	}
 
 	switch {
@@ -226,32 +228,44 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 	case action == "ichi":
 		txt := formatCTAIchimoku(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 
 	case action == "fib":
 		txt := formatCTAFibonacci(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 
 	case action == "patterns":
 		txt := formatCTAPatterns(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 
 	case action == "confluence":
 		txt := formatCTAConfluence(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 
 	case action == "mtf":
 		txt := formatCTAMTF(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 
 	case action == "zones":
 		txt := formatCTAZones(state)
 		kb := h.kb.CTADetailMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
 	}
 
 	return nil
