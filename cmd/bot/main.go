@@ -20,6 +20,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	tgbot "github.com/arkcode369/ark-intelligent/internal/adapter/telegram"
 	"github.com/arkcode369/ark-intelligent/internal/config"
+	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/health"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/scheduler"
@@ -32,6 +33,7 @@ import (
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
+	ta "github.com/arkcode369/ark-intelligent/internal/service/ta"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -341,6 +343,28 @@ func main() {
 	if alphaServices != nil {
 		handler.WithAlpha(alphaServices)
 		log.Info().Msg("Alpha commands registered (/xfactors /playbook /heat /rankx /transition /cryptoalpha)")
+	}
+
+	// Wire CTA services (Classical Technical Analysis engine)
+	{
+		taEngine := ta.NewEngine()
+		ctaServices := &tgbot.CTAServices{
+			TAEngine:       taEngine,
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+			PriceMapping:   domain.DefaultPriceSymbolMappings,
+		}
+		handler.WithCTA(ctaServices)
+		log.Info().Msg("CTA commands registered (/cta)")
+
+		// Wire CTA Backtest services (reuses same TA engine + repos)
+		ctabtServices := &tgbot.CTABTServices{
+			TAEngine:       taEngine,
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+		}
+		handler.WithCTABT(ctabtServices)
+		log.Info().Msg("CTA Backtest commands registered (/ctabt)")
 	}
 
 	// Register free-text handler for chatbot mode

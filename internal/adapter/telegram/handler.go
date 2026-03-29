@@ -93,6 +93,18 @@ type Handler struct {
 	// alphaCache stores per-chat alpha state with TTL for unified /alpha dashboard.
 	// Initialized by WithAlpha; nil if alpha services are not configured.
 	alphaCache *alphaStateCache
+
+	// cta holds optional Classical TA engine services.
+	// May be nil — /cta command disabled if not configured.
+	cta *CTAServices
+
+	// ctaCache stores per-chat CTA state with TTL for the /cta dashboard.
+	// Initialized by WithCTA; nil if CTA services are not configured.
+	ctaCache *ctaStateCache
+
+	// ctabt holds optional CTA Backtest engine services.
+	// May be nil — /ctabt command disabled if not configured.
+	ctabt *CTABTServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
@@ -227,8 +239,10 @@ func (h *Handler) sendHelp(ctx context.Context, chatID string, userID int64) err
 	sb.WriteString(`🦅 <b>ARK Intelligence Terminal</b>
 <i>Institutional Flow &amp; Macro Analytics</i>
 
-<b>⚡ Alpha Engine</b>
+<b>⚡ Alpha &amp; Technical Analysis</b>
 /alpha — Dashboard lengkap (ringkasan + navigasi detail)
+/cta — Classical TA dashboard · <code>/cta EUR</code> · <code>/cta EUR 4h</code>
+/ctabt — Backtest strategi Classical TA · <code>/ctabt EUR</code> · <code>/ctabt EUR 4h</code>
 
 <b>📊 Market Data</b>
 /cot — COT positioning · <code>/cot EUR</code>

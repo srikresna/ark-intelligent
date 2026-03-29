@@ -785,6 +785,88 @@ func (kb *KeyboardBuilder) AlphaCryptoDetailMenu() ports.InlineKeyboard {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// CTA Keyboards
+// ---------------------------------------------------------------------------
+
+// CTAMenu builds the inline keyboard for the /cta dashboard.
+func (kb *KeyboardBuilder) CTAMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 15m", CallbackData: "cta:tf:15m"},
+				{Text: "📊 1H", CallbackData: "cta:tf:1h"},
+				{Text: "📊 4H", CallbackData: "cta:tf:4h"},
+				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
+			},
+			{
+				{Text: "🏯 Ichimoku", CallbackData: "cta:ichi"},
+				{Text: "📐 Fibonacci", CallbackData: "cta:fib"},
+				{Text: "🕯 Patterns", CallbackData: "cta:patterns"},
+			},
+			{
+				{Text: "⚡ Confluence", CallbackData: "cta:confluence"},
+				{Text: "📱 Multi-TF", CallbackData: "cta:mtf"},
+				{Text: "🎯 Zones", CallbackData: "cta:zones"},
+			},
+			{
+				{Text: "🔄 Refresh", CallbackData: "cta:refresh"},
+			},
+		},
+	}
+}
+
+// CTADetailMenu builds the back-navigation keyboard for CTA detail views.
+func (kb *KeyboardBuilder) CTADetailMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "<< Kembali ke Ringkasan", CallbackData: "cta:back"},
+			},
+		},
+	}
+}
+
+// CTATimeframeMenu builds the timeframe selection keyboard for CTA.
+func (kb *KeyboardBuilder) CTATimeframeMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 15m", CallbackData: "cta:tf:15m"},
+				{Text: "📊 1H", CallbackData: "cta:tf:1h"},
+				{Text: "📊 4H", CallbackData: "cta:tf:4h"},
+				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
+				{Text: "📊 Weekly", CallbackData: "cta:tf:weekly"},
+			},
+			{
+				{Text: "<< Kembali ke Ringkasan", CallbackData: "cta:back"},
+			},
+		},
+	}
+}
+
+// CTABTMenu builds the inline keyboard for the /ctabt backtest dashboard.
+func (kb *KeyboardBuilder) CTABTMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Daily", CallbackData: "ctabt:daily"},
+				{Text: "📊 4H", CallbackData: "ctabt:4h"},
+				{Text: "📊 1H", CallbackData: "ctabt:1h"},
+			},
+			{
+				{Text: "Grade: A", CallbackData: "ctabt:gradeA"},
+				{Text: "Grade: B", CallbackData: "ctabt:gradeB"},
+				{Text: "Grade: C", CallbackData: "ctabt:gradeC"},
+			},
+			{
+				{Text: "📋 Detail Trades", CallbackData: "ctabt:trades"},
+				{Text: "🔄 Refresh", CallbackData: "ctabt:refresh"},
+			},
+		},
+	}
+}
+
 // PriceMenu builds a categorized currency selection keyboard for the /price command.
 func (kb *KeyboardBuilder) PriceMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{

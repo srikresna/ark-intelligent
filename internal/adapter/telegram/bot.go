@@ -583,6 +583,122 @@ func (b *Bot) DeleteMessage(ctx context.Context, chatID string, msgID int) error
 }
 
 // ---------------------------------------------------------------------------
+// Photo Sending (for chart images)
+// ---------------------------------------------------------------------------
+
+// SendPhoto sends a photo with optional HTML caption. photoData is raw PNG bytes.
+// Returns the message ID of the sent photo message.
+func (b *Bot) SendPhoto(ctx context.Context, chatID string, photoData []byte, caption string) (int, error) {
+	return b.sendPhotoInternal(ctx, chatID, photoData, caption, nil)
+}
+
+// SendPhotoWithKeyboard sends a photo with HTML caption and inline keyboard.
+// Returns the message ID of the sent photo message.
+func (b *Bot) SendPhotoWithKeyboard(ctx context.Context, chatID string, photoData []byte, caption string, kb ports.InlineKeyboard) (int, error) {
+	return b.sendPhotoInternal(ctx, chatID, photoData, caption, &kb)
+}
+
+// sendPhotoInternal handles multipart/form-data POST to Telegram sendPhoto API.
+func (b *Bot) sendPhotoInternal(ctx context.Context, chatID string, photoData []byte, caption string, kb *ports.InlineKeyboard) (int, error) {
+	if chatID == "" {
+		chatID = b.defaultID
+	}
+
+	b.rateLimit()
+
+	// Build multipart body
+	var body bytes.Buffer
+	boundary := fmt.Sprintf("----TGBoundary%d", time.Now().UnixNano())
+	writer := fmt.Sprintf
+
+	// Helper to write a form field
+	writeField := func(name, value string) {
+		body.WriteString(writer("--%s\r\n", boundary))
+		body.WriteString(writer("Content-Disposition: form-data; name=\"%s\"\r\n\r\n", name))
+		body.WriteString(value)
+		body.WriteString("\r\n")
+	}
+
+	// chat_id (handle thread IDs)
+	if strings.Contains(chatID, ":") {
+		parts := strings.SplitN(chatID, ":", 2)
+		writeField("chat_id", parts[0])
+		writeField("message_thread_id", parts[1])
+	} else {
+		writeField("chat_id", chatID)
+	}
+
+	// caption
+	if caption != "" {
+		// Telegram photo captions are limited to 1024 characters
+		if len(caption) > 1024 {
+			caption = caption[:1021] + "..."
+		}
+		writeField("caption", caption)
+		writeField("parse_mode", "HTML")
+	}
+
+	// reply_markup (inline keyboard)
+	if kb != nil {
+		keyboard := b.buildInlineKeyboard(*kb)
+		kbJSON, err := json.Marshal(keyboard)
+		if err == nil {
+			writeField("reply_markup", string(kbJSON))
+		}
+	}
+
+	// photo file field
+	body.WriteString(writer("--%s\r\n", boundary))
+	body.WriteString("Content-Disposition: form-data; name=\"photo\"; filename=\"chart.png\"\r\n")
+	body.WriteString("Content-Type: image/png\r\n\r\n")
+	body.Write(photoData)
+	body.WriteString("\r\n")
+
+	// closing boundary
+	body.WriteString(writer("--%s--\r\n", boundary))
+
+	url := fmt.Sprintf("%s/sendPhoto", b.apiBase)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
+	if err != nil {
+		return 0, fmt.Errorf("create sendPhoto request: %w", err)
+	}
+	req.Header.Set("Content-Type", fmt.Sprintf("multipart/form-data; boundary=%s", boundary))
+
+	resp, err := b.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("sendPhoto: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
+	if err != nil {
+		return 0, fmt.Errorf("read sendPhoto response: %w", err)
+	}
+
+	var apiResp apiResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return 0, fmt.Errorf("parse sendPhoto response: %w", err)
+	}
+
+	if !apiResp.OK {
+		return 0, &apiError{
+			Code:        apiResp.ErrorCode,
+			Description: apiResp.Description,
+			RetryAfter:  retryAfterFromResp(apiResp),
+		}
+	}
+
+	var msg sentMessage
+	if len(apiResp.Result) > 0 {
+		if err := json.Unmarshal(apiResp.Result, &msg); err != nil {
+			return 0, fmt.Errorf("unmarshal sendPhoto result: %w", err)
+		}
+	}
+
+	return msg.MessageID, nil
+}
+
+// ---------------------------------------------------------------------------
 // Proactive messaging (for alerts and scheduled reports)
 // ---------------------------------------------------------------------------
 
