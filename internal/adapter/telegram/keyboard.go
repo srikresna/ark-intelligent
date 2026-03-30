@@ -639,6 +639,10 @@ func (kb *KeyboardBuilder) SeasonalMenu() ports.InlineKeyboard {
 				{Text: "🛢 Oil", CallbackData: "cmd:seasonal:OIL"},
 				{Text: "🔶 Copper", CallbackData: "cmd:seasonal:COPPER"},
 			},
+			{
+				{Text: "⛽ ULSD", CallbackData: "cmd:seasonal:ULSD"},
+				{Text: "⛽ RBOB", CallbackData: "cmd:seasonal:RBOB"},
+			},
 			// Indices
 			{
 				{Text: "S&P500", CallbackData: "cmd:seasonal:SPX500"},
@@ -646,12 +650,23 @@ func (kb *KeyboardBuilder) SeasonalMenu() ports.InlineKeyboard {
 				{Text: "Dow", CallbackData: "cmd:seasonal:DJI"},
 				{Text: "Russell", CallbackData: "cmd:seasonal:RUT"},
 			},
-			// Bonds & Crypto
+			// Bonds
 			{
+				{Text: "🏛 2Y", CallbackData: "cmd:seasonal:BOND2"},
+				{Text: "🏛 5Y", CallbackData: "cmd:seasonal:BOND5"},
 				{Text: "🏛 10Y", CallbackData: "cmd:seasonal:BOND"},
 				{Text: "🏛 30Y", CallbackData: "cmd:seasonal:BOND30"},
+			},
+			// Crypto & Crosses
+			{
 				{Text: "₿ BTC", CallbackData: "cmd:seasonal:BTC"},
 				{Text: "Ξ ETH", CallbackData: "cmd:seasonal:ETH"},
+			},
+			{
+				{Text: "XAU/EUR", CallbackData: "cmd:seasonal:XAUEUR"},
+				{Text: "XAU/GBP", CallbackData: "cmd:seasonal:XAUGBP"},
+				{Text: "XAG/EUR", CallbackData: "cmd:seasonal:XAGEUR"},
+				{Text: "XAG/GBP", CallbackData: "cmd:seasonal:XAGGBP"},
 			},
 		},
 	}
@@ -795,8 +810,13 @@ func (kb *KeyboardBuilder) CTAMenu() ports.InlineKeyboard {
 		Rows: [][]ports.InlineButton{
 			{
 				{Text: "📊 15m", CallbackData: "cta:tf:15m"},
+				{Text: "📊 30m", CallbackData: "cta:tf:30m"},
 				{Text: "📊 1H", CallbackData: "cta:tf:1h"},
 				{Text: "📊 4H", CallbackData: "cta:tf:4h"},
+			},
+			{
+				{Text: "📊 6H", CallbackData: "cta:tf:6h"},
+				{Text: "📊 12H", CallbackData: "cta:tf:12h"},
 				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
 			},
 			{
@@ -833,10 +853,14 @@ func (kb *KeyboardBuilder) CTATimeframeMenu() ports.InlineKeyboard {
 		Rows: [][]ports.InlineButton{
 			{
 				{Text: "📊 15m", CallbackData: "cta:tf:15m"},
+				{Text: "📊 30m", CallbackData: "cta:tf:30m"},
 				{Text: "📊 1H", CallbackData: "cta:tf:1h"},
 				{Text: "📊 4H", CallbackData: "cta:tf:4h"},
+			},
+			{
+				{Text: "📊 6H", CallbackData: "cta:tf:6h"},
+				{Text: "📊 12H", CallbackData: "cta:tf:12h"},
 				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
-				{Text: "📊 Weekly", CallbackData: "cta:tf:weekly"},
 			},
 			{
 				{Text: "<< Kembali ke Ringkasan", CallbackData: "cta:back"},
@@ -918,6 +942,13 @@ func (kb *KeyboardBuilder) PriceMenu() ports.InlineKeyboard {
 				{Text: "⛽ ULSD", CallbackData: "cmd:price:ULSD"},
 				{Text: "⛽ RBOB", CallbackData: "cmd:price:RBOB"},
 			},
+			// --- Cross Pairs ---
+			{
+				{Text: "XAU/EUR", CallbackData: "cmd:price:XAUEUR"},
+				{Text: "XAU/GBP", CallbackData: "cmd:price:XAUGBP"},
+				{Text: "XAG/EUR", CallbackData: "cmd:price:XAGEUR"},
+				{Text: "XAG/GBP", CallbackData: "cmd:price:XAGGBP"},
+			},
 		},
 	}
 }
@@ -949,8 +980,14 @@ func (kb *KeyboardBuilder) QuantMenu() ports.InlineKeyboard {
 				{Text: "📋 Full Report", CallbackData: "quant:full"},
 			},
 			{
-				{Text: "⏰ 1H", CallbackData: "quant:tf:1h"},
-				{Text: "📅 4H", CallbackData: "quant:tf:4h"},
+				{Text: "15m", CallbackData: "quant:tf:15m"},
+				{Text: "30m", CallbackData: "quant:tf:30m"},
+				{Text: "1H", CallbackData: "quant:tf:1h"},
+				{Text: "4H", CallbackData: "quant:tf:4h"},
+			},
+			{
+				{Text: "6H", CallbackData: "quant:tf:6h"},
+				{Text: "12H", CallbackData: "quant:tf:12h"},
 				{Text: "📊 Daily", CallbackData: "quant:tf:daily"},
 			},
 		},
