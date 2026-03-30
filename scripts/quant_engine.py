@@ -446,31 +446,24 @@ def compute_correlation(df, symbol, timeframe, params, multi_asset, chart_path=N
         save_chart(fig, chart_path)
 
     # Format text
-    text = f"""🔗 <b>Correlation Matrix: {symbol}</b>
+    text = f"""🔗 <b>Correlation: {symbol}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📅 {len(ret_df)} observasi, {timeframe}
+(Lihat chart untuk heatmap lengkap)
 
+🔑 <b>Key Correlations:</b>
 """
-    # Matrix display
-    header = "       " + "  ".join(f"{s:>6}" for s in symbols)
-    text += f"<code>{header}\n"
-    for s1 in symbols:
-        row = f"{s1:>6} "
-        for s2 in symbols:
-            v = corr.loc[s1, s2]
-            row += f" {v:+.2f} "
-        text += row + "\n"
-    text += "</code>\n"
-
-    # Key insights
-    text += "\n🔑 <b>Key Insights:</b>\n"
-    for sym, rc in rolling_corrs.items():
+    # Sort by absolute correlation with primary symbol, show top relationships
+    sorted_corrs = sorted(
+        [(sym, rc) for sym, rc in rolling_corrs.items() if rc.get("current") is not None],
+        key=lambda x: abs(x[1]["current"]), reverse=True
+    )
+    for sym, rc in sorted_corrs[:8]:
         curr = rc["current"]
-        if curr is None:
-            continue
         strength = "sangat kuat" if abs(curr) > 0.7 else ("moderate" if abs(curr) > 0.4 else "lemah")
         direction = "positif" if curr > 0 else "negatif"
-        text += f"  {symbol}↔{sym}: {curr:+.2f} ({strength} {direction})\n"
+        emoji = "🟢" if abs(curr) > 0.5 else "🟡"
+        text += f"  {emoji} {symbol}↔{sym}: {curr:+.2f} ({strength} {direction})\n"
         if rc.get("prev_30d") is not None:
             delta = curr - rc["prev_30d"]
             trend = "strengthening" if abs(curr) > abs(rc["prev_30d"]) else "weakening"
@@ -924,16 +917,18 @@ def compute_arima(df, symbol, timeframe, params, chart_path=None):
     close = df["Close"]
     n = len(close)
     if n < 50:
-        return output("arima", symbol, False, {}, "", error="Minimal 50 bar untuk ARIMA forecast")
+        return output("arima", symbol, False, {}, "", error="Minimal 50 bar untuk forecast")
 
     horizon = params.get("forecast_horizon", 5)
+    current_price = close.iloc[-1]
 
-    # Strategy 1: ARIMA on prices (traditional)
+    forecasts = {}  # model_name → forecast_values
+
+    # --- Model 1: ARIMA on prices ---
     best_aic = np.inf
     best_order = (1, 1, 1)
     best_res = None
-
-    orders = [(1,1,0), (0,1,1), (1,1,1), (2,1,1), (1,1,2), (2,1,2), (3,1,1), (1,1,3)]
+    orders = [(1,1,0), (0,1,1), (1,1,1), (2,1,1), (1,1,2), (2,1,2), (3,1,1)]
     for order in orders:
         try:
             model = ARIMA(close, order=order)
@@ -945,74 +940,91 @@ def compute_arima(df, symbol, timeframe, params, chart_path=None):
         except Exception:
             continue
 
-    # Strategy 2: Exponential Smoothing (Holt-Winters) — captures trend better
-    ets_forecast = None
-    ets_label = None
+    if best_res is not None:
+        fcast = best_res.get_forecast(steps=horizon)
+        fc_arima = fcast.predicted_mean.values
+        fc_ci = fcast.conf_int(alpha=0.05)
+        forecasts["ARIMA"] = fc_arima
+    else:
+        fc_ci = None
+
+    # --- Model 2: Holt-Winters ETS ---
     try:
         ets_model = ExponentialSmoothing(close, trend="add", damped_trend=True,
                                          seasonal=None, initialization_method="estimated")
         ets_res = ets_model.fit(optimized=True)
-        ets_forecast = ets_res.forecast(horizon)
-        ets_label = "Holt-Winters (damped)"
+        forecasts["ETS"] = ets_res.forecast(horizon).values
     except Exception:
         pass
 
-    if best_res is None and ets_forecast is None:
-        return output("arima", symbol, False, {}, "", error="ARIMA fitting gagal")
+    # --- Model 3: Linear trend extrapolation (last 20 bars) ---
+    try:
+        lookback_trend = min(20, n)
+        recent = close.iloc[-lookback_trend:]
+        x = np.arange(lookback_trend)
+        slope, intercept = np.polyfit(x, recent.values, 1)
+        trend_fc = np.array([intercept + slope * (lookback_trend + i) for i in range(horizon)])
+        forecasts["Trend"] = trend_fc
+    except Exception:
+        pass
 
-    # Use ARIMA as primary
-    if best_res is not None:
-        fcast = best_res.get_forecast(steps=horizon)
-        fc_mean = fcast.predicted_mean
-        fc_ci = fcast.conf_int(alpha=0.05)
-    else:
-        fc_mean = ets_forecast
-        fc_ci = None
+    if not forecasts:
+        return output("arima", symbol, False, {}, "", error="Semua model forecast gagal")
 
-    # If ARIMA forecast is essentially flat (all values within 0.01% of current),
-    # prefer ETS forecast which captures trend
-    arima_is_flat = best_res is not None and all(
-        abs(v - close.iloc[-1]) / close.iloc[-1] < 0.0001 for v in fc_mean.values
-    )
+    # --- Ensemble: weighted average ---
+    # Weight: ARIMA 0.3, ETS 0.4, Trend 0.3 (ETS tends to capture trend best)
+    weights = {"ARIMA": 0.3, "ETS": 0.4, "Trend": 0.3}
+    total_weight = sum(weights.get(k, 0) for k in forecasts)
+    ensemble = np.zeros(horizon)
+    for name, fc in forecasts.items():
+        w = weights.get(name, 0.2) / total_weight
+        ensemble += fc[:horizon] * w
 
-    primary_label = f"ARIMA{best_order}"
-    if arima_is_flat and ets_forecast is not None:
-        # ARIMA is flat (random walk), use ETS instead
-        fc_mean = ets_forecast
-        fc_ci = None  # ETS doesn't provide CI easily
-        primary_label = ets_label
-        best_order = "ETS"
+    # Check if ensemble is still flat
+    expected_return = (ensemble[-1] - current_price) / current_price
+
+    # Select primary display model
+    # Use ensemble as the main forecast
+    fc_display = ensemble
+    primary_label = f"Ensemble ({'+'.join(forecasts.keys())})"
 
     result = {
-        "order": list(best_order) if isinstance(best_order, tuple) else str(best_order),
-        "model_label": primary_label,
-        "aic": safe_float(best_aic) if isinstance(best_order, tuple) else None,
-        "forecast": [safe_float(v) for v in fc_mean.values],
+        "models_used": list(forecasts.keys()),
+        "primary_label": primary_label,
+        "arima_order": list(best_order) if best_res else None,
+        "aic": safe_float(best_aic) if best_res else None,
+        "forecast": [safe_float(v) for v in fc_display],
+        "individual_forecasts": {k: [safe_float(v) for v in vs[:horizon]] for k, vs in forecasts.items()},
         "conf_lower": [safe_float(v) for v in fc_ci.iloc[:, 0].values] if fc_ci is not None else None,
         "conf_upper": [safe_float(v) for v in fc_ci.iloc[:, 1].values] if fc_ci is not None else None,
-        "current_price": safe_float(close.iloc[-1]),
-        "arima_was_flat": arima_is_flat,
+        "current_price": safe_float(current_price),
+        "expected_return": safe_float(expected_return),
     }
-
-    # Expected return
-    expected_return = (fc_mean.iloc[-1] - close.iloc[-1]) / close.iloc[-1]
 
     # Chart
     if chart_path:
         fig, ax = plt.subplots(figsize=(14, 7))
-        fig.suptitle(f"{symbol} — {primary_label} Forecast — {timeframe}", color=TEXT_COLOR, fontsize=13, fontweight="bold")
+        fig.suptitle(f"{symbol} — Forecast Ensemble — {timeframe}", color=TEXT_COLOR, fontsize=13, fontweight="bold")
 
-        # Last 60 bars
         recent = close.iloc[-60:]
         ax.plot(recent.index, recent, color=ACCENT1, linewidth=1.2, label="Price")
 
-        # Forecast
         last_date = close.index[-1]
         fc_dates = pd.date_range(start=last_date, periods=horizon+1, freq="B")[1:]
-        ax.plot(fc_dates, fc_mean.values, color=ACCENT2, linewidth=2, linestyle="--", label="Forecast", marker="o", markersize=4)
+
+        # Individual model forecasts (thin lines)
+        model_colors = {"ARIMA": "#666666", "ETS": ACCENT3, "Trend": ACCENT4}
+        for name, fc in forecasts.items():
+            ax.plot(fc_dates, fc[:horizon], color=model_colors.get(name, "#888"),
+                   linewidth=0.8, linestyle=":", alpha=0.6, label=name)
+
+        # Ensemble (bold)
+        ax.plot(fc_dates, fc_display, color=ACCENT2, linewidth=2.5, linestyle="--",
+               label="Ensemble", marker="o", markersize=5)
+
         if fc_ci is not None:
             ax.fill_between(fc_dates, fc_ci.iloc[:, 0].values, fc_ci.iloc[:, 1].values,
-                            alpha=0.15, color=ACCENT2, label="95% CI")
+                            alpha=0.1, color=ACCENT2, label="ARIMA 95% CI")
 
         ax.axvline(last_date, color=GRID_COLOR, linestyle=":", linewidth=0.8)
         ax.set_ylabel("Price")
@@ -1022,29 +1034,33 @@ def compute_arima(df, symbol, timeframe, params, chart_path=None):
         plt.tight_layout()
         save_chart(fig, chart_path)
 
-    direction = "📈 NAIK" if expected_return > 0.001 else ("📉 TURUN" if expected_return < -0.001 else "➡️ FLAT")
+    direction = "📈 NAIK" if expected_return > 0.002 else ("📉 TURUN" if expected_return < -0.002 else "➡️ FLAT")
 
-    aic_str = f" (AIC: {best_aic:.1f})" if isinstance(best_order, tuple) else ""
-    flat_note = "\n⚠️ ARIMA murni menghasilkan flat — switched ke Holt-Winters." if arima_is_flat else ""
-
-    text = f"""📉 <b>Forecast: {symbol}</b>
+    text = f"""📉 <b>Forecast Ensemble: {symbol}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-Model: {primary_label}{aic_str}{flat_note}
+Models: {', '.join(forecasts.keys())}
 
-📊 <b>Forecast ({horizon} bar):</b>
-  Current: {close.iloc[-1]:.4f}
+📊 <b>Ensemble Forecast ({horizon} bar):</b>
+  Current: {current_price:.4f}
 """
     for i in range(horizon):
-        fc_val = fc_mean.iloc[i]
+        fc_val = fc_display[i]
+        ret_i = (fc_val - current_price) / current_price * 100
         if fc_ci is not None:
-            text += f"  Bar +{i+1}: {fc_val:.4f} [{fc_ci.iloc[i, 0]:.4f} — {fc_ci.iloc[i, 1]:.4f}]\n"
+            text += f"  Bar +{i+1}: {fc_val:.4f} ({ret_i:+.2f}%) [{fc_ci.iloc[i, 0]:.4f} — {fc_ci.iloc[i, 1]:.4f}]\n"
         else:
-            text += f"  Bar +{i+1}: {fc_val:.4f}\n"
+            text += f"  Bar +{i+1}: {fc_val:.4f} ({ret_i:+.2f}%)\n"
 
     text += f"""
-🎯 <b>Expected: {direction} {expected_return*100:+.2f}%</b>
+🎯 <b>Expected: {direction} {expected_return*100:+.3f}%</b>
 
-⚠️ Forecast limitations: linear model, best combined with regime + vol models."""
+📊 <b>Individual Models:</b>
+"""
+    for name, fc in forecasts.items():
+        ret = (fc[horizon-1] - current_price) / current_price * 100
+        text += f"  {name}: {fc[horizon-1]:.4f} ({ret:+.2f}%)\n"
+
+    text += "\n⚠️ Forecast = statistical projection, bukan rekomendasi trading."
 
     return output("arima", symbol, True, result, text, chart_path=chart_path or "")
 
