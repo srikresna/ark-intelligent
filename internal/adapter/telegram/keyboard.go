@@ -921,3 +921,40 @@ func (kb *KeyboardBuilder) PriceMenu() ports.InlineKeyboard {
 		},
 	}
 }
+
+// QuantMenu builds the main /quant dashboard inline keyboard.
+func (kb *KeyboardBuilder) QuantMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Stats", CallbackData: "quant:stats"},
+				{Text: "📈 Volatility", CallbackData: "quant:garch"},
+				{Text: "🔗 Correlation", CallbackData: "quant:corr"},
+			},
+			{
+				{Text: "📉 ARIMA", CallbackData: "quant:arima"},
+				{Text: "🔄 Mean Revert", CallbackData: "quant:meanrevert"},
+				{Text: "⚡ Granger", CallbackData: "quant:granger"},
+			},
+			{
+				{Text: "🎭 Regime (HMM)", CallbackData: "quant:regime"},
+			},
+			{
+				{Text: "⏰ 1H", CallbackData: "quant:tf:1h"},
+				{Text: "📅 4H", CallbackData: "quant:tf:4h"},
+				{Text: "📊 Daily", CallbackData: "quant:tf:daily"},
+			},
+		},
+	}
+}
+
+// QuantDetailMenu builds the back-navigation keyboard for quant detail views.
+func (kb *KeyboardBuilder) QuantDetailMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "<< Kembali ke Dashboard", CallbackData: "quant:back"},
+			},
+		},
+	}
+}

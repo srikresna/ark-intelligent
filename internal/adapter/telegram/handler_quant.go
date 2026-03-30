@@ -1,671 +1,505 @@
 package telegram
 
+// handler_quant.go — /quant command: Econometric/Statistical Analysis dashboard
+//   /quant [SYMBOL] [TIMEFRAME]  — Quant dashboard with inline keyboard
+
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
-	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
-	fredSvc "github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
-// overviewAssetGroup defines a labelled group of assets for overview displays.
-type overviewAssetGroup struct {
-	label  string
-	assets []string
+// ---------------------------------------------------------------------------
+// QuantServices — dependencies for the /quant command
+// ---------------------------------------------------------------------------
+
+type QuantServices struct {
+	DailyPriceRepo pricesvc.DailyPriceStore
+	IntradayRepo   pricesvc.IntradayStore
+	PriceMapping   []domain.PriceSymbolMapping
 }
 
-// overviewGroups returns all monitored assets grouped by category.
-func overviewGroups() []overviewAssetGroup {
-	return []overviewAssetGroup{
-		{"FX Majors", []string{"EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"}},
-		{"Metals", []string{"XAU", "XAG", "COPPER"}},
-		{"Energy", []string{"OIL", "ULSD", "RBOB"}},
-		{"Bonds", []string{"BOND", "BOND30", "BOND5", "BOND2"}},
-		{"Indices", []string{"SPX500", "NDX", "DJI", "RUT"}},
-		{"Crypto", []string{"BTC", "ETH"}},
-	}
+// ---------------------------------------------------------------------------
+// quantState — cached per-chat state
+// ---------------------------------------------------------------------------
+
+type quantState struct {
+	symbol    string
+	currency  string
+	timeframe string
+	bars      map[string][]ta.OHLCV // tf → bars
+	createdAt time.Time
 }
 
-// cmdCorr handles /corr — cross-pair correlation matrix.
-func (h *Handler) cmdCorr(ctx context.Context, chatID string, userID int64, args string) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Correlation data not available yet. Daily prices are being initialized.")
-		return err
-	}
+const quantStateTTL = 30 * time.Minute
 
-	engine := pricesvc.NewCorrelationEngine(h.dailyPriceRepo)
-	matrix, err := engine.BuildWithBreakdowns(ctx)
-	if err != nil {
-		errMsg := fmt.Sprintf(
-			"<b>Correlation matrix unavailable</b>\n\n%s\n\n<i>Daily prices may still be loading. Try again in a few minutes.</i>",
-			html.EscapeString(err.Error()),
-		)
-		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
-		return sendErr
-	}
+// ---------------------------------------------------------------------------
+// quantStateCache
+// ---------------------------------------------------------------------------
 
-	htmlOut := h.fmt.FormatCorrelationMatrix(matrix)
+type quantStateCache struct {
+	mu    sync.Mutex
+	store map[string]*quantState // chatID → state
+}
 
-	// Note if the matrix fell back to a shorter period than the default 20-day
-	if matrix.Period < 20 {
-		htmlOut += fmt.Sprintf("\n<i>Note: Insufficient data for 20-day window; using %d-day fallback.</i>\n", matrix.Period)
-	}
+func newQuantStateCache() *quantStateCache {
+	return &quantStateCache{store: make(map[string]*quantState)}
+}
 
-	// Report which currencies are included vs excluded from the matrix
-	allCurrencies := domain.DefaultCorrelationCurrencies()
-	includedSet := make(map[string]bool, len(matrix.Currencies))
-	for _, c := range matrix.Currencies {
-		includedSet[c] = true
+func (c *quantStateCache) get(chatID string) *quantState {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.store[chatID]
+	if !ok || time.Since(s.createdAt) > quantStateTTL {
+		delete(c.store, chatID)
+		return nil
 	}
-	var excluded []string
-	for _, c := range allCurrencies {
-		if !includedSet[c] {
-			excluded = append(excluded, c)
+	return s
+}
+
+func (c *quantStateCache) set(chatID string, s *quantState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	// Evict old entries
+	for k, v := range c.store {
+		if now.Sub(v.createdAt) > quantStateTTL*2 {
+			delete(c.store, k)
 		}
 	}
-	if len(excluded) > 0 {
-		htmlOut += fmt.Sprintf("\n<i>Included: %s</i>", strings.Join(matrix.Currencies, ", "))
-		htmlOut += fmt.Sprintf("\n<i>Excluded (insufficient data): %s</i>\n", strings.Join(excluded, ", "))
-	}
-
-	// Detect clusters
-	clusters := engine.DetectClusters(matrix, 0.70)
-	if len(clusters) > 0 {
-		htmlOut += "\n" + h.fmt.FormatCorrelationClusters(clusters)
-	}
-
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
+	c.store[chatID] = s
 }
 
-// cmdCarry handles /carry — interest rate differential and carry trade ranking.
-func (h *Handler) cmdCarry(ctx context.Context, chatID string, userID int64, args string) error {
-	_, _ = h.bot.SendHTML(ctx, chatID, "Fetching central bank rates...")
+// ---------------------------------------------------------------------------
+// WithQuant injects QuantServices and registers commands
+// ---------------------------------------------------------------------------
 
-	engine := fredSvc.NewRateDifferentialEngine()
-	ranking, err := engine.FetchCarryRanking(ctx)
-	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Failed to fetch carry data: %s", html.EscapeString(err.Error())))
-		return sendErr
+func (h *Handler) WithQuant(q *QuantServices) *Handler {
+	h.quant = q
+	if q != nil {
+		h.quantCache = newQuantStateCache()
+		h.registerQuantCommands()
 	}
-
-	htmlOut := h.fmt.FormatCarryRanking(ranking)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
+	return h
 }
 
-// cmdIntraday handles /intraday [currency] — 4H price context.
-func (h *Handler) cmdIntraday(ctx context.Context, chatID string, userID int64, args string) error {
-	if h.intradayRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Intraday data not available yet. 4H data is being initialized.")
+func (h *Handler) registerQuantCommands() {
+	h.bot.RegisterCommand("/quant", h.cmdQuant)
+	h.bot.RegisterCallback("quant:", h.handleQuantCallback)
+}
+
+// ---------------------------------------------------------------------------
+// /quant — Main command
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args string) error {
+	if h.quant == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Quant Engine not configured.")
 		return err
 	}
 
-	args = strings.TrimSpace(strings.ToUpper(args))
-
-	if args == "" {
-		return h.intradayOverview(ctx, chatID)
+	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
+	symbol := "EUR"
+	timeframe := "daily"
+	if len(parts) > 0 && parts[0] != "" {
+		symbol = parts[0]
+	}
+	if len(parts) > 1 {
+		timeframe = strings.ToLower(parts[1])
 	}
 
-	mapping := domain.FindPriceMappingByCurrency(args)
+	mapping := domain.FindPriceMappingByCurrency(symbol)
 	if mapping == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Unknown instrument: <code>%s</code>\n\nUsage: <code>/intraday EUR</code>",
-			args,
+			"❌ Symbol <code>%s</code> tidak ditemukan.\nContoh: <code>/quant EUR</code>, <code>/quant XAU 4h</code>",
+			html.EscapeString(symbol),
 		))
 		return err
 	}
 
-	return h.intradayDetail(ctx, chatID, mapping)
-}
+	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
 
-// intradayOverview shows a quick 4H snapshot of all monitored instruments.
-func (h *Handler) intradayOverview(ctx context.Context, chatID string) error {
-	builder := pricesvc.NewIntradayContextBuilder(h.intradayRepo)
-
-	var sections []string
-	skipped := 0
-
-	for _, group := range overviewGroups() {
-		var lines []string
-		for _, cur := range group.assets {
-			mapping := domain.FindPriceMappingByCurrency(cur)
-			if mapping == nil {
-				skipped++
-				continue
-			}
-			ic, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
-			if err != nil {
-				skipped++
-				continue
-			}
-
-			arrow := "→"
-			if ic.Chg4H > 0 {
-				arrow = "▲"
-			} else if ic.Chg4H < 0 {
-				arrow = "▼"
-			}
-
-			trend := ic.IntradayMATrend()
-			trendIcon := "⚪"
-			switch trend {
-			case "BULLISH":
-				trendIcon = "🟢"
-			case "BEARISH":
-				trendIcon = "🔴"
-			}
-
-			lines = append(lines, fmt.Sprintf(
-				"<code>%-7s %+.2f%% 24h:%+.2f%%</code> %s %s",
-				ic.Currency, ic.Chg4H, ic.Chg24H, arrow, trendIcon,
-			))
-		}
-		if len(lines) > 0 {
-			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
-		}
-	}
-
-	if len(sections) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "No intraday data available yet. 4H data is fetched every 4 hours.")
-		return err
-	}
-
-	msg := "⏰ <b>4H INTRADAY OVERVIEW</b>\n\n" +
-		strings.Join(sections, "\n\n") +
-		"\n\n<i>Use</i> <code>/intraday EUR</code> <i>for detailed view</i>"
-	if skipped > 0 {
-		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
-	}
-
-	_, err := h.bot.SendHTML(ctx, chatID, msg)
-	return err
-}
-
-// intradayDetail shows detailed 4H context for a single instrument.
-func (h *Handler) intradayDetail(ctx context.Context, chatID string, mapping *domain.PriceSymbolMapping) error {
-	builder := pricesvc.NewIntradayContextBuilder(h.intradayRepo)
-	ic, err := builder.Build(ctx, mapping.ContractCode, mapping.Currency)
+	state, err := h.computeQuantState(ctx, mapping, timeframe)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"No intraday data for <code>%s</code> yet.\n4H data is fetched every 4 hours.",
-			mapping.Currency,
-		))
-		return sendErr
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
+		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
+		return err2
 	}
 
-	htmlOut := h.fmt.FormatIntradayContext(ic)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	h.quantCache.set(chatID, state)
+
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
+
+	// Send dashboard
+	dashboard := h.formatQuantDashboard(state)
+	kb := h.kb.QuantMenu()
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, dashboard, kb)
 	return err
 }
 
 // ---------------------------------------------------------------------------
-// GARCH(1,1) Volatility Forecast
+// computeQuantState fetches bars for primary symbol + multi-asset
 // ---------------------------------------------------------------------------
 
-// cmdGarch handles /garch [currency] — GARCH(1,1) volatility forecast.
-func (h *Handler) cmdGarch(ctx context.Context, chatID string, userID int64, args string) error {
-	args = strings.TrimSpace(strings.ToUpper(args))
+func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSymbolMapping, timeframe string) (*quantState, error) {
+	code := mapping.ContractCode
+	barsByTF := make(map[string][]ta.OHLCV)
 
-	if args == "" {
-		return h.garchOverview(ctx, chatID)
+	// Fetch daily bars (always needed for most models)
+	dailyRecords, err := h.quant.DailyPriceRepo.GetDailyHistory(ctx, code, 500)
+	if err != nil || len(dailyRecords) < 30 {
+		return nil, fmt.Errorf("insufficient daily data for %s (%d bars)", mapping.Currency, len(dailyRecords))
 	}
+	barsByTF["daily"] = ta.DailyPricesToOHLCV(dailyRecords)
 
-	mapping := domain.FindPriceMappingByCurrency(args)
-	if mapping == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Unknown instrument: <code>%s</code>\n\nUsage: <code>/garch EUR</code>",
-			args,
-		))
-		return err
-	}
-
-	return h.garchDetail(ctx, chatID, mapping)
-}
-
-// garchOverview shows GARCH vol forecast for all monitored instruments.
-func (h *Handler) garchOverview(ctx context.Context, chatID string) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
-		return err
-	}
-
-	var sections []string
-	skipped := 0
-
-	for _, group := range overviewGroups() {
-		var lines []string
-		for _, cur := range group.assets {
-			mapping := domain.FindPriceMappingByCurrency(cur)
-			if mapping == nil {
-				skipped++
-				continue
-			}
-			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-			if err != nil || len(prices) < 30 {
-				skipped++
-				continue
-			}
-
-			records := dailyToPriceRecords(prices)
-			garch, err := pricesvc.EstimateGARCH(records)
-			if err != nil {
-				skipped++
-				continue
-			}
-
-			icon := "⚪"
-			switch garch.VolForecast {
-			case "INCREASING":
-				icon = "🔴"
-			case "DECREASING":
-				icon = "🟢"
-			}
-
-			// Human-friendly: show daily vol %, forecast direction, and ratio vs average
-			ratioLabel := "avg"
-			if garch.VolRatio > 1.25 {
-				ratioLabel = "HIGH"
-			} else if garch.VolRatio < 0.75 {
-				ratioLabel = "LOW"
-			}
-
-			lines = append(lines, fmt.Sprintf(
-				"<code>%-7s %.2f%%/day → %.2f%% (%s)</code> %s",
-				cur, garch.CurrentVol*100, garch.ForecastVol1*100, ratioLabel, icon,
-			))
+	// Fetch intraday if requested
+	if timeframe != "daily" && h.quant.IntradayRepo != nil {
+		count := 500
+		if timeframe == "15m" || timeframe == "30m" {
+			count = 2000
 		}
-		if len(lines) > 0 {
-			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+		intradayBars, iErr := h.quant.IntradayRepo.GetHistory(ctx, code, timeframe, count)
+		if iErr == nil && len(intradayBars) > 30 {
+			barsByTF[timeframe] = ta.IntradayBarsToOHLCV(intradayBars)
 		}
 	}
 
-	if len(sections) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for GARCH estimation (need ≥30 daily bars).")
-		return err
-	}
-
-	msg := "📊 <b>VOLATILITY FORECAST</b>\n" +
-		"<i>How wild prices move today → predicted tomorrow</i>\n\n" +
-		strings.Join(sections, "\n\n") +
-		"\n\n🔴 Getting wilder  ⚪ Stable  🟢 Calming down\n" +
-		"<i>Use</i> <code>/garch EUR</code> <i>for detailed view</i>"
-	if skipped > 0 {
-		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
-	}
-
-	_, err := h.bot.SendHTML(ctx, chatID, msg)
-	return err
+	return &quantState{
+		symbol:    mapping.Currency,
+		currency:  mapping.Currency,
+		timeframe: timeframe,
+		bars:      barsByTF,
+		createdAt: time.Now(),
+	}, nil
 }
 
-// garchDetail shows detailed GARCH output for a single instrument.
-func (h *Handler) garchDetail(ctx context.Context, chatID string, mapping *domain.PriceSymbolMapping) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
+// ---------------------------------------------------------------------------
+// formatQuantDashboard — quick summary dashboard
+// ---------------------------------------------------------------------------
+
+func (h *Handler) formatQuantDashboard(state *quantState) string {
+	return fmt.Sprintf(`📊 <b>QUANT DASHBOARD: %s</b>
+📅 %s — %s
+
+Pilih model analisis di bawah.
+Setiap model akan menghasilkan chart + analisis detail.
+
+<b>📊 Foundation:</b>
+  Stats · GARCH · Correlation
+
+<b>📈 Time Series:</b>
+  ARIMA · Mean Reversion · Granger
+
+<b>🎭 Advanced:</b>
+  HMM Regime Detection
+
+Klik tombol untuk mulai analisis.`,
+		html.EscapeString(state.symbol),
+		time.Now().Format("02 Jan 2006"),
+		state.timeframe,
+	)
+}
+
+// ---------------------------------------------------------------------------
+// handleQuantCallback — inline button handler
+// ---------------------------------------------------------------------------
+
+func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID int, _ int64, data string) error {
+	// Format: quant:{action}
+	parts := strings.SplitN(data, ":", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	action := parts[1]
+
+	state := h.quantCache.get(chatID)
+	if state == nil {
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendHTML(ctx, chatID, "⏰ Session expired. Gunakan <code>/quant "+html.EscapeString("")+"</code> lagi.")
 		return err
 	}
 
-	prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-	if err != nil || len(prices) < 30 {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Insufficient data for <code>%s</code> GARCH (need ≥30 daily bars, got %d).",
-			mapping.Currency, len(prices),
-		))
-		return sendErr
+	// Timeframe switch
+	if strings.HasPrefix(action, "tf:") {
+		newTF := strings.TrimPrefix(action, "tf:")
+		state.timeframe = newTF
+		h.quantCache.set(chatID, state)
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		dashboard := h.formatQuantDashboard(state)
+		kb := h.kb.QuantMenu()
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, dashboard, kb)
+		return err
 	}
 
-	records := dailyToPriceRecords(prices)
-	garch, err := pricesvc.EstimateGARCH(records)
+	// Back to dashboard
+	if action == "back" {
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		dashboard := h.formatQuantDashboard(state)
+		kb := h.kb.QuantMenu()
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, dashboard, kb)
+		return err
+	}
+
+	// Model-specific actions
+	validModes := map[string]bool{
+		"stats": true, "garch": true, "corr": true, "regime": true,
+		"arima": true, "meanrevert": true, "granger": true,
+	}
+
+	mode := action
+	// Alias
+	if mode == "corr" {
+		mode = "correlation"
+	}
+	if mode == "mr" {
+		mode = "meanrevert"
+	}
+
+	if !validModes[action] {
+		return nil
+	}
+
+	// Send loading
+	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("⏳ Running %s for <b>%s</b> (%s)...", action, html.EscapeString(state.symbol), state.timeframe))
+
+	// Run quant engine
+	result, err := h.runQuantEngine(state, mode)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("GARCH estimation failed: %s", html.EscapeString(err.Error())))
-		return sendErr
+		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
+		return err2
 	}
 
-	htmlOut := h.fmt.FormatGARCH(mapping.Currency, garch)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	kb := h.kb.QuantDetailMenu()
+
+	// Send chart if available
+	if result.ChartPath != "" {
+		chartData, readErr := os.ReadFile(result.ChartPath)
+		if readErr == nil && len(chartData) > 0 {
+			shortCaption := fmt.Sprintf("📊 %s — %s — %s", strings.ToUpper(action), html.EscapeString(state.symbol), state.timeframe)
+			_, _ = h.bot.SendPhoto(ctx, chatID, chartData, shortCaption)
+		}
+		os.Remove(result.ChartPath) // cleanup
+	}
+
+	// Send text
+	if result.TextOutput != "" {
+		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, result.TextOutput, kb)
+	} else if !result.Success {
+		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, "❌ "+html.EscapeString(result.Error), kb)
+	}
 	return err
 }
 
 // ---------------------------------------------------------------------------
-// Hurst Exponent — Regime Analysis
+// quantEngineResult — parsed output from Python
 // ---------------------------------------------------------------------------
 
-// cmdHurst handles /hurst [currency] — Hurst exponent analysis.
-func (h *Handler) cmdHurst(ctx context.Context, chatID string, userID int64, args string) error {
-	args = strings.TrimSpace(strings.ToUpper(args))
-
-	if args == "" {
-		return h.hurstOverview(ctx, chatID)
-	}
-
-	mapping := domain.FindPriceMappingByCurrency(args)
-	if mapping == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Unknown instrument: <code>%s</code>\n\nUsage: <code>/hurst EUR</code>",
-			args,
-		))
-		return err
-	}
-
-	return h.hurstDetail(ctx, chatID, mapping)
+type quantEngineResult struct {
+	Mode       string                 `json:"mode"`
+	Symbol     string                 `json:"symbol"`
+	Success    bool                   `json:"success"`
+	Error      string                 `json:"error"`
+	Result     map[string]interface{} `json:"result"`
+	TextOutput string                 `json:"text_output"`
+	ChartPath  string                 `json:"chart_path"`
 }
 
-// hurstOverview shows Hurst exponent for all monitored instruments.
-func (h *Handler) hurstOverview(ctx context.Context, chatID string) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
-		return err
+// ---------------------------------------------------------------------------
+// quantEngineInput — JSON sent to Python
+// ---------------------------------------------------------------------------
+
+type quantEngineInput struct {
+	Mode       string                       `json:"mode"`
+	Symbol     string                       `json:"symbol"`
+	Timeframe  string                       `json:"timeframe"`
+	Bars       []chartBar                   `json:"bars"`
+	MultiAsset map[string][]quantAssetClose `json:"multi_asset,omitempty"`
+	Params     map[string]interface{}       `json:"params,omitempty"`
+}
+
+type quantAssetClose struct {
+	Date  string  `json:"date"`
+	Close float64 `json:"close"`
+}
+
+// ---------------------------------------------------------------------------
+// runQuantEngine — execute Python quant_engine.py
+// ---------------------------------------------------------------------------
+
+func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineResult, error) {
+	tf := state.timeframe
+	bars, ok := state.bars[tf]
+	if !ok || len(bars) == 0 {
+		// Fallback to daily
+		bars, ok = state.bars["daily"]
+		if !ok || len(bars) == 0 {
+			return nil, fmt.Errorf("no bars available for %s", state.symbol)
+		}
+		tf = "daily"
 	}
 
-	var sections []string
-	skipped := 0
-
-	for _, group := range overviewGroups() {
-		var lines []string
-		for _, cur := range group.assets {
-			mapping := domain.FindPriceMappingByCurrency(cur)
-			if mapping == nil {
-				skipped++
-				continue
-			}
-			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 200)
-			if err != nil || len(prices) < 50 {
-				skipped++
-				continue
-			}
-
-			records := dailyToPriceRecords(prices)
-			hurst, err := pricesvc.ComputeHurstExponent(records)
-			if err != nil {
-				skipped++
-				continue
-			}
-
-			icon := "⚪"
-			label := "Random"
-			switch hurst.Classification {
-			case "TRENDING":
-				icon = "📈"
-				label = "Trending"
-			case "MEAN_REVERTING":
-				icon = "🔄"
-				label = "Reverting"
-			}
-
-			lines = append(lines, fmt.Sprintf(
-				"<code>%-7s H=%.2f %-9s</code> %s",
-				cur, hurst.H, label, icon,
-			))
-		}
-		if len(lines) > 0 {
-			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
+	// Convert bars (newest-first → oldest-first)
+	n := len(bars)
+	chartBars := make([]chartBar, n)
+	for i, b := range bars {
+		chartBars[n-1-i] = chartBar{
+			Date:   b.Date.Format(time.RFC3339),
+			Open:   b.Open,
+			High:   b.High,
+			Low:    b.Low,
+			Close:  b.Close,
+			Volume: b.Volume,
 		}
 	}
 
-	if len(sections) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for Hurst estimation (need ≥50 daily bars).")
-		return err
+	input := quantEngineInput{
+		Mode:      mode,
+		Symbol:    state.symbol,
+		Timeframe: tf,
+		Bars:      chartBars,
+		Params: map[string]interface{}{
+			"lookback":         120,
+			"forecast_horizon": 5,
+			"confidence_level": 0.95,
+		},
 	}
 
-	msg := "📐 <b>MARKET BEHAVIOUR</b>\n" +
-		"<i>Is each market trending or bouncing back?</i>\n\n" +
-		strings.Join(sections, "\n\n") +
-		"\n\n📈 Trending (follow momentum)  🔄 Reverting (fades back)  ⚪ Random\n" +
-		"<i>Use</i> <code>/hurst EUR</code> <i>for detailed view</i>"
-	if skipped > 0 {
-		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
+	// Multi-asset data for correlation/granger
+	needsMultiAsset := mode == "correlation" || mode == "granger"
+	if needsMultiAsset {
+		multiAsset, maErr := h.fetchMultiAssetCloses(state.symbol, tf)
+		if maErr == nil && len(multiAsset) > 0 {
+			input.MultiAsset = multiAsset
+		}
 	}
 
-	_, err := h.bot.SendHTML(ctx, chatID, msg)
-	return err
-}
-
-// hurstDetail shows detailed Hurst analysis for a single instrument.
-func (h *Handler) hurstDetail(ctx context.Context, chatID string, mapping *domain.PriceSymbolMapping) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
-		return err
-	}
-
-	prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 200)
-	if err != nil || len(prices) < 50 {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Insufficient data for <code>%s</code> Hurst (need ≥50 daily bars, got %d).",
-			mapping.Currency, len(prices),
-		))
-		return sendErr
-	}
-
-	records := dailyToPriceRecords(prices)
-	hurst, err := pricesvc.ComputeHurstExponent(records)
+	// Marshal + execute
+	jsonData, err := json.Marshal(input)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Hurst estimation failed: %s", html.EscapeString(err.Error())))
-		return sendErr
+		return nil, fmt.Errorf("marshal quant input: %w", err)
 	}
 
-	// Also get ADX regime for combined view
-	var regime *pricesvc.HurstRegimeContext
-	if len(records) >= 14 {
-		adxRegime := pricesvc.ClassifyPriceRegime(records, nil)
-		regime = pricesvc.CombineRegimeClassification(adxRegime, hurst)
+	tmpDir := os.TempDir()
+	ts := time.Now().UnixNano()
+	inputPath := filepath.Join(tmpDir, fmt.Sprintf("quant_input_%d.json", ts))
+	outputPath := filepath.Join(tmpDir, fmt.Sprintf("quant_output_%d.json", ts))
+	chartPath := filepath.Join(tmpDir, fmt.Sprintf("quant_chart_%d.png", ts))
+
+	if err := os.WriteFile(inputPath, jsonData, 0644); err != nil {
+		return nil, fmt.Errorf("write quant input: %w", err)
+	}
+	defer os.Remove(inputPath)
+	defer os.Remove(outputPath)
+
+	scriptPath := findQuantScript()
+	cmd := exec.CommandContext(context.Background(), "python3", scriptPath, inputPath, outputPath, chartPath)
+	cmd.Stderr = os.Stderr
+
+	// Timeout: 60s for complex models
+	cmdCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd = exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("quant engine failed: %w", err)
 	}
 
-	htmlOut := h.fmt.FormatHurst(mapping.Currency, hurst, regime)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
+	// Read output
+	outData, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, fmt.Errorf("read quant output: %w", err)
+	}
+
+	var result quantEngineResult
+	if err := json.Unmarshal(outData, &result); err != nil {
+		return nil, fmt.Errorf("parse quant output: %w", err)
+	}
+
+	// Check if chart was actually generated
+	if _, err := os.Stat(chartPath); err == nil {
+		result.ChartPath = chartPath
+	}
+
+	return &result, nil
 }
 
-// dailyToPriceRecords converts DailyPrice slice to PriceRecord slice.
-func dailyToPriceRecords(prices []domain.DailyPrice) []domain.PriceRecord {
-	records := make([]domain.PriceRecord, len(prices))
-	for i, p := range prices {
-		records[i] = domain.PriceRecord{
-			Date:  p.Date,
-			Open:  p.Open,
-			High:  p.High,
-			Low:   p.Low,
-			Close: p.Close,
+// ---------------------------------------------------------------------------
+// fetchMultiAssetCloses — get daily closes for all tracked symbols
+// ---------------------------------------------------------------------------
+
+func (h *Handler) fetchMultiAssetCloses(excludeSymbol string, tf string) (map[string][]quantAssetClose, error) {
+	ctx := context.Background()
+	result := make(map[string][]quantAssetClose)
+
+	// Key related symbols for each asset class
+	relatedSymbols := []string{
+		"EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD", "USD",
+		"XAU", "XAG", "OIL", "COPPER",
+		"SPX500", "NDX", "DJI",
+	}
+
+	for _, sym := range relatedSymbols {
+		if strings.EqualFold(sym, excludeSymbol) {
+			continue
+		}
+		mapping := domain.FindPriceMappingByCurrency(sym)
+		if mapping == nil {
+			continue
+		}
+
+		records, err := h.quant.DailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 300)
+		if err != nil || len(records) < 30 {
+			continue
+		}
+
+		closes := make([]quantAssetClose, len(records))
+		for i, r := range records {
+			// records are newest-first, reverse for Python
+			closes[len(records)-1-i] = quantAssetClose{
+				Date:  r.Date.Format(time.RFC3339),
+				Close: r.Close,
+			}
+		}
+		result[sym] = closes
+	}
+
+	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// findQuantScript locates the quant_engine.py script
+// ---------------------------------------------------------------------------
+
+func findQuantScript() string {
+	candidates := []string{
+		"scripts/quant_engine.py",
+		"../scripts/quant_engine.py",
+		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/quant_engine.py",
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
 		}
 	}
-	return records
-}
-
-// ---------------------------------------------------------------------------
-// HMM Regime-Switching Model
-// ---------------------------------------------------------------------------
-
-// cmdRegime handles /regime [currency] — HMM regime analysis.
-func (h *Handler) cmdRegime(ctx context.Context, chatID string, userID int64, args string) error {
-	args = strings.TrimSpace(strings.ToUpper(args))
-
-	if args == "" {
-		return h.regimeOverview(ctx, chatID)
-	}
-
-	mapping := domain.FindPriceMappingByCurrency(args)
-	if mapping == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Unknown instrument: <code>%s</code>\n\nUsage: <code>/regime EUR</code>",
-			args,
-		))
-		return err
-	}
-
-	return h.regimeDetail(ctx, chatID, mapping)
-}
-
-// regimeOverview shows HMM regime for all monitored instruments.
-func (h *Handler) regimeOverview(ctx context.Context, chatID string) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
-		return err
-	}
-
-	var sections []string
-	skipped := 0
-
-	for _, group := range overviewGroups() {
-		var lines []string
-		for _, cur := range group.assets {
-			mapping := domain.FindPriceMappingByCurrency(cur)
-			if mapping == nil {
-				skipped++
-				continue
-			}
-			prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-			if err != nil || len(prices) < 60 {
-				skipped++
-				continue
-			}
-
-			records := dailyToPriceRecords(prices)
-			hmm, err := pricesvc.EstimateHMMRegime(records)
-			if err != nil {
-				skipped++
-				continue
-			}
-
-			icon := "⚪"
-			label := "Unknown"
-			switch hmm.CurrentState {
-			case pricesvc.HMMRiskOn:
-				icon = "🟢"
-				label = "Risk-On"
-			case pricesvc.HMMRiskOff:
-				icon = "🟡"
-				label = "Risk-Off"
-			case pricesvc.HMMCrisis:
-				icon = "🔴"
-				label = "Crisis"
-			}
-
-			warning := ""
-			if hmm.TransitionWarning != "" {
-				warning = " ⚠️"
-			}
-
-			lines = append(lines, fmt.Sprintf(
-				"<code>%-7s %-8s P:%.0f%%</code> %s%s",
-				cur, label,
-				hmm.StateProbabilities[stateIndex(hmm.CurrentState)]*100,
-				icon, warning,
-			))
-		}
-		if len(lines) > 0 {
-			sections = append(sections, fmt.Sprintf("<i>%s</i>\n%s", group.label, strings.Join(lines, "\n")))
-		}
-	}
-
-	if len(sections) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "Insufficient price data for HMM regime estimation (need ≥60 daily bars).")
-		return err
-	}
-
-	msg := "🔀 <b>MARKET REGIME</b>\n" +
-		"<i>Is each market in calm, cautious, or panic mode?</i>\n\n" +
-		strings.Join(sections, "\n\n") +
-		"\n\n🟢 Risk-On (calm)  🟡 Risk-Off (cautious)  🔴 Crisis (panic)  ⚠️ Shifting\n" +
-		"<i>Use</i> <code>/regime EUR</code> <i>for detailed view</i>"
-	if skipped > 0 {
-		msg += fmt.Sprintf("\n⚠️ %d instruments unavailable", skipped)
-	}
-
-	_, err := h.bot.SendHTML(ctx, chatID, msg)
-	return err
-}
-
-// regimeDetail shows detailed HMM regime for a single instrument.
-func (h *Handler) regimeDetail(ctx context.Context, chatID string, mapping *domain.PriceSymbolMapping) error {
-	if h.dailyPriceRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet.")
-		return err
-	}
-
-	prices, err := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 120)
-	if err != nil || len(prices) < 60 {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"Insufficient data for <code>%s</code> HMM (need ≥60 daily bars, got %d).",
-			mapping.Currency, len(prices),
-		))
-		return sendErr
-	}
-
-	records := dailyToPriceRecords(prices)
-	hmm, err := pricesvc.EstimateHMMRegime(records)
-	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("HMM estimation failed: %s", html.EscapeString(err.Error())))
-		return sendErr
-	}
-
-	htmlOut := h.fmt.FormatHMMRegime(mapping.Currency, hmm)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
-}
-
-// stateIndex returns the numeric index for an HMM state label.
-func stateIndex(state string) int {
-	switch state {
-	case pricesvc.HMMRiskOn:
-		return 0
-	case pricesvc.HMMRiskOff:
-		return 1
-	case pricesvc.HMMCrisis:
-		return 2
-	default:
-		return 1
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Factor Decomposition
-// ---------------------------------------------------------------------------
-
-// cmdFactors handles /factors — factor return decomposition.
-func (h *Handler) cmdFactors(ctx context.Context, chatID string, userID int64, args string) error {
-	if h.signalRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Signal repository not available.")
-		return err
-	}
-
-	_, _ = h.bot.SendHTML(ctx, chatID, "Running factor decomposition...")
-
-	decomposer := backtestsvc.NewFactorDecomposer(h.signalRepo)
-	result, err := decomposer.Decompose(ctx)
-	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Factor decomposition failed: %s", html.EscapeString(err.Error())))
-		return sendErr
-	}
-
-	htmlOut := h.fmt.FormatFactorDecomposition(result)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// Walk-Forward Optimization
-// ---------------------------------------------------------------------------
-
-// cmdWFOpt handles /wfopt — walk-forward weight optimization.
-func (h *Handler) cmdWFOpt(ctx context.Context, chatID string, userID int64, args string) error {
-	if h.signalRepo == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "Signal repository not available.")
-		return err
-	}
-
-	_, _ = h.bot.SendHTML(ctx, chatID, "Running walk-forward optimization (26W train → 4W test)...")
-
-	optimizer := backtestsvc.NewWalkForwardOptimizer(h.signalRepo)
-	result, err := optimizer.Optimize(ctx)
-	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Walk-forward optimization failed: %s", html.EscapeString(err.Error())))
-		return sendErr
-	}
-
-	htmlOut := h.fmt.FormatWFOptimization(result)
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
-	return err
+	return "scripts/quant_engine.py"
 }

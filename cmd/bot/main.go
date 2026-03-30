@@ -365,6 +365,15 @@ func main() {
 		}
 		handler.WithCTABT(ctabtServices)
 		log.Info().Msg("CTA Backtest commands registered (/ctabt)")
+
+		// Wire Quant services (Econometric/Statistical Analysis engine)
+		quantServices := &tgbot.QuantServices{
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+			PriceMapping:   domain.DefaultPriceSymbolMappings,
+		}
+		handler.WithQuant(quantServices)
+		log.Info().Msg("Quant commands registered (/quant)")
 	}
 
 	// Register free-text handler for chatbot mode

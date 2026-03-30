@@ -102,6 +102,13 @@ type Handler struct {
 	// Initialized by WithCTA; nil if CTA services are not configured.
 	ctaCache *ctaStateCache
 
+	// quant holds optional Quant/Econometric engine services.
+	// May be nil — /quant command disabled if not configured.
+	quant *QuantServices
+
+	// quantCache stores per-chat Quant state with TTL.
+	quantCache *quantStateCache
+
 	// ctabt holds optional CTA Backtest engine services.
 	// May be nil — /ctabt command disabled if not configured.
 	ctabt *CTABTServices
@@ -171,14 +178,6 @@ func NewHandler(
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
 	bot.RegisterCommand("/price", h.cmdPrice) // Daily price context
 	bot.RegisterCommand("/levels", h.cmdLevels) // Support/resistance levels + position sizing
-	bot.RegisterCommand("/intraday", h.cmdIntraday) // 4H intraday context
-	bot.RegisterCommand("/corr", h.cmdCorr)         // Cross-pair correlation matrix
-	bot.RegisterCommand("/carry", h.cmdCarry)       // Interest rate differential / carry trade
-	bot.RegisterCommand("/garch", h.cmdGarch)       // GARCH(1,1) volatility forecast
-	bot.RegisterCommand("/hurst", h.cmdHurst)       // Hurst exponent / regime analysis
-	bot.RegisterCommand("/regime", h.cmdRegime)     // HMM regime-switching model
-	bot.RegisterCommand("/factors", h.cmdFactors)   // Factor decomposition
-	bot.RegisterCommand("/wfopt", h.cmdWFOpt)       // Walk-forward weight optimization
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -243,6 +242,7 @@ func (h *Handler) sendHelp(ctx context.Context, chatID string, userID int64) err
 /alpha — Dashboard lengkap (ringkasan + navigasi detail)
 /cta — Classical TA dashboard · <code>/cta EUR</code> · <code>/cta EUR 4h</code>
 /ctabt — Backtest strategi Classical TA · <code>/ctabt EUR</code> · <code>/ctabt EUR 4h</code>
+/quant — Econometric/Statistical analysis · <code>/quant EUR</code> · <code>/quant XAU 4h</code>
 
 <b>📊 Market Data</b>
 /cot — COT positioning · <code>/cot EUR</code>
@@ -1352,22 +1352,9 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdPrice(ctx, chatID, userID, args)
 	case "levels":
 		return h.cmdLevels(ctx, chatID, userID, args)
-	case "corr":
-		return h.cmdCorr(ctx, chatID, userID, args)
-	case "carry":
-		return h.cmdCarry(ctx, chatID, userID, args)
-	case "intraday":
-		return h.cmdIntraday(ctx, chatID, userID, args)
-	case "garch":
-		return h.cmdGarch(ctx, chatID, userID, args)
-	case "hurst":
-		return h.cmdHurst(ctx, chatID, userID, args)
-	case "regime":
-		return h.cmdRegime(ctx, chatID, userID, args)
-	case "factors":
-		return h.cmdFactors(ctx, chatID, userID, args)
-	case "wfopt":
-		return h.cmdWFOpt(ctx, chatID, userID, args)
+	case "corr", "carry", "intraday", "garch", "hurst", "regime", "factors", "wfopt":
+		// These are now handled by /quant
+		return h.cmdQuant(ctx, chatID, userID, args)
 	default:
 		return nil
 	}
