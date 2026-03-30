@@ -455,20 +455,14 @@ func (h *Handler) fetchMultiAssetCloses(excludeSymbol string, tf string) (map[st
 	ctx := context.Background()
 	result := make(map[string][]quantAssetClose)
 
-	// Key related symbols for each asset class
-	relatedSymbols := []string{
-		"EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD", "USD",
-		"XAU", "XAG", "OIL", "COPPER",
-		"SPX500", "NDX", "DJI",
-	}
-
-	for _, sym := range relatedSymbols {
+	// Use ALL tracked symbols from price mappings
+	for _, mapping := range domain.DefaultPriceSymbolMappings {
+		sym := mapping.Currency
 		if strings.EqualFold(sym, excludeSymbol) {
 			continue
 		}
-		mapping := domain.FindPriceMappingByCurrency(sym)
-		if mapping == nil {
-			continue
+		if mapping.RiskOnly {
+			continue // skip VIX, SPX risk-only symbols
 		}
 
 		records, err := h.quant.DailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 300)
