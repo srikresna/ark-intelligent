@@ -4,7 +4,7 @@ Quant Engine — Econometric/Statistical Analysis for Trading.
 
 Usage: python3 quant_engine.py <input.json> <output.json> [chart_output.png]
 
-Modes: stats, garch, correlation, regime, arima, granger, meanrevert, pca, cointegration, var, risk, full
+Modes: stats, garch, correlation, regime, seasonal, granger, meanrevert, pca, cointegration, var, risk, full
 
 Input JSON: { mode, symbol, timeframe, bars[], multi_asset{}, params{} }
 Output JSON: { mode, symbol, success, error, result{}, chart_path, text_output }
@@ -907,162 +907,162 @@ def compute_granger(df, symbol, timeframe, params, multi_asset, chart_path=None)
 
 
 # ===========================================================================
-# MODE: ARIMA — Forecast
+# MODE: SEASONAL — Day-of-Week & Month-of-Year Analysis
 # ===========================================================================
 
-def compute_arima(df, symbol, timeframe, params, chart_path=None):
-    from statsmodels.tsa.arima.model import ARIMA
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+def compute_seasonal(df, symbol, timeframe, params, chart_path=None):
+    """Analyze historical returns by day-of-week and month-of-year."""
 
-    close = df["Close"]
-    n = len(close)
-    if n < 50:
-        return output("arima", symbol, False, {}, "", error="Minimal 50 bar untuk forecast")
+    returns = compute_returns(df)
+    n = len(returns)
+    if n < 60:
+        return output("seasonal", symbol, False, {}, "", error="Minimal 60 bar untuk seasonal analysis")
 
-    horizon = params.get("forecast_horizon", 5)
-    current_price = close.iloc[-1]
+    from scipy import stats as sp_stats
 
-    forecasts = {}  # model_name → forecast_values
+    # --- Day of Week Analysis ---
+    dow_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    returns_with_dow = returns.copy()
+    returns_with_dow.index = pd.to_datetime(returns_with_dow.index)
+    dow_groups = returns_with_dow.groupby(returns_with_dow.index.dayofweek)
 
-    # --- Model 1: ARIMA on prices ---
-    best_aic = np.inf
-    best_order = (1, 1, 1)
-    best_res = None
-    orders = [(1,1,0), (0,1,1), (1,1,1), (2,1,1), (1,1,2), (2,1,2), (3,1,1)]
-    for order in orders:
-        try:
-            model = ARIMA(close, order=order)
-            res = model.fit()
-            if res.aic < best_aic:
-                best_aic = res.aic
-                best_order = order
-                best_res = res
-        except Exception:
+    dow_stats = {}
+    for dow, group in dow_groups:
+        if len(group) < 5:
             continue
+        mean_r = float(group.mean())
+        std_r = float(group.std())
+        win_rate = float((group > 0).mean())
+        count = len(group)
+        # T-test: is mean significantly different from 0?
+        t_stat, p_val = sp_stats.ttest_1samp(group, 0)
+        dow_stats[dow_names[dow]] = {
+            "mean_return": safe_float(mean_r),
+            "std_dev": safe_float(std_r),
+            "win_rate": safe_float(win_rate),
+            "count": count,
+            "t_stat": safe_float(t_stat),
+            "p_value": safe_float(p_val),
+            "significant": p_val < 0.05,
+        }
 
-    if best_res is not None:
-        fcast = best_res.get_forecast(steps=horizon)
-        fc_arima = fcast.predicted_mean.values
-        fc_ci = fcast.conf_int(alpha=0.05)
-        forecasts["ARIMA"] = fc_arima
-    else:
-        fc_ci = None
+    # --- Month of Year Analysis ---
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    month_groups = returns_with_dow.groupby(returns_with_dow.index.month)
 
-    # --- Model 2: Holt-Winters ETS ---
-    try:
-        ets_model = ExponentialSmoothing(close, trend="add", damped_trend=True,
-                                         seasonal=None, initialization_method="estimated")
-        ets_res = ets_model.fit(optimized=True)
-        forecasts["ETS"] = ets_res.forecast(horizon).values
-    except Exception:
-        pass
+    month_stats = {}
+    for month, group in month_groups:
+        if len(group) < 5:
+            continue
+        mean_r = float(group.mean())
+        std_r = float(group.std())
+        win_rate = float((group > 0).mean())
+        count = len(group)
+        t_stat, p_val = sp_stats.ttest_1samp(group, 0)
+        month_stats[month_names[month - 1]] = {
+            "mean_return": safe_float(mean_r),
+            "std_dev": safe_float(std_r),
+            "win_rate": safe_float(win_rate),
+            "count": count,
+            "t_stat": safe_float(t_stat),
+            "p_value": safe_float(p_val),
+            "significant": p_val < 0.05,
+        }
 
-    # --- Model 3: Linear trend extrapolation (last 20 bars) ---
-    try:
-        lookback_trend = min(20, n)
-        recent = close.iloc[-lookback_trend:]
-        x = np.arange(lookback_trend)
-        slope, intercept = np.polyfit(x, recent.values, 1)
-        trend_fc = np.array([intercept + slope * (lookback_trend + i) for i in range(horizon)])
-        forecasts["Trend"] = trend_fc
-    except Exception:
-        pass
-
-    if not forecasts:
-        return output("arima", symbol, False, {}, "", error="Semua model forecast gagal")
-
-    # --- Ensemble: weighted average ---
-    # Weight: ARIMA 0.3, ETS 0.4, Trend 0.3 (ETS tends to capture trend best)
-    weights = {"ARIMA": 0.3, "ETS": 0.4, "Trend": 0.3}
-    total_weight = sum(weights.get(k, 0) for k in forecasts)
-    ensemble = np.zeros(horizon)
-    for name, fc in forecasts.items():
-        w = weights.get(name, 0.2) / total_weight
-        ensemble += fc[:horizon] * w
-
-    # Check if ensemble is still flat
-    expected_return = (ensemble[-1] - current_price) / current_price
-
-    # Select primary display model
-    # Use ensemble as the main forecast
-    fc_display = ensemble
-    primary_label = f"Ensemble ({'+'.join(forecasts.keys())})"
+    # --- Current context ---
+    today = df.index[-1]
+    current_dow = dow_names[today.dayofweek] if hasattr(today, 'dayofweek') else "N/A"
+    current_month = month_names[today.month - 1] if hasattr(today, 'month') else "N/A"
 
     result = {
-        "models_used": list(forecasts.keys()),
-        "primary_label": primary_label,
-        "arima_order": list(best_order) if best_res else None,
-        "aic": safe_float(best_aic) if best_res else None,
-        "forecast": [safe_float(v) for v in fc_display],
-        "individual_forecasts": {k: [safe_float(v) for v in vs[:horizon]] for k, vs in forecasts.items()},
-        "conf_lower": [safe_float(v) for v in fc_ci.iloc[:, 0].values] if fc_ci is not None else None,
-        "conf_upper": [safe_float(v) for v in fc_ci.iloc[:, 1].values] if fc_ci is not None else None,
-        "current_price": safe_float(current_price),
-        "expected_return": safe_float(expected_return),
+        "day_of_week": dow_stats,
+        "month_of_year": month_stats,
+        "current_day": current_dow,
+        "current_month": current_month,
+        "n_observations": n,
     }
 
-    # Chart
+    # Chart: two subplots — DOW bar chart + Month bar chart
     if chart_path:
-        fig, ax = plt.subplots(figsize=(14, 7))
-        fig.suptitle(f"{symbol} — Forecast Ensemble — {timeframe}", color=TEXT_COLOR, fontsize=13, fontweight="bold")
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+        fig.suptitle(f"{symbol} — Seasonal Analysis — {timeframe} ({n} obs)",
+                    color=TEXT_COLOR, fontsize=13, fontweight="bold")
 
-        recent = close.iloc[-60:]
-        ax.plot(recent.index, recent, color=ACCENT1, linewidth=1.2, label="Price")
+        # Day of Week
+        if dow_stats:
+            days = [d for d in dow_names if d in dow_stats]
+            means = [dow_stats[d]["mean_return"] * 100 for d in days]
+            colors_dow = [UP_COLOR if m > 0 else DOWN_COLOR for m in means]
+            bars1 = ax1.bar(days, means, color=colors_dow, alpha=0.7, edgecolor="none")
+            ax1.axhline(0, color=GRID_COLOR, linewidth=0.5)
+            ax1.set_title("Day of Week", color=TEXT_COLOR)
+            ax1.set_ylabel("Mean Return (%)")
+            ax1.grid(True, alpha=0.2, axis="y")
+            # Mark significant days
+            for i, d in enumerate(days):
+                if dow_stats[d].get("significant"):
+                    ax1.text(i, means[i], "★", ha="center", va="bottom" if means[i] > 0 else "top",
+                            color=ACCENT2, fontsize=12, fontweight="bold")
+            # Win rate labels
+            for i, d in enumerate(days):
+                wr = dow_stats[d]["win_rate"] * 100
+                ax1.text(i, 0, f"{wr:.0f}%", ha="center", va="top" if means[i] > 0 else "bottom",
+                        color=TEXT_COLOR, fontsize=7, alpha=0.7)
 
-        last_date = close.index[-1]
-        fc_dates = pd.date_range(start=last_date, periods=horizon+1, freq="B")[1:]
-
-        # Individual model forecasts (thin lines)
-        model_colors = {"ARIMA": "#666666", "ETS": ACCENT3, "Trend": ACCENT4}
-        for name, fc in forecasts.items():
-            ax.plot(fc_dates, fc[:horizon], color=model_colors.get(name, "#888"),
-                   linewidth=0.8, linestyle=":", alpha=0.6, label=name)
-
-        # Ensemble (bold)
-        ax.plot(fc_dates, fc_display, color=ACCENT2, linewidth=2.5, linestyle="--",
-               label="Ensemble", marker="o", markersize=5)
-
-        if fc_ci is not None:
-            ax.fill_between(fc_dates, fc_ci.iloc[:, 0].values, fc_ci.iloc[:, 1].values,
-                            alpha=0.1, color=ACCENT2, label="ARIMA 95% CI")
-
-        ax.axvline(last_date, color=GRID_COLOR, linestyle=":", linewidth=0.8)
-        ax.set_ylabel("Price")
-        ax.legend(fontsize=8, facecolor=BG_COLOR, edgecolor=GRID_COLOR)
-        ax.grid(True, alpha=0.3)
+        # Month of Year
+        if month_stats:
+            months = [m for m in month_names if m in month_stats]
+            means_m = [month_stats[m]["mean_return"] * 100 for m in months]
+            colors_m = [UP_COLOR if m > 0 else DOWN_COLOR for m in means_m]
+            bars2 = ax2.bar(months, means_m, color=colors_m, alpha=0.7, edgecolor="none")
+            ax2.axhline(0, color=GRID_COLOR, linewidth=0.5)
+            ax2.set_title("Month of Year", color=TEXT_COLOR)
+            ax2.set_ylabel("Mean Return (%)")
+            ax2.grid(True, alpha=0.2, axis="y")
+            ax2.tick_params(axis="x", rotation=45)
+            # Mark significant months
+            for i, m in enumerate(months):
+                if month_stats[m].get("significant"):
+                    ax2.text(i, means_m[i], "★", ha="center", va="bottom" if means_m[i] > 0 else "top",
+                            color=ACCENT2, fontsize=12, fontweight="bold")
 
         plt.tight_layout()
         save_chart(fig, chart_path)
 
-    direction = "📈 NAIK" if expected_return > 0.002 else ("📉 TURUN" if expected_return < -0.002 else "➡️ FLAT")
-
-    text = f"""📉 <b>Forecast Ensemble: {symbol}</b>
+    # Format text
+    text = f"""📅 <b>Seasonal Analysis: {symbol}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-Models: {', '.join(forecasts.keys())}
+📊 {n} observasi, {timeframe}
+Today: {current_dow}, {current_month}
 
-📊 <b>Ensemble Forecast ({horizon} bar):</b>
-  Current: {current_price:.4f}
+📆 <b>Day of Week:</b>
 """
-    for i in range(horizon):
-        fc_val = fc_display[i]
-        ret_i = (fc_val - current_price) / current_price * 100
-        if fc_ci is not None:
-            text += f"  Bar +{i+1}: {fc_val:.4f} ({ret_i:+.2f}%) [{fc_ci.iloc[i, 0]:.4f} — {fc_ci.iloc[i, 1]:.4f}]\n"
+    # Sort by mean return
+    for day in sorted(dow_stats.keys(), key=lambda d: dow_stats[d]["mean_return"], reverse=True):
+        ds = dow_stats[day]
+        emoji = "🟢" if ds["mean_return"] > 0 else "🔴"
+        sig = " ★" if ds["significant"] else ""
+        text += f"  {emoji} {day}: {ds['mean_return']*100:+.3f}% (win {ds['win_rate']*100:.0f}%, n={ds['count']}){sig}\n"
+
+    text += "\n📅 <b>Month of Year:</b>\n"
+    for month in sorted(month_stats.keys(), key=lambda m: month_stats[m]["mean_return"], reverse=True):
+        ms = month_stats[month]
+        emoji = "🟢" if ms["mean_return"] > 0 else "🔴"
+        sig = " ★" if ms["significant"] else ""
+        text += f"  {emoji} {month}: {ms['mean_return']*100:+.3f}% (win {ms['win_rate']*100:.0f}%, n={ms['count']}){sig}\n"
+
+    text += "\n★ = statistically significant (p≤0.05)"
+
+    # Current context advice
+    if current_dow in dow_stats:
+        ds = dow_stats[current_dow]
+        if ds["mean_return"] > 0:
+            text += f"\n\n💡 <b>{current_dow} historically bullish</b> ({ds['mean_return']*100:+.3f}%, win {ds['win_rate']*100:.0f}%)"
         else:
-            text += f"  Bar +{i+1}: {fc_val:.4f} ({ret_i:+.2f}%)\n"
+            text += f"\n\n💡 <b>{current_dow} historically bearish</b> ({ds['mean_return']*100:+.3f}%, win {ds['win_rate']*100:.0f}%)"
 
-    text += f"""
-🎯 <b>Expected: {direction} {expected_return*100:+.3f}%</b>
-
-📊 <b>Individual Models:</b>
-"""
-    for name, fc in forecasts.items():
-        ret = (fc[horizon-1] - current_price) / current_price * 100
-        text += f"  {name}: {fc[horizon-1]:.4f} ({ret:+.2f}%)\n"
-
-    text += "\n⚠️ Forecast = statistical projection, bukan rekomendasi trading."
-
-    return output("arima", symbol, True, result, text, chart_path=chart_path or "")
+    return output("seasonal", symbol, True, result, text, chart_path=chart_path or "")
 
 
 # ===========================================================================
@@ -1685,9 +1685,9 @@ def compute_full_report(df, symbol, timeframe, params, multi_asset, chart_path=N
         errors.append(f"meanrevert: {e}")
 
     try:
-        sub_results["arima"] = compute_arima(df, symbol, timeframe, params)
+        sub_results["seasonal"] = compute_seasonal(df, symbol, timeframe, params)
     except Exception as e:
-        errors.append(f"arima: {e}")
+        errors.append(f"seasonal: {e}")
 
     try:
         sub_results["risk"] = compute_risk(df, symbol, timeframe, params)
@@ -1718,21 +1718,22 @@ def compute_full_report(df, symbol, timeframe, params, multi_asset, chart_path=N
         else:
             signals.append(("Regime", "NEUTRAL", regime_prob))
 
-    # ARIMA direction
-    if "arima" in sub_results and sub_results["arima"]["success"]:
-        arima_result = sub_results["arima"]["result"]
-        fc = arima_result.get("forecast", [])
-        current = arima_result.get("current_price", 0)
-        if fc and current and current > 0:
-            expected_ret = (fc[-1] - current) / current
-            if expected_ret > 0.001:
-                signals.append(("ARIMA", "BULLISH", min(abs(expected_ret) * 50, 1.0)))
-                confidence_scores.append(0.15)
-            elif expected_ret < -0.001:
-                signals.append(("ARIMA", "BEARISH", min(abs(expected_ret) * 50, 1.0)))
-                confidence_scores.append(-0.15)
+    # Seasonal signal
+    if "seasonal" in sub_results and sub_results["seasonal"]["success"]:
+        seasonal_result = sub_results["seasonal"]["result"]
+        current_dow = seasonal_result.get("current_day", "")
+        dow_data = seasonal_result.get("day_of_week", {})
+        if current_dow in dow_data:
+            dow_mean = dow_data[current_dow].get("mean_return", 0) or 0
+            dow_wr = dow_data[current_dow].get("win_rate", 0.5) or 0.5
+            if dow_mean > 0 and dow_wr > 0.55:
+                signals.append(("Seasonal", "BULLISH", min(dow_wr, 1.0)))
+                confidence_scores.append(0.1)
+            elif dow_mean < 0 and dow_wr < 0.45:
+                signals.append(("Seasonal", "BEARISH", min(1 - dow_wr, 1.0)))
+                confidence_scores.append(-0.1)
             else:
-                signals.append(("ARIMA", "NEUTRAL", 0.5))
+                signals.append(("Seasonal", "NEUTRAL", 0.5))
 
     # Mean reversion signal
     if "meanrevert" in sub_results and sub_results["meanrevert"]["success"]:
@@ -1897,7 +1898,7 @@ MODES = {
     "granger": lambda data, chart: compute_granger(
         bars_to_df(data["bars"]), data["symbol"], data["timeframe"], data.get("params", {}),
         data.get("multi_asset", {}), chart),
-    "arima": lambda data, chart: compute_arima(
+    "seasonal": lambda data, chart: compute_seasonal(
         bars_to_df(data["bars"]), data["symbol"], data["timeframe"], data.get("params", {}), chart),
     "cointegration": lambda data, chart: compute_cointegration(
         bars_to_df(data["bars"]), data["symbol"], data["timeframe"], data.get("params", {}),

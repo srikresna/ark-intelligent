@@ -932,7 +932,7 @@ func (kb *KeyboardBuilder) QuantMenu() ports.InlineKeyboard {
 				{Text: "🔗 Correlation", CallbackData: "quant:corr"},
 			},
 			{
-				{Text: "📉 ARIMA", CallbackData: "quant:arima"},
+				{Text: "📅 Seasonal", CallbackData: "quant:seasonal"},
 				{Text: "🔄 Mean Revert", CallbackData: "quant:meanrevert"},
 				{Text: "⚡ Granger", CallbackData: "quant:granger"},
 			},

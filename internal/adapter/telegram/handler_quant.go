@@ -258,7 +258,7 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 	// Model-specific actions
 	validModes := map[string]bool{
 		"stats": true, "garch": true, "corr": true, "regime": true,
-		"arima": true, "meanrevert": true, "granger": true,
+		"seasonal": true, "meanrevert": true, "granger": true,
 		"coint": true, "pca": true, "var": true, "risk": true, "full": true,
 	}
 
