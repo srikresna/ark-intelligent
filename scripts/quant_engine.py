@@ -1448,7 +1448,7 @@ Model: VAR({best_lag}) — {len(ret_df.columns)} variabel
 # MODE: RISK — Portfolio VaR + CVaR + Tail Risk
 # ===========================================================================
 
-def compute_risk(df, symbol, timeframe, params, multi_asset, chart_path=None):
+def compute_risk(df, symbol, timeframe, params, chart_path=None):
     from scipy import stats as sp_stats
 
     returns = compute_returns(df)

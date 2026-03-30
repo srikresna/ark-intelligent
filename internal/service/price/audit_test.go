@@ -565,7 +565,7 @@ func TestAggregateTo4H_Audit_OHLCCorrectness(t *testing.T) {
 		{Timestamp: base.Add(3 * time.Hour), Open: 1.1035, High: 1.1045, Low: 1.0980, Close: 1.1000, Source: "test"},
 	}
 
-	result := aggregateTo4H(hourBars, "099741")
+	result := aggregateToInterval(hourBars, "099741", "4h")
 	if len(result) != 1 {
 		t.Fatalf("Expected 1 aggregated bar, got %d", len(result))
 	}
@@ -599,7 +599,7 @@ func TestAggregateTo4H_Audit_IncompleteBucketFiltered(t *testing.T) {
 		{Timestamp: base, Open: 1.10, High: 1.11, Low: 1.09, Close: 1.10, Source: "test"},
 	}
 
-	result := aggregateTo4H(hourBars, "099741")
+	result := aggregateToInterval(hourBars, "099741", "4h")
 	if len(result) != 0 {
 		t.Errorf("Expected 0 bars for single-hour bucket, got %d", len(result))
 	}
