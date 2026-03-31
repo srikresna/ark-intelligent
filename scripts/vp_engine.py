@@ -1626,12 +1626,457 @@ def _draw_delta_chart(df, cum_delta, bar_delta, buy_vol, sell_vol, vp,
     save_chart(fig, chart_path)
 
 
+
 # ===========================================================================
-# MODE: AUCTION — Auction Market Theory
+# MODE: AUCTION — Advanced Auction Market Theory (Institutional)
 # ===========================================================================
 
+def _split_by_trading_day(df):
+    """Split DataFrame into per-day DataFrames."""
+    df_copy = df.copy()
+    df_copy["trade_date"] = df_copy.index.date
+    days = {}
+    for d in sorted(df_copy["trade_date"].unique()):
+        day_df = df_copy[df_copy["trade_date"] == d].copy()
+        if len(day_df) >= 2:
+            days[d] = day_df
+    return days
+
+
+def _classify_day_type(day_df, prev_day_vp=None):
+    """
+    Classify a trading day into Dalton's 6 Market Profile day types.
+    Returns dict with type, description, metrics.
+    """
+    if len(day_df) < 4:
+        return {"type": "UNKNOWN", "desc": "Insufficient data"}
+
+    day_high = day_df["High"].max()
+    day_low = day_df["Low"].min()
+    day_range = day_high - day_low
+    if day_range <= 0:
+        return {"type": "UNKNOWN", "desc": "Zero range"}
+
+    day_open = day_df["Open"].iloc[0]
+    day_close = day_df["Close"].iloc[-1]
+
+    # Initial Balance: first ~25% of bars (approximation of first hour)
+    ib_count = max(2, len(day_df) // 4)
+    ib_bars = day_df.iloc[:ib_count]
+    ib_high = ib_bars["High"].max()
+    ib_low = ib_bars["Low"].min()
+    ib_range = ib_high - ib_low
+
+    ib_ratio = ib_range / day_range if day_range > 0 else 0
+
+    # Extension: how far price went beyond IB
+    ext_above = max(0, day_high - ib_high)
+    ext_below = max(0, ib_low - day_low)
+    total_ext = ext_above + ext_below
+    ext_ratio = total_ext / day_range if day_range > 0 else 0
+
+    # Open/Close position in range
+    open_pos = (day_open - day_low) / day_range
+    close_pos = (day_close - day_low) / day_range
+
+    # VP for shape detection
+    vp = compute_volume_profile(day_df, n_bins=40, va_pct=0.70)
+    poc_pos = 0.5
+    vol_skew = 0
+    if vp:
+        poc_pos = (vp["poc_price"] - day_low) / day_range
+        volumes = vp["volumes"]
+        n_bins = len(volumes)
+        upper = volumes[n_bins//2:].sum()
+        lower = volumes[:n_bins//2].sum()
+        total = upper + lower
+        vol_skew = (upper - lower) / total if total > 0 else 0
+
+    # Classification logic (Dalton's framework)
+    # Trend Day: IB is small portion of range, open near one extreme, close near other
+    if ib_ratio < 0.35 and abs(close_pos - open_pos) > 0.5:
+        if close_pos > open_pos:
+            return {"type": "TREND_UP", "desc": "Trend Day ↑ — strong conviction buying",
+                    "ib_ratio": ib_ratio, "ext_ratio": ext_ratio}
+        else:
+            return {"type": "TREND_DOWN", "desc": "Trend Day ↓ — strong conviction selling",
+                    "ib_ratio": ib_ratio, "ext_ratio": ext_ratio}
+
+    # Double Distribution: check for bimodal volume
+    if vp:
+        from scipy.signal import find_peaks
+        import pandas as pd
+        smoothed = pd.Series(vp["volumes"]).rolling(3, center=True).mean().fillna(0).values
+        peaks, _ = find_peaks(smoothed, height=smoothed.max()*0.3, distance=len(smoothed)//5,
+                              prominence=smoothed.max()*0.15)
+        if len(peaks) >= 2:
+            return {"type": "DOUBLE_DIST", "desc": "Double Distribution — event caused value migration",
+                    "ib_ratio": ib_ratio, "peaks": len(peaks)}
+
+    # P-shape: heavy volume up top
+    if poc_pos > 0.60 and vol_skew > 0.12:
+        return {"type": "P_SHAPE", "desc": "P-shape Day — buying rally or long liquidation",
+                "ib_ratio": ib_ratio, "poc_pos": poc_pos}
+
+    # b-shape: heavy volume at bottom
+    if poc_pos < 0.40 and vol_skew < -0.12:
+        return {"type": "B_SHAPE", "desc": "b-shape Day — sell-off or short covering",
+                "ib_ratio": ib_ratio, "poc_pos": poc_pos}
+
+    # Normal Variation: IB extends 50-100% on one side
+    if 0.35 <= ib_ratio <= 0.65 and ext_ratio > 0.3:
+        direction = "up" if ext_above > ext_below else "down"
+        return {"type": f"NORMAL_VAR_{direction.upper()}", "desc": f"Normal Variation {direction} — moderate directional day",
+                "ib_ratio": ib_ratio, "ext_ratio": ext_ratio}
+
+    # Normal Day: most range contained in IB
+    if ib_ratio > 0.65:
+        return {"type": "NORMAL", "desc": "Normal Day — balanced, range-bound",
+                "ib_ratio": ib_ratio}
+
+    return {"type": "NORMAL_VAR", "desc": "Normal Variation — moderate range extension",
+            "ib_ratio": ib_ratio, "ext_ratio": ext_ratio}
+
+
+def _classify_opening_type(today_df, prev_vah, prev_val):
+    """
+    Classify opening type (Dalton's 4 types).
+    Needs today's first bars + yesterday's VA.
+    """
+    if len(today_df) < 4 or prev_vah is None or prev_val is None:
+        return {"type": "UNKNOWN", "desc": "Insufficient data"}
+
+    open_price = today_df["Open"].iloc[0]
+
+    # First 4 bars (~first hour for 15m data)
+    first_bars = today_df.iloc[:4]
+    first_high = first_bars["High"].max()
+    first_low = first_bars["Low"].min()
+    first_close = first_bars["Close"].iloc[-1]
+
+    # Where did we open?
+    opened_above = open_price > prev_vah
+    opened_below = open_price < prev_val
+    opened_inside = not opened_above and not opened_below
+
+    if opened_inside:
+        return {"type": "OPEN_AUCTION", "emoji": "↔️",
+                "desc": "Open Auction — opened inside VA, balanced start",
+                "implication": "Range day likely. Tunggu breakout direction."}
+
+    if opened_above:
+        # Did we drive away from VA or return?
+        moved_further = first_high > open_price + (open_price - prev_vah) * 0.5
+        returned_to_va = first_low <= prev_vah
+
+        if moved_further and not returned_to_va:
+            return {"type": "OPEN_DRIVE", "emoji": "🚀",
+                    "desc": "Open Drive ↑ — opened above VA, driving higher",
+                    "implication": "Strongest bullish signal. DON'T FADE. Follow momentum."}
+        elif returned_to_va and first_close > prev_vah:
+            return {"type": "OPEN_TEST_DRIVE", "emoji": "🔄",
+                    "desc": "Open Test Drive ↑ — tested VA, then drove away",
+                    "implication": "Bullish confirmed. Buy on first pullback."}
+        elif returned_to_va and first_close <= prev_vah:
+            return {"type": "OPEN_REJECTION_REVERSE", "emoji": "🔻",
+                    "desc": "Open Rejection Reverse ↓ — opened above VA, failed, reversed",
+                    "implication": "Bearish reversal. Failed breakout = fade opportunity."}
+        else:
+            return {"type": "OPEN_TEST_DRIVE", "emoji": "🔄",
+                    "desc": "Open Test Drive ↑ — testing above VA",
+                    "implication": "Watch for follow-through or rejection."}
+
+    if opened_below:
+        moved_further = first_low < open_price - (prev_val - open_price) * 0.5
+        returned_to_va = first_high >= prev_val
+
+        if moved_further and not returned_to_va:
+            return {"type": "OPEN_DRIVE", "emoji": "💥",
+                    "desc": "Open Drive ↓ — opened below VA, driving lower",
+                    "implication": "Strongest bearish signal. DON'T FADE. Follow momentum."}
+        elif returned_to_va and first_close < prev_val:
+            return {"type": "OPEN_TEST_DRIVE", "emoji": "🔄",
+                    "desc": "Open Test Drive ↓ — tested VA, then drove away",
+                    "implication": "Bearish confirmed. Sell on first rally."}
+        elif returned_to_va and first_close >= prev_val:
+            return {"type": "OPEN_REJECTION_REVERSE", "emoji": "🔺",
+                    "desc": "Open Rejection Reverse ↑ — opened below VA, failed, reversed",
+                    "implication": "Bullish reversal. Failed breakdown = buy opportunity."}
+        else:
+            return {"type": "OPEN_TEST_DRIVE", "emoji": "🔄",
+                    "desc": "Open Test Drive ↓ — testing below VA",
+                    "implication": "Watch for follow-through or rejection."}
+
+    return {"type": "UNKNOWN", "desc": "Indeterminate opening"}
+
+
+def _compute_rotation_factor(day_df, poc):
+    """
+    Count half-rotations around POC within a day.
+    High RF = balanced. Low RF = directional.
+    """
+    if len(day_df) < 4:
+        return 0, "INSUFFICIENT"
+
+    above = day_df["Close"].values > poc
+    rotations = 0
+    for i in range(1, len(above)):
+        if above[i] != above[i-1]:
+            rotations += 1
+
+    if rotations >= 6:
+        character = "VERY_BALANCED"
+    elif rotations >= 4:
+        character = "BALANCED"
+    elif rotations >= 2:
+        character = "MODERATE"
+    else:
+        character = "DIRECTIONAL"
+
+    return rotations, character
+
+
+def _analyze_close_location(day_df, vp):
+    """Analyze where the day closed relative to VP levels."""
+    if vp is None or len(day_df) < 2:
+        return None
+
+    close = day_df["Close"].iloc[-1]
+    day_high = day_df["High"].max()
+    day_low = day_df["Low"].min()
+    day_range = day_high - day_low
+
+    poc = vp["poc_price"]
+    vah = vp["vah"]
+    val = vp["val"]
+
+    if day_range <= 0:
+        return {"location": "UNKNOWN", "position": 0.5}
+
+    position = (close - day_low) / day_range  # 0 = low, 1 = high
+
+    if close > vah:
+        location = "ABOVE_VAH"
+        implication = "Bullish — strong close above value area"
+        follow_bias = "BULLISH"
+    elif close < val:
+        location = "BELOW_VAL"
+        implication = "Bearish — weak close below value area"
+        follow_bias = "BEARISH"
+    elif abs(close - poc) / poc < 0.001:
+        location = "AT_POC"
+        implication = "Neutral — closed at fair value, maximum uncertainty"
+        follow_bias = "NEUTRAL"
+    elif close > poc:
+        location = "UPPER_VA"
+        implication = "Mildly bullish — closed in upper value area"
+        follow_bias = "MILD_BULLISH"
+    else:
+        location = "LOWER_VA"
+        implication = "Mildly bearish — closed in lower value area"
+        follow_bias = "MILD_BEARISH"
+
+    return {
+        "location": location,
+        "position": float(position),
+        "implication": implication,
+        "follow_bias": follow_bias,
+        "close": float(close),
+        "poc": float(poc),
+        "vah": float(vah),
+        "val": float(val),
+    }
+
+
+def _compute_value_migration(daily_vps, n_days=5):
+    """
+    Track POC/VA migration across multiple days.
+    Returns migration direction, velocity, and per-day data.
+    """
+    if len(daily_vps) < 2:
+        return {"direction": "INSUFFICIENT", "detail": "Need 2+ days"}
+
+    # Get last N days
+    dates = sorted(daily_vps.keys())[-n_days:]
+    pocs = []
+    vahs = []
+    vals = []
+    day_data = []
+
+    for d in dates:
+        vp = daily_vps[d]
+        pocs.append(vp["poc_price"])
+        vahs.append(vp["vah"])
+        vals.append(vp["val"])
+        day_data.append({"date": str(d), "poc": vp["poc_price"], "vah": vp["vah"], "val": vp["val"]})
+
+    if len(pocs) < 2:
+        return {"direction": "INSUFFICIENT", "detail": "Need 2+ days", "days": day_data}
+
+    # POC direction
+    poc_changes = [pocs[i] - pocs[i-1] for i in range(1, len(pocs))]
+    up_days = sum(1 for c in poc_changes if c > 0)
+    down_days = sum(1 for c in poc_changes if c < 0)
+
+    # VA width trend
+    va_widths = [vahs[i] - vals[i] for i in range(len(vahs))]
+    va_expanding = va_widths[-1] > va_widths[0] if len(va_widths) >= 2 else False
+
+    # Net POC movement
+    net_poc_move = pocs[-1] - pocs[0]
+
+    if up_days >= len(poc_changes) * 0.7:
+        direction = "BULLISH_MIGRATION"
+        desc = f"POC rising {up_days}/{len(poc_changes)} days — strong bullish value discovery"
+    elif down_days >= len(poc_changes) * 0.7:
+        direction = "BEARISH_MIGRATION"
+        desc = f"POC falling {down_days}/{len(poc_changes)} days — strong bearish value discovery"
+    elif abs(net_poc_move) < (vahs[-1] - vals[-1]) * 0.2:
+        direction = "BALANCED"
+        desc = "POC oscillating within narrow range — market in balance"
+    else:
+        direction = "TRANSITIONING"
+        desc = "Mixed POC movement — value area transitioning"
+
+    return {
+        "direction": direction,
+        "desc": desc,
+        "net_poc_move": float(net_poc_move),
+        "up_days": up_days,
+        "down_days": down_days,
+        "va_expanding": va_expanding,
+        "days": day_data,
+    }
+
+
+def _detect_mgi_signals(df, vp, lookback=20):
+    """
+    Market-Generated Information: detect acceptance/rejection at VA boundaries.
+    When price breaks out of VA, does it STAY (acceptance) or RETURN (rejection)?
+    """
+    if vp is None or len(df) < lookback:
+        return []
+
+    vah = vp["vah"]
+    val = vp["val"]
+    signals = []
+
+    closes = df["Close"].values[-lookback:]
+    highs = df["High"].values[-lookback:]
+    lows = df["Low"].values[-lookback:]
+
+    i = 0
+    while i < len(closes) - 2:
+        # Detect break above VAH
+        if highs[i] > vah and closes[i] > vah:
+            # Check next 2 bars: does it stay above?
+            stayed = sum(1 for j in range(i+1, min(i+3, len(closes))) if closes[j] > vah)
+            if stayed >= 2:
+                signals.append({"type": "ACCEPTANCE_UP", "bar": i,
+                    "desc": "Price accepted above VAH — bullish value discovery"})
+            else:
+                signals.append({"type": "REJECTION_UP", "bar": i,
+                    "desc": "Price rejected above VAH — responsive selling"})
+            i += 3
+            continue
+
+        # Detect break below VAL
+        if lows[i] < val and closes[i] < val:
+            stayed = sum(1 for j in range(i+1, min(i+3, len(closes))) if closes[j] < val)
+            if stayed >= 2:
+                signals.append({"type": "ACCEPTANCE_DOWN", "bar": i,
+                    "desc": "Price accepted below VAL — bearish value discovery"})
+            else:
+                signals.append({"type": "REJECTION_DOWN", "bar": i,
+                    "desc": "Price rejected below VAL — responsive buying"})
+            i += 3
+            continue
+        i += 1
+
+    return signals[-5:]  # last 5 signals
+
+
+def _analyze_excess_poor(df, vp):
+    """Analyze excess (strong rejection) vs poor (weak) highs/lows."""
+    results = []
+
+    high_idx = df["High"].idxmax()
+    high_pos = df.index.get_loc(high_idx)
+    high_price = df["High"].max()
+    low_idx = df["Low"].idxmin()
+    low_pos = df.index.get_loc(low_idx)
+    low_price = df["Low"].min()
+
+    avg_vol = vp["volumes"].mean()
+
+    # Analyze high
+    if high_pos < len(df) - 1:
+        bars_after = df.iloc[high_pos:]
+        rejection_tail = high_price - bars_after["Close"].iloc[-1]
+        bar_range = high_price - low_price
+
+        high_bin = np.clip(np.searchsorted(vp["bin_edges"], high_price) - 1, 0, vp["n_bins"] - 1)
+        vol_at_high = vp["volumes"][high_bin]
+
+        if vol_at_high > avg_vol * 1.5 and bar_range > 0 and rejection_tail > bar_range * 0.1:
+            results.append({"type": "Excess High", "price": float(high_price),
+                            "emoji": "✅", "implication": "genuine reversal — strong rejection"})
+        else:
+            results.append({"type": "Poor High", "price": float(high_price),
+                            "emoji": "⚠️", "implication": "likely revisit — weak rejection"})
+
+    # Analyze low
+    if low_pos < len(df) - 1:
+        bars_after = df.iloc[low_pos:]
+        bounce = bars_after["Close"].iloc[-1] - low_price
+        bar_range = high_price - low_price
+
+        low_bin = np.clip(np.searchsorted(vp["bin_edges"], low_price) - 1, 0, vp["n_bins"] - 1)
+        vol_at_low = vp["volumes"][low_bin]
+
+        if vol_at_low > avg_vol * 1.5 and bar_range > 0 and bounce > bar_range * 0.1:
+            results.append({"type": "Excess Low", "price": float(low_price),
+                            "emoji": "✅", "implication": "genuine support — strong bounce"})
+        else:
+            results.append({"type": "Poor Low", "price": float(low_price),
+                            "emoji": "⚠️", "implication": "likely revisit — weak support"})
+
+    return results
+
+
+def _find_single_prints(df, vp):
+    """Find price levels touched only once (potential gap/breakout zones)."""
+    volumes = vp["volumes"]
+    bin_edges = vp["bin_edges"]
+    n_bins = vp["n_bins"]
+
+    touch_count = np.zeros(n_bins)
+    for _, bar in df.iterrows():
+        low_bin = np.clip(np.searchsorted(bin_edges, bar["Low"]) - 1, 0, n_bins - 1)
+        high_bin = np.clip(np.searchsorted(bin_edges, bar["High"]) - 1, 0, n_bins - 1)
+        for b in range(low_bin, high_bin + 1):
+            touch_count[b] += 1
+
+    singles = []
+    in_zone = False
+    zone_start = None
+    for i in range(n_bins):
+        if 0 < touch_count[i] <= 2:
+            if not in_zone:
+                zone_start = i
+                in_zone = True
+        else:
+            if in_zone:
+                singles.append({"low": float(bin_edges[zone_start]), "high": float(bin_edges[i])})
+                in_zone = False
+    if in_zone:
+        singles.append({"low": float(bin_edges[zone_start]), "high": float(bin_edges[n_bins])})
+
+    return singles[:10]
+
+
 def compute_auction(df, symbol, timeframe, params, chart_path=None):
-    """Auction Market Theory analysis."""
+    """Advanced Auction Market Theory — Institutional Grade."""
     n = len(df)
     if n < 30:
         return output("auction", symbol, False, {}, "",
@@ -1639,7 +2084,9 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
 
     dec = price_decimals(df["Close"].iloc[-1])
     current_price = df["Close"].iloc[-1]
+    pip = pip_value(symbol)
 
+    # --- Overall VP ---
     vp = compute_volume_profile(df, va_pct=0.70)
     if vp is None:
         return output("auction", symbol, False, {}, "",
@@ -1649,7 +2096,78 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
     vah = vp["vah"]
     val = vp["val"]
 
-    # Auction state
+    # --- Split into trading days ---
+    days = _split_by_trading_day(df)
+    sorted_dates = sorted(days.keys())
+
+    # --- Per-day VP ---
+    daily_vps = {}
+    for d, day_df in days.items():
+        dvp = compute_volume_profile(day_df, n_bins=40, va_pct=0.70)
+        if dvp:
+            daily_vps[d] = dvp
+
+    # --- Module 1: Day Type Classification (last 5 days) ---
+    day_types = []
+    for i, d in enumerate(sorted_dates[-5:]):
+        prev_vp = daily_vps.get(sorted_dates[sorted_dates.index(d)-1]) if sorted_dates.index(d) > 0 else None
+        dtype = _classify_day_type(days[d], prev_vp)
+        dtype["date"] = str(d)
+        day_types.append(dtype)
+
+    today_type = day_types[-1] if day_types else {"type": "UNKNOWN", "desc": "N/A"}
+
+    # --- Module 2: Opening Type (today vs yesterday's VA) ---
+    opening = {"type": "UNKNOWN", "desc": "Insufficient data", "emoji": "❓", "implication": "N/A"}
+    if len(sorted_dates) >= 2:
+        today_date = sorted_dates[-1]
+        yesterday_date = sorted_dates[-2]
+        if yesterday_date in daily_vps and today_date in days:
+            yest_vp = daily_vps[yesterday_date]
+            opening = _classify_opening_type(days[today_date], yest_vp["vah"], yest_vp["val"])
+
+    # --- Module 3: Rotation Factor (today) ---
+    today_rf = 0
+    today_character = "UNKNOWN"
+    if sorted_dates and sorted_dates[-1] in days and sorted_dates[-1] in daily_vps:
+        today_poc = daily_vps[sorted_dates[-1]]["poc_price"]
+        today_rf, today_character = _compute_rotation_factor(days[sorted_dates[-1]], today_poc)
+
+    # --- Module 4: Close Location (yesterday) ---
+    close_analysis = None
+    if len(sorted_dates) >= 2:
+        yest_date = sorted_dates[-2]
+        if yest_date in daily_vps and yest_date in days:
+            close_analysis = _analyze_close_location(days[yest_date], daily_vps[yest_date])
+
+    # Follow-through tracking (last 5 days)
+    follow_through = []
+    for i in range(max(0, len(sorted_dates)-6), len(sorted_dates)-1):
+        d = sorted_dates[i]
+        next_d = sorted_dates[i+1]
+        if d in daily_vps and next_d in days:
+            cl = _analyze_close_location(days[d], daily_vps[d])
+            if cl:
+                next_open = days[next_d]["Open"].iloc[0]
+                next_close = days[next_d]["Close"].iloc[-1]
+                followed = (cl["follow_bias"] == "BULLISH" and next_close > next_open) or \
+                           (cl["follow_bias"] == "BEARISH" and next_close < next_open) or \
+                           (cl["follow_bias"] in ("MILD_BULLISH", "MILD_BEARISH") and True)
+                follow_through.append({"date": str(d), "bias": cl["follow_bias"], "followed": followed})
+
+    follow_rate = sum(1 for ft in follow_through if ft["followed"]) / len(follow_through) if follow_through else 0
+
+    # --- Module 5: Value Migration ---
+    migration = _compute_value_migration(daily_vps, n_days=5)
+
+    # --- MGI Signals ---
+    mgi = _detect_mgi_signals(df, vp)
+
+    # --- Excess/Poor + Single Prints (from original) ---
+    excess_poor = _analyze_excess_poor(df, vp)
+    single_prints = _find_single_prints(df, vp)
+
+    # --- Current Auction State ---
     if current_price > vah:
         auction_state = "BREAKOUT_UP"
         state_emoji = "🚀"
@@ -1668,196 +2186,133 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
     elif current_price > poc:
         auction_state = "RESPONSIVE_SELL_ZONE"
         state_emoji = "📊"
-        state_desc = "Above POC but inside VA — responsive selling territory"
-        strategy = "Watch for rejection at VAH → short; or break above VAH → long"
+        state_desc = "Above POC inside VA — responsive selling territory"
+        strategy = "Watch rejection at VAH → short; break above VAH → long"
     else:
         auction_state = "RESPONSIVE_BUY_ZONE"
         state_emoji = "📊"
-        state_desc = "Below POC but inside VA — responsive buying territory"
-        strategy = "Watch for bounce at VAL → long; or break below VAL → short"
+        state_desc = "Below POC inside VA — responsive buying territory"
+        strategy = "Watch bounce at VAL → long; break below VAL → short"
 
-    # Excess / Poor structure analysis
-    excess_poor = _analyze_excess_poor(df, vp)
+    # Initiative vs Responsive
+    recent = df.iloc[-10:]
+    bars_above = int((recent["Close"] > vah).sum())
+    bars_below = int((recent["Close"] < val).sum())
+    bars_in = len(recent) - bars_above - bars_below
 
-    # Single prints detection
-    single_prints = _find_single_prints(df, vp)
-
-    # Initiative vs Responsive activity
-    recent_bars = df.iloc[-10:]
-    bars_above_vah = (recent_bars["Close"] > vah).sum()
-    bars_below_val = (recent_bars["Close"] < val).sum()
-    bars_in_va = len(recent_bars) - bars_above_vah - bars_below_val
-
-    if bars_above_vah > 5 or bars_below_val > 5:
+    if bars_above > 5 or bars_below > 5:
         activity = "INITIATIVE"
-        act_desc = "Market bergerak ke luar Value Area — new information driving price"
-    elif bars_in_va > 7:
+    elif bars_in > 7:
         activity = "RESPONSIVE"
-        act_desc = "Market tetap dalam Value Area — responsive to value, range-bound"
     else:
         activity = "TRANSITIONING"
-        act_desc = "Market antara initiative dan responsive — watch for confirmation"
 
+    # --- Build result ---
     result = {
         "auction_state": auction_state,
         "activity": activity,
-        "poc": safe_float(poc),
-        "vah": safe_float(vah),
-        "val": safe_float(val),
-        "bars_above_vah": int(bars_above_vah),
-        "bars_below_val": int(bars_below_val),
-        "bars_in_va": int(bars_in_va),
+        "today_type": today_type,
+        "opening": opening,
+        "rotation_factor": today_rf,
+        "rotation_character": today_character,
+        "close_analysis": close_analysis,
+        "follow_through_rate": safe_float(follow_rate),
+        "migration": migration,
+        "mgi_signals": mgi,
         "excess_poor": excess_poor,
         "single_prints": single_prints,
+        "day_types_history": day_types,
     }
 
-    text = f"""🏛 <b>Auction Market Theory: {symbol} — {timeframe}</b>
+    # --- Build text ---
+    text = f"""{state_emoji} <b>Auction Market Theory: {symbol} — {timeframe}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-{state_emoji} <b>State: {auction_state}</b>
-{state_desc}
-🎯 Strategy: {strategy}
 
-📊 <b>Activity: {activity}</b>
-{act_desc}
-  Last 10 bars: {bars_in_va} in VA, {bars_above_vah} above VAH, {bars_below_val} below VAL
+<b>🏛 State: {auction_state}</b>
+{state_desc}
+🎯 {strategy}
+Activity: {activity} (last 10: {bars_in} in VA, {bars_above} above, {bars_below} below)
 """
 
-    if excess_poor:
-        text += "\n🔴 <b>Structure:</b>\n"
-        for ep in excess_poor[:4]:
-            text += f"  {ep['emoji']} {ep['type']} at {format_price(ep['price'], dec)}"
-            text += f" — {ep['implication']}\n"
+    # Day Type
+    text += f"""
+<b>📅 Day Type: {today_type['type']}</b>
+{today_type['desc']}
+"""
+    if len(day_types) > 1:
+        text += "History: " + " → ".join(dt["type"].replace("_", " ") for dt in day_types) + "\n"
 
+    # Opening
+    text += f"""
+<b>{opening.get('emoji','❓')} Opening: {opening['type']}</b>
+{opening['desc']}
+💡 {opening.get('implication', 'N/A')}
+"""
+
+    # Rotation
+    rf_emoji = "⚖️" if today_character in ("VERY_BALANCED", "BALANCED") else "📈"
+    text += f"""
+<b>🔄 Rotation Factor: {today_rf} ({today_character})</b>
+{rf_emoji} {'Balanced day — fade extremes' if today_rf >= 4 else 'Directional — follow momentum' if today_rf <= 1 else 'Moderate rotation'}
+"""
+
+    # Close Analysis
+    if close_analysis:
+        text += f"""
+<b>🌙 Yesterday Close: {close_analysis['location']}</b>
+{close_analysis['implication']}
+Follow-through rate: {follow_rate*100:.0f}% (last {len(follow_through)} days)
+"""
+
+    # Value Migration
+    mig = migration
+    if mig.get("direction") != "INSUFFICIENT":
+        mig_emoji = "📈" if "BULLISH" in mig["direction"] else ("📉" if "BEARISH" in mig["direction"] else "↔️")
+        text += f"""
+<b>{mig_emoji} Value Migration: {mig['direction']}</b>
+{mig['desc']}
+"""
+        if mig.get("va_expanding"):
+            text += "📏 VA expanding — increasing price acceptance\n"
+        else:
+            text += "📏 VA contracting — breakout building\n"
+
+    # MGI
+    if mgi:
+        text += "\n<b>⚡ Market-Generated Information:</b>\n"
+        for sig in mgi[-3:]:
+            emoji = "✅" if "ACCEPTANCE" in sig["type"] else "❌"
+            text += f"  {emoji} {sig['desc']}\n"
+
+    # Excess/Poor
+    if excess_poor:
+        text += "\n<b>🔴 Structure:</b>\n"
+        for ep in excess_poor[:3]:
+            text += f"  {ep['emoji']} {ep['type']} at {format_price(ep['price'], dec)} — {ep['implication']}\n"
+
+    # Single Prints
     if single_prints:
-        text += "\n⚡ <b>Single Prints (gap zones):</b>\n"
-        for sp in single_prints[:4]:
+        text += "\n<b>⚡ Single Prints:</b>\n"
+        for sp in single_prints[:3]:
             text += f"  {format_price(sp['low'], dec)} — {format_price(sp['high'], dec)}\n"
 
+    # Chart
     if chart_path:
         _draw_auction_chart(df, vp, auction_state, excess_poor, single_prints,
+                            daily_vps, day_types, migration,
                             symbol, timeframe, chart_path, current_price)
 
     return output("auction", symbol, True, result, text, chart_path=chart_path or "")
 
 
-def _analyze_excess_poor(df, vp):
-    """Analyze excess (strong rejection) vs poor (weak) highs/lows."""
-    results = []
-    dec = price_decimals(df["Close"].iloc[-1])
-
-    # Analyze high
-    high_idx = df["High"].idxmax()
-    high_pos = df.index.get_loc(high_idx)
-    high_price = df["High"].max()
-
-    # Check for rejection tail (excess) at the high
-    if high_pos < len(df) - 1:
-        bars_after_high = df.iloc[high_pos:]
-        rejection_tail = high_price - bars_after_high["Close"].iloc[-1]
-        bar_range = df["High"].max() - df["Low"].min()
-
-        # Volume at the high
-        high_bin = np.searchsorted(vp["bin_edges"], high_price) - 1
-        high_bin = np.clip(high_bin, 0, vp["n_bins"] - 1)
-        vol_at_high = vp["volumes"][high_bin]
-        avg_vol = vp["volumes"].mean()
-
-        if vol_at_high > avg_vol * 1.5 and rejection_tail > bar_range * 0.1:
-            results.append({
-                "type": "Excess High",
-                "price": float(high_price),
-                "emoji": "✅",
-                "implication": "genuine reversal — strong rejection",
-            })
-        else:
-            results.append({
-                "type": "Poor High",
-                "price": float(high_price),
-                "emoji": "⚠️",
-                "implication": "likely revisit — weak rejection",
-            })
-
-    # Analyze low
-    low_idx = df["Low"].idxmin()
-    low_pos = df.index.get_loc(low_idx)
-    low_price = df["Low"].min()
-
-    if low_pos < len(df) - 1:
-        bars_after_low = df.iloc[low_pos:]
-        bounce = bars_after_low["Close"].iloc[-1] - low_price
-        bar_range = df["High"].max() - df["Low"].min()
-
-        low_bin = np.searchsorted(vp["bin_edges"], low_price) - 1
-        low_bin = np.clip(low_bin, 0, vp["n_bins"] - 1)
-        vol_at_low = vp["volumes"][low_bin]
-
-        if vol_at_low > avg_vol * 1.5 and bounce > bar_range * 0.1:
-            results.append({
-                "type": "Excess Low",
-                "price": float(low_price),
-                "emoji": "✅",
-                "implication": "genuine support — strong bounce",
-            })
-        else:
-            results.append({
-                "type": "Poor Low",
-                "price": float(low_price),
-                "emoji": "⚠️",
-                "implication": "likely revisit — weak support",
-            })
-
-    return results
-
-
-def _find_single_prints(df, vp):
-    """Find price levels touched only once (potential gap/breakout zones)."""
-    volumes = vp["volumes"]
-    bin_edges = vp["bin_edges"]
-    bin_centers = vp["bin_centers"]
-    n_bins = vp["n_bins"]
-
-    # Count unique bars touching each bin
-    touch_count = np.zeros(n_bins)
-    for _, bar in df.iterrows():
-        low_bin = np.clip(np.searchsorted(bin_edges, bar["Low"]) - 1, 0, n_bins - 1)
-        high_bin = np.clip(np.searchsorted(bin_edges, bar["High"]) - 1, 0, n_bins - 1)
-        for b in range(low_bin, high_bin + 1):
-            touch_count[b] += 1
-
-    # Single prints: touched only 1-2 times
-    singles = []
-    in_zone = False
-    zone_start = None
-
-    for i in range(n_bins):
-        if touch_count[i] <= 2 and touch_count[i] > 0:
-            if not in_zone:
-                zone_start = i
-                in_zone = True
-        else:
-            if in_zone:
-                singles.append({
-                    "low": float(bin_edges[zone_start]),
-                    "high": float(bin_edges[i]),
-                })
-                in_zone = False
-
-    if in_zone:
-        singles.append({
-            "low": float(bin_edges[zone_start]),
-            "high": float(bin_edges[n_bins]),
-        })
-
-    return singles[:10]
-
-
 def _draw_auction_chart(df, vp, state, excess_poor, single_prints,
+                         daily_vps, day_types, migration,
                          symbol, timeframe, chart_path, current_price):
-    """Draw auction market theory chart."""
+    """Draw advanced AMT chart: price + VP + migration overlay."""
     fig, (ax, ax_vol) = plt.subplots(
-        1, 2, figsize=(16, 8), gridspec_kw={"width_ratios": [3, 1]}, sharey=True)
+        1, 2, figsize=(16, 9), gridspec_kw={"width_ratios": [3, 1]}, sharey=True)
 
-    fig.suptitle(f"{symbol} — Auction: {state} — {timeframe}",
+    fig.suptitle(f"{symbol} — AMT: {state} — {timeframe}",
                  color=TEXT_COLOR, fontsize=13, fontweight="bold")
 
     # Candlesticks
@@ -1876,9 +2331,24 @@ def _draw_auction_chart(df, vp, state, excess_poor, single_prints,
     ax.axhline(vp["val"], color=VAL_COLOR, linewidth=1, linestyle="--", label="VAL")
     ax.axhspan(vp["val"], vp["vah"], alpha=0.05, color=VAH_COLOR)
 
+    # Daily POC migration (if available)
+    if daily_vps and len(daily_vps) >= 2:
+        sorted_dates = sorted(daily_vps.keys())
+        # Map dates to x positions
+        df_dates = df.index.date if hasattr(df.index, 'date') else [d.date() for d in df.index]
+        for d in sorted_dates[-5:]:
+            dvp = daily_vps[d]
+            # Find x range for this date
+            day_indices = [i for i, dd in enumerate(df_dates) if dd == d]
+            if day_indices:
+                x_start = day_indices[0]
+                x_end = day_indices[-1]
+                ax.plot([x_start, x_end], [dvp["poc_price"], dvp["poc_price"]],
+                        color=ACCENT3, linewidth=1, alpha=0.5, linestyle="-")
+
     # Single prints
     for sp in (single_prints or [])[:5]:
-        ax.axhspan(sp["low"], sp["high"], alpha=0.1, color=ACCENT4)
+        ax.axhspan(sp["low"], sp["high"], alpha=0.08, color=ACCENT4)
 
     # Excess/Poor markers
     for ep in (excess_poor or []):
@@ -1903,6 +2373,7 @@ def _draw_auction_chart(df, vp, state, excess_poor, single_prints,
 
     plt.tight_layout()
     save_chart(fig, chart_path)
+
 
 
 # ===========================================================================
