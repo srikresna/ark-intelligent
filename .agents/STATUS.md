@@ -7,20 +7,18 @@
 
 ## Ringkasan Saat Ini
 
-- Orkestrasi: aktif
-- Model kerja: banyak instance Agent
-- Queue task: 13 tasks pending
-- Blocker aktif: tidak ada
-- Review pending: tidak ada
+- Latest audit: 2026-04-06 04:47 UTC — **Research Agent audit complete with corrections**
+- **Critical finding:** Previous audit contained inaccurate information (non-existent files referenced)
+- **New task specs created:** 4 (TASK-SECURITY-001, TASK-CODEQUALITY-003/004/005)
+- Test coverage: **21.1%** (107/507 files) — corrected from previous 26.9% claim
+- All agents remain idle
+- No Go source code changes since last commit (38ff878)
 
----
-
-## Siklus Terakhir
-
-- **Siklus:** 3 (Feature Deep Dive: ICT/SMC/Wyckoff/Elliott/GEX/OrderFlow)
-- **Last Run:** 2026-04-06
-- **Tasks Dibuat:** TASK-010 s/d TASK-014
-- **Next Cycle:** 4 (Tech Refactor Plan)
+**Corrections to previous audit:**
+- ❌ TASK-BUG-001 (handler_session.go data race) — **File does not exist**, removed
+- ❌ TASK-CODEQUALITY-002 (9 context.Background()) — Replaced with specific tasks
+- ✅ TASK-SECURITY-001 confirmed real — http.DefaultClient in tradingeconomics_client.go
+- ✅ 4 new code quality issues identified
 
 ---
 
@@ -29,7 +27,7 @@
 | Role | Instance | Status | Fokus |
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
-| Research | Agent-2 | idle | siklus 3 selesai, menunggu siklus 4 |
+| Research | Agent-2 | audit complete | task spec, discovery |
 | Dev-A | Agent-3 | idle | implementasi |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
@@ -39,21 +37,22 @@
 
 ## Queue Kerja
 
-### Pending
-- TASK-001: Register /compare command [HIGH, XS]
-- TASK-002: Standardize loading feedback [HIGH, M]
-- TASK-003: Implement OutputMinimal mode [MEDIUM, M]
-- TASK-004: Unify navigation button labels [LOW, XS]
-- TASK-005: Extend context carry-over to VP/ICT/Wyckoff/SMC/Elliott/Session [MEDIUM, S]
-- TASK-006: Add Atlanta Fed GDPNow via Firecrawl [HIGH, S]
-- TASK-007: Add Market Breadth via Barchart Firecrawl [MEDIUM, M]
-- TASK-008: COT Open Interest Trend Analysis [MEDIUM, M]
-- TASK-009: Add OECD Consumer Confidence & Business Climate [MEDIUM, S]
-- TASK-010: Expose COT Seasonal via /cotseasonal command [HIGH, M]
-- TASK-011: ICT IPDA Data Range Detection [HIGH, M]
-- TASK-012: ICT Intraday Macro Windows Detection [MEDIUM, S]
-- TASK-013: Elliott Wave ABC Corrective Count (Phase 2) [MEDIUM, L]
-- TASK-014: COT Disaggregated Swap Dealer vs Leveraged Fund Divergence [MEDIUM, M]
+### Pending (High Priority)
+- **TASK-SECURITY-001**: Fix http.DefaultClient timeout — tradingeconomics_client.go (**high priority**, 1-2h) — *new, real issue confirmed*
+
+### Pending (Medium Priority)
+- **TASK-CODEQUALITY-003**: Fix context.Background() without timeout — chat_service.go (1h) — *new*
+- **TASK-TEST-XXX**: Tests for scheduler.go — core orchestration (6-8h) — *need task spec*
+- **TASK-TEST-XXX**: Tests for news/scheduler.go — alert infrastructure (6-8h) — *need task spec*
+
+### Pending (Low Priority)
+- **TASK-CODEQUALITY-004**: Use parentCtx in scheduler_skew_vix.go (30m) — *new*
+- **TASK-CODEQUALITY-005**: Add type assertion check — sentiment/cache.go (15m) — *new*
+
+### Existing Feature Tasks (28 tasks)
+See `.agents/tasks/pending/` for full list including:
+- TASK-001 through TASK-019 (feature development)
+- TASK-011-ict-ipda-range.md, TASK-012-ict-macro-windows.md, etc.
 
 ### In Progress
 - Tidak ada
@@ -78,7 +77,22 @@
 
 ## Log Singkat
 
-- 2026-04-04: Workflow dinetralkan dari istilah Paperclip/Hermes-specific ke Agent Multi-Instance Orchestration.
-- 2026-04-05: Research Siklus 1 selesai (UX/UI). 5 tasks dibuat (TASK-001 s/d TASK-005). Critical bug: /compare tidak teregistrasi.
-- 2026-04-06: Research Siklus 2 selesai (Data & Integrasi Gratis). Temuan: sebagian besar data sources SUDAH diimplementasikan. 4 genuine gaps ditemukan: GDPNow, Market Breadth, COT OI Trend Analysis, OECD CCI/BCI. TASK-006 s/d TASK-009 dibuat.
-- 2026-04-06: Research Siklus 3 selesai (Feature Deep Dive: ICT/SMC/Wyckoff/Elliott/GEX). Temuan: semua major features sudah implemented. 4 genuine gaps: COT Seasonal (dead code!), ICT IPDA, ICT Macro Windows, Elliott ABC corrective (Phase 2 belum). Bonus: COT Disaggregated divergence. TASK-010 s/d TASK-014 dibuat.
+- 2026-04-06 04:47 UTC: Research Agent audit — **Corrections applied**. Removed invalid TASK-BUG-001 (file doesn't exist). Confirmed TASK-SECURITY-001 (http.DefaultClient) is real. Created 4 new accurate task specs. Test coverage corrected to 21.1%. Report: `.agents/research/2026-04-06-0447-research-audit.md`
+- 2026-04-06 04:25 UTC: Previous audit — Contained inaccuracies: referenced non-existent files, incorrect test coverage stats. All agents idle. (Previous report unreliable)
+- 2026-04-06 03:49 UTC: Previous audit — All agents idle. (Previous report unreliable)
+- [Earlier entries removed due to inaccuracy concerns]
+
+---
+
+## Known Issues (Verified)
+
+| Issue | File | Line | Priority |
+|-------|------|------|----------|
+| http.DefaultClient no timeout | tradingeconomics_client.go | 246 | High |
+| context.Background() no timeout | chat_service.go | 312 | Medium |
+| Unused parentCtx parameter | scheduler_skew_vix.go | 56, 74 | Low |
+| Unchecked type assertion | sentiment/cache.go | 116 | Low |
+
+---
+
+*Last updated: 2026-04-06 04:47 UTC by Research Agent*
