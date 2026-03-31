@@ -8,10 +8,33 @@
 
 | Agent | Branch | Role |
 |---|---|---|
-| **Research** | `agents/research` | Riset fitur, buat task spec, kirim laporan ke Telegram |
-| **Dev-A** | `agents/dev-a` | Implementasi task dari queue |
+| **Research** | `agents/research` | Riset rotating focus, buat task spec, kirim laporan ke Telegram |
+| **Dev-A** | `agents/dev-a` | Implementasi + Senior Reviewer (merge PR Dev-B & Dev-C) |
 | **Dev-B** | `agents/dev-b` | Implementasi task dari queue |
 | **Dev-C** | `agents/dev-c` | Implementasi task dari queue |
+
+## Research: Rotating Focus
+
+Research Agent TIDAK mengerjakan semua sekaligus. Setiap siklus punya **satu fokus**:
+
+| Siklus | Fokus | Output |
+|---|---|---|
+| 1 | UX/UI improvement | 3-5 task UX |
+| 2 | Data & integrasi baru (gratis) | 3-5 task data |
+| 3 | Fitur baru (ICT, SMC, Quant, dll) | 3-5 task fitur |
+| 4 | Bug hunting & tech debt | 3-5 task fix/refactor |
+| 5 | Review & optimasi yang sudah ada | 3-5 task improvement |
+| → rotate kembali ke siklus 1 | | |
+
+Referensi riset: baca `.agents/FEATURE_INDEX.md`, `.agents/UX_AUDIT.md`, `.agents/DATA_SOURCES_AUDIT.md`
+
+## Dev-A: Senior Reviewer
+
+Dev-A mengerjakan task seperti Dev-B dan Dev-C, **ditambah**:
+- Review PR dari Dev-B dan Dev-C setelah selesai implement task
+- Merge PR ke `agents/main` kalau build clean dan logic benar
+- Kalau ada issue → comment di PR + buat task fix di `pending/` dengan tag `[BLOCKING]`
+- Dev-A TIDAK review PR-nya sendiri
 
 ## Hierarki Branch
 

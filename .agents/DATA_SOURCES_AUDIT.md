@@ -23,70 +23,71 @@
 
 ---
 
-## ❌ BERBAYAR / PERLU LANGGANAN
+## ⚠️ BERBAYAR — SUDAH ADA, BIARKAN
 
-| Sumber | Data | Biaya | Alternatif Gratis |
-|---|---|---|---|
-| **Massive (Polygon.io)** | Historical price data, flat files | Berbayar | Yahoo Finance, Alpha Vantage free |
-| **Firecrawl** | Web scraping (AAII sentiment) | Berbayar ($16/mo+) | Scrape langsung AAII.com |
-| **Claude (Anthropic)** | AI analysis | Berbayar | Gemini free tier |
-| **TwelveData (paid)** | Multi-key rotation untuk volume tinggi | Berbayar | Lihat alternatif di bawah |
+| Sumber | Data | Status |
+|---|---|---|
+| **Massive (Polygon.io)** | Historical price data, flat files | Sudah di .env → pakai |
+| **Firecrawl** | Web scraping | Sudah di .env → **manfaatkan lebih** |
+| **Claude (Anthropic)** | AI analysis | Sudah di .env → pakai |
+| **TwelveData** | Intraday price data | Sudah di .env → pakai |
 
----
-
-## 🔄 REKOMENDASI PENGGANTIAN
-
-### 1. Massive → Yahoo Finance (gratis, no key)
-```go
-// Yahoo Finance OHLCV — tidak perlu API key
-// https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X?interval=1d&range=2y
-```
-Data: forex (suffix =X), stocks, ETFs, futures — gratis unlimited
-
-### 2. Firecrawl → Direct scrape AAII (gratis)
-```go
-// AAII sentiment page bisa di-scrape langsung
-// https://www.aaii.com/sentimentsurvey/sent_results
-```
-
-### 3. Massive S3 flat files → CFTC bulk download (gratis)
-- CFTC sudah provide bulk historical COT data gratis
-
-### 4. Claude (mahal) → Gemini Flash (gratis)
-- `gemini-2.0-flash-exp` gratis via Google AI Studio key
-- Sudah ada integrasi Gemini di codebase
-
-### 5. TwelveData (kalau limit) → Alpha Vantage (gratis)
-- 25 req/day free tier (terbatas), tapi ada `premium` community key
-- Alternatif: Stooq.com (no key, Polish data provider, semua forex gratis)
+**Prinsip: jangan rombak yang sudah ada. Kalau butuh sumber baru → cari gratis.**
 
 ---
 
-## 📋 ACTION ITEMS untuk Research Agent
+## 🔄 PELUANG MANFAATKAN FIRECRAWL LEBIH LANJUT
 
-Task yang perlu dibuat untuk memastikan semua gratis:
+Firecrawl sudah ada dan dibayar — maksimalkan penggunaannya:
 
-1. **TASK: Ganti Massive → Yahoo Finance** untuk price fetching
-2. **TASK: Ganti Firecrawl → direct AAII scraper** untuk sentiment
-3. **TASK: Tambah fallback chain** — TwelveData → Yahoo Finance → Stooq → Alpha Vantage
-4. **TASK: FRED API key** — daftar gratis di fred.stlouisfed.org (5 menit)
-5. **TASK: EIA API key** — daftar gratis di eia.gov/opendata (5 menit)
-6. **TASK: Gemini API key** — gratis di aistudio.google.com
-7. **TASK: CoinGecko demo key** — gratis di coingecko.com/api
+### Sumber yang bisa di-scrape via Firecrawl (gratis setelah punya key):
+- **AAII Sentiment Survey** — `aaii.com/sentimentsurvey/sent_results`
+- **Fear & Greed Index** — `money.cnn.com/data/fear-and-greed`
+- **BofA Fund Manager Survey** (saat dirilis) — media coverage
+- **COT positioning narrative** dari berbagai broker/analyst
+- **Commitments of Traders commentary** — tastytrade, barchart
+- **Market breadth data** — barchart.com/stocks/market-pulse
+- **Insider trading flow** — openinsider.com (public)
+- **Options unusual activity** — unusualwhales.com (public pages)
+- **Macro commentary** — federalreserve.gov speeches/minutes
+
+### TASK untuk Research Agent:
+1. **TASK: Tambah AAII sentiment via Firecrawl** (sudah ada key, tinggal implement)
+2. **TASK: Tambah Fear & Greed Index scraper** via Firecrawl
+3. **TASK: Fed speeches scraper** via Firecrawl → input ke AI analysis
 
 ---
 
-## 💯 Target Arsitektur Data (Semua Gratis)
+## 📋 KALAU BUTUH SUMBER BARU — GRATIS DULU
+
+Prioritas pencarian sumber baru:
+
+1. **Yahoo Finance** — forex, stocks, ETFs (no key, unlimited)
+2. **Stooq.com** — historical forex data (no key)
+3. **Alpha Vantage free** — 25 req/day (minimal, backup only)
+4. **Quandl/NASDAQ Data Link free** — beberapa dataset gratis
+5. **World Bank API** — macro global data (gratis, no key)
+6. **IMF Data API** — macro global (gratis, no key)
+7. **BIS Data** — FX turnover, cross-border banking (gratis)
+
+---
+
+## 💯 Arsitektur Data Saat Ini (Jangan Dirombak)
 
 ```
-COT Data          → CFTC Socrata (gratis, unlimited) ✅ sudah
-Macro/FRED        → FRED API (gratis, 120 req/min) ✅ sudah
-Economic Calendar → MQL5 scraping (gratis) ✅ sudah
-Price Data        → Yahoo Finance (gratis) ← GANTI dari Massive
-Intraday          → TwelveData free tier (800/day) ← sudah ada
-AI Analysis       → Gemini Flash (gratis) ← sudah ada, jadikan primary
-Crypto data       → Bybit public + CoinGecko demo (gratis) ✅ sudah
-VIX Sentiment     → CBOE public (gratis) ✅ sudah
-AAII Sentiment    → Direct scrape (gratis) ← GANTI dari Firecrawl
-Energy Data       → EIA (gratis) ← sudah ada, daftar key
+COT Data          → CFTC Socrata ✅ gratis
+Macro/FRED        → FRED API ✅ gratis (perlu key)
+Economic Calendar → MQL5 scraping ✅ gratis
+Price (intraday)  → TwelveData ✅ sudah di .env
+Price (historical)→ Massive/Polygon ✅ sudah di .env
+AI Analysis       → Claude + Gemini ✅ sudah di .env
+Web Scraping      → Firecrawl ✅ sudah di .env — manfaatkan lebih!
+Crypto data       → Bybit public + CoinGecko ✅ sudah di .env
+VIX Sentiment     → CBOE public ✅ gratis
+Energy Data       → EIA ✅ gratis (perlu key)
+
+Baru (gratis):
+AAII Sentiment    → via Firecrawl (implement)
+Fear & Greed      → via Firecrawl (implement)
+Fed Speeches      → via Firecrawl (implement)
 ```
