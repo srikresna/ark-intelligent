@@ -170,14 +170,14 @@ def pip_value(symbol):
 # CORE: Volume Profile Computation
 # ===========================================================================
 
-def compute_volume_profile(df, n_bins=None, va_pct=0.70):
+def compute_volume_profile(df, n_bins=None, va_pct=0.70, min_bars=10):
     """
     Compute volume profile from OHLCV data.
 
     Returns dict with:
       bins, volumes, poc, vah, val, hvn_zones, lvn_zones, total_volume
     """
-    if len(df) < 10:
+    if len(df) < min_bars:
         return None
 
     price_high = df["High"].max()
@@ -1632,12 +1632,20 @@ def _draw_delta_chart(df, cum_delta, bar_delta, buy_vol, sell_vol, vp,
 # ===========================================================================
 
 def _split_by_trading_day(df):
-    """Split DataFrame into per-day DataFrames."""
+    """Split DataFrame into per-day DataFrames.
+    For FX (24h market): uses 17:00 EST (22:00 UTC) as day boundary,
+    which is the standard FX new-day marker.
+    For others: uses calendar date.
+    """
     df_copy = df.copy()
-    df_copy["trade_date"] = df_copy.index.date
+    # FX convention: new day starts at 17:00 EST = 22:00 UTC
+    # Shift timestamps by +2h so that 22:00 UTC becomes midnight of next day
+    shifted = df_copy.index + pd.Timedelta(hours=2)
+    df_copy["trade_date"] = shifted.date
     days = {}
     for d in sorted(df_copy["trade_date"].unique()):
         day_df = df_copy[df_copy["trade_date"] == d].copy()
+        day_df = day_df.drop(columns=["trade_date"])
         if len(day_df) >= 2:
             days[d] = day_df
     return days
@@ -1660,9 +1668,10 @@ def _classify_day_type(day_df, prev_day_vp=None):
     day_open = day_df["Open"].iloc[0]
     day_close = day_df["Close"].iloc[-1]
 
-    # Initial Balance: first ~25% of bars (approximation of first hour)
-    ib_count = max(2, len(day_df) // 4)
-    ib_bars = day_df.iloc[:ib_count]
+    # Initial Balance: first 60 minutes (time-based, not bar-count)
+    ib_bars = _get_initial_balance_bars(day_df, minutes=60)
+    if len(ib_bars) < 1:
+        ib_bars = day_df.iloc[:2]  # fallback: first 2 bars
     ib_high = ib_bars["High"].max()
     ib_low = ib_bars["Low"].min()
     ib_range = ib_high - ib_low
@@ -1680,7 +1689,7 @@ def _classify_day_type(day_df, prev_day_vp=None):
     close_pos = (day_close - day_low) / day_range
 
     # VP for shape detection
-    vp = compute_volume_profile(day_df, n_bins=40, va_pct=0.70)
+    vp = compute_volume_profile(day_df, n_bins=min(40, max(10, len(day_df)*3)), va_pct=0.70, min_bars=3)
     poc_pos = 0.5
     vol_skew = 0
     if vp:
@@ -1738,18 +1747,33 @@ def _classify_day_type(day_df, prev_day_vp=None):
             "ib_ratio": ib_ratio, "ext_ratio": ext_ratio}
 
 
+def _get_initial_balance_bars(day_df, minutes=60):
+    """Get bars within the first N minutes of the trading day (time-based IB)."""
+    if len(day_df) == 0:
+        return day_df
+    first_ts = day_df.index[0]
+    cutoff = first_ts + pd.Timedelta(minutes=minutes)
+    ib = day_df[day_df.index <= cutoff]
+    if len(ib) < 1:
+        return day_df.iloc[:1]
+    return ib
+
+
 def _classify_opening_type(today_df, prev_vah, prev_val):
     """
     Classify opening type (Dalton's 4 types).
     Needs today's first bars + yesterday's VA.
+    Uses time-based first 30 minutes instead of fixed bar count.
     """
-    if len(today_df) < 4 or prev_vah is None or prev_val is None:
-        return {"type": "UNKNOWN", "desc": "Insufficient data"}
+    if len(today_df) < 2 or prev_vah is None or prev_val is None:
+        return {"type": "UNKNOWN", "desc": "Insufficient data", "emoji": "❓", "implication": "N/A"}
 
     open_price = today_df["Open"].iloc[0]
 
-    # First 4 bars (~first hour for 15m data)
-    first_bars = today_df.iloc[:4]
+    # First 30 minutes of bars (time-based)
+    first_bars = _get_initial_balance_bars(today_df, minutes=30)
+    if len(first_bars) < 1:
+        first_bars = today_df.iloc[:2]
     first_high = first_bars["High"].max()
     first_low = first_bars["Low"].min()
     first_close = first_bars["Close"].iloc[-1]
@@ -1810,19 +1834,34 @@ def _classify_opening_type(today_df, prev_vah, prev_val):
     return {"type": "UNKNOWN", "desc": "Indeterminate opening"}
 
 
-def _compute_rotation_factor(day_df, poc):
+def _compute_rotation_factor(day_df, poc, vah=None, val=None):
     """
-    Count half-rotations around POC within a day.
+    Count half-rotations between VA extremes within a day.
+    A rotation = price crossing from upper half (above midpoint) to lower half or vice versa.
     High RF = balanced. Low RF = directional.
+    Also computes time-in-VA ratio.
     """
     if len(day_df) < 4:
-        return 0, "INSUFFICIENT"
+        return 0, "INSUFFICIENT", 0.0
 
-    above = day_df["Close"].values > poc
+    # Use VA midpoint for rotation counting (between VAH and VAL)
+    if vah is not None and val is not None:
+        midpoint = (vah + val) / 2
+    else:
+        midpoint = poc
+
+    closes = day_df["Close"].values
+    above = closes > midpoint
     rotations = 0
     for i in range(1, len(above)):
         if above[i] != above[i-1]:
             rotations += 1
+
+    # Time-in-VA ratio
+    time_in_va = 0.0
+    if vah is not None and val is not None:
+        in_va = ((closes >= val) & (closes <= vah)).sum()
+        time_in_va = in_va / len(closes) if len(closes) > 0 else 0.0
 
     if rotations >= 6:
         character = "VERY_BALANCED"
@@ -1833,7 +1872,7 @@ def _compute_rotation_factor(day_df, poc):
     else:
         character = "DIRECTIONAL"
 
-    return rotations, character
+    return rotations, character, float(time_in_va)
 
 
 def _analyze_close_location(day_df, vp):
@@ -2077,17 +2116,22 @@ def _find_single_prints(df, vp):
 
 def _build_daily_vps_from_daily_bars(df, daily_vps):
     """
-    For daily timeframe: build rolling-window pseudo VPs per day.
-    Uses 20-bar rolling window to get POC/VAH/VAL context for each day.
+    For daily timeframe: build non-overlapping weekly pseudo VPs.
+    Each 5-bar chunk represents a week. Uses last 50 bars for enough migration data.
     """
-    import pandas as pd
-    window = 20
-    for i in range(window, len(df)):
-        window_df = df.iloc[i-window:i+1]
-        vp = compute_volume_profile(window_df, n_bins=40, va_pct=0.70)
-        if vp:
-            d = df.index[i].date() if hasattr(df.index[i], 'date') else df.index[i]
-            daily_vps[d] = vp
+    chunk_size = 5  # ~1 trading week
+    n = len(df)
+
+    # Look back further to get enough chunks for migration analysis
+    start = max(0, n - 50)
+    for i in range(start, n, chunk_size):
+        end = min(i + chunk_size, n)
+        chunk = df.iloc[i:end]
+        if len(chunk) >= 3:
+            vp = compute_volume_profile(chunk, n_bins=30, va_pct=0.70, min_bars=3)
+            if vp:
+                d = df.index[end-1].date() if hasattr(df.index[end-1], 'date') else df.index[end-1]
+                daily_vps[d] = vp
 
 
 def _analyze_close_location_daily(df, vp):
@@ -2167,7 +2211,7 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
         days = _split_by_trading_day(df)
         sorted_dates = sorted(days.keys())
         for d, day_df in days.items():
-            dvp = compute_volume_profile(day_df, n_bins=40, va_pct=0.70)
+            dvp = compute_volume_profile(day_df, n_bins=min(40, max(10, len(day_df)*3)), va_pct=0.70, min_bars=3)
             if dvp:
                 daily_vps[d] = dvp
     else:
@@ -2190,18 +2234,28 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
     # --- Module 2: Opening Type (INTRADAY ONLY) ---
     opening = None
     if is_intraday and len(sorted_dates) >= 2:
-        today_date = sorted_dates[-1]
-        yesterday_date = sorted_dates[-2]
-        if yesterday_date in daily_vps and today_date in days:
-            yest_vp = daily_vps[yesterday_date]
-            opening = _classify_opening_type(days[today_date], yest_vp["vah"], yest_vp["val"])
+        # Find last day with bars AND the day before it with VP data
+        for i in range(len(sorted_dates)-1, 0, -1):
+            today_date = sorted_dates[i]
+            yesterday_date = sorted_dates[i-1]
+            if today_date in days and yesterday_date in daily_vps and len(days[today_date]) >= 2:
+                yest_vp = daily_vps[yesterday_date]
+                opening = _classify_opening_type(days[today_date], yest_vp["vah"], yest_vp["val"])
+                break
 
     # --- Module 3: Rotation Factor (INTRADAY ONLY) ---
     today_rf = 0
     today_character = None
-    if is_intraday and sorted_dates and sorted_dates[-1] in days and sorted_dates[-1] in daily_vps:
-        today_poc = daily_vps[sorted_dates[-1]]["poc_price"]
-        today_rf, today_character = _compute_rotation_factor(days[sorted_dates[-1]], today_poc)
+    time_in_va = 0.0
+    if is_intraday and sorted_dates:
+        # Find the last day that has both bars and VP data
+        for d in reversed(sorted_dates):
+            if d in days and d in daily_vps:
+                today_dvp = daily_vps[d]
+                today_rf, today_character, time_in_va = _compute_rotation_factor(
+                    days[d], today_dvp["poc_price"],
+                    vah=today_dvp["vah"], val=today_dvp["val"])
+                break
 
     # --- Module 4: Close Location ---
     close_analysis = None
@@ -2226,7 +2280,8 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
                     next_close = days[next_d]["Close"].iloc[-1]
                     followed = (cl["follow_bias"] == "BULLISH" and next_close > next_open) or \
                                (cl["follow_bias"] == "BEARISH" and next_close < next_open) or \
-                               (cl["follow_bias"] in ("MILD_BULLISH", "MILD_BEARISH") and True)
+                               (cl["follow_bias"] == "MILD_BULLISH" and next_close > next_open) or \
+                               (cl["follow_bias"] == "MILD_BEARISH" and next_close < next_open)
                     follow_through.append({"date": str(d), "bias": cl["follow_bias"], "followed": followed})
     else:
         # Daily: track bar-to-bar follow-through using rolling VP context
@@ -2305,6 +2360,7 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
         "opening": opening,
         "rotation_factor": today_rf,
         "rotation_character": today_character,
+        "time_in_va": safe_float(time_in_va),
         "close_analysis": close_analysis,
         "follow_through_rate": safe_float(follow_rate),
         "migration": migration,
@@ -2344,9 +2400,11 @@ Activity: {activity} (last 10: {bars_in} in VA, {bars_above} above, {bars_below}
     # Rotation (intraday only)
     if is_intraday and today_character:
         rf_emoji = "⚖️" if today_character in ("VERY_BALANCED", "BALANCED") else "📈"
+        rf_desc = 'Balanced day — fade extremes' if today_rf >= 4 else 'Directional — follow momentum' if today_rf <= 1 else 'Moderate rotation'
         text += f"""
 <b>🔄 Rotation Factor: {today_rf} ({today_character})</b>
-{rf_emoji} {'Balanced day — fade extremes' if today_rf >= 4 else 'Directional — follow momentum' if today_rf <= 1 else 'Moderate rotation'}
+{rf_emoji} {rf_desc}
+⏱ Time in VA: {time_in_va*100:.0f}%
 """
 
     # Close Analysis
