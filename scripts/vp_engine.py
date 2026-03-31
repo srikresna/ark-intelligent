@@ -2285,12 +2285,19 @@ def compute_auction(df, symbol, timeframe, params, chart_path=None):
                     follow_through.append({"date": str(d), "bias": cl["follow_bias"], "followed": followed})
     else:
         # Daily: track bar-to-bar follow-through using rolling VP context
-        for i in range(max(0, len(df)-11), len(df)-1):
+        # Use a 20-bar rolling window VP instead of overall VP to avoid trend bias
+        for i in range(max(20, len(df)-11), len(df)-1):
+            window_df = df.iloc[max(0, i-20):i+1]
+            rolling_vp = compute_volume_profile(window_df, n_bins=30, va_pct=0.70, min_bars=3)
+            if rolling_vp is None:
+                continue
             bar = df.iloc[i]
             next_bar = df.iloc[i+1]
-            if bar["Close"] > vah:
+            r_vah = rolling_vp["vah"]
+            r_val = rolling_vp["val"]
+            if bar["Close"] > r_vah:
                 bias = "BULLISH"
-            elif bar["Close"] < val:
+            elif bar["Close"] < r_val:
                 bias = "BEARISH"
             else:
                 bias = "NEUTRAL"
