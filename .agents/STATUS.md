@@ -1,11 +1,11 @@
-# Agent Status — last updated: 2026-04-01 16:10 WIB
+# Agent Status — last updated: 2026-04-01 17:30 WIB
 
 ## Research
-- **Siklus saat ini:** 4/5 (Technical Refactor) — SELESAI, next: siklus 5 (Bug Hunting)
-- **Last run:** 2026-04-01 16:10 WIB
-- **Current:** completed siklus 4 — audit TECH-003 s/d TECH-009, temuan baru (interface{} modernization, handler_alpha format mixing)
-- **Tasks created today:** 5 (TASK-040 s/d TASK-044)
-- **Total tasks created:** 44 (TASK-000 template + TASK-001 s/d TASK-044)
+- **Siklus saat ini:** 5/5 (Bug Hunting — Sesi 2) — SELESAI, next: siklus 1 (UX/UI)
+- **Last run:** 2026-04-01 17:30 WIB
+- **Current:** completed siklus 5 sesi 2 — temuan BUG-B1 s/d BUG-B5 (gemini model config, python subprocess timeout, newsScheduler wiring, gemini ctx-unaware sleep)
+- **Tasks created today:** 5 (TASK-045 s/d TASK-049)
+- **Total tasks created:** 49 (TASK-000 template + TASK-001 s/d TASK-049)
 
 ---
 
