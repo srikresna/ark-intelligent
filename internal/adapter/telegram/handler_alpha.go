@@ -528,7 +528,7 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build asset profiles: "+alphaErr(err))
+		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
 	}
 
@@ -549,7 +549,7 @@ func (h *Handler) cmdPlaybook(ctx context.Context, chatID string, _ int64, _ str
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
 	}
 
@@ -583,7 +583,7 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
 	}
 	ranking := h.alpha.FactorEngine.Rank(profiles)
@@ -614,7 +614,7 @@ func (h *Handler) cmdRankX(ctx context.Context, chatID string, _ int64, _ string
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
 	}
 	result := h.alpha.FactorEngine.Rank(profiles)

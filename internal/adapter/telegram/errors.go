@@ -42,8 +42,13 @@ func userFriendlyError(err error, command string) string {
 		return "🚦 <b>Batas request tercapai</b>\n\nTerlalu banyak request dalam waktu singkat. Sistem perlu jeda sebentar.\n\n💡 <i>Tip: Tunggu 1-2 menit lalu coba lagi.</i>"
 	}
 
+	// Chart / rendering errors (checked before AI to avoid "failed" matching "ai")
+	if strings.Contains(lower, "chart") || strings.Contains(lower, "render") || strings.Contains(lower, "script") {
+		return "📈 <b>Gagal membuat chart</b>\n\nTerjadi masalah saat rendering visualisasi.\n\n💡 <i>Tip: " + suggestRetry(command) + "</i>"
+	}
+
 	// AI / generation errors
-	if strings.Contains(lower, "ai") || strings.Contains(lower, "gemini") || strings.Contains(lower, "claude") || strings.Contains(lower, "generation failed") || strings.Contains(lower, "model") {
+	if strings.Contains(lower, " ai ") || strings.Contains(lower, "gemini") || strings.Contains(lower, "claude") || strings.Contains(lower, "generation failed") || strings.Contains(lower, "openai") || strings.Contains(lower, "llm") {
 		return "🤖 <b>AI sedang tidak tersedia</b>\n\nLayanan AI sedang mengalami gangguan. Analisis template tetap tersedia.\n\n💡 <i>Tip: " + suggestRetry(command) + "</i>"
 	}
 
@@ -55,11 +60,6 @@ func userFriendlyError(err error, command string) string {
 	// BadgerDB errors
 	if strings.Contains(lower, "badger") {
 		return "💾 <b>Gangguan penyimpanan</b>\n\nDatabase internal sedang bermasalah. Data kamu aman.\n\n💡 <i>Tip: Coba lagi dalam beberapa saat. Hubungi admin jika terus terjadi.</i>"
-	}
-
-	// Chart / rendering errors
-	if strings.Contains(lower, "chart") || strings.Contains(lower, "render") || strings.Contains(lower, "script") {
-		return "📈 <b>Gagal membuat chart</b>\n\nTerjadi masalah saat rendering visualisasi.\n\n💡 <i>Tip: " + suggestRetry(command) + "</i>"
 	}
 
 	// Generic fallback

@@ -85,13 +85,7 @@ func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args 
 	// Run analysis
 	result, err := h.gex.Engine.Analyze(ctx, sym)
 	if err != nil {
-		editErr := h.bot.EditMessage(ctx, chatID, loadID,
-			fmt.Sprintf("❌ <b>GEX analysis failed</b>\n\n"+
-				"<code>%s</code>\n\n"+
-				"Deribit API may be temporarily unavailable. Please try again.", err.Error()))
-		if editErr != nil {
-			return editErr
-		}
+		h.editUserError(ctx, chatID, loadID, err, "gex")
 		return nil
 	}
 
