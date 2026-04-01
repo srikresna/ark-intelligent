@@ -270,7 +270,7 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 		if lowCount > 0 {
 			html += fmt.Sprintf("🟡 Low Impact: %d events\n", lowCount)
 		}
-		if firstMatch != nil {
+		if firstMatch != nil && !firstMatch.TimeWIB.IsZero() {
 			html += fmt.Sprintf("\nPertama: %s WIB — %s %s",
 				firstMatch.TimeWIB.Format("15:04"), firstMatch.Currency, firstMatch.Event)
 		}
@@ -423,6 +423,11 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 			continue // Already released
 		}
 
+		if e.TimeWIB.IsZero() {
+			schedLog.Warn().Str("event", e.Event).Str("currency", e.Currency).Msg("skipping event with zero TimeWIB")
+			continue
+		}
+
 		minsUntil := int(e.TimeWIB.Sub(now).Minutes())
 		if minsUntil < 0 || minsUntil > 120 {
 			continue // Not in relevant window
@@ -520,6 +525,11 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 	triggerScrape := false
 	for _, e := range events {
 		if e.Actual != "" {
+			continue
+		}
+
+		if e.TimeWIB.IsZero() {
+			schedLog.Warn().Str("event", e.Event).Str("currency", e.Currency).Msg("skipping micro-scrape event with zero TimeWIB")
 			continue
 		}
 

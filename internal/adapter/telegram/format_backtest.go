@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -371,8 +372,12 @@ func (f *Formatter) FormatSmartMoneyAccuracy(results []backtestsvc.SmartMoneyAcc
 		} else if r.Edge == "INSUFFICIENT" {
 			edgeIcon = "?"
 		}
-		b.WriteString(fmt.Sprintf("%-5s %4.0f%% %4.0f%% %4.0f%% %+.2f  %s\n",
-			r.Currency, r.Accuracy1W, r.Accuracy2W, r.Accuracy4W, r.Correlation, edgeIcon))
+		corrStr := fmt.Sprintf("%+.2f", r.Correlation)
+		if math.IsNaN(r.Correlation) {
+			corrStr = " N/A"
+		}
+		b.WriteString(fmt.Sprintf("%-5s %4.0f%% %4.0f%% %4.0f%% %5s  %s\n",
+			r.Currency, r.Accuracy1W, r.Accuracy2W, r.Accuracy4W, corrStr, edgeIcon))
 	}
 	b.WriteString("</pre>\n")
 

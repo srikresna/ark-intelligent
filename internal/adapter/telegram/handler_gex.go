@@ -6,6 +6,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
@@ -49,7 +50,7 @@ var validGEXSymbols = map[string]struct{}{
 // cmdGEX handles the /gex [SYMBOL] command.
 func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ GEX engine is not configured.")
+		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ <b>GEX</b> engine tidak tersedia. Hubungi admin.")
 		return err
 	}
 
@@ -65,10 +66,11 @@ func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args 
 		for k := range validGEXSymbols {
 			keys = append(keys, k)
 		}
+		sort.Strings(keys)
 		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
-			"⚠️ Unsupported symbol <code>%s</code>.\n"+
-				"Supported: <code>%s</code>\n\n"+
-				"Usage: <code>/gex BTC</code> or <code>/gex ETH</code>",
+			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
+				"Tersedia: <code>%s</code>\n\n"+
+				"Contoh: <code>/gex BTC</code> atau <code>/gex ETH</code>",
 			sym, strings.Join(keys, "</code>, <code>"),
 		))
 		return err

@@ -7,6 +7,7 @@ package health
 
 import (
 	"context"
+	"os/exec"
 	"encoding/json"
 	"net/http"
 	"sync/atomic"
@@ -116,4 +117,28 @@ func (c *Checker) handleReady(w http.ResponseWriter, r *http.Request) {
 		"checks": checks,
 		"uptime": time.Since(c.started).String(),
 	})
+}
+
+// CheckPythonDeps validates that required Python packages are importable.
+// Call at startup to surface missing dependencies early.
+func CheckPythonDeps() {
+	deps := []string{"mplfinance", "matplotlib", "numpy", "pandas"}
+	importStmt := ""
+	for i, d := range deps {
+		if i > 0 {
+			importStmt += "; "
+		}
+		importStmt += "import " + d
+	}
+
+	cmd := exec.CommandContext(context.Background(), "python3", "-c", importStmt)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error().
+			Err(err).
+			Str("output", string(output)).
+			Strs("packages", deps).
+			Msg("Python chart dependencies missing — chart generation will fail")
+	} else {
+		log.Info().Strs("packages", deps).Msg("Python chart dependencies OK")
+	}
 }

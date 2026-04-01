@@ -87,6 +87,14 @@ func (wfa *WalkForwardAnalyzer) Analyze(ctx context.Context) (*WalkForwardResult
 		return evaluated[i].ReportDate.Before(evaluated[j].ReportDate)
 	})
 
+	// Defensive guard: re-check length at point-of-use in case future
+	// refactoring adds filtering between the initial check and here.
+	if len(evaluated) == 0 {
+		return &WalkForwardResult{
+			Recommendation: "No evaluated signals available for walk-forward analysis.",
+		}, nil
+	}
+
 	earliest := evaluated[0].ReportDate
 	latest := evaluated[len(evaluated)-1].ReportDate
 

@@ -4,6 +4,7 @@ package telegram
 // Chart types, Python chart renderer, and data-preparation utilities.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -219,7 +220,6 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
-	defer os.Remove(outputPath)
 
 	// Find the script path relative to the binary
 	scriptPath := findCTAScript()
@@ -228,13 +228,19 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 	cmdCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("CTA chart renderer subprocess failed")
+		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed (timeout 90s): %w", err)
 	}
 
 	// Read output PNG
 	pngData, err := os.ReadFile(outputPath)
+	os.Remove(outputPath)
 	if err != nil {
 		return nil, fmt.Errorf("read chart output: %w", err)
 	}
@@ -260,18 +266,23 @@ func runChartScript(ctx context.Context, input any) ([]byte, error) {
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
-	defer os.Remove(outputPath)
 
 	scriptPath := findCTAScript()
 	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("CTA detail chart renderer subprocess failed")
+		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed: %w", err)
 	}
 
 	pngBytes, readErr := os.ReadFile(outputPath)
+	os.Remove(outputPath)
 	if readErr != nil {
 		return nil, fmt.Errorf("read chart output: %w", readErr)
 	}

@@ -82,6 +82,9 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 	if effectiveText == "" && len(contentBlocks) > 0 {
 		// Try to extract text from content blocks
 		for _, b := range contentBlocks {
+			if b.Type == "" {
+				continue // skip zero-value blocks
+			}
 			if b.Type == "text" && b.Text != "" {
 				effectiveText = b.Text
 				break
@@ -320,6 +323,9 @@ func truncateErr(err error) string {
 func describeContentBlocks(blocks []ports.ContentBlock) string {
 	var parts []string
 	for _, b := range blocks {
+		if b.Type == "" {
+			continue // skip zero-value blocks
+		}
 		switch b.Type {
 		case "image":
 			parts = append(parts, "[Image]")

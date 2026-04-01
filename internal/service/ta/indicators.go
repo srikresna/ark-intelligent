@@ -773,6 +773,7 @@ func CalcADX(bars []OHLCV, period int) *ADXResult {
 // Ref: Joseph Granville, "New Key to Stock Market Profits" (1963).
 func CalcOBV(bars []OHLCV) *OBVResult {
 	series := CalcOBVSeries(bars)
+	// Guard: CalcOBVSeries returns nil for < 2 bars; protect all downstream indexing.
 	if len(series) == 0 {
 		return nil
 	}
@@ -785,7 +786,7 @@ func CalcOBV(bars []OHLCV) *OBVResult {
 		// recent bar, so reverse to oldest-first, compute SMA, then check the last value.
 		obvAsc := reverseFloat64(series)
 		sma := CalcSMA(obvAsc, 10)
-		if sma != nil {
+		if sma != nil && len(sma) > 0 && len(obvAsc) > 0 {
 			latestSMA := sma[len(sma)-1]
 			latestOBV := obvAsc[len(obvAsc)-1]
 			if !math.IsNaN(latestSMA) {
@@ -801,10 +802,10 @@ func CalcOBV(bars []OHLCV) *OBVResult {
 		// For 5+ bars, average the 2 newest and 2 oldest for smoothing.
 		// For 2-4 bars, compare single newest vs oldest (no panic on short slices).
 		var newestAvg, oldestAvg float64
-		if len(series) >= 5 {
+		if len(series) >= 5 && len(series) >= 2 {
 			newestAvg = (series[0] + series[1]) / 2
 			oldestAvg = (series[len(series)-1] + series[len(series)-2]) / 2
-		} else {
+		} else if len(series) >= 1 {
 			newestAvg = series[0]
 			oldestAvg = series[len(series)-1]
 		}
@@ -815,6 +816,10 @@ func CalcOBV(bars []OHLCV) *OBVResult {
 		}
 	}
 
+	// Final bounds guard before accessing series[0].
+	if len(series) == 0 {
+		return nil
+	}
 	return &OBVResult{Value: series[0], Trend: trend, Series: series}
 }
 
