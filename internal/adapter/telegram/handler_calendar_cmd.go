@@ -252,7 +252,9 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdLevels(ctx, chatID, userID, args)
 	case "carry":
 		return h.cmdCarry(ctx, chatID, userID, args)
-	case "corr", "intraday", "garch", "hurst", "regime", "factors", "wfopt":
+	case "regime":
+		return h.cmdRegime(ctx, chatID, userID, args)
+	case "corr", "intraday", "garch", "hurst", "factors", "wfopt":
 		// These are now handled by /quant
 		return h.cmdQuant(ctx, chatID, userID, args)
 	case "quant":

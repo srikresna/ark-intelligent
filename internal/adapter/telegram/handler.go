@@ -153,6 +153,10 @@ type Handler struct {
 	// orderFlow holds optional price repos for the /orderflow command.
 	// May be nil — /orderflow command disabled if not configured.
 	orderFlow *OrderFlowServices
+
+	// regimeProvider exposes regime state data for the /regime command.
+	// May be nil — regime feature disabled if scheduler not wired.
+	regimeProvider RegimeAlertProvider
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
