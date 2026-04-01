@@ -671,7 +671,11 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 	// does not prevent past-horizon impact records from being persisted.
 	if s.impactRecorder != nil && hasActual {
 		saferun.Go(ctx, "record-impact-"+ev.Event, schedLog, func() {
-			s.impactRecorder.RecordImpact(context.Background(), ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
+			// Use a detached context with timeout so shutdown does not cancel
+			// in-flight impact recording, but goroutine cannot hang forever.
+			recordCtx, recordCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer recordCancel()
+			s.impactRecorder.RecordImpact(recordCtx, ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
 		})
 	}
 
