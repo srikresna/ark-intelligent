@@ -208,6 +208,7 @@ func NewHandler(
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
 	bot.RegisterCallback("macro:", h.cbMacro)
 	bot.RegisterCallback("imp:", h.cbImpact)
+	bot.RegisterCallback("nav:", h.cbNav)
 
 	log.Info().Int("commands", 37).Int("callbacks", 9).Msg("registered commands and callback prefixes")
 	return h
@@ -1370,6 +1371,20 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 
 // handleMonthNav handles prevmonth / thismonth / nextmonth navigation.
 // dateStr is the reference date from the callback (e.g. "20260301") to compute relative months.
+
+// cbNav handles navigation callbacks (e.g. home button).
+func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "nav:")
+	switch action {
+	case "home":
+		// Delete the current message and show the main menu
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		return h.cmdStart(ctx, chatID, userID, "")
+	default:
+		return nil
+	}
+}
+
 func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, navType, dateStr string) error {
 	// Parse the reference date from the callback; fall back to "now" if invalid.
 	// BUG #6 FIX: parse with WIB timezone for consistency with month boundary in WIB.
