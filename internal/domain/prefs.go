@@ -69,6 +69,7 @@ type UserPrefs struct {
 	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
 	CalendarView   string     `json:"calendar_view"`   // Last used view: "day", "week", "month"
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default) or "full"
+	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
 	// ExperienceLevel: user's self-reported trading experience.
 	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).

@@ -563,6 +563,7 @@ func (h *Handler) cmdCOT(ctx context.Context, chatID string, userID int64, args 
 		}
 
 		if code != "" {
+			h.saveLastCurrency(ctx, userID, code)
 			contractCode := currencyToContractCode(code)
 			return h.sendCOTDetail(ctx, chatID, contractCode, code, isRaw, 0)
 		}
@@ -1635,6 +1636,31 @@ func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID in
 	default:
 		return nil
 	}
+}
+
+
+// saveLastCurrency persists the user's last viewed currency for context carry-over.
+func (h *Handler) saveLastCurrency(ctx context.Context, userID int64, currency string) {
+	if currency == "" {
+		return
+	}
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	prefs.LastCurrency = strings.ToUpper(currency)
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+}
+
+// getLastCurrency returns the user's last viewed currency, or empty string.
+func (h *Handler) getLastCurrency(ctx context.Context, userID int64) string {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	return prefs.LastCurrency
+}
+
+// resolveOrLastCurrency returns the given currency if non-empty, otherwise the user's last currency.
+func (h *Handler) resolveOrLastCurrency(ctx context.Context, userID int64, currency string) string {
+	if currency != "" {
+		return currency
+	}
+	return h.getLastCurrency(ctx, userID)
 }
 
 // cbViewToggle handles compact/full view toggle callbacks.
