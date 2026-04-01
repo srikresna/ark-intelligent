@@ -106,6 +106,12 @@ func (wfo *WalkForwardOptimizer) Optimize(ctx context.Context) (*WFOResult, erro
 		return evaluated[i].ReportDate.Before(evaluated[j].ReportDate)
 	})
 
+	// Defensive guard at point-of-use (filtering above may reduce slice).
+	if len(evaluated) < wfoMinTrain+wfoMinTest {
+		return nil, fmt.Errorf("insufficient evaluated signals after filtering: need %d, got %d",
+			wfoMinTrain+wfoMinTest, len(evaluated))
+	}
+
 	earliest := evaluated[0].ReportDate
 	latest := evaluated[len(evaluated)-1].ReportDate
 
