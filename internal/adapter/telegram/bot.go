@@ -319,10 +319,12 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 			return
 		}
 		log.Warn().Str("command", cmd).Int64("user_id", userID).Msg("unknown command")
-		_, _ = b.SendHTML(ctx, chatID, fmt.Sprintf(
+		if _, err := b.SendHTML(ctx, chatID, fmt.Sprintf(
 			"Unknown command <code>%s</code>\nType /help for available commands.",
 			html.EscapeString(cmd),
-		))
+		)); err != nil {
+			log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send unknown-command message")
+		}
 		return
 	}
 
@@ -331,13 +333,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 		result := b.middleware.Authorize(ctx, userID, username, cmd)
 		if !result.Allowed {
 			log.Warn().Int64("user_id", userID).Str("command", cmd).Str("reason", result.Reason).Msg("user denied by middleware")
-			_, _ = b.SendHTML(ctx, chatID, fmt.Sprintf("\xe2\x9b\x94 %s", result.Reason))
+			if _, err := b.SendHTML(ctx, chatID, fmt.Sprintf("\xe2\x9b\x94 %s", result.Reason)); err != nil {
+				log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send authorization-denied message")
+			}
 			return
 		}
 	} else if userID != 0 && !b.isOwner(userID) && !b.userLimiter.Allow(userID) {
 		// Fallback to legacy rate limiter if middleware not installed
 		log.Warn().Int64("user_id", userID).Str("command", cmd).Msg("user rate limited")
-		_, _ = b.SendHTML(ctx, chatID, "\u23f3 Rate limited \u2014 please wait a moment before sending more commands.")
+		if _, err := b.SendHTML(ctx, chatID, "\u23f3 Rate limited \u2014 please wait a moment before sending more commands."); err != nil {
+			log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send rate-limited message")
+		}
 		return
 	}
 
@@ -350,8 +356,10 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 	metrics.RecordCommand(cmd, userID, elapsed, err)
 
 	if err != nil {
-		_, _ = b.SendHTML(ctx, chatID,
-			fmt.Sprintf("Error processing <code>%s</code>. Please try again later.", html.EscapeString(cmd)))
+		if _, err := b.SendHTML(ctx, chatID,
+			fmt.Sprintf("Error processing <code>%s</code>. Please try again later.", html.EscapeString(cmd))); err != nil {
+			log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send error message")
+		}
 	}
 }
 
