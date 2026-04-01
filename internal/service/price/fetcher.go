@@ -20,7 +20,7 @@ import (
 var log = logger.Component("price")
 
 // Fetcher implements ports.PriceFetcher with 3-layer resilience:
-// Twelve Data (primary) → Alpha Vantage (secondary) → Yahoo Finance (fallback).
+// Twelve Data (primary) → Alpha Vantage (secondary) → Yahoo Finance → Stooq.com (fallback).
 // CoinGecko is used as a dedicated provider for crypto market cap data (TOTAL3).
 type Fetcher struct {
 	httpClient     *http.Client
@@ -33,6 +33,7 @@ type Fetcher struct {
 	cbAlphaVantage *circuitbreaker.Breaker
 	cbYahoo        *circuitbreaker.Breaker
 	cbCoinGecko    *circuitbreaker.Breaker
+	cbStooq        *circuitbreaker.Breaker
 }
 
 // NewFetcher creates a new price fetcher with the given API keys.
@@ -48,6 +49,7 @@ func NewFetcher(twelveDataKeys []string, avKeys []string) *Fetcher {
 		cbAlphaVantage: circuitbreaker.New("alpha-vantage", 3, 5*time.Minute),
 		cbYahoo:        circuitbreaker.New("yahoo-finance", 5, 3*time.Minute),
 		cbCoinGecko:    circuitbreaker.New("coingecko", 3, 5*time.Minute),
+		cbStooq:        circuitbreaker.New("stooq", 3, 5*time.Minute),
 	}
 }
 
@@ -184,7 +186,7 @@ func (f *Fetcher) FetchRiskInstruments(ctx context.Context, weeks int) ([]domain
 }
 
 // FetchWeekly fetches weekly OHLC data for a single contract.
-// Tries: CoinGecko (if applicable) → TwelveData → AlphaVantage → Yahoo Finance → Synthetic cross.
+// Tries: CoinGecko (if applicable) → TwelveData → AlphaVantage → Yahoo Finance → Stooq → Synthetic cross.
 func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMapping, weeks int) ([]domain.PriceRecord, error) {
 	// CoinGecko-sourced instruments (TOTAL3) — dedicated provider, no fallback chain
 	if mapping.CoinGecko != "" && f.coinGeckoKey != "" {
@@ -228,6 +230,17 @@ func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMap
 		}
 		if err != nil {
 			log.Debug().Err(err).Str("symbol", mapping.Yahoo).Msg("Yahoo failed")
+		}
+	}
+
+	// Fallback to Stooq.com (free, no API key — forex historical OHLCV)
+	if stooqSymbol(mapping.Currency) != "" {
+		records, err := f.fetchStooq(ctx, mapping, weeks)
+		if err == nil && len(records) > 0 {
+			return records, nil
+		}
+		if err != nil {
+			log.Debug().Err(err).Str("currency", mapping.Currency).Msg("Stooq failed")
 		}
 	}
 
