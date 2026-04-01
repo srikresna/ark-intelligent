@@ -198,6 +198,7 @@ func NewHandler(
 	bot.RegisterCommand("/calendar", h.cmdCalendar)
 	bot.RegisterCommand("/rank", h.cmdRank)
 	bot.RegisterCommand("/macro", h.cmdMacro)
+	bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
 	bot.RegisterCommand("/bias", h.cmdBias)
 	bot.RegisterCommand("/backtest", h.cmdBacktest)
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)

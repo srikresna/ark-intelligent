@@ -1,6 +1,7 @@
 package telegram
 
 // /macro — FRED Macro Regime Dashboard
+// /ecb   — ECB Statistical Data Warehouse Dashboard
 
 import (
 	"context"
@@ -9,6 +10,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 )
 
@@ -298,4 +300,24 @@ func (h *Handler) renderMacroSummary(ctx context.Context, chatID string, userID 
 	}
 	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, htmlOut, kb)
 	return err
+}
+
+// ---------------------------------------------------------------------------
+// /ecb — ECB Statistical Data Warehouse Dashboard
+// ---------------------------------------------------------------------------
+
+// cmdECB handles the /ecb command — fetches and displays ECB monetary policy data
+// (key rate, M3 money supply, EUR/USD official rate) from the ECB SDW API.
+func (h *Handler) cmdECB(ctx context.Context, chatID string, _ int64, _ string) error {
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "🏦 Fetching ECB monetary policy data... ⏳")
+
+	data, err := macro.GetECBData(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("ECB data fetch failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"❌ Gagal mengambil data ECB. Silakan coba lagi nanti.")
+	}
+
+	htmlMsg := macro.FormatECBData(data)
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
