@@ -3,7 +3,7 @@ package telegram
 // handler_cta.go — /cta command: Classical Technical Analysis dashboard
 //   /cta [SYMBOL] [TIMEFRAME]  — TA dashboard with chart + inline keyboard
 //
-// This file contains only orchestration logic (command dispatch + callback routing).
+// Orchestration only: command parsing → data fetch → format → send.
 // Chart generation: chart_cta.go
 // Output formatting: formatter_cta.go
 
@@ -17,7 +17,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
-	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
@@ -28,8 +28,8 @@ import (
 // CTAServices holds the services required for the CTA command.
 type CTAServices struct {
 	TAEngine       *ta.Engine
-	DailyPriceRepo pricesvc.DailyPriceStore
-	IntradayRepo   pricesvc.IntradayStore
+	DailyPriceRepo price.DailyPriceStore
+	IntradayRepo   price.IntradayStore
 	PriceMapping   []domain.PriceSymbolMapping
 }
 
@@ -94,7 +94,7 @@ func (c *ctaStateCache) set(chatID string, s *ctaState) {
 }
 
 // ---------------------------------------------------------------------------
-// Handler wiring
+// Handler fields (stored in Handler struct)
 // ---------------------------------------------------------------------------
 
 // WithCTA injects CTAServices into the handler and registers CTA commands.
@@ -144,6 +144,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 
 	symbol := parts[0]
 
+	// Resolve symbol to contract code
 	mapping := h.resolveCTAMapping(symbol)
 	if mapping == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
@@ -153,8 +154,10 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 		return err
 	}
 
+	// Send loading indicator
 	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("⚡ Computing TA for <b>%s</b>... ⏳", html.EscapeString(mapping.Currency)))
 
+	// Compute CTA state
 	state, err := h.computeCTAState(ctx, mapping)
 	if err != nil {
 		if loadingID > 0 {
@@ -166,20 +169,27 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 
 	h.ctaCache.set(chatID, state)
 
+	// Generate chart for daily timeframe
 	chartPNG, chartErr := h.generateCTAChart(state, "daily")
 	if chartErr != nil {
 		log.Warn().Err(chartErr).Str("symbol", symbol).Msg("chart generation failed")
 	}
 
+	// Delete loading message
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
 
+	// Format summary
 	summary := formatCTASummary(state)
 	kb := h.kb.CTAMenu()
 
+	// Send photo with keyboard if chart available, otherwise text
 	if chartPNG != nil && len(chartPNG) > 0 {
 		state.chartData["daily"] = chartPNG
+
+		// Photo caption limited to 1024 chars by Telegram.
+		// Send chart with short caption, then full analysis as separate message.
 		shortCaption := fmt.Sprintf("⚡ <b>CTA: %s</b> — Daily", html.EscapeString(mapping.Currency))
 		_, photoErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, shortCaption, kb)
 		if photoErr != nil {
@@ -187,10 +197,12 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 			_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 			return err
 		}
+		// Send full analysis as text
 		_, err = h.bot.SendHTML(ctx, chatID, summary)
 		return err
 	}
 
+	// Fallback: send text only
 	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
@@ -202,12 +214,14 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID int, _ int64, data string) error {
 	action := strings.TrimPrefix(data, "cta:")
 
+	// Symbol selection from CTASymbolMenu (before state check)
 	if strings.HasPrefix(action, "sym:") {
 		sym := strings.TrimPrefix(action, "sym:")
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 		return h.cmdCTA(ctx, chatID, 0, sym)
 	}
 
+	// Get or recompute state
 	state := h.ctaCache.get(chatID)
 	if state == nil {
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
@@ -220,6 +234,7 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 		return h.ctaShowSummaryChart(ctx, chatID, msgID, state, "daily")
 
 	case action == "refresh":
+		// Recompute
 		mapping := h.resolveCTAMapping(state.currency)
 		if mapping == nil {
 			return h.bot.EditMessage(ctx, chatID, msgID, "❌ Symbol not found.")
@@ -301,11 +316,13 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 func (h *Handler) ctaShowSummaryChart(ctx context.Context, chatID string, msgID int, state *ctaState, tf string) error {
 	chartPNG, err := h.getCTAChart(state, tf)
 	if err != nil || len(chartPNG) == 0 {
+		// Fallback to text
 		summary := formatCTASummary(state)
 		kb := h.kb.CTAMenu()
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, summary, kb)
 	}
 
+	// Delete old and send new photo
 	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 	summary := formatCTASummary(state)
 	kb := h.kb.CTAMenu()
@@ -319,6 +336,11 @@ func (h *Handler) ctaShowSummaryChart(ctx context.Context, chatID string, msgID 
 	return sendErr
 }
 
+// resolveCTAMapping looks up the symbol mapping for CTA commands.
+func (h *Handler) resolveCTAMapping(symbol string) *domain.PriceSymbolMapping {
+	return domain.FindPriceMappingByCurrency(strings.ToUpper(symbol))
+}
+
 // ctaShowTimeframe shows a specific timeframe detail + chart.
 func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int, state *ctaState, tf string) error {
 	result := h.getCTAResult(state, tf)
@@ -327,10 +349,12 @@ func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int
 	}
 
 	chartPNG, _ := h.getCTAChart(state, tf)
+
 	txt := formatCTATimeframeDetail(state, tf, result)
 	kb := h.kb.CTATimeframeMenu()
 
 	if chartPNG != nil && len(chartPNG) > 0 {
+		// Delete old and send photo with short caption + full text separately
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 		shortCaption := fmt.Sprintf("⚡ <b>CTA: %s</b> — %s", html.EscapeString(state.symbol), strings.ToUpper(tf))
 		_, photoErr := h.bot.SendPhotoWithKeyboard(ctx, chatID, chartPNG, shortCaption, kb)
@@ -343,12 +367,4 @@ func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int
 	}
 
 	return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
-}
-
-// ---------------------------------------------------------------------------
-// Symbol Resolution
-// ---------------------------------------------------------------------------
-
-func (h *Handler) resolveCTAMapping(symbol string) *domain.PriceSymbolMapping {
-	return domain.FindPriceMappingByCurrency(strings.ToUpper(symbol))
 }
