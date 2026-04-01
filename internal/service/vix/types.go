@@ -32,4 +32,7 @@ type VIXTermStructure struct {
 
 	// MOVE Index (bond volatility) — cross-asset vol comparison
 	MOVE *MOVEData // nil if MOVE data unavailable
+
+	// Cross-asset volatility suite (SKEW, OVX, GVZ, RVX, VIX9D)
+	VolSuite *VolSuite // nil if vol suite data unavailable
 }

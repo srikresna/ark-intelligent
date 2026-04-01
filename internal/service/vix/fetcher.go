@@ -66,6 +66,12 @@ func FetchTermStructure(ctx context.Context) (*VIXTermStructure, error) {
 		ts.MOVE = moveData
 	}
 
+	// Fetch cross-asset volatility suite (SKEW, OVX, GVZ, RVX, VIX9D) — non-fatal
+	volSuite := FetchVolSuite(ctx, ts.Spot)
+	if volSuite != nil && volSuite.Available {
+		ts.VolSuite = volSuite
+	}
+
 	return ts, nil
 }
 

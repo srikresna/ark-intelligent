@@ -27,6 +27,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
 	"github.com/arkcode369/ark-intelligent/internal/service/vix"
 )
 
@@ -43,7 +44,9 @@ type SentimentFetcher struct {
 	cbVIX      *circuitbreaker.Breaker
 	cbMyfxbook *circuitbreaker.Breaker
 	cbCryptoGlobal *circuitbreaker.Breaker
-	vixCache   *vix.Cache
+	vixCache    *vix.Cache
+	dvolFetcher *dvol.Fetcher
+	cbDVOL      *circuitbreaker.Breaker
 }
 
 // NewSentimentFetcher creates a SentimentFetcher with per-source circuit breakers.
@@ -58,7 +61,9 @@ func NewSentimentFetcher() *SentimentFetcher {
 		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
 		cbMyfxbook: circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
 		cbCryptoGlobal: circuitbreaker.New("sentiment-crypto-global", 3, 5*time.Minute),
-		vixCache:   vix.NewCache(),
+		vixCache:    vix.NewCache(),
+		dvolFetcher: dvol.NewFetcher(),
+		cbDVOL:      circuitbreaker.New("sentiment-dvol", 3, 10*time.Minute),
 	}
 }
 
@@ -157,6 +162,20 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 			data.MOVEDivergence = ts.MOVE.Divergence
 			data.MOVEAvailable = true
 		}
+		// Cross-asset volatility suite
+		if ts.VolSuite != nil && ts.VolSuite.Available {
+			data.VolSKEW = ts.VolSuite.SKEW
+			data.VolOVX = ts.VolSuite.OVX
+			data.VolGVZ = ts.VolSuite.GVZ
+			data.VolRVX = ts.VolSuite.RVX
+			data.VolVIX9D = ts.VolSuite.VIX9D
+			data.SKEWVIXRatio = ts.VolSuite.SKEWVIXRatio
+			data.RVXVIXRatio = ts.VolSuite.RVXVIXRatio
+			data.VIX9D30Ratio = ts.VolSuite.VIX9D30Ratio
+			data.VolTailRisk = ts.VolSuite.TailRisk
+			data.VolDivergences = ts.VolSuite.Divergences
+			data.VolSuiteAvail = true
+		}
 		return nil
 	}); err != nil {
 		log.Debug().Str("source", "vix").Err(err).Msg("sentiment: VIX circuit breaker rejected or source unavailable")
@@ -174,6 +193,22 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		return nil
 	}); err != nil {
 		log.Debug().Str("source", "myfxbook").Err(err).Msg("sentiment: Myfxbook circuit breaker rejected or source unavailable")
+	}
+
+
+	// Deribit DVOL - Crypto Volatility Index - wrapped in circuit breaker
+	if err := f.cbDVOL.Execute(func() error {
+		dvolResult, dvolErr := f.dvolFetcher.Fetch(ctx)
+		if dvolErr != nil {
+			return dvolErr
+		}
+		if dvolResult == nil || !dvolResult.Available {
+			return fmt.Errorf("DVOL data unavailable")
+		}
+		IntegrateDVOLIntoSentiment(data, dvolResult)
+		return nil
+	}); err != nil {
+		log.Debug().Str("source", "dvol").Err(err).Msg("sentiment: DVOL circuit breaker rejected or source unavailable")
 	}
 
 	return data, nil
@@ -237,6 +272,42 @@ type SentimentData struct {
 	VIXMOVERatio   float64 // VIX/MOVE — normal 0.15-0.30
 	MOVEDivergence string  // "EQUITY_FEAR", "BOND_STRESS", "SYSTEMIC_STRESS", "ALIGNED"
 	MOVEAvailable  bool
+
+	// Deribit DVOL - Crypto Volatility Index (crypto VIX equivalent)
+	DVOLBTCCurrent      float64 // BTC DVOL level (annualized IV %)
+	DVOLBTCChange24hPct float64 // BTC DVOL 24h change %
+	DVOLBTCHigh24h      float64 // BTC DVOL 24h high
+	DVOLBTCLow24h       float64 // BTC DVOL 24h low
+	DVOLBTCHV           float64 // BTC realized (historical) vol %
+	DVOLBTCIVHVSpread   float64 // BTC IV - HV spread
+	DVOLBTCIVHVRatio    float64 // BTC IV / HV ratio
+	DVOLBTCSpike        bool    // BTC DVOL spike (>20% change in 24h)
+	DVOLBTCAvailable    bool
+
+	DVOLETHCurrent      float64 // ETH DVOL level
+	DVOLETHChange24hPct float64 // ETH DVOL 24h change %
+	DVOLETHHigh24h      float64 // ETH DVOL 24h high
+	DVOLETHLow24h       float64 // ETH DVOL 24h low
+	DVOLETHHV           float64 // ETH realized vol %
+	DVOLETHIVHVSpread   float64 // ETH IV - HV spread
+	DVOLETHIVHVRatio    float64 // ETH IV / HV ratio
+	DVOLETHSpike        bool    // ETH DVOL spike
+	DVOLETHAvailable    bool
+
+	DVOLAvailable       bool    // True if any DVOL data available
+
+	// Cross-Asset Volatility Suite (CBOE indices)
+	VolSKEW        float64  // S&P 500 tail risk index
+	VolOVX         float64  // Crude oil volatility
+	VolGVZ         float64  // Gold volatility
+	VolRVX         float64  // Russell 2000 volatility
+	VolVIX9D       float64  // 9-day VIX (event pricing)
+	SKEWVIXRatio   float64  // SKEW/VIX — >8 historically dangerous
+	RVXVIXRatio    float64  // RVX/VIX — >1.3 risk appetite declining
+	VIX9D30Ratio   float64  // VIX9D/VIX — >1 near-term event
+	VolTailRisk    string   // "NORMAL", "ELEVATED", "EXTREME"
+	VolDivergences []string // detected cross-asset divergences
+	VolSuiteAvail  bool
 
 	// Myfxbook Retail Positioning (Firecrawl)
 	MyfxbookPairs     []MyfxbookPairSentiment

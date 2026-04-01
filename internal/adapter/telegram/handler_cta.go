@@ -148,15 +148,20 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 		return err
 	}
 
-	// Send loading indicator
-	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("⚡ Computing TA for <b>%s</b>... ⏳", html.EscapeString(mapping.Currency)))
+	// Multi-step progress indicator
+	sym := html.EscapeString(mapping.Currency)
+	prog := NewProgress(h.bot, chatID, []string{
+		fmt.Sprintf("⏳ Fetching price data for <b>%s</b>...", sym),
+		fmt.Sprintf("🔄 Running technical analysis for <b>%s</b>...", sym),
+		fmt.Sprintf("📊 Generating charts for <b>%s</b>...", sym),
+		fmt.Sprintf("✨ Finalizing CTA report for <b>%s</b>...", sym),
+	})
+	prog.Start(ctx)
 
 	// Compute CTA state
 	state, err := h.computeCTAState(ctx, mapping)
 	if err != nil {
-		if loadingID > 0 {
-			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-		}
+		prog.Stop(ctx)
 		h.sendUserError(ctx, chatID, err, "cta")
 		return nil
 	}
@@ -170,10 +175,8 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 		log.Error().Err(chartErr).Str("symbol", symbol).Str("timeframe", "daily").Msg("CTA chart generation failed, falling back to text")
 	}
 
-	// Delete loading message
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
+	// Delete progress message
+	prog.Stop(ctx)
 
 	// Format summary
 	summary := formatCTASummary(state)

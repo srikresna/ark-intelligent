@@ -26,6 +26,7 @@ type Signal struct {
 	Bias            Bias    // derived directional bias
 	ConfirmEntry    bool    // true = microstructure confirms a directional entry
 	Strength        float64 // 0-1 strength of the signal
+	FundingStats    *bybit.FundingRateStats // historical funding rate analysis (nil if unavailable)
 	UpdatedAt       time.Time
 }
 
@@ -101,6 +102,16 @@ func (e *Engine) Analyze(ctx context.Context, category, symbol string) (*Signal,
 			log.Warn().Str("symbol", symbol).Err(err).Msg("microstructure: ticker fetch failed")
 		} else {
 			sig.FundingRate = ticker.FundingRate
+		}
+	}
+
+	// --- 5b. Funding rate history (for regime analysis) ---
+	if category == "linear" {
+		rates, err := e.client.GetFundingHistory(ctx, category, symbol, 200)
+		if err != nil {
+			log.Warn().Str("symbol", symbol).Err(err).Msg("microstructure: funding history fetch failed")
+		} else if len(rates) > 0 {
+			sig.FundingStats = bybit.ComputeFundingStats(symbol, rates)
 		}
 	}
 

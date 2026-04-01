@@ -6,6 +6,7 @@ import (
 	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
@@ -1310,6 +1311,108 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		}
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
+	}
+
+
+	// --- Deribit DVOL - Crypto Volatility Index ---
+	if data.DVOLAvailable {
+		b.WriteString("\n<b>Crypto Volatility (Deribit DVOL)</b>\n")
+
+		formatDVOLCurrency := func(label string, current, change24hPct, high24h, low24h, hv, ivhvSpread, ivhvRatio float64, spike, available bool) {
+			if !available {
+				return
+			}
+			changeArrow := "\u2192"
+			changeEmoji := ""
+			if change24hPct > 5 {
+				changeArrow = "\u2191"
+				changeEmoji = "\U0001f534" // red circle for vol up
+			} else if change24hPct < -5 {
+				changeArrow = "\u2193"
+				changeEmoji = "\U0001f7e2" // green circle for vol down
+			}
+			b.WriteString(fmt.Sprintf("<code>%s DVOL : %.1f%%  %s %+.1f%% %s</code>\n", label, current, changeArrow, change24hPct, changeEmoji))
+			b.WriteString(fmt.Sprintf("<code>  24h   : %.1f - %.1f</code>\n", low24h, high24h))
+			if hv > 0 {
+				spreadLabel := dvol.SpreadSignal(ivhvRatio)
+				b.WriteString(fmt.Sprintf("<code>  IV/HV : %.1f%% / %.1f%% (spread: %+.1f)</code>\n", current, hv, ivhvSpread))
+				b.WriteString(fmt.Sprintf("<code>  Signal: %s</code>\n", spreadLabel))
+			}
+			if spike {
+				b.WriteString(fmt.Sprintf("\u26a0\ufe0f <i>%s DVOL spike >20%% dalam 24h \u2014 volatility surge!</i>\n", label))
+			}
+		}
+
+		formatDVOLCurrency("BTC", data.DVOLBTCCurrent, data.DVOLBTCChange24hPct, data.DVOLBTCHigh24h, data.DVOLBTCLow24h, data.DVOLBTCHV, data.DVOLBTCIVHVSpread, data.DVOLBTCIVHVRatio, data.DVOLBTCSpike, data.DVOLBTCAvailable)
+		formatDVOLCurrency("ETH", data.DVOLETHCurrent, data.DVOLETHChange24hPct, data.DVOLETHHigh24h, data.DVOLETHLow24h, data.DVOLETHHV, data.DVOLETHIVHVSpread, data.DVOLETHIVHVRatio, data.DVOLETHSpike, data.DVOLETHAvailable)
+
+		// Cross-asset vol comparison: DVOL vs CBOE VIX
+		if data.DVOLBTCAvailable && data.VIXAvailable && data.VIXSpot > 0 {
+			dvolVixRatio := data.DVOLBTCCurrent / data.VIXSpot
+			b.WriteString(fmt.Sprintf("\n<code>BTC DVOL/VIX: %.1fx</code>", dvolVixRatio))
+			if dvolVixRatio > 5 {
+				b.WriteString(" \u2014 <i>Crypto vol jauh melebihi ekuitas</i>")
+			} else if dvolVixRatio < 2 {
+				b.WriteString(" \u2014 <i>Crypto vol relatif rendah vs ekuitas</i>")
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	// --- Cross-Asset Volatility Suite (CBOE) ---
+	if data.VolSuiteAvail {
+		b.WriteString("\n<b>Vol Suite (CBOE)</b>\n")
+		if data.VolSKEW > 0 {
+			var skewEmoji string
+			switch {
+			case data.VolSKEW > 140:
+				skewEmoji = "🔴"
+			case data.VolSKEW > 130:
+				skewEmoji = "⚠️"
+			default:
+				skewEmoji = "✅"
+			}
+			b.WriteString(fmt.Sprintf("<code>SKEW  : %.1f %s</code>\n", data.VolSKEW, skewEmoji))
+		}
+		if data.VolOVX > 0 {
+			b.WriteString(fmt.Sprintf("<code>OVX   : %.1f</code>\n", data.VolOVX))
+		}
+		if data.VolGVZ > 0 {
+			b.WriteString(fmt.Sprintf("<code>GVZ   : %.1f</code>\n", data.VolGVZ))
+		}
+		if data.VolRVX > 0 {
+			var rvxEmoji string
+			if data.RVXVIXRatio > 1.3 {
+				rvxEmoji = " ⚠️"
+			}
+			b.WriteString(fmt.Sprintf("<code>RVX   : %.1f%s</code>\n", data.VolRVX, rvxEmoji))
+		}
+		if data.VolVIX9D > 0 {
+			var v9dEmoji string
+			if data.VIX9D30Ratio > 1.1 {
+				v9dEmoji = " ⚠️"
+			}
+			b.WriteString(fmt.Sprintf("<code>VIX9D : %.2f%s</code>\n", data.VolVIX9D, v9dEmoji))
+		}
+		if data.SKEWVIXRatio > 0 {
+			var ratioEmoji string
+			if data.SKEWVIXRatio > 8.0 {
+				ratioEmoji = " 🔴"
+			}
+			b.WriteString(fmt.Sprintf("<code>SKEW/VIX: %.1f%s</code>\n", data.SKEWVIXRatio, ratioEmoji))
+		}
+		if data.RVXVIXRatio > 0 {
+			b.WriteString(fmt.Sprintf("<code>RVX/VIX : %.2f</code>\n", data.RVXVIXRatio))
+		}
+		switch data.VolTailRisk {
+		case "EXTREME":
+			b.WriteString("<i>🔴 TAIL RISK EXTREME — SKEW/VIX historically dangerous.</i>\n")
+		case "ELEVATED":
+			b.WriteString("<i>⚠️ Tail risk elevated — SKEW tinggi vs VIX rendah.</i>\n")
+		}
+		for _, d := range data.VolDivergences {
+			b.WriteString(fmt.Sprintf("<i>📊 %s</i>\n", d))
+		}
 	}
 
 	// --- Composite reading ---

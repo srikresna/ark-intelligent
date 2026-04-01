@@ -1014,7 +1014,15 @@ func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []stri
 			sb.WriteString(fmt.Sprintf("  OI Change: %+.1f%% | LS Ratio: %.2f\n",
 				sig.OIChange, sig.LongShortRatio))
 		}
-		if sig.FundingRate != 0 {
+		if sig.FundingStats != nil {
+			fs := sig.FundingStats
+			sb.WriteString(fmt.Sprintf("  Funding: %+.4f%% (7d avg: %+.4f%%)\n",
+				fs.Current*100, fs.Avg7D*100))
+			sb.WriteString(fmt.Sprintf("  30d: avg %+.4f%% | min %+.4f%% | max %+.4f%%\n",
+				fs.Avg30D*100, fs.Min30D*100, fs.Max30D*100))
+			sb.WriteString(fmt.Sprintf("  Regime: %s (pctl: %.0f%%)\n",
+				fs.Regime, fs.Percentile))
+		} else if sig.FundingRate != 0 {
 			sb.WriteString(fmt.Sprintf("  Funding: %+.4f%%\n", sig.FundingRate*100))
 		}
 		sb.WriteString(fmt.Sprintf("  Bias: <b>%s</b> (kekuatan %.0f%%)\n",
@@ -1039,7 +1047,19 @@ func cryptoInterpretIndonesian(sig *microstructure.Signal) string {
 	default:
 		parts = append(parts, "tidak ada tekanan dominan")
 	}
-	if sig.FundingRate > 0.01 {
+	if sig.FundingStats != nil {
+		switch sig.FundingStats.Regime {
+		case "POSITIVE_BIAS":
+			parts = append(parts, "funding positif berkepanjangan (crowded long)")
+		case "NEGATIVE_BIAS":
+			parts = append(parts, "funding negatif berkepanjangan (squeeze risk)")
+		}
+		if sig.FundingStats.Percentile > 90 {
+			parts = append(parts, "funding di pctl 90+% (extreme)")
+		} else if sig.FundingStats.Percentile < 10 {
+			parts = append(parts, "funding di pctl <10% (extreme rendah)")
+		}
+	} else if sig.FundingRate > 0.01 {
 		parts = append(parts, "funding rate tinggi (hati-hati long)")
 	} else if sig.FundingRate < -0.01 {
 		parts = append(parts, "funding rate negatif (hati-hati short)")
