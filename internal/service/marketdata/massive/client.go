@@ -17,6 +17,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/keyring"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("massive")
@@ -64,31 +65,33 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 		fullURL += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("massive: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Accept", "application/json")
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("massive: build request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("massive: http: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("massive: http: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("massive: read body: %w", err)
-	}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("massive: read body: %w", err)
+		}
 
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, fmt.Errorf("massive: rate limited (429) on key rotation — add more keys or slow down")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("massive: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
-	}
-	return body, nil
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, fmt.Errorf("massive: rate limited (429) on key rotation — add more keys or slow down")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("massive: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		}
+		return body, nil
+	})
 }
 
 // ---------------------------------------------------------------------------

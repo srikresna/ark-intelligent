@@ -25,6 +25,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("bybit")
@@ -73,37 +74,39 @@ func (c *Client) getPublic(ctx context.Context, path string, params url.Values) 
 		fullURL += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: build request: %w", err)
+		}
+		req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: http: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: http: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: read body: %w", err)
-	}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: read body: %w", err)
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bybit: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("bybit: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		}
 
-	// Check Bybit retCode
-	var check struct {
-		RetCode int    `json:"retCode"`
-		RetMsg  string `json:"retMsg"`
-	}
-	if err := json.Unmarshal(body, &check); err == nil && check.RetCode != 0 {
-		return nil, fmt.Errorf("bybit: retCode=%d msg=%s", check.RetCode, check.RetMsg)
-	}
+		// Check Bybit retCode
+		var check struct {
+			RetCode int    `json:"retCode"`
+			RetMsg  string `json:"retMsg"`
+		}
+		if err := json.Unmarshal(body, &check); err == nil && check.RetCode != 0 {
+			return nil, fmt.Errorf("bybit: retCode=%d msg=%s", check.RetCode, check.RetMsg)
+		}
 
-	return body, nil
+		return body, nil
+	})
 }
 
 // ---------------------------------------------------------------------------

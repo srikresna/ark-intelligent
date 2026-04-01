@@ -15,6 +15,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("coingecko")
@@ -55,32 +56,34 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 		fullURL += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("coingecko: build request: %w", err)
-	}
-	if c.apiKey != "" {
-		req.Header.Set("x-cg-demo-api-key", c.apiKey)
-	}
-	req.Header.Set("Accept", "application/json")
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("coingecko: build request: %w", err)
+		}
+		if c.apiKey != "" {
+			req.Header.Set("x-cg-demo-api-key", c.apiKey)
+		}
+		req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("coingecko: http: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("coingecko: http: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("coingecko: read body: %w", err)
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, fmt.Errorf("coingecko: rate limited (429)")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("coingecko: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
-	}
-	return body, nil
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("coingecko: read body: %w", err)
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, fmt.Errorf("coingecko: rate limited (429)")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("coingecko: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		}
+		return body, nil
+	})
 }
 
 // ---------------------------------------------------------------------------

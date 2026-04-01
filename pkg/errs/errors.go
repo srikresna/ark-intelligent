@@ -16,64 +16,81 @@ import (
 
 // Sentinel errors — use errors.Is() to distinguish error categories.
 var (
+	// ---------------------------------------------------------------------------
+	// Data availability
+	// ---------------------------------------------------------------------------
+
 	// ErrNoData indicates the upstream source returned successfully but
 	// contained no usable data (empty result set, no matching records, etc.).
 	ErrNoData = errors.New("no data available")
+
+	// ErrInsufficientData indicates not enough data points are available
+	// to perform the requested analysis (e.g., too few bars for an indicator).
+	ErrInsufficientData = errors.New("insufficient data for analysis")
+
+	// ErrStaleData indicates the data exists but is outdated beyond an
+	// acceptable threshold.
+	ErrStaleData = errors.New("data is stale")
+
+	// ErrCacheMiss indicates the requested entry was not found in the cache.
+	ErrCacheMiss = errors.New("cache miss")
+
+	// ---------------------------------------------------------------------------
+	// API / Network
+	// ---------------------------------------------------------------------------
 
 	// ErrRateLimited indicates the request was rejected due to rate limiting
 	// (HTTP 429 or provider-specific throttle response).
 	ErrRateLimited = errors.New("rate limited")
 
-	// ErrNotFound indicates the requested resource does not exist
-	// (HTTP 404 or missing record/contract/symbol).
-	ErrNotFound = errors.New("not found")
-
 	// ErrTimeout indicates the operation exceeded its deadline or context
 	// was cancelled due to timeout.
 	ErrTimeout = errors.New("timeout")
 
-	// ErrBadData indicates the upstream returned data that could not be
-	// parsed or was structurally invalid (malformed JSON, unexpected schema, etc.).
-	ErrBadData = errors.New("bad data")
+	// ErrAPIUnavailable indicates the API service is temporarily or permanently
+	// unavailable (connection refused, DNS failure, HTTP 5xx).
+	ErrAPIUnavailable = errors.New("API service unavailable")
 
 	// ErrUpstream indicates a generic upstream failure (non-200 status,
 	// connection error, etc.) that doesn't fit a more specific sentinel.
 	ErrUpstream = errors.New("upstream error")
 
-	// ErrInsufficientData indicates not enough data points to run the analysis
-	// (e.g. fewer bars than the lookback period requires).
-	ErrInsufficientData = errors.New("insufficient data for analysis")
+	// ErrNotFound indicates the requested resource does not exist
+	// (HTTP 404 or missing record/contract/symbol).
+	ErrNotFound = errors.New("not found")
 
-	// ErrStaleData indicates the data is too old to be useful (exceeds
-	// freshness threshold for the operation).
-	ErrStaleData = errors.New("data is stale")
+	// ---------------------------------------------------------------------------
+	// Auth / Configuration
+	// ---------------------------------------------------------------------------
 
-	// ErrAPIUnavailable indicates the external API service is down or
-	// returning unexpected errors beyond a simple rate limit or auth issue.
-	ErrAPIUnavailable = errors.New("API service unavailable")
-
-	// ErrNoAPIKey indicates the required API key is not configured in the
-	// application config (empty string or missing env var).
+	// ErrNoAPIKey indicates the required API key or credential is not configured.
 	ErrNoAPIKey = errors.New("API key not configured")
 
-	// ErrFeatureDisabled indicates the feature is intentionally disabled
-	// via configuration (e.g. HasClaude() == false).
+	// ErrFeatureDisabled indicates the requested feature is disabled in config.
 	ErrFeatureDisabled = errors.New("feature disabled")
 
-	// ErrUnauthorized indicates the API key or credentials were rejected
-	// by the upstream service (HTTP 401 or equivalent).
+	// ErrUnauthorized indicates the request was rejected due to authentication
+	// or authorization failure (HTTP 401/403).
 	ErrUnauthorized = errors.New("unauthorized")
 
-	// ErrParseFailed indicates a parsing step failed — e.g. XML/JSON decode
-	// succeeded but the resulting structure was semantically invalid.
+	// ---------------------------------------------------------------------------
+	// Parsing / Validation
+	// ---------------------------------------------------------------------------
+
+	// ErrParseFailed indicates data parsing failed (malformed JSON, CSV, XML, etc.).
 	ErrParseFailed = errors.New("data parsing failed")
+
+	// ErrBadData indicates the upstream returned data that could not be
+	// parsed or was structurally invalid (malformed JSON, unexpected schema, etc.).
+	ErrBadData = errors.New("bad data")
 
 	// ErrInvalidFormat indicates the input or output did not match the
 	// expected schema or format (e.g. wrong column count in CSV).
 	ErrInvalidFormat = errors.New("invalid data format")
 
-	// ErrCacheMiss indicates the requested key was not found in the cache.
-	ErrCacheMiss = errors.New("cache miss")
+	// ---------------------------------------------------------------------------
+	// Computation
+	// ---------------------------------------------------------------------------
 
 	// ErrDivisionByZero indicates a computation attempted to divide by zero.
 	ErrDivisionByZero = errors.New("division by zero")
