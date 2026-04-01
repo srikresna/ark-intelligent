@@ -127,12 +127,13 @@ func (h *Handler) sendUserError(ctx context.Context, chatID string, err error, c
 
 	friendly := userFriendlyError(err, command)
 
-	// Attach retry button for retriable errors with a known command.
+	// Attach retry + home buttons for retriable errors with a known command.
 	cbData := retryCallbackData(command)
 	if isRetriableError(err) && cbData != "" {
 		kb := ports.InlineKeyboard{
 			Rows: [][]ports.InlineButton{{
 				{Text: "🔄 Coba Lagi", CallbackData: cbData},
+				{Text: "🏠 Menu Utama", CallbackData: "nav:home"},
 			}},
 		}
 		if _, sendErr := h.bot.SendWithKeyboard(ctx, chatID, friendly, kb); sendErr != nil {
@@ -147,6 +148,7 @@ func (h *Handler) sendUserError(ctx context.Context, chatID string, err error, c
 }
 
 // editUserError logs the technical error and edits an existing message with a user-friendly error.
+// For retriable errors, a retry + home inline keyboard is attached.
 func (h *Handler) editUserError(ctx context.Context, chatID string, msgID int, err error, command string) {
 	log.Error().
 		Err(err).
@@ -155,6 +157,22 @@ func (h *Handler) editUserError(ctx context.Context, chatID string, msgID int, e
 		Msg("handler error")
 
 	friendly := userFriendlyError(err, command)
+
+	// Attach retry + home buttons for retriable errors.
+	cbData := retryCallbackData(command)
+	if isRetriableError(err) && cbData != "" {
+		kb := ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{{
+				{Text: "🔄 Coba Lagi", CallbackData: cbData},
+				{Text: "🏠 Menu Utama", CallbackData: "nav:home"},
+			}},
+		}
+		if editErr := h.bot.EditWithKeyboard(ctx, chatID, msgID, friendly, kb); editErr != nil {
+			log.Error().Err(editErr).Str("chat_id", chatID).Msg("failed to edit error message with retry")
+		}
+		return
+	}
+
 	if editErr := h.bot.EditMessage(ctx, chatID, msgID, friendly); editErr != nil {
 		log.Error().Err(editErr).Str("chat_id", chatID).Msg("failed to edit error message")
 	}
