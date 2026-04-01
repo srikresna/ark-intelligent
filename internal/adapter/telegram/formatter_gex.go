@@ -30,13 +30,13 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	sb.WriteString(fmt.Sprintf("🌡️ <b>GEX REGIME:</b> %s %s (<code>%s</code>)\n",
 		regimeEmoji, r.Regime, gexFormatGEXValue(r.TotalGEX)))
 	if r.Regime == "POSITIVE_GEX" {
-		sb.WriteString("✅ Dealers net long gamma — range-bound / volatility damping\n\n")
+		sb.WriteString("✅ Dealers net long gamma — range-bound / peredam volatilitas\n\n")
 	} else {
-		sb.WriteString("⚠️ Dealers net short gamma — volatility amplifying / trending\n\n")
+		sb.WriteString("⚠️ Dealers net short gamma — volatilitas meningkat / trending\n\n")
 	}
 
 	// Key Levels
-	sb.WriteString("🎯 <b>KEY LEVELS:</b>\n")
+	sb.WriteString("🎯 <b>LEVEL KUNCI:</b>\n")
 	if r.GEXFlipLevel > 0 {
 		flipArrow := "🔼"
 		if r.SpotPrice > r.GEXFlipLevel {
@@ -49,22 +49,22 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 		sb.WriteString(fmt.Sprintf("  📌 Max Pain:   <code>%s</code>\n", gexFormatPrice(r.MaxPain)))
 	}
 	if r.GammaWall > 0 {
-		sb.WriteString(fmt.Sprintf("  📌 Gamma Wall: <code>%s</code> (call resistance)\n", gexFormatPrice(r.GammaWall)))
+		sb.WriteString(fmt.Sprintf("  📌 Gamma Wall: <code>%s</code> (resistansi call)\n", gexFormatPrice(r.GammaWall)))
 	}
 	if r.PutWall > 0 {
-		sb.WriteString(fmt.Sprintf("  📌 Put Wall:   <code>%s</code> (put support)\n", gexFormatPrice(r.PutWall)))
+		sb.WriteString(fmt.Sprintf("  📌 Put Wall:   <code>%s</code> (support put)\n", gexFormatPrice(r.PutWall)))
 	}
 	sb.WriteString("\n")
 
 	// GEX Profile (mini bar chart around spot, up to 10 strikes)
 	if len(r.Levels) > 0 {
-		sb.WriteString("📊 <b>GEX PROFILE</b> (±20% of spot):\n")
+		sb.WriteString("📊 <b>PROFIL GEX</b> (±20% dari spot):\n")
 		sb.WriteString(gexProfileBars(r.Levels, r.SpotPrice, 10))
 		sb.WriteString("\n")
 	}
 
 	// Implication
-	sb.WriteString("💡 <b>IMPLICATION:</b>\n")
+	sb.WriteString("💡 <b>IMPLIKASI:</b>\n")
 	sb.WriteString(gexWrapText(r.Implication, 300))
 
 	return sb.String()
