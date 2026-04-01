@@ -168,3 +168,11 @@ func callbackFriendlyError(err error) string {
 
 	return "⚠️ Terjadi kesalahan. Coba lagi atau hubungi admin."
 }
+
+// sessionExpiredMessage returns a unified session-expired message for any command.
+// All handlers should use this instead of hardcoding their own expired text.
+// The output uses consistent emoji (⏳), Indonesian language, and <code> tags.
+func sessionExpiredMessage(command string) string {
+	return "⏳ <b>Sesi berakhir</b>\n\nData sudah expired. Ketik <code>/" + command + "</code> untuk memulai ulang."
+}
+
