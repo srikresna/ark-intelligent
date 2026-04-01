@@ -82,6 +82,16 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	snap.SuperTrend = CalcSuperTrend(bars, 10, 3.0)
 	snap.Fibonacci = CalcFibonacci(bars, 50)
 
+	// ICT: Fair Value Gaps + Order Blocks
+	fvgs := DetectFVG(bars, snap.ATR)
+	obs := DetectOrderBlocks(bars, snap.ATR)
+	if fvgs != nil || obs != nil {
+		snap.ICT = &ICTResult{
+			FVGs:        fvgs,
+			OrderBlocks: obs,
+		}
+	}
+
 	return snap
 }
 
