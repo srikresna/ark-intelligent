@@ -263,6 +263,9 @@ type parsedObs []float64
 // individual failures. If FRED_API_KEY is not set, it uses an empty string.
 func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	apiKey := os.Getenv("FRED_API_KEY")
+	if apiKey == "" {
+		log.Warn().Msg("FRED_API_KEY not set — macro data (yields, inflation, labor) may be rate-limited or unavailable. Get free key at https://fred.stlouisfed.org/docs/api/api_key.html")
+	}
 	data := &MacroData{FetchedAt: time.Now()}
 	client := &http.Client{Timeout: 15 * time.Second}
 

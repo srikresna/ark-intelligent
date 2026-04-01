@@ -27,7 +27,7 @@ Hexagonal (ports & adapters) architecture in Go 1.22:
    cp .env.example .env
    ```
 
-2. Set at minimum `BOT_TOKEN` and `CHAT_ID`. Optionally add `GEMINI_API_KEY` for AI features.
+2. Set at minimum `BOT_TOKEN` and `CHAT_ID`. Optionally add `GEMINI_API_KEY` for AI features and `FRED_API_KEY` for macro data (free at https://fred.stlouisfed.org/docs/api/api_key.html).
 
 3. Run with Docker Compose:
    ```bash
