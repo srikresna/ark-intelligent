@@ -254,6 +254,7 @@ func NewHandler(
 	bot.RegisterCallback("imp:", h.cbImpact)
 	bot.RegisterCallback("nav:", h.cbNav)
 	bot.RegisterCallback("help:", h.cbHelp)
+	bot.RegisterCallback("share:", h.cbShare)
 
 	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
 	return h
@@ -1138,6 +1139,12 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 		prefs.PreferredModel = "claude"
 	case "model_gemini":
 		prefs.PreferredModel = "gemini"
+	case "output_mode_toggle":
+		if prefs.OutputMode == domain.OutputFull {
+			prefs.OutputMode = domain.OutputCompact
+		} else {
+			prefs.OutputMode = domain.OutputFull
+		}
 	case "impact_high_only":
 		prefs.AlertImpacts = []string{"High"}
 	case "impact_high_med":
@@ -1977,6 +1984,47 @@ func (h *Handler) resolveOrLastCurrency(ctx context.Context, userID int64, curre
 		return currency
 	}
 	return h.getLastCurrency(ctx, userID)
+}
+
+
+// cbShare handles "share:<type>:<key>" callbacks.
+// Generates a plain-text, copy-paste friendly version of the analysis
+// and sends it wrapped in <code> tags for easy copying in Telegram.
+func (h *Handler) cbShare(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	// data format: "share:<type>:<key>"
+	trimmed := strings.TrimPrefix(data, "share:")
+	parts := strings.SplitN(trimmed, ":", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	shareType, key := parts[0], parts[1]
+
+	switch shareType {
+	case "cot":
+		return h.shareCOT(ctx, chatID, key)
+	case "outlook":
+		// Outlook share — placeholder for future implementation
+		_, err := h.bot.SendHTML(ctx, chatID, "<i>Outlook share coming soon.</i>")
+		return err
+	default:
+		return nil
+	}
+}
+
+// shareCOT generates and sends a plain-text COT share message.
+func (h *Handler) shareCOT(ctx context.Context, chatID string, contractCode string) error {
+	analysis, err := h.cotRepo.GetLatestAnalysis(ctx, contractCode)
+	if err != nil {
+		_, sendErr := h.bot.SendHTML(ctx, chatID, "<i>COT data not available for sharing.</i>")
+		return sendErr
+	}
+
+	shareText := h.fmt.FormatCOTShareText(*analysis)
+
+	// Wrap in <code> block for easy copy on Telegram
+	shareHTML := fmt.Sprintf("<code>%s</code>", html.EscapeString(shareText))
+	_, err = h.bot.SendHTML(ctx, chatID, shareHTML)
+	return err
 }
 
 // cbViewToggle handles compact/full view toggle callbacks.

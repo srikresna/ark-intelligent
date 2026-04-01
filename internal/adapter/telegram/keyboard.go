@@ -444,7 +444,17 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		claudeModelBtn(domain.ClaudeModelHaiku4),
 	})
 
-	// Row 11: View Changelog
+	// Row 11: Output Mode toggle (compact vs full)
+	outputLabel := "📊 Output: Compact -> Full"
+	if prefs.OutputMode == domain.OutputFull {
+		outputLabel = "📖 Output: Full -> Compact"
+	}
+	rows = append(rows, []ports.InlineButton{{
+		Text:         outputLabel,
+		CallbackData: "set:output_mode_toggle",
+	}})
+
+	// Row 12: View Changelog
 	rows = append(rows, []ports.InlineButton{{
 		Text:         "📜 View Changelog",
 		CallbackData: "set:changelog_view",
@@ -477,6 +487,9 @@ func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKe
 		{Text: "📈 Seasonal", CallbackData: fmt.Sprintf("cmd:seasonal:%s", currency)},
 		{Text: "💹 Sentiment", CallbackData: "cmd:sentiment"},
 	})
+
+	// Share button for copy-paste friendly output
+	rows = append(rows, kb.ShareRow(fmt.Sprintf("share:cot:%s", code)))
 
 	rows = append(rows, []ports.InlineButton{
 		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
@@ -755,6 +768,9 @@ func (kb *KeyboardBuilder) COTDetailMenuWithBias(code string, isRaw bool, signal
 		{Text: "📈 Seasonal", CallbackData: fmt.Sprintf("cmd:seasonal:%s", currencyLabel)},
 		{Text: "💹 Sentiment", CallbackData: "cmd:sentiment"},
 	})
+
+	// Share button for copy-paste friendly output
+	rows = append(rows, kb.ShareRow(fmt.Sprintf("share:cot:%s", code)))
 
 	rows = append(rows, []ports.InlineButton{
 		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
@@ -1347,5 +1363,17 @@ func (kb *KeyboardBuilder) StarterKitMenu(level string) ports.InlineKeyboard {
 				},
 			},
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Share Buttons
+// ---------------------------------------------------------------------------
+
+// ShareRow returns a single-button row with a share/forward button.
+// callbackBase should be e.g. "share:cot:EUR", "share:outlook:latest".
+func (kb *KeyboardBuilder) ShareRow(callbackBase string) []ports.InlineButton {
+	return []ports.InlineButton{
+		{Text: "📤 Share", CallbackData: callbackBase},
 	}
 }

@@ -227,6 +227,17 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 				m.FedBalSheet/1_000, m.FedBalSheetTrend.Arrow(), regime.FedBalance))
 		}
 
+		// Treasury General Account (TGA)
+		if m.TGABalance > 0 {
+			b.WriteString(fmt.Sprintf("TGA Balance: $%.0fB %s (%s)\n",
+				m.TGABalance, m.TGABalanceTrend.Arrow(), regime.TGALabel))
+		}
+
+		// Net Liquidity Regime
+		if m.LiquidityRegime != "" {
+			b.WriteString(fmt.Sprintf("Net Liquidity: %s (%s)\n", m.LiquidityRegime, regime.LiquidityLabel))
+		}
+
 		// USD
 		if m.DXY > 0 {
 			b.WriteString(fmt.Sprintf("DXY: %.1f (%s)\n", m.DXY, regime.USDStrength))

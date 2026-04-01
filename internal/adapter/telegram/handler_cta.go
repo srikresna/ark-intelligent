@@ -1590,6 +1590,37 @@ func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult)
 		if snap.CCI != nil {
 			sb.WriteString(fmt.Sprintf("• CCI: %.1f (%s)\n", snap.CCI.Value, snap.CCI.Zone))
 		}
+
+		// SMC: Smart Money Concepts
+		if snap.SMC != nil {
+			smc := snap.SMC
+			structEmoji := "🔵"
+			if string(smc.Structure) == "BULLISH" {
+				structEmoji = "🟢"
+			} else if string(smc.Structure) == "BEARISH" {
+				structEmoji = "🔴"
+			}
+			sb.WriteString(fmt.Sprintf("\n🏗 <b>SMC Structure:</b> %s %s (zone: %s)\n",
+				structEmoji, smc.Structure, smc.CurrentZone))
+			if len(smc.RecentCHOCH) > 0 {
+				ch := smc.RecentCHOCH[0]
+				chEmoji := "🔄"
+				if ch.Dir == "BULLISH" {
+					chEmoji = "🟢🔄"
+				} else if ch.Dir == "BEARISH" {
+					chEmoji = "🔴🔄"
+				}
+				sb.WriteString(fmt.Sprintf("  %s CHOCH %s @ %.4f\n", chEmoji, ch.Dir, ch.Price))
+			}
+			if len(smc.RecentBOS) > 0 {
+				bos := smc.RecentBOS[0]
+				bosEmoji := "📈"
+				if bos.Dir == "BEARISH" {
+					bosEmoji = "📉"
+				}
+				sb.WriteString(fmt.Sprintf("  %s BOS %s @ %.4f\n", bosEmoji, bos.Dir, bos.Price))
+			}
+		}
 	}
 
 	if len(result.Patterns) > 0 {

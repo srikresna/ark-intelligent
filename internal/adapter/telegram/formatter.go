@@ -967,6 +967,13 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 		b.WriteString(fmt.Sprintf("<code>[AI] Claude Variant : %s</code>\n", claudeVariant))
 	}
 
+	// Output format mode
+	outputDisplay := "Compact 📊"
+	if prefs.OutputMode == domain.OutputFull {
+		outputDisplay = "Full Detail 📖"
+	}
+	b.WriteString(fmt.Sprintf("<code>[UI] Format Output: %s</code>\n", outputDisplay))
+
 	// Alert minutes display
 	if len(prefs.AlertMinutes) > 0 {
 		parts := make([]string, len(prefs.AlertMinutes))
@@ -1722,6 +1729,12 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 	}
 	if regime.FedBalance != "N/A" && regime.FedBalance != "" {
 		b.WriteString(fmt.Sprintf("<code>Fed Balance  : %s</code>\n", regime.FedBalance))
+	}
+	if regime.TGALabel != "N/A" && regime.TGALabel != "" {
+		b.WriteString(fmt.Sprintf("<code>TGA Balance  : %s</code>\n", regime.TGALabel))
+	}
+	if regime.LiquidityLabel != "" {
+		b.WriteString(fmt.Sprintf("<code>Net Liquidity: %s</code>\n", regime.LiquidityLabel))
 	}
 
 	// --- Financial Stress ---
@@ -4592,4 +4605,106 @@ func (f *Formatter) FormatLevels(lc *pricesvc.LevelsContext, currency string) st
 	}
 
 	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// Share Text Formatters — Plain text for copy-paste / forwarding
+// ---------------------------------------------------------------------------
+
+// FormatCOTShareText generates a plain-text, copy-paste friendly version of COT analysis.
+// No HTML tags — suitable for forwarding to other chats or platforms.
+func (f *Formatter) FormatCOTShareText(a domain.COTAnalysis) string {
+	var b strings.Builder
+
+	currency := contractCodeToFriendly(a.Contract.Code)
+	if currency == "" {
+		currency = a.Contract.Name
+	}
+
+	biasEmoji := "⚪"
+	biasLabel := "NEUTRAL"
+	if a.NetPosition > 0 {
+		biasEmoji = "🟢"
+		biasLabel = "BULLISH"
+	} else if a.NetPosition < 0 {
+		biasEmoji = "🔴"
+		biasLabel = "BEARISH"
+	}
+
+	b.WriteString(fmt.Sprintf("📊 COT Report — %s\n", currency))
+	b.WriteString(fmt.Sprintf("Date: %s\n\n", a.ReportDate.Format("2 Jan 2006")))
+
+	b.WriteString(fmt.Sprintf("Net Position: %s contracts [%s %s]\n",
+		fmtutil.FmtNumSigned(a.NetPosition, 0), biasEmoji, biasLabel))
+	b.WriteString(fmt.Sprintf("COT Index: %.1f%%\n", a.COTIndex))
+	b.WriteString(fmt.Sprintf("Net Change (WoW): %s\n", fmtutil.FmtNumSigned(a.NetChange, 0)))
+
+	if a.SpecMomentum4W != 0 {
+		b.WriteString(fmt.Sprintf("Momentum (4W): %s\n", fmtutil.FmtNumSigned(a.SpecMomentum4W, 0)))
+	}
+
+	b.WriteString(fmt.Sprintf("Signal: %s\n", a.SpeculatorSignal))
+
+	b.WriteString("\n⚡ ARK Intelligence Terminal")
+
+	return b.String()
+}
+
+// FormatOutlookShareText generates a plain-text version of AI outlook for sharing.
+// Strips HTML tags and returns clean text suitable for forwarding.
+func (f *Formatter) FormatOutlookShareText(htmlContent string) string {
+	// Strip HTML tags for plain text output
+	text := htmlContent
+
+	// Replace common HTML entities and tags with plain equivalents
+	replacer := strings.NewReplacer(
+		"<b>", "", "</b>", "",
+		"<i>", "", "</i>", "",
+		"<code>", "", "</code>", "",
+		"<pre>", "", "</pre>", "",
+		"<u>", "", "</u>", "",
+		"<s>", "", "</s>", "",
+		"<tg-spoiler>", "", "</tg-spoiler>", "",
+		"&amp;", "&",
+		"&lt;", "<",
+		"&gt;", ">",
+		"&quot;", "\"",
+	)
+	text = replacer.Replace(text)
+
+	// Remove any remaining HTML-like tags
+	for {
+		start := strings.Index(text, "<")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(text[start:], ">")
+		if end == -1 {
+			break
+		}
+		text = text[:start] + text[start+end+1:]
+	}
+
+	// Trim excessive whitespace
+	lines := strings.Split(text, "\n")
+	var cleaned []string
+	blankCount := 0
+	for _, line := range lines {
+		trimmed := strings.TrimRight(line, " \t")
+		if trimmed == "" {
+			blankCount++
+			if blankCount <= 2 {
+				cleaned = append(cleaned, "")
+			}
+		} else {
+			blankCount = 0
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+
+	result := strings.Join(cleaned, "\n")
+	result = strings.TrimSpace(result)
+	result += "\n\n⚡ ARK Intelligence Terminal"
+
+	return result
 }
