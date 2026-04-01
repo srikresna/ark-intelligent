@@ -205,6 +205,7 @@ func NewHandler(
 	bot.RegisterCommand("/rank", h.cmdRank)
 	bot.RegisterCommand("/macro", h.cmdMacro)
 	bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
+	bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
 	bot.RegisterCommand("/bias", h.cmdBias)
 	bot.RegisterCommand("/backtest", h.cmdBacktest)
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
