@@ -21,6 +21,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/service/factors"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/cryptocompare"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
@@ -690,7 +691,10 @@ func (h *Handler) cmdCryptoAlpha(ctx context.Context, chatID string, _ int64, ar
 
 	results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", symbols)
 	tvl := defillama.GetCachedOrFetch(ctx)
-	_, err := h.bot.SendHTML(ctx, chatID, formatCryptoAlpha(results, symbols, tvl))
+	exVol := cryptocompare.GetCachedOrFetch(ctx)
+	out := formatCryptoAlpha(results, symbols, tvl)
+	out += cryptocompare.FormatExchangeVolumeSection(exVol)
+	_, err := h.bot.SendHTML(ctx, chatID, out)
 	return err
 }
 
