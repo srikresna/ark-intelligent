@@ -2,15 +2,18 @@ package fred
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
 // defaultTTL is how long fetched FRED data stays valid before a re-fetch.
 // FRED daily series update intraday; monthly series (PCE, CPI) update less often.
 // 1 hour is a safe balance between freshness and rate-limit protection.
 const defaultTTL = 1 * time.Hour
+
+var cacheLog = logger.Component("fred-cache")
 
 type cachedMacroData struct {
 	data      *MacroData
@@ -57,7 +60,7 @@ func GetCachedOrFetch(ctx context.Context) (*MacroData, error) {
 		data := globalCache.data
 		age := time.Since(globalCache.fetchedAt)
 		cacheMu.RUnlock()
-		fmt.Printf("[fred-cache] returning cached data (age: %s)\n", age.Round(time.Second))
+		cacheLog.Debug().Dur("age", age).Msg("returning cached data")
 		return data, nil
 	}
 	cacheMu.RUnlock()
@@ -72,7 +75,7 @@ func GetCachedOrFetch(ctx context.Context) (*MacroData, error) {
 	globalCache = &cachedMacroData{data: data, fetchedAt: time.Now()}
 	cacheMu.Unlock()
 
-	fmt.Printf("[fred-cache] fetched fresh data from FRED API\n")
+	cacheLog.Debug().Msg("fetched fresh data from FRED API")
 	invokePostFetchHook(ctx, data)
 
 	return data, nil
@@ -88,7 +91,7 @@ func GetCachedOrFetchWithMeta(ctx context.Context) (*CacheResult, error) {
 			CacheAge:  time.Since(globalCache.fetchedAt),
 		}
 		cacheMu.RUnlock()
-		fmt.Printf("[fred-cache] returning cached data (age: %s)\n", result.CacheAge.Round(time.Second))
+		cacheLog.Debug().Dur("age", result.CacheAge).Msg("returning cached data")
 		return result, nil
 	}
 	cacheMu.RUnlock()
@@ -102,7 +105,7 @@ func GetCachedOrFetchWithMeta(ctx context.Context) (*CacheResult, error) {
 	globalCache = &cachedMacroData{data: data, fetchedAt: time.Now()}
 	cacheMu.Unlock()
 
-	fmt.Printf("[fred-cache] fetched fresh data from FRED API\n")
+	cacheLog.Debug().Msg("fetched fresh data from FRED API")
 	invokePostFetchHook(ctx, data)
 
 	return &CacheResult{Data: data, FromCache: false, CacheAge: 0}, nil

@@ -497,7 +497,7 @@ func simpleOLS(X [][]float64, y []float64) ([]float64, float64, []float64) {
 	// Clamp R² to [0, 1] — negative R² means model is worse than mean
 	if r2 < 0 {
 		// Log warning: negative R² indicates poor model fit
-		fmt.Printf("WARNING: simpleOLS produced negative R² (%.4f), clamping to 0. Model may be worse than mean predictor.\n", r2)
+		log.Warn().Float64("r2", r2).Msg("simpleOLS produced negative R², clamping to 0; model may be worse than mean predictor")
 		r2 = 0
 	}
 

@@ -7,7 +7,10 @@ import (
 	"sort"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
+
+var corrLog = logger.Component("price-correlation")
 
 // CorrelationEngine computes rolling cross-pair correlation matrices.
 type CorrelationEngine struct {
@@ -35,7 +38,7 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 	for _, cur := range currencies {
 		mapping := domain.FindPriceMappingByCurrency(cur)
 		if mapping == nil {
-			fmt.Printf("[correlation] SKIP %s: no price mapping found\n", cur)
+			corrLog.Warn().Str("currency", cur).Msg("skip: no price mapping found")
 			skippedNoMapping = append(skippedNoMapping, cur)
 			continue
 		}
@@ -48,12 +51,12 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 		}
 		records, err := ce.dailyRepo.GetDailyHistory(ctx, mapping.ContractCode, calendarDays)
 		if err != nil {
-			fmt.Printf("[correlation] SKIP %s: fetch error: %v\n", cur, err)
+			corrLog.Warn().Str("currency", cur).Err(err).Msg("skip: fetch error")
 			skippedFetchErr = append(skippedFetchErr, cur)
 			continue
 		}
 		if len(records) < period {
-			fmt.Printf("[correlation] SKIP %s: insufficient records (have %d, need %d)\n", cur, len(records), period)
+			corrLog.Warn().Str("currency", cur).Int("have", len(records)).Int("need", period).Msg("skip: insufficient records")
 			skippedInsufficient = append(skippedInsufficient, cur)
 			continue
 		}
@@ -76,14 +79,13 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 			returnsMap[cur] = returns
 			succeeded = append(succeeded, cur)
 		} else {
-			fmt.Printf("[correlation] SKIP %s: insufficient valid returns after gap filter (have %d, need %d)\n", cur, len(returns), period-2)
+			corrLog.Warn().Str("currency", cur).Int("have", len(returns)).Int("need", period-2).Msg("skip: insufficient valid returns after gap filter")
 			skippedInsufficient = append(skippedInsufficient, cur)
 		}
 	}
 
 	// Summary log
-	fmt.Printf("[correlation] period=%d | succeeded=%v | skipped_no_mapping=%v | skipped_fetch_err=%v | skipped_insufficient=%v\n",
-		period, succeeded, skippedNoMapping, skippedFetchErr, skippedInsufficient)
+	corrLog.Info().Int("period", period).Strs("succeeded", succeeded).Strs("skipped_no_mapping", skippedNoMapping).Strs("skipped_fetch_err", skippedFetchErr).Strs("skipped_insufficient", skippedInsufficient).Msg("correlation matrix build summary")
 
 	// Build valid currencies list (only those with enough data)
 	var validCurrencies []string
@@ -126,14 +128,14 @@ func (ce *CorrelationEngine) BuildWithBreakdowns(ctx context.Context) (*domain.C
 	// Short-term (20-day) with fallback to 10-day
 	shortMatrix, err := ce.BuildMatrix(ctx, 20)
 	if err != nil {
-		fmt.Printf("[correlation] 20-day matrix failed (%v), falling back to 10-day\n", err)
+		corrLog.Warn().Err(err).Msg("20-day matrix failed, falling back to 10-day")
 		shortMatrix, err = ce.BuildMatrix(ctx, 10)
 		if err != nil {
 			// Build a diagnostic message showing data availability
 			return nil, fmt.Errorf("correlation matrix unavailable (tried 20-day and 10-day): %w\n%s",
 				err, ce.diagnoseDataAvailability(ctx))
 		}
-		fmt.Printf("[correlation] 10-day fallback succeeded with %d currencies\n", len(shortMatrix.Currencies))
+		corrLog.Info().Int("currencies", len(shortMatrix.Currencies)).Msg("10-day fallback succeeded")
 	}
 
 	// Baseline (60-day)
@@ -216,7 +218,7 @@ func (ce *CorrelationEngine) diagnoseDataAvailability(ctx context.Context) strin
 	}
 
 	msg := fmt.Sprintf("Data available: %v | Missing: %v", withData, withoutData)
-	fmt.Printf("[correlation] diagnosis: %s\n", msg)
+	corrLog.Info().Str("diagnosis", msg).Msg("data availability diagnosis")
 	return msg
 }
 
