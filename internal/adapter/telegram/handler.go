@@ -137,6 +137,8 @@ type Handler struct {
 	// wyckoff holds optional Wyckoff analysis engine services.
 	// May be nil — /wyckoff command disabled if not configured.
 	wyckoff *WyckoffServices
+	// wyckoffCache stores last Wyckoff analysis state per chat for callback navigation.
+	wyckoffCache *wyckoffStateCache
 
 	// elliott holds optional Elliott Wave engine services.
 	// May be nil — /elliott command disabled if not configured.
