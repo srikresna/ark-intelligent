@@ -460,21 +460,24 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	resultJSON, err := os.ReadFile(outputPath)
 	os.Remove(outputPath)
 	if err != nil {
+		os.Remove(chartPath) // cleanup chart if output unreadable
 		return nil, fmt.Errorf("read output: %w", err)
 	}
 
 	var result vpEngineResult
 	if err := json.Unmarshal(resultJSON, &result); err != nil {
+		os.Remove(chartPath) // cleanup chart if output unparseable
 		return nil, fmt.Errorf("unmarshal output: %w", err)
 	}
 
 	if !result.Success {
+		os.Remove(chartPath) // cleanup chart on engine-reported failure
 		return &result, fmt.Errorf("%s", result.Error)
 	}
 
 	if fi, statErr := os.Stat(chartPath); statErr == nil {
 		if fi.Size() > 0 {
-			result.ChartPath = chartPath
+			result.ChartPath = chartPath // caller owns cleanup
 		} else {
 			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
 			os.Remove(chartPath)

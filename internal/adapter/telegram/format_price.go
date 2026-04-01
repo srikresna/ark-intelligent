@@ -424,8 +424,12 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 			case "DRAW":
 				trendIcon = "\xF0\x9F\x93\x89"
 			}
-			b.WriteString(fmt.Sprintf("<code>Inventory: %s %s (avg %+.1fM bbl/wk)</code>\n",
-				p.EIACtx.InventoryTrend, trendIcon, p.EIACtx.AvgWeeklyChange))
+			unit := "M bbl/wk"
+			if p.Currency == "NG" || p.Currency == "NATGAS" {
+				unit = "BCF/wk"
+			}
+			b.WriteString(fmt.Sprintf("<code>Inventory: %s %s (avg %+.1f %s)</code>\n",
+				p.EIACtx.InventoryTrend, trendIcon, p.EIACtx.AvgWeeklyChange, unit))
 		}
 		if p.EIACtx.RefineryUtil > 0 {
 			b.WriteString(fmt.Sprintf("<code>Refinery : %.1f%% utilization</code>\n", p.EIACtx.RefineryUtil))
