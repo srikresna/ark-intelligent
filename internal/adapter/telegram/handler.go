@@ -235,6 +235,7 @@ func NewHandler(
 	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
 	bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
 	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
+	bot.RegisterCommand("/bis", h.cmdBIS)           // BIS Statistics: CB policy rates, credit gaps, global liquidity
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
