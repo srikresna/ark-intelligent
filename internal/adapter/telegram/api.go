@@ -209,7 +209,7 @@ func (b *Bot) SendChatAction(ctx context.Context, chatID string, action string) 
 	if chatID == "" {
 		chatID = b.defaultID
 	}
-	params := map[string]interface{}{
+	params := map[string]any{
 		"action": action,
 	}
 	b.setChatID(params, chatID)

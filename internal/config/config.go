@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -241,6 +242,30 @@ func (c *Config) validate() {
 	}
 	if c.ConfluenceCalcInterval < 1*time.Minute {
 		log.Fatal().Msg("CONFLUENCE_CALC_INTERVAL must be >= 1m")
+	}
+
+	// Cross-field: Claude endpoint requires model to be set.
+	if c.ClaudeEndpoint != "" && c.ClaudeModel == "" {
+		log.Fatal().Msg("CLAUDE_MODEL must be set when CLAUDE_ENDPOINT is configured")
+	}
+
+	// Cross-field: Massive S3 credentials must be paired (both or neither).
+	hasS3Key := c.MassiveS3AccessKey != ""
+	hasS3Secret := c.MassiveS3SecretKey != ""
+	if hasS3Key != hasS3Secret {
+		log.Fatal().Msg("MASSIVE_S3_ACCESS_KEY and MASSIVE_S3_SECRET_KEY must both be set or both empty")
+	}
+
+	// DATA_DIR writable check — fail fast at startup rather than on first write.
+	testFile := filepath.Join(c.DataDir, ".write_test")
+	if err := os.WriteFile(testFile, []byte("ok"), 0600); err != nil {
+		log.Fatal().Str("dir", c.DataDir).Err(err).Msg("DATA_DIR is not writable")
+	}
+	_ = os.Remove(testFile)
+
+	// Advisory: Gemini API key set but model left at default — warn only.
+	if c.GeminiAPIKey != "" && c.GeminiModel == "" {
+		log.Warn().Msg("GEMINI_API_KEY is set but GEMINI_MODEL is empty; using hardcoded default")
 	}
 }
 

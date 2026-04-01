@@ -39,7 +39,7 @@ func NewClient() *Client {
 
 // get performs a GET request to the Deribit API and unmarshals the result
 // into dest. Returns an error on network failure or non-2xx status.
-func (c *Client) get(ctx context.Context, endpoint string, params url.Values, dest interface{}) error {
+func (c *Client) get(ctx context.Context, endpoint string, params url.Values, dest any) error {
 	rawURL := fmt.Sprintf("%s/%s", c.baseURL, endpoint)
 	if len(params) > 0 {
 		rawURL = rawURL + "?" + params.Encode()
