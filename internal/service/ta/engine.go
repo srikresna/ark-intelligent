@@ -83,6 +83,10 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	snap.SuperTrend = CalcSuperTrend(bars, 10, 3.0)
 	snap.Fibonacci = CalcFibonacci(bars, 50)
 
+	// Killzone: classify current trading session
+	kz := ClassifyKillzone(time.Now())
+	snap.Killzone = &kz
+
 	return snap
 }
 
