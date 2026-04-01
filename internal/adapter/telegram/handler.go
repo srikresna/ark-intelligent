@@ -1248,8 +1248,8 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 	if strings.ToLower(strings.TrimSpace(args)) == "week" {
 		events, err := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
 		if err != nil {
-			_, err = h.bot.SendHTML(ctx, chatID, "Failed to get weekly calendar")
-			return err
+			h.sendUserError(ctx, chatID, err, "calendar")
+			return nil
 		}
 		html := h.fmt.FormatCalendarWeek(now.Format("Jan 02, 2006"), events, savedFilter)
 		kb := h.kb.CalendarFilter(savedFilter, now.Format("20060102"), true)
@@ -1259,8 +1259,8 @@ func (h *Handler) cmdCalendar(ctx context.Context, chatID string, userID int64, 
 	dateStr := now.Format("20060102")
 	events, err := h.newsRepo.GetByDate(ctx, dateStr)
 	if err != nil {
-		_, err = h.bot.SendHTML(ctx, chatID, "Failed to get today's calendar")
-		return err
+		h.sendUserError(ctx, chatID, err, "calendar")
+		return nil
 	}
 
 	html := h.fmt.FormatCalendarDay(now.Format("Mon Jan 02, 2006"), events, savedFilter)
