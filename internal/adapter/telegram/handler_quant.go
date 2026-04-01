@@ -170,6 +170,7 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	h.quantCache.set(chatID, state)
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)

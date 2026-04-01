@@ -105,7 +105,7 @@ func (h *Handler) registerCTACommands() {
 
 // /cta — Main CTA Command
 
-func (h *Handler) cmdCTA(ctx context.Context, chatID string, _ int64, args string) error {
+func (h *Handler) cmdCTA(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.cta == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ CTA Engine not configured.")
 		return err
@@ -113,8 +113,13 @@ func (h *Handler) cmdCTA(ctx context.Context, chatID string, _ int64, args strin
 
 	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
 	if len(parts) == 0 {
-		_, err := h.bot.SendWithKeyboard(ctx, chatID,
-			`📈 <b>CTA — Classical Technical Analysis</b>
+		// Auto-reload last currency when no args provided
+		if lc := h.getLastCurrency(ctx, userID); lc != "" {
+			parts = []string{lc}
+			_, _ = h.bot.SendHTML(ctx, chatID, fmt.Sprintf("🔄 Loading <b>%s</b> (last viewed)...", html.EscapeString(lc)))
+		} else {
+			_, err := h.bot.SendWithKeyboard(ctx, chatID,
+				`📈 <b>CTA — Classical Technical Analysis</b>
 
 Multi-timeframe TA dashboard dengan 6 tools:
 
@@ -127,7 +132,8 @@ Multi-timeframe TA dashboard dengan 6 tools:
 🎯 <b>Zones</b> — Entry/SL/TP otomatis
 
 Pilih aset:`, h.kb.CTASymbolMenu())
-		return err
+			return err
+		}
 	}
 
 	symbol := parts[0]
@@ -156,6 +162,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	}
 
 	h.ctaCache.set(chatID, state)
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
 	// Generate chart for daily timeframe
 	chartPNG, chartErr := h.generateCTAChart(state, "daily")
