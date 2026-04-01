@@ -341,3 +341,23 @@ func (h *Handler) cmdSNB(ctx context.Context, chatID string, _ int64, _ string) 
 	htmlMsg := macro.FormatSNBData(data)
 	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
+
+// ---------------------------------------------------------------------------
+// /leading — OECD Composite Leading Indicators Dashboard
+// ---------------------------------------------------------------------------
+
+// cmdLeading handles the /leading command — fetches and displays OECD CLI data
+// showing economic growth momentum across G7+ countries with FX divergence signals.
+func (h *Handler) cmdLeading(ctx context.Context, chatID string, _ int64, _ string) error {
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "📊 Fetching OECD leading indicators... ⏳")
+
+	data, err := macro.GetOECDCLIData(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("OECD CLI data fetch failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"❌ Gagal mengambil data OECD CLI. Silakan coba lagi nanti.")
+	}
+
+	htmlMsg := macro.FormatOECDCLIData(data)
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+}
