@@ -350,7 +350,7 @@ type quantEngineResult struct {
 	Symbol     string                 `json:"symbol"`
 	Success    bool                   `json:"success"`
 	Error      string                 `json:"error"`
-	Result     map[string]interface{} `json:"result"`
+	Result     map[string]any `json:"result"`
 	TextOutput string                 `json:"text_output"`
 	ChartPath  string                 `json:"chart_path"`
 }
@@ -365,7 +365,7 @@ type quantEngineInput struct {
 	Timeframe  string                       `json:"timeframe"`
 	Bars       []chartBar                   `json:"bars"`
 	MultiAsset map[string][]quantAssetClose `json:"multi_asset,omitempty"`
-	Params     map[string]interface{}       `json:"params,omitempty"`
+	Params     map[string]any       `json:"params,omitempty"`
 }
 
 type quantAssetClose struct {
@@ -408,7 +408,7 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 		Symbol:    state.symbol,
 		Timeframe: tf,
 		Bars:      chartBars,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"lookback":         120,
 			"forecast_horizon": 5,
 			"confidence_level": 0.95,

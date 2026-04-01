@@ -332,12 +332,12 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 		return result
 	}
 
-	input := map[string]interface{}{
+	input := map[string]any{
 		"mode":      mode,
 		"symbol":    state.symbol,
 		"timeframe": tf,
 		"bars":      toBars(bars),
-		"params":    map[string]interface{}{},
+		"params":    map[string]any{},
 	}
 
 	// For multi-TF modes, include all other TF bars
@@ -401,7 +401,7 @@ type vpEngineResult struct {
 	ChartPath  string          `json:"chart_path"`
 }
 
-func (h *Handler) runVPEngine(input map[string]interface{}) (*vpEngineResult, error) {
+func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	ts := time.Now().UnixNano()
 	inputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_in_%d.json", ts))
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_out_%d.json", ts))

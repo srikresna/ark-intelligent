@@ -729,7 +729,7 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 }
 
 // runChartScript marshals input to JSON, runs cta_chart.py, and returns PNG bytes.
-func runChartScript(ctx context.Context, input interface{}) ([]byte, error) {
+func runChartScript(ctx context.Context, input any) ([]byte, error) {
 	jsonData, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("marshal chart input: %w", err)

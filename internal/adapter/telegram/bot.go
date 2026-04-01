@@ -251,7 +251,7 @@ func (b *Bot) StartPolling(ctx context.Context) error {
 
 // getUpdates calls the Telegram getUpdates API with long polling.
 func (b *Bot) getUpdates(ctx context.Context, offset, limit, timeout int) ([]Update, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		"offset":          offset,
 		"limit":           limit,
 		"timeout":         timeout,
@@ -417,7 +417,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 // ports.Messenger Implementation — Outbound messaging
 // ---------------------------------------------------------------------------
 
-func (b *Bot) setChatID(params map[string]interface{}, chatID string) {
+func (b *Bot) setChatID(params map[string]any, chatID string) {
 	if strings.Contains(chatID, ":") {
 		parts := strings.SplitN(chatID, ":", 2)
 		params["chat_id"] = parts[0]
@@ -437,7 +437,7 @@ func (b *Bot) SendMessage(ctx context.Context, chatID string, text string) (int,
 
 	b.rateLimit()
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"text": text,
 	}
 	b.setChatID(params, chatID)
@@ -461,7 +461,7 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 	var lastMsgID int
 
 	for _, chunk := range chunks {
-		params := map[string]interface{}{
+		params := map[string]any{
 			"text":                     chunk,
 			"parse_mode":               "HTML",
 			"disable_web_page_preview": true,
@@ -488,7 +488,7 @@ func (b *Bot) SendWithKeyboard(ctx context.Context, chatID string, text string, 
 
 	keyboard := b.buildInlineKeyboard(kb)
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"text":                     text,
 		"parse_mode":               "HTML",
 		"disable_web_page_preview": true,
@@ -514,7 +514,7 @@ func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text st
 	chunks := splitMessage(text, 4096)
 
 	// Edit the original message with the first chunk.
-	params := map[string]interface{}{
+	params := map[string]any{
 		"message_id":               msgID,
 		"text":                     chunks[0],
 		"parse_mode":               "HTML",
@@ -544,7 +544,7 @@ func (b *Bot) EditWithKeyboard(ctx context.Context, chatID string, msgID int, te
 
 	keyboard := b.buildInlineKeyboard(kb)
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"message_id":               msgID,
 		"text":                     text,
 		"parse_mode":               "HTML",
@@ -558,7 +558,7 @@ func (b *Bot) EditWithKeyboard(ctx context.Context, chatID string, msgID int, te
 
 // AnswerCallback acknowledges a callback query.
 func (b *Bot) AnswerCallback(ctx context.Context, callbackID string, text string) error {
-	params := map[string]interface{}{
+	params := map[string]any{
 		"callback_query_id": callbackID,
 	}
 	if text != "" {
@@ -574,7 +574,7 @@ func (b *Bot) DeleteMessage(ctx context.Context, chatID string, msgID int) error
 		chatID = b.defaultID
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"message_id": msgID,
 	}
 	b.setChatID(params, chatID)
@@ -589,7 +589,7 @@ func (b *Bot) SendTyping(ctx context.Context, chatID string) {
 	if chatID == "" {
 		chatID = b.defaultID
 	}
-	params := map[string]interface{}{
+	params := map[string]any{
 		"action": "typing",
 	}
 	b.setChatID(params, chatID)
@@ -740,7 +740,7 @@ func (b *Bot) BroadcastWithKeyboard(ctx context.Context, html string, kb ports.I
 // ---------------------------------------------------------------------------
 
 // apiCall makes a Telegram Bot API call and unmarshals the result.
-func (b *Bot) apiCall(ctx context.Context, method string, params map[string]interface{}, result interface{}) error {
+func (b *Bot) apiCall(ctx context.Context, method string, params map[string]any, result any) error {
 	url := fmt.Sprintf("%s/%s", b.apiBase, method)
 
 	body, err := json.Marshal(params)
@@ -812,7 +812,7 @@ const maxRetries = 3
 // apiCallWithRetry wraps apiCall with exponential backoff retry for 429 rate limits.
 // Base delays: 5s, 10s, 20s (with jitter). If Telegram provides retry_after, that
 // value is used instead. Gives up after maxRetries attempts.
-func (b *Bot) apiCallWithRetry(ctx context.Context, method string, params map[string]interface{}, result interface{}) error {
+func (b *Bot) apiCallWithRetry(ctx context.Context, method string, params map[string]any, result any) error {
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := b.apiCall(ctx, method, params, result)
@@ -857,12 +857,12 @@ func (b *Bot) apiCallWithRetry(ctx context.Context, method string, params map[st
 }
 
 // apiCallNoResult makes a Telegram API call without parsing the result.
-func (b *Bot) apiCallNoResult(ctx context.Context, method string, params map[string]interface{}) error {
+func (b *Bot) apiCallNoResult(ctx context.Context, method string, params map[string]any) error {
 	return b.apiCallWithRetry(ctx, method, params, nil)
 }
 
 // buildInlineKeyboard converts ports.InlineKeyboard to Telegram API format.
-func (b *Bot) buildInlineKeyboard(kb ports.InlineKeyboard) map[string]interface{} {
+func (b *Bot) buildInlineKeyboard(kb ports.InlineKeyboard) map[string]any {
 	rows := make([][]map[string]string, 0, len(kb.Rows))
 	for _, row := range kb.Rows {
 		btnRow := make([]map[string]string, 0, len(row))
@@ -878,7 +878,7 @@ func (b *Bot) buildInlineKeyboard(kb ports.InlineKeyboard) map[string]interface{
 		}
 		rows = append(rows, btnRow)
 	}
-	return map[string]interface{}{"inline_keyboard": rows}
+	return map[string]any{"inline_keyboard": rows}
 }
 
 // rateLimit ensures we don't exceed Telegram's rate limits.
@@ -1217,7 +1217,7 @@ type telegramFile struct {
 
 // getFilePath resolves a Telegram file_id to a downloadable file_path.
 func (b *Bot) getFilePath(ctx context.Context, fileID string) (string, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		"file_id": fileID,
 	}
 	var f telegramFile

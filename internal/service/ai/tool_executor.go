@@ -17,7 +17,7 @@ func NewMemoryToolExecutor(store *MemoryStore) *MemoryToolExecutor {
 }
 
 // Execute processes a tool call and returns the result text.
-func (e *MemoryToolExecutor) Execute(ctx context.Context, userID int64, toolName string, input map[string]interface{}) string {
+func (e *MemoryToolExecutor) Execute(ctx context.Context, userID int64, toolName string, input map[string]any) string {
 	switch toolName {
 	case "memory":
 		return e.executeMemory(ctx, userID, input)
@@ -28,7 +28,7 @@ func (e *MemoryToolExecutor) Execute(ctx context.Context, userID int64, toolName
 
 // executeMemory handles memory tool commands by parsing the input map
 // into a memoryCommand and delegating to the MemoryStore.
-func (e *MemoryToolExecutor) executeMemory(ctx context.Context, userID int64, input map[string]interface{}) string {
+func (e *MemoryToolExecutor) executeMemory(ctx context.Context, userID int64, input map[string]any) string {
 	// Parse the input map into a memoryCommand struct
 	data, err := json.Marshal(input)
 	if err != nil {

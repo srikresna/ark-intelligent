@@ -36,7 +36,7 @@ type ClaudeClient struct {
 // userID is needed for per-user memory isolation.
 type ToolExecutor interface {
 	// Execute processes a tool call and returns the result text.
-	Execute(ctx context.Context, userID int64, toolName string, input map[string]interface{}) string
+	Execute(ctx context.Context, userID int64, toolName string, input map[string]any) string
 }
 
 // NewClaudeClient creates a Claude client targeting the given endpoint.
@@ -76,7 +76,7 @@ func (c *ClaudeClient) SetModel(model string) {
 type claudeRequest struct {
 	Model     string          `json:"model"`
 	MaxTokens int             `json:"max_tokens"`
-	System    interface{}     `json:"system,omitempty"`     // string or []claudeSystemBlock (for cache_control)
+	System    any     `json:"system,omitempty"`     // string or []claudeSystemBlock (for cache_control)
 	Messages  []claudeMessage `json:"messages"`
 	Tools     []claudeToolDef `json:"tools,omitempty"`
 	Thinking  *claudeThinking `json:"thinking,omitempty"`   // extended thinking config
@@ -102,7 +102,7 @@ type claudeCacheControl struct {
 
 type claudeMessage struct {
 	Role    string      `json:"role"`
-	Content interface{} `json:"content"` // string for text-only, []claudeContentInput for multimodal
+	Content any `json:"content"` // string for text-only, []claudeContentInput for multimodal
 }
 
 // claudeContentInput represents a single content block in a multimodal user message.
@@ -145,11 +145,11 @@ type claudeContentBlock struct {
 	Signature string                 `json:"signature,omitempty"` // thinking block signature
 	Name      string                 `json:"name,omitempty"`      // for tool_use blocks
 	ID        string                 `json:"id,omitempty"`
-	Input     map[string]interface{} `json:"input,omitempty"`     // for tool_use blocks (command args)
+	Input     map[string]any `json:"input,omitempty"`     // for tool_use blocks (command args)
 	Citations []claudeCitation       `json:"citations,omitempty"` // document citations
 	// tool_result fields (for round-trip messages)
 	ToolUseID string      `json:"tool_use_id,omitempty"` // references a tool_use block
-	Content   interface{} `json:"content,omitempty"`      // tool_result content (string or structured)
+	Content   any `json:"content,omitempty"`      // tool_result content (string or structured)
 }
 
 // claudeCitation represents a citation reference from a Claude response.
@@ -218,7 +218,7 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 	}
 
 	// Build system prompt (with or without prompt caching)
-	var system interface{}
+	var system any
 	if req.SystemPrompt != "" {
 		if c.useCache {
 			system = []claudeSystemBlock{{
