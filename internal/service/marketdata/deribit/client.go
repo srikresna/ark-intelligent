@@ -9,8 +9,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -30,10 +32,8 @@ type Client struct {
 // NewClient creates a Deribit public API client with the default base URL.
 func NewClient() *Client {
 	return &Client{
-		baseURL: defaultBaseURL,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
+		baseURL:    defaultBaseURL,
+		httpClient: httpclient.NewClient(defaultTimeout),
 	}
 }
 
@@ -89,6 +89,8 @@ func (c *Client) GetInstruments(ctx context.Context, currency string) ([]Instrum
 }
 
 // GetBookSummary returns OI/volume data for all options of a given currency.
+// Expired options are filtered out client-side, consistent with GetInstruments
+// which uses expired=false. This prevents stale data on expiry days.
 func (c *Client) GetBookSummary(ctx context.Context, currency string) ([]BookSummary, error) {
 	params := url.Values{
 		"currency": {currency},
@@ -98,8 +100,52 @@ func (c *Client) GetBookSummary(ctx context.Context, currency string) ([]BookSum
 	if err := c.get(ctx, "get_book_summary_by_currency", params, &result); err != nil {
 		return nil, err
 	}
-	log.Debug().Str("currency", currency).Int("count", len(result.Result)).Msg("book summary fetched")
-	return result.Result, nil
+
+	// Filter out expired options.
+	now := time.Now()
+	nowMs := now.UnixMilli()
+	active := make([]BookSummary, 0, len(result.Result))
+	filtered := 0
+	for _, bs := range result.Result {
+		expMs := bs.ExpirationTS
+		// Fallback: parse expiry from instrument name if timestamp is missing.
+		if expMs == 0 {
+			if t, err := parseExpiryFromInstrument(bs.InstrumentName); err == nil {
+				expMs = t.UnixMilli()
+			}
+		}
+		if expMs > 0 && expMs <= nowMs {
+			filtered++
+			continue
+		}
+		active = append(active, bs)
+	}
+
+	log.Debug().
+		Str("currency", currency).
+		Int("total", len(result.Result)).
+		Int("filtered", filtered).
+		Int("active", len(active)).
+		Msg("book summary fetched (expired filtered)")
+	return active, nil
+}
+
+// parseExpiryFromInstrument extracts the expiration date from a Deribit
+// instrument name like "BTC-28MAR25-80000-C". The expiry is at 08:00 UTC
+// on the given date per Deribit convention.
+func parseExpiryFromInstrument(name string) (time.Time, error) {
+	parts := strings.SplitN(name, "-", 4)
+	if len(parts) < 4 {
+		return time.Time{}, fmt.Errorf("invalid instrument name: %s", name)
+	}
+	dateStr := parts[1] // e.g. "28MAR25"
+	t, err := time.Parse("2Jan06", dateStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse expiry from %s: %w", name, err)
+	}
+	// Deribit options expire at 08:00 UTC.
+	t = t.Add(8 * time.Hour)
+	return t, nil
 }
 
 // GetTicker returns per-instrument Greeks for a single option contract.
@@ -112,4 +158,24 @@ func (c *Client) GetTicker(ctx context.Context, instrument string) (*Ticker, err
 		return nil, err
 	}
 	return &result.Result, nil
+}
+
+// GetIndexPrice returns the current Deribit index price for a currency (e.g. "btc_usd").
+// This is the canonical spot price source when UnderlyingPrice is unavailable in book summaries.
+// Deribit index name format: lowercase currency + "_usd" (e.g. "btc_usd", "eth_usd").
+func (c *Client) GetIndexPrice(ctx context.Context, currency string) (float64, error) {
+	// Deribit index names are lowercase: btc_usd, eth_usd, etc.
+	indexName := strings.ToLower(currency) + "_usd"
+	params := url.Values{
+		"index_name": {indexName},
+	}
+	var result indexPriceResult
+	if err := c.get(ctx, "get_index_price", params, &result); err != nil {
+		return 0, fmt.Errorf("deribit: get_index_price %s: %w", indexName, err)
+	}
+	if result.Result.IndexPrice <= 0 {
+		return 0, fmt.Errorf("deribit: invalid index price (%.4f) for %s", result.Result.IndexPrice, indexName)
+	}
+	log.Debug().Str("index", indexName).Float64("price", result.Result.IndexPrice).Msg("index price fetched")
+	return result.Result.IndexPrice, nil
 }

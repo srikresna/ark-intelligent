@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -42,10 +43,8 @@ type ToolExecutor interface {
 // NewClaudeClient creates a Claude client targeting the given endpoint.
 func NewClaudeClient(endpoint string, timeout time.Duration, maxTokens int) *ClaudeClient {
 	return &ClaudeClient{
-		endpoint: endpoint,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
+		endpoint:       endpoint,
+		httpClient:     httpclient.NewClient(timeout),
 		model:          "claude-opus-4-6",
 		maxTokens:      maxTokens,
 		thinkingBudget: 2048, // default thinking budget for extended thinking

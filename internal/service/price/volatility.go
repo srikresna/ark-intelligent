@@ -56,7 +56,11 @@ func ComputeNormalizedATR(prices []domain.PriceRecord, period int) float64 {
 	if atr == 0 {
 		return 0
 	}
-	return roundN(atr/prices[0].Close*100, 4)
+	result := roundN(atr/prices[0].Close*100, 4)
+	if math.IsNaN(result) || math.IsInf(result, 0) {
+		return 0
+	}
+	return result
 }
 
 // ClassifyVolatilityRegime returns the volatility regime based on current vs average ATR.
@@ -64,10 +68,13 @@ func ComputeNormalizedATR(prices []domain.PriceRecord, period int) float64 {
 //   - CONTRACTING: currentATR < avgATR * 0.75
 //   - NORMAL:      otherwise
 func ClassifyVolatilityRegime(currentATR, avgATR float64) string {
-	if avgATR <= 0 {
+	if avgATR <= 0 || currentATR <= 0 || math.IsNaN(currentATR) || math.IsInf(currentATR, 0) {
 		return VolatilityNormal
 	}
 	ratio := currentATR / avgATR
+	if math.IsNaN(ratio) || math.IsInf(ratio, 0) {
+		return VolatilityNormal
+	}
 	switch {
 	case ratio > 1.25:
 		return VolatilityExpanding

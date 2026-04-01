@@ -23,13 +23,13 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 	b.WriteString(fmt.Sprintf("📊 <b>WYCKOFF ANALYSIS — %s %s</b>\n\n",
 		r.Symbol, r.Timeframe))
 
-	b.WriteString(fmt.Sprintf("%s <b>SCHEMATIC:</b> %s (%s confidence)\n",
+	b.WriteString(fmt.Sprintf("%s <b>SKEMA:</b> %s (kepercayaan: %s)\n",
 		schIcon, r.Schematic, r.Confidence))
-	b.WriteString(fmt.Sprintf("📍 <b>CURRENT PHASE:</b> %s\n\n",
+	b.WriteString(fmt.Sprintf("📍 <b>FASE SAAT INI:</b> %s\n\n",
 		formatPhaseName(r.CurrentPhase)))
 
 	if len(r.Events) > 0 {
-		b.WriteString("⚡ <b>EVENTS DETECTED:</b>\n")
+		b.WriteString("⚡ <b>EVENT TERDETEKSI:</b>\n")
 		for _, e := range r.Events {
 			phase := phaseForEvent(r.Phases, e.BarIndex)
 			icon := eventIcon(e.Name)
@@ -37,7 +37,7 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 			if e.Significance == "HIGH" {
 				sigIcon = " ⭐"
 			}
-			b.WriteString(fmt.Sprintf("  [%s] %s <b>%s</b>: %.5f (vol %.1fx avg)%s\n",
+			b.WriteString(fmt.Sprintf("  [%s] %s <b>%s</b>: %.5f (vol %.1fx rata-rata)%s\n",
 				phase,
 				icon,
 				string(e.Name),
@@ -54,19 +54,19 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 			r.TradingRange[0], r.TradingRange[1]))
 	}
 	if r.ProjectedMove > 0 {
-		b.WriteString(fmt.Sprintf("🎯 <b>PROJECTED MOVE:</b> <code>%.5f</code> (cause built: %.0f%%)\n",
+		b.WriteString(fmt.Sprintf("🎯 <b>PERGERAKAN PROYEKSI:</b> <code>%.5f</code> (cause terbangun: %.0f%%)\n",
 			r.ProjectedMove, r.CauseBuilt))
 	}
 
 	// Next watch
 	nextWatch := nextWatchEvent(r)
 	if nextWatch != "" {
-		b.WriteString(fmt.Sprintf("⚡ <b>NEXT TO WATCH:</b> %s\n", nextWatch))
+		b.WriteString(fmt.Sprintf("⚡ <b>PANTAU SELANJUTNYA:</b> %s\n", nextWatch))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("💡 <b>SUMMARY:</b> %s\n", r.Summary))
-	b.WriteString(fmt.Sprintf("\n<i>Analyzed: %s UTC</i>", r.AnalyzedAt.Format("2006-01-02 15:04")))
+	b.WriteString(fmt.Sprintf("💡 <b>RINGKASAN:</b> %s\n", r.Summary))
+	b.WriteString(fmt.Sprintf("\n<i>Dianalisis: %s UTC</i>", r.AnalyzedAt.Format("2006-01-02 15:04")))
 
 	out := b.String()
 	if len(out) > 4000 {
@@ -79,13 +79,13 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 func formatPhaseName(phase string) string {
 	switch phase {
 	case "A":
-		return "A — Stopping the Prior Trend"
+		return "A — Menghentikan Tren Sebelumnya"
 	case "B":
-		return "B — Building the Cause"
+		return "B — Membangun Cause"
 	case "C":
-		return "C — The Test (Spring/UTAD)"
+		return "C — Pengujian (Spring/UTAD)"
 	case "D":
-		return "D — Dominance (SOS/SOW)"
+		return "D — Dominasi (SOS/SOW)"
 	case "E":
 		return "E — Markup / Markdown"
 	default:
@@ -136,26 +136,26 @@ func nextWatchEvent(r *wyckoff.WyckoffResult) string {
 	switch r.CurrentPhase {
 	case "A":
 		if r.Schematic == "ACCUMULATION" {
-			return "Secondary Test (low volume revisit of SC lows)"
+			return "Secondary Test (kunjungan ulang SC lows volume rendah)"
 		}
-		return "Automatic Reaction (first sell-off)"
+		return "Automatic Reaction (tekanan jual pertama)"
 	case "B":
 		if r.Schematic == "ACCUMULATION" {
-			return "Spring / Shakeout below trading range"
+			return "Spring / Shakeout di bawah trading range"
 		}
-		return "Upthrust (failed break above range high)"
+		return "Upthrust (kegagalan break di atas resistance range)"
 	case "C":
 		if r.Schematic == "ACCUMULATION" {
-			return fmt.Sprintf("Sign of Strength — break above %.5f", r.TradingRange[1])
+			return fmt.Sprintf("Sign of Strength — break di atas %.5f", r.TradingRange[1])
 		}
-		return fmt.Sprintf("Sign of Weakness — break below %.5f", r.TradingRange[0])
+		return fmt.Sprintf("Sign of Weakness — break di bawah %.5f", r.TradingRange[0])
 	case "D":
 		if r.Schematic == "ACCUMULATION" {
-			return "Last Point of Support (low-volume pullback)"
+			return "Last Point of Support (pullback volume rendah)"
 		}
 		return "Last Point of Supply (LPSY)"
 	case "E":
-		return "Trend continuation — trail stops"
+		return "Kelanjutan tren — trailing stops"
 	default:
 		return ""
 	}

@@ -2,9 +2,14 @@ package vix
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
+
+var log = logger.Component("vix-cache")
 
 const cacheTTL = 6 * time.Hour
 
@@ -35,11 +40,18 @@ func (c *Cache) Get(ctx context.Context) (*VIXTermStructure, error) {
 	// Fetch fresh data
 	ts, err := FetchTermStructure(ctx)
 	if err != nil {
-		return &VIXTermStructure{
-			Available: false,
-			Error:     err.Error(),
-			AsOf:      time.Now().UTC(),
-		}, nil // graceful fallback
+		// If we have stale cached data, return it with a warning instead of failing.
+		c.mu.RLock()
+		stale := c.data
+		c.mu.RUnlock()
+		if stale != nil {
+			log.Warn().Err(err).
+				Time("stale_since", c.fetchedAt).
+				Msg("fetch failed, returning stale cache")
+			return stale, nil
+		}
+		// No stale data — propagate the error to the caller.
+		return nil, fmt.Errorf("vix cache: fetch term structure: %w", err)
 	}
 
 	if ts.Available {
