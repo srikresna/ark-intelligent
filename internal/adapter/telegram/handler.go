@@ -594,6 +594,8 @@ func (h *Handler) cmdCOT(ctx context.Context, chatID string, userID int64, args 
 		return err
 	}
 
+	h.bot.SendTyping(ctx, chatID)
+
 	// Build conviction scores for overview (best-effort, non-fatal)
 	var overviewConvictions []cot.ConvictionScore
 	macroDataOv, fredErrOv := fred.GetCachedOrFetch(ctx)

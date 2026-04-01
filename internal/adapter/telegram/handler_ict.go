@@ -146,9 +146,16 @@ Pilih pair:`,
 		return err
 	}
 
+	// Send loading indicator for long-running computation.
+	loadingID, _ := h.bot.SendLoading(ctx, chatID,
+		fmt.Sprintf("🔷 Menganalisis ICT/SMC untuk <b>%s</b> (%s)... ⏳", html.EscapeString(symbol), timeframe))
+
 	// Compute ICT analysis.
 	result, err := h.computeICTState(ctx, mapping, timeframe)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "ict")
 		return err
 	}
@@ -163,6 +170,9 @@ Pilih pair:`,
 
 	msg := FormatICTResult(result)
 	kb := ictNavKeyboard(symbol, timeframe)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendWithKeyboard(ctx, chatID, msg, kb)
 	return err
 }

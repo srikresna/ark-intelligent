@@ -16,14 +16,22 @@ func (h *Handler) cmdReport(ctx context.Context, chatID string, userID int64, ar
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Generating weekly report... ⏳")
+
 	gen := backtestsvc.NewReportGenerator(h.signalRepo)
 	report, err := gen.GenerateWeeklyReport(ctx)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
 
 	htmlOut := h.fmt.FormatWeeklyReport(report)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
@@ -146,18 +154,29 @@ func (h *Handler) backtestMenu(ctx context.Context, chatID string, calc *backtes
 }
 
 func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Computing full backtest statistics... ⏳")
+
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
 
 	if stats.TotalSignals == 0 {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err := h.bot.SendHTML(ctx, chatID, "No signal data available yet. Signals are generated on each COT release.")
 		return err
 	}
 
 	htmlOut := h.fmt.FormatBacktestStats(stats)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
@@ -300,9 +319,14 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 
 // backtestBaseline compares system performance against random direction baseline.
 func (h *Handler) backtestBaseline(ctx context.Context, chatID string) error {
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Running baseline simulation (1000 iterations)... ⏳")
+
 	gen := backtestsvc.NewBaselineGenerator(h.signalRepo)
 	result, err := gen.ComputeBaseline(ctx, 1000)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
@@ -336,6 +360,9 @@ func (h *Handler) backtestBaseline(ctx context.Context, chatID string) error {
 		b.WriteString("\xF0\x9F\x94\xB4 <i>System underperforms random baseline. Review signal quality.</i>")
 	}
 
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, b.String())
 	return err
 }
@@ -443,19 +470,30 @@ func (h *Handler) backtestSmartMoney(ctx context.Context, chatID string) error {
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🏛 Analyzing smart money tracking accuracy... ⏳")
+
 	analyzer := backtestsvc.NewSmartMoneyAnalyzer(h.cotRepo, h.priceRepo)
 	results, err := analyzer.Analyze(ctx)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
 
 	if len(results) == 0 {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err := h.bot.SendHTML(ctx, chatID, "Not enough data for smart money analysis. Need COT + price history.")
 		return err
 	}
 
 	htmlOut := h.fmt.FormatSmartMoneyAccuracy(results)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
@@ -467,19 +505,30 @@ func (h *Handler) backtestExcursion(ctx context.Context, chatID string) error {
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Computing MFE/MAE excursion analysis... ⏳")
+
 	analyzer := backtestsvc.NewExcursionAnalyzer(h.signalRepo, h.dailyPriceRepo)
 	summary, err := analyzer.Analyze(ctx, 10)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
 
 	if summary.TotalSignals == 0 {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err := h.bot.SendHTML(ctx, chatID, "Not enough data for excursion analysis. Need evaluated signals + daily price history.")
 		return err
 	}
 
 	htmlOut := h.fmt.FormatExcursionSummary(summary)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
@@ -571,9 +620,14 @@ func (h *Handler) backtestMatrix(ctx context.Context, chatID string) error {
 
 // backtestMonteCarlo runs Monte Carlo bootstrap simulation.
 func (h *Handler) backtestMonteCarlo(ctx context.Context, chatID string) error {
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎲 Running Monte Carlo simulation (1000 runs)... ⏳")
+
 	sim := backtestsvc.NewMonteCarloSimulator(h.signalRepo)
 	result, err := sim.Simulate(ctx, 1000)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "backtest")
 		return nil
 	}
@@ -594,6 +648,9 @@ func (h *Handler) backtestMonteCarlo(ctx context.Context, chatID string) error {
 	b.WriteString(fmt.Sprintf("<code>P(Loss)  :</code> %.1f%%\n", result.ProbabilityOfLoss))
 	b.WriteString(fmt.Sprintf("<code>Med Sharpe:</code> %.2f\n", result.MedianSharpe))
 
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, b.String())
 	return err
 }

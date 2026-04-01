@@ -350,7 +350,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 			count++
 		}
 		// Avoid flooding Telegram API
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(config.TelegramFloodDelay)
 	}
 
 	log.Info().Int("users", count).Msg("sent COT release alert")
@@ -460,7 +460,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 						continue
 					}
 					_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, html)
-					time.Sleep(50 * time.Millisecond)
+					time.Sleep(config.TelegramFloodDelay)
 				}
 			}
 		}
@@ -548,7 +548,7 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 			if _, sendErr := s.deps.Bot.SendHTML(ctx, prefs.ChatID, msg); sendErr == nil {
 				count++
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(config.TelegramFloodDelay)
 		}
 		log.Info().Str("alert_type", string(alert.Type)).Int("users", count).Msg("FRED alert sent")
 	}

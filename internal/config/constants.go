@@ -64,3 +64,13 @@ const (
 	// PollRetryDelay is the delay before retrying after a poll error.
 	PollRetryDelay = 5 * time.Second
 )
+
+// ---------------------------------------------------------------------------
+// Telegram Flood Control
+// ---------------------------------------------------------------------------
+
+const (
+	// TelegramFloodDelay is the minimum pause between consecutive Telegram
+	// API calls to avoid hitting flood-control limits.
+	TelegramFloodDelay = 50 * time.Millisecond
+)
