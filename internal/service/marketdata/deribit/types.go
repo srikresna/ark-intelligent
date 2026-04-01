@@ -45,3 +45,13 @@ type bookSummaryResult struct {
 type tickerResult struct {
 	Result Ticker `json:"result"`
 }
+
+// IndexPrice holds the Deribit index price for a currency.
+type IndexPrice struct {
+	IndexPrice float64 `json:"index_price"`
+}
+
+// indexPriceResult is the raw API envelope for get_index_price.
+type indexPriceResult struct {
+	Result IndexPrice `json:"result"`
+}
