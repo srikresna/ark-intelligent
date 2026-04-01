@@ -154,6 +154,11 @@ type Bot struct {
 
 	// Authorization middleware (tiered access control + quotas)
 	middleware *Middleware
+
+	// Worker pool semaphore: limits concurrent handleUpdate goroutines.
+	// Buffered channel used as semaphore; capacity = max concurrent handlers.
+	// Configured via HANDLER_CONCURRENCY env var (default 20).
+	workerSem chan struct{}
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +209,18 @@ func (b *Bot) StartPolling(ctx context.Context) error {
 
 		for _, update := range updates {
 			b.offset = update.UpdateID + 1
-			go b.handleUpdate(ctx, update)
+			// Acquire a worker slot before spawning the goroutine.
+			// The select ensures the polling loop exits immediately on context
+			// cancellation even when all slots are occupied.
+			select {
+			case b.workerSem <- struct{}{}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			go func(u Update) {
+				defer func() { <-b.workerSem }()
+				b.handleUpdate(ctx, u)
+			}(update)
 		}
 	}
 }

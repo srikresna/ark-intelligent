@@ -18,6 +18,9 @@ var _ ports.Messenger = (*Bot)(nil)
 // The default chat ID is also used to identify the bot owner (exempt from rate limits).
 // For private chats, chat ID == user ID. For groups (negative IDs), owner derivation
 // is skipped — the owner must be set via OWNER_ID env or identified at runtime.
+//
+// HANDLER_CONCURRENCY env var (default 20) controls the maximum number of
+// concurrent handleUpdate goroutines, preventing memory exhaustion under spam/flood.
 func NewBot(token, defaultChatID string) *Bot {
 	// Check dedicated OWNER_ID env var first, then fall back to defaultChatID.
 	var ownerID int64
@@ -34,6 +37,15 @@ func NewBot(token, defaultChatID string) *Bot {
 		}
 	}
 
+	// Configurable worker pool size via HANDLER_CONCURRENCY env var.
+	const defaultConcurrency = 20
+	concurrency := defaultConcurrency
+	if v := strings.TrimSpace(os.Getenv("HANDLER_CONCURRENCY")); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			concurrency = parsed
+		}
+	}
+
 	return &Bot{
 		token:     token,
 		defaultID: defaultChatID,
@@ -45,5 +57,6 @@ func NewBot(token, defaultChatID string) *Bot {
 		commands:    make(map[string]CommandHandler),
 		callbacks:   make(map[string]CallbackHandler),
 		userLimiter: newUserRateLimiter(),
+		workerSem:   make(chan struct{}, concurrency),
 	}
 }
