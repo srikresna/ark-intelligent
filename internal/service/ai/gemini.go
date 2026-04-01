@@ -21,20 +21,21 @@ var geminiLog = logger.Component("gemini")
 // financial analysis prompts. It manages the client lifecycle,
 // model configuration, and retry logic.
 type GeminiClient struct {
-	client  *genai.Client
-	model   *genai.GenerativeModel
-	apiKey  string
-	limiter *aiRateLimiter
+	client    *genai.Client
+	model     *genai.GenerativeModel
+	apiKey    string
+	modelName string
+	limiter   *aiRateLimiter
 }
 
-// NewGeminiClient creates a Gemini client with the given API key and rate limits.
-func NewGeminiClient(ctx context.Context, apiKey string, maxRPM int, maxDaily int) (*GeminiClient, error) {
+// NewGeminiClient creates a Gemini client with the given API key, model name, and rate limits.
+func NewGeminiClient(ctx context.Context, apiKey string, modelName string, maxRPM int, maxDaily int) (*GeminiClient, error) {
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, fmt.Errorf("create gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-3.1-flash-lite-preview")
+	model := client.GenerativeModel(modelName)
 
 	// Configure for financial analysis
 	model.SetTemperature(0.3) // low creativity, high precision
@@ -49,10 +50,11 @@ func NewGeminiClient(ctx context.Context, apiKey string, maxRPM int, maxDaily in
 	}
 
 	return &GeminiClient{
-		client:  client,
-		model:   model,
-		apiKey:  apiKey,
-		limiter: newAIRateLimiter(maxRPM, maxDaily),
+		client:    client,
+		model:     model,
+		apiKey:    apiKey,
+		modelName: modelName,
+		limiter:   newAIRateLimiter(maxRPM, maxDaily),
 	}, nil
 }
 
@@ -105,7 +107,7 @@ func (gc *GeminiClient) GenerateWithSystem(ctx context.Context, systemPrompt, us
 	}
 
 	// Clone model config with system instruction
-	model := gc.client.GenerativeModel("gemini-3.1-flash-lite-preview")
+	model := gc.client.GenerativeModel(gc.modelName)
 	model.SetTemperature(0.3)
 	model.SetTopP(0.8)
 	model.SetTopK(40)
