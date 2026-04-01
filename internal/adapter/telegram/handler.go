@@ -212,8 +212,9 @@ func NewHandler(
 	bot.RegisterCommand("/impact", h.cmdImpact)
 	bot.RegisterCommand("/sentiment", h.cmdSentiment)
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
-	bot.RegisterCommand("/price", h.cmdPrice) // Daily price context
-	bot.RegisterCommand("/levels", h.cmdLevels) // Support/resistance levels + position sizing
+	bot.RegisterCommand("/price", h.cmdPrice)       // Daily price context
+	bot.RegisterCommand("/levels", h.cmdLevels)     // Support/resistance levels + position sizing
+	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
