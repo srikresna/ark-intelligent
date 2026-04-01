@@ -13,6 +13,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -241,7 +242,7 @@ func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMap
 		}
 	}
 
-	return nil, fmt.Errorf("no price source available for %s", mapping.Currency)
+	return nil, errs.Wrapf(errs.ErrNotFound, "no price source for %s", mapping.Currency)
 }
 
 // HealthCheck verifies that at least one price API is reachable.
@@ -371,10 +372,10 @@ func (f *Fetcher) parseAVFXWeekly(body []byte, mapping domain.PriceSymbolMapping
 		return nil, fmt.Errorf("parse AV FX response: %w", err)
 	}
 	if resp.Note != "" || resp.Info != "" {
-		return nil, fmt.Errorf("AV rate limited: %s%s", resp.Note, resp.Info)
+		return nil, errs.Wrapf(errs.ErrRateLimited, "alphavantage: %s%s", resp.Note, resp.Info)
 	}
 	if len(resp.TimeSeries) == 0 {
-		return nil, fmt.Errorf("AV FX empty response")
+		return nil, errs.Wrap(errs.ErrNoData, "alphavantage FX")
 	}
 
 	records := make([]domain.PriceRecord, 0, len(resp.TimeSeries))
@@ -411,10 +412,10 @@ func (f *Fetcher) parseAVCommodity(body []byte, mapping domain.PriceSymbolMappin
 		return nil, fmt.Errorf("parse AV commodity response: %w", err)
 	}
 	if resp.Note != "" || resp.Info != "" {
-		return nil, fmt.Errorf("AV rate limited: %s%s", resp.Note, resp.Info)
+		return nil, errs.Wrapf(errs.ErrRateLimited, "alphavantage: %s%s", resp.Note, resp.Info)
 	}
 	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("AV commodity empty response")
+		return nil, errs.Wrap(errs.ErrNoData, "alphavantage commodity")
 	}
 
 	records := make([]domain.PriceRecord, 0, weeks)
@@ -490,7 +491,7 @@ func (f *Fetcher) fetchYahoo(ctx context.Context, mapping domain.PriceSymbolMapp
 		}
 
 		if len(resp.Chart.Result) == 0 {
-			return fmt.Errorf("yahoo empty response for %s", mapping.Yahoo)
+			return errs.Wrapf(errs.ErrNoData, "yahoo empty response for %s", mapping.Yahoo)
 		}
 
 		result := resp.Chart.Result[0]
@@ -902,7 +903,7 @@ func (f *Fetcher) FetchSpotPrice(ctx context.Context, contractCode string) (floa
 		}
 
 		if len(resp.Chart.Result) == 0 {
-			return fmt.Errorf("yahoo spot empty response for %s", mapping.Yahoo)
+			return errs.Wrapf(errs.ErrNoData, "yahoo spot empty response for %s", mapping.Yahoo)
 		}
 
 		result := resp.Chart.Result[0]

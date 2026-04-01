@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -68,7 +69,7 @@ func (f *Fetcher) FetchLatest(ctx context.Context, contracts []domain.COTContrac
 	})
 
 	if sErr != nil && cErr != nil {
-		return nil, fmt.Errorf("both Socrata (%v) and CSV (%v) failed", sErr, cErr)
+		return nil, errs.Wrapf(errs.ErrUpstream, "both Socrata (%v) and CSV (%v) failed", sErr, cErr)
 	}
 
 	if sErr != nil {
@@ -120,7 +121,7 @@ func getLatestDate(records []domain.COTRecord) time.Time {
 func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract, weeks int) ([]domain.COTRecord, error) {
 	url, ok := f.endpoints[contract.ReportType]
 	if !ok {
-		return nil, fmt.Errorf("no endpoint for report type %s", contract.ReportType)
+		return nil, errs.Wrapf(errs.ErrNotFound, "no endpoint for report type %s", contract.ReportType)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -143,7 +144,7 @@ func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("socrata history: status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "socrata history: status %d", resp.StatusCode)
 	}
 
 	var raw []domain.SocrataRecord
@@ -185,7 +186,7 @@ func (f *Fetcher) fetchFromSocrata(ctx context.Context, contracts []domain.COTCo
 	}
 
 	var allRecords []domain.COTRecord
-	var errs []error
+	var fetchErrs []error
 
 	for reportType, reportContracts := range byReport {
 		url, ok := f.endpoints[reportType]
@@ -196,14 +197,14 @@ func (f *Fetcher) fetchFromSocrata(ctx context.Context, contracts []domain.COTCo
 
 		records, err := f.fetchReport(ctx, url, reportContracts)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", reportType, err))
+			fetchErrs = append(fetchErrs, fmt.Errorf("%s: %w", reportType, err))
 			continue
 		}
 		allRecords = append(allRecords, records...)
 	}
 
-	if len(allRecords) == 0 && len(errs) > 0 {
-		return nil, fmt.Errorf("all socrata reports failed: %v", errs)
+	if len(allRecords) == 0 && len(fetchErrs) > 0 {
+		return nil, errs.Wrapf(errs.ErrUpstream, "all socrata reports failed: %v", fetchErrs)
 	}
 
 	return allRecords, nil
@@ -236,7 +237,7 @@ func (f *Fetcher) fetchReport(ctx context.Context, url string, contracts []domai
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "status %d", resp.StatusCode)
 	}
 
 	var raw []domain.SocrataRecord
@@ -287,7 +288,7 @@ func (f *Fetcher) fetchFromCSV(ctx context.Context, contracts []domain.COTContra
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("csv status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "csv status %d", resp.StatusCode)
 	}
 
 	reader := csv.NewReader(resp.Body)

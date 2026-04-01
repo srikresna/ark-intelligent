@@ -1307,6 +1307,15 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 	}
 
 	html := h.fmt.FormatBiasHTML(signals, filterCurrency)
+
+	// Append USD Aggregate COT signal when showing all currencies (no filter).
+	if filterCurrency == "" {
+		usdAgg := cot.ComputeUSDAggregate(analyses, domain.DefaultCOTContracts)
+		if aggHTML := cot.FormatUSDAggregate(usdAgg); aggHTML != "" {
+			html += aggHTML
+		}
+	}
+
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
