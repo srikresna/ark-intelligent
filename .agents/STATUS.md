@@ -1,11 +1,11 @@
-# Agent Status — last updated: 2026-04-02 02:00 WIB
+# Agent Status — last updated: 2026-04-02 03:00 WIB
 
 ## Research
-- **Siklus saat ini:** 2/5 (Data) — Putaran 3, SELESAI. Next: siklus 3 (Fitur) putaran 3
-- **Last run:** 2026-04-02 02:00 WIB
-- **Current:** completed siklus 2 putaran 3 — Deribit IV/DVOL expanded, TradingEconomics, Finviz
-- **Tasks created this session:** 35 (TASK-100–134)
-- **Total tasks created:** 134 (TASK-000 template + TASK-001 s/d TASK-134)
+- **Siklus saat ini:** 3/5 (Fitur Baru) — Putaran 3, SELESAI. Next: siklus 4 (Tech Refactor) putaran 3
+- **Last run:** 2026-04-02 03:00 WIB
+- **Current:** completed siklus 3 putaran 3 — Vol cone, carry monitor, microstructure+, regime alert, multi-strategy backtest
+- **Tasks created this session:** 40 (TASK-100–139)
+- **Total tasks created:** 139 (TASK-000 template + TASK-001 s/d TASK-139)
 
 <<<<<<< HEAD
 ---
@@ -13,15 +13,22 @@
 ## Ringkasan Saat Ini
 =======
 ## Dev-A
-- **Last run:** -
-- **Current:** not started
-- **PRs merged today:** 5 (TASK-011, TASK-012, TASK-028, TASK-056, TASK-066)
+- **Last run:** 2026-04-01
+- **Current:** active — merged TASK-041 (bot wiring split), TASK-061 (VIX term structure), TASK-060 (COT z-score)
+- **PRs merged today:** 8+
 - **PRs pending review:** 0
 
 ## Dev-B
-- **Last run:** -
-- **Current:** claimed TASK-005, TASK-011
+- **Last run:** 2026-04-01
+- **Current:** claimed TASK-005
 - **Files being edited:** -
+- **PRs today:** multiple
+
+## Dev-C
+- **Last run:** -
+- **Current:** not started
+- **Files being edited:** -
+- **PRs today:** 0
 - **PRs today:** 0
 >>>>>>> 7cb8ce0 (research: UX siklus 1 putaran 3 — Wyckoff/GEX/Shortcuts UX gaps, help discoverability, educational tooltips)
 
