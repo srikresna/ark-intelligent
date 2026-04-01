@@ -360,7 +360,12 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	kb := h.kb.RelatedCommandsKeyboard("bias", filterCurrency)
+	if len(kb.Rows) > 0 {
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	} else {
+		_, err = h.bot.SendHTML(ctx, chatID, html)
+	}
 	return err
 }
 
@@ -651,6 +656,11 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	kb := h.kb.RelatedCommandsKeyboard("rank", "")
+	if len(kb.Rows) > 0 {
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	} else {
+		_, err = h.bot.SendHTML(ctx, chatID, html)
+	}
 	return err
 }

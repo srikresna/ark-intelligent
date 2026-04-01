@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // FormatWyckoffResult formats a WyckoffResult as an HTML Telegram message.
@@ -12,16 +13,11 @@ import (
 func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 	var b strings.Builder
 
-	schIcon := "📊"
-	switch r.Schematic {
-	case "ACCUMULATION":
-		schIcon = "🟢"
-	case "DISTRIBUTION":
-		schIcon = "🔴"
-	}
+	schIcon := fmtutil.AccumulationDistributionIcon(r.Schematic)
 
-	b.WriteString(fmt.Sprintf("📊 <b>WYCKOFF ANALYSIS — %s %s</b>\n\n",
-		r.Symbol, r.Timeframe))
+	// Header — uses fmtutil.AnalysisHeader for consistency.
+	b.WriteString(fmtutil.AnalysisHeader("📊", "WYCKOFF ANALYSIS", r.Symbol, r.Timeframe))
+	b.WriteString("\n")
 
 	b.WriteString(fmt.Sprintf("%s <b>SKEMA:</b> %s (kepercayaan: %s)\n",
 		schIcon, r.Schematic, r.Confidence))

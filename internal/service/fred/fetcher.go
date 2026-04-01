@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -272,7 +273,7 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		log.Warn().Msg("FRED_API_KEY not set — macro data (yields, inflation, labor) may be rate-limited or unavailable. Get free key at https://fred.stlouisfed.org/docs/api/api_key.html")
 	}
 	data := &MacroData{FetchedAt: time.Now()}
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New()
 
 	// Define all series to fetch
 	type fetchJob struct {

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // CBOEPutCallData holds the latest CBOE put/call ratio data.
@@ -68,7 +70,7 @@ func FetchCBOEPutCall(ctx context.Context) *CBOEPutCallData {
 		return result
 	}
 
-	fcClient := &http.Client{Timeout: 30 * time.Second}
+	fcClient := httpclient.New(httpclient.WithTimeout(30 * time.Second))
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.firecrawl.dev/v1/scrape", bytes.NewReader(bodyBytes))
 	if err != nil {
 		log.Debug().Err(err).Msg("CBOE P/C: failed to build Firecrawl request")

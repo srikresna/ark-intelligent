@@ -43,7 +43,12 @@ func (h *Handler) cmdIntermarket(ctx context.Context, chatID string, _ int64, ar
 	if placeholderID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, placeholderID)
 	}
-	_, err = h.bot.SendHTML(ctx, chatID, text)
+	kb := h.kb.RelatedCommandsKeyboard("intermarket", "")
+	if len(kb.Rows) > 0 {
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, text, kb)
+	} else {
+		_, err = h.bot.SendHTML(ctx, chatID, text)
+	}
 	return err
 }
 

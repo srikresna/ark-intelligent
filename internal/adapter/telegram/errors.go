@@ -5,6 +5,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/arkcode369/ark-intelligent/internal/ports"
 )
 
 // userFriendlyError translates a technical error into a user-friendly message
@@ -75,8 +77,47 @@ func suggestRetry(command string) string {
 	return "Coba ulangi dengan /" + command + "."
 }
 
+// isRetriableError returns true for errors where a retry makes sense:
+// timeouts, network issues, rate limits, chart rendering, and AI failures.
+// Permission errors, missing data, and insufficient data are NOT retriable.
+func isRetriableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+
+	// Retriable categories
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	retriablePatterns := []string{
+		"timeout", "deadline exceeded", "context canceled",
+		"connection refused", "no such host", "dial tcp", "unreachable",
+		"rate limit", "too many requests", "429", "quota",
+		"chart", "render", "script",
+		" ai ", "gemini", "claude", "generation failed", "openai", "llm",
+		"badger",
+	}
+	for _, p := range retriablePatterns {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// retryCallbackData builds a "cmd:<command>" callback data string for the
+// retry button. If command is empty, returns empty (no retry shown).
+func retryCallbackData(command string) string {
+	if command == "" {
+		return ""
+	}
+	return "cmd:" + command
+}
+
 // sendUserError logs the technical error and sends a user-friendly message.
-// This is the main entry point for error handling in handlers.
+// For retriable errors, a "Retry" inline button is attached so the user can
+// re-execute the failed command with one tap.
 func (h *Handler) sendUserError(ctx context.Context, chatID string, err error, command string) {
 	log.Error().
 		Err(err).
@@ -85,6 +126,21 @@ func (h *Handler) sendUserError(ctx context.Context, chatID string, err error, c
 		Msg("handler error")
 
 	friendly := userFriendlyError(err, command)
+
+	// Attach retry button for retriable errors with a known command.
+	cbData := retryCallbackData(command)
+	if isRetriableError(err) && cbData != "" {
+		kb := ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{{
+				{Text: "🔄 Coba Lagi", CallbackData: cbData},
+			}},
+		}
+		if _, sendErr := h.bot.SendWithKeyboard(ctx, chatID, friendly, kb); sendErr != nil {
+			log.Error().Err(sendErr).Str("chat_id", chatID).Msg("failed to send error message with retry")
+		}
+		return
+	}
+
 	if _, sendErr := h.bot.SendHTML(ctx, chatID, friendly); sendErr != nil {
 		log.Error().Err(sendErr).Str("chat_id", chatID).Msg("failed to send error message")
 	}

@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // datedObs holds a FRED observation with its date preserved.
@@ -79,7 +81,7 @@ func FetchHistoricalRegimes(ctx context.Context, weeks int) (map[string]string, 
 	}
 
 	apiKey := os.Getenv("FRED_API_KEY")
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New()
 
 	// Fetch key series with dates.
 	// Weekly series: fetch `weeks` observations.

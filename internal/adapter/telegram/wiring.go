@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
@@ -38,8 +39,8 @@ func NewBot(token, defaultChatID string) *Bot {
 	}
 
 	// Configurable worker pool size via HANDLER_CONCURRENCY env var.
-	const defaultConcurrency = 20
-	concurrency := defaultConcurrency
+	// Falls back to config.MaxConcurrentHandlers (20) when not set.
+	concurrency := config.MaxConcurrentHandlers
 	if v := strings.TrimSpace(os.Getenv("HANDLER_CONCURRENCY")); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
 			concurrency = parsed

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // FormatGEXResult formats a GEXResult as a Telegram HTML message.
@@ -16,17 +17,13 @@ import (
 func FormatGEXResult(r *gexsvc.GEXResult) string {
 	var sb strings.Builder
 
-	// Header
-	regimeEmoji := "🟢"
-	if r.Regime == "NEGATIVE_GEX" {
-		regimeEmoji = "🔴"
-	}
-
-	sb.WriteString(fmt.Sprintf("📊 <b>GAMMA EXPOSURE — %s</b>\n", r.Symbol))
+	// Header — uses fmtutil.AnalysisHeader.
+	sb.WriteString(fmtutil.AnalysisHeader("📊", "GAMMA EXPOSURE", r.Symbol, ""))
 	sb.WriteString(fmt.Sprintf("💰 Spot: <code>%s</code>\n", gexFormatPrice(r.SpotPrice)))
 	sb.WriteString(fmt.Sprintf("📅 %s UTC\n\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
 
-	// GEX Regime
+	// GEX Regime — uses fmtutil.RegimeEmoji.
+	regimeEmoji := fmtutil.RegimeEmoji(r.Regime)
 	sb.WriteString(fmt.Sprintf("🌡️ <b>GEX REGIME:</b> %s %s (<code>%s</code>)\n",
 		regimeEmoji, r.Regime, gexFormatGEXValue(r.TotalGEX)))
 	if r.Regime == "POSITIVE_GEX" {
@@ -71,12 +68,13 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 }
 
 // gexFormatPrice formats a price for the GEX display.
+// Uses fmtutil.FmtNum for the integer portion when p >= 10000.
 func gexFormatPrice(p float64) string {
 	if p == 0 {
 		return "N/A"
 	}
 	if p >= 10000 {
-		return fmt.Sprintf("$%s", gexCommaSep(int64(math.Round(p))))
+		return fmt.Sprintf("$%s", fmtutil.FmtNum(math.Round(p), 0))
 	}
 	if p >= 100 {
 		return fmt.Sprintf("$%.2f", p)
@@ -101,22 +99,9 @@ func gexFormatGEXValue(v float64) string {
 	}
 }
 
-// gexCommaSep formats an integer with comma thousand separators.
-func gexCommaSep(n int64) string {
-	s := fmt.Sprintf("%d", n)
-	var result strings.Builder
-	for i, c := range s {
-		pos := len(s) - i
-		if i > 0 && pos%3 == 0 {
-			result.WriteByte(',')
-		}
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
 // gexProfileBars renders a mini bar chart of GEX levels around spot.
 // Shows up to maxLines strikes closest to spot.
+// Uses fmtutil.ProgressBar for the bar rendering.
 func gexProfileBars(levels []gexsvc.GEXLevel, spot float64, maxLines int) string {
 	if len(levels) == 0 {
 		return "  (no data)\n"
@@ -142,20 +127,21 @@ func gexProfileBars(levels []gexsvc.GEXLevel, spot float64, maxLines int) string
 		}
 	}
 
+	const barWidth = 8
 	var sb strings.Builder
-	barWidth := 8
 	for _, l := range sorted {
 		priceStr := gexFormatPrice(l.Strike)
-		ratio := l.NetGEX / maxAbs
-		filled := int(math.Round(math.Abs(ratio) * float64(barWidth)))
-		if filled > barWidth {
-			filled = barWidth
-		}
+		absRatio := math.Abs(l.NetGEX) / maxAbs
 
-		bar := ""
+		var bar string
 		if l.NetGEX >= 0 {
-			bar = strings.Repeat("▓", filled) + strings.Repeat("░", barWidth-filled)
+			bar = fmtutil.ProgressBar(absRatio, 1, barWidth, "▓", "░")
 		} else {
+			// Negative GEX: fill from the right side.
+			filled := int(math.Round(absRatio * float64(barWidth)))
+			if filled > barWidth {
+				filled = barWidth
+			}
 			bar = strings.Repeat("░", barWidth-filled) + strings.Repeat("▓", filled)
 		}
 
