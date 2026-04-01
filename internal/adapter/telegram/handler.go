@@ -1724,7 +1724,7 @@ func (h *Handler) macroRegimePerformance(ctx context.Context, chatID string, msg
 	builder := fred.NewRegimePerformanceBuilder(h.signalRepo)
 	matrix, err := builder.Build(ctx)
 	if err != nil {
-		errMsg := fmt.Sprintf("Error: %s", html.EscapeString(err.Error()))
+		errMsg := userFriendlyError(err, "macro")
 		if msgID > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.MacroDetailMenu())
 		}

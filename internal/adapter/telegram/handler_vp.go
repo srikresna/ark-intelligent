@@ -135,7 +135,7 @@ Pilih aset:`, h.kb.VPSymbolMenu())
 
 	state, err := h.computeVPState(ctx, mapping, timeframe)
 	if err != nil {
-		errMsg := fmt.Sprintf("❌ Error: %s", html.EscapeString(err.Error()))
+		errMsg := userFriendlyError(err, "vp")
 		if msgID > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
 		}
@@ -173,7 +173,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state, err := h.computeVPState(ctx, mapping, timeframe)
 		if err != nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+				userFriendlyError(err, "vp"), h.kb.VPMenu())
 		}
 		h.vpCache.set(chatID, state)
 		return h.vpRunMode(ctx, chatID, msgID, state, "profile")
@@ -195,7 +195,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 			newState, err := h.computeVPState(ctx, mapping, newTF)
 			if err != nil {
 				return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-					fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+					userFriendlyError(err, "vp"), h.kb.VPMenu())
 			}
 			h.vpCache.set(chatID, newState)
 			state = newState
@@ -227,7 +227,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		newState, err := h.computeVPState(ctx, mapping, state.timeframe)
 		if err != nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+				userFriendlyError(err, "vp"), h.kb.VPMenu())
 		}
 		h.vpCache.set(chatID, newState)
 		return h.vpRunMode(ctx, chatID, msgID, newState, "profile")
@@ -353,7 +353,7 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 
 	result, err := h.runVPEngine(input)
 	if err != nil {
-		errMsg := fmt.Sprintf("❌ VP error: %s", html.EscapeString(err.Error()))
+		errMsg := userFriendlyError(err, "vp")
 		if msgID > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
 		}

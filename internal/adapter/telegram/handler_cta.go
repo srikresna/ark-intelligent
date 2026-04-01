@@ -163,8 +163,8 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 		if loadingID > 0 {
 			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 		}
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		h.sendUserError(ctx, chatID, err, "cta")
+		return nil
 	}
 
 	h.ctaCache.set(chatID, state)
@@ -241,7 +241,8 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 		}
 		newState, err := h.computeCTAState(ctx, mapping)
 		if err != nil {
-			return h.bot.EditMessage(ctx, chatID, msgID, "❌ "+html.EscapeString(err.Error()))
+			h.editUserError(ctx, chatID, msgID, err, "cta")
+			return nil
 		}
 		h.ctaCache.set(chatID, newState)
 		return h.ctaShowSummaryChart(ctx, chatID, msgID, newState, "daily")
