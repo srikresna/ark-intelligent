@@ -96,6 +96,9 @@ type UserPrefs struct {
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
+	// DefaultTimeframe stores the user-preferred timeframe (e.g. "daily", "4h").
+	DefaultTimeframe string `json:"default_timeframe,omitempty"`
+
 	// PinnedCommands stores user-customized pinned command shortcuts.
 	PinnedCommands []string `json:"pinned_commands,omitempty"`
 
