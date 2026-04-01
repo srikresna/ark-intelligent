@@ -115,7 +115,7 @@ func deduplicateOBs(obs []OrderBlock) []OrderBlock {
 		midI := (obs[i].Top + obs[i].Bottom) / 2
 		for _, r := range result {
 			midR := (r.Top + r.Bottom) / 2
-			if r.Kind == obs[i].Kind && abs64(midI-midR)/midR < 0.0005 {
+			if r.Kind == obs[i].Kind && midR != 0 && abs64(midI-midR)/abs64(midR) < 0.0005 {
 				dup = true
 				break
 			}
