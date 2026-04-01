@@ -34,6 +34,7 @@ import (
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	ta "github.com/arkcode369/ark-intelligent/internal/service/ta"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -382,6 +383,15 @@ func main() {
 		}
 		handler.WithVP(vpServices)
 		log.Info().Msg("Volume Profile commands registered (/vp)")
+
+		// Wire ICT/SMC services (Smart Money Concepts analysis engine)
+		ictServices := &tgbot.ICTServices{
+			Engine:         ictsvc.NewEngine(),
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+		}
+		handler.WithICT(ictServices)
+		log.Info().Msg("ICT/SMC commands registered (/ict)")
 	}
 
 	// Register free-text handler for chatbot mode

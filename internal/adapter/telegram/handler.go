@@ -121,6 +121,11 @@ type Handler struct {
 	// ctabt holds optional CTA Backtest engine services.
 	// May be nil — /ctabt command disabled if not configured.
 	ctabt *CTABTServices
+
+	// ict holds optional ICT/SMC analysis engine services.
+	// May be nil — /ict command disabled if not configured.
+	ict      *ICTServices
+	ictCache *ictStateCache
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
