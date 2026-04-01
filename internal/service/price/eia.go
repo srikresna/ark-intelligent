@@ -45,7 +45,32 @@ type EIASeasonalData struct {
 	// Weekly crude production (thousand barrels/day)
 	CrudeProduction []EIAWeeklyObs
 
+	// Weekly natural gas storage (billion cubic feet)
+	NaturalGasStorage []EIAWeeklyObs
+	// Daily Henry Hub natural gas spot price (USD/MMBtu)
+	HenryHubPrice []EIAWeeklyObs
+
 	FetchedAt time.Time
+}
+
+// NaturalGasData holds processed natural gas market data.
+type NaturalGasData struct {
+	// Latest storage level in BCF
+	LatestStorageBCF float64
+	// Week-over-week storage change in BCF
+	WeekOverWeekChange float64
+	// Storage vs 5-year average (percent deviation)
+	StorageVs5YrAvgPct float64
+	// Storage trend: "INJECTION", "WITHDRAWAL", "FLAT"
+	StorageTrend string
+	// Henry Hub latest price USD/MMBtu
+	HenryHubLatest float64
+	// Henry Hub 7-day average
+	HenryHub7dAvg float64
+	// Henry Hub 30-day average
+	HenryHub30dAvg float64
+	// Season context: "INJECTION" (Apr-Oct) or "WITHDRAWAL" (Nov-Mar)
+	SeasonContext string
 }
 
 // EIAWeeklyObs represents a single weekly observation.
@@ -81,13 +106,15 @@ func (c *EIAClient) FetchSeasonalData(ctx context.Context) (*EIASeasonalData, er
 		desc     string
 	}
 
-	// EIA v2 API series IDs for weekly petroleum data
+	// EIA v2 API series IDs for weekly petroleum + natural gas data
 	series := []seriesSpec{
 		{"PET.WCESTUS1.W", &data.CrudeInventory, "crude inventory"},
 		{"PET.WGTSTUS1.W", &data.GasolineInventory, "gasoline inventory"},
 		{"PET.WDISTUS1.W", &data.DistillateInventory, "distillate inventory"},
 		{"PET.WPULEUS3.W", &data.RefineryUtilization, "refinery utilization"},
 		{"PET.WCRFPUS2.W", &data.CrudeProduction, "crude production"},
+		{"NG.NW2_EPG0_SWO_R48_BCF.W", &data.NaturalGasStorage, "natural gas storage"},
+		{"NG.RNGWHHD.D", &data.HenryHubPrice, "henry hub price"},
 	}
 
 	for _, s := range series {
@@ -166,7 +193,7 @@ func ComputeEIAContext(eiaData *EIASeasonalData, currency string, month int) *EI
 
 	// Only applies to energy assets
 	switch currency {
-	case "OIL", "RBOB", "ULSD":
+	case "OIL", "RBOB", "ULSD", "NG", "NATGAS":
 		// continue
 	default:
 		return nil
@@ -183,6 +210,8 @@ func ComputeEIAContext(eiaData *EIASeasonalData, currency string, month int) *EI
 		inventoryObs = eiaData.GasolineInventory
 	case "ULSD":
 		inventoryObs = eiaData.DistillateInventory
+	case "NG", "NATGAS":
+		inventoryObs = eiaData.NaturalGasStorage
 	}
 
 	// Compute average weekly change for this month
@@ -290,10 +319,16 @@ func generateEIAAssessment(currency string, month int, eia *EIAContext) string {
 	monthName := monthNames[month-1]
 	var parts []string
 
+	// Natural gas uses BCF, petroleum uses M bbl
+	unit := "M bbl/wk"
+	if currency == "NG" || currency == "NATGAS" {
+		unit = "BCF/wk"
+	}
+
 	if eia.InventoryTrend == "BUILD" {
-		parts = append(parts, fmt.Sprintf("%s build season in %s (avg %.1fM bbl/wk)", currency, monthName, eia.AvgWeeklyChange))
+		parts = append(parts, fmt.Sprintf("%s build season in %s (avg %.1f %s)", currency, monthName, eia.AvgWeeklyChange, unit))
 	} else if eia.InventoryTrend == "DRAW" {
-		parts = append(parts, fmt.Sprintf("%s draw season in %s (avg %.1fM bbl/wk)", currency, monthName, eia.AvgWeeklyChange))
+		parts = append(parts, fmt.Sprintf("%s draw season in %s (avg %.1f %s)", currency, monthName, eia.AvgWeeklyChange, unit))
 	}
 
 	if eia.RefineryUtil > 0 {
@@ -315,6 +350,97 @@ func generateEIAAssessment(currency string, month int, eia *EIAContext) string {
 	}
 
 	return joinParts(parts)
+}
+
+// ComputeNaturalGasData processes raw EIA natural gas data into actionable metrics.
+func ComputeNaturalGasData(eiaData *EIASeasonalData) *NaturalGasData {
+	if eiaData == nil || len(eiaData.NaturalGasStorage) == 0 {
+		return nil
+	}
+
+	ng := &NaturalGasData{}
+
+	// Storage data (sorted descending — newest first)
+	storage := eiaData.NaturalGasStorage
+	ng.LatestStorageBCF = storage[0].Value
+
+	// Week-over-week change
+	if len(storage) >= 2 {
+		ng.WeekOverWeekChange = storage[0].Value - storage[1].Value
+	}
+
+	// Determine storage trend from last 4 weeks
+	if len(storage) >= 4 {
+		netChange := storage[0].Value - storage[3].Value
+		if netChange > 5 {
+			ng.StorageTrend = "INJECTION"
+		} else if netChange < -5 {
+			ng.StorageTrend = "WITHDRAWAL"
+		} else {
+			ng.StorageTrend = "FLAT"
+		}
+	}
+
+	// Storage vs 5-year average for current week
+	now := time.Now()
+	currentWeek := now.YearDay() / 7
+	currentYear := now.Year()
+
+	var historicalLevels []float64
+	for _, obs := range storage {
+		week := obs.Date.YearDay() / 7
+		year := obs.Date.Year()
+		if week == currentWeek && year < currentYear {
+			historicalLevels = append(historicalLevels, obs.Value)
+		}
+	}
+	if len(historicalLevels) > 0 {
+		sum := 0.0
+		for _, v := range historicalLevels {
+			sum += v
+		}
+		avg := sum / float64(len(historicalLevels))
+		if avg > 0 {
+			ng.StorageVs5YrAvgPct = (ng.LatestStorageBCF - avg) / avg * 100
+		}
+	}
+
+	// Season context: injection (Apr-Oct) or withdrawal (Nov-Mar)
+	month := int(now.Month())
+	if month >= 4 && month <= 10 {
+		ng.SeasonContext = "INJECTION"
+	} else {
+		ng.SeasonContext = "WITHDRAWAL"
+	}
+
+	// Henry Hub price metrics
+	if len(eiaData.HenryHubPrice) > 0 {
+		ng.HenryHubLatest = eiaData.HenryHubPrice[0].Value
+
+		// 7-day average
+		sum7 := 0.0
+		count7 := 0
+		for i := 0; i < len(eiaData.HenryHubPrice) && i < 7; i++ {
+			sum7 += eiaData.HenryHubPrice[i].Value
+			count7++
+		}
+		if count7 > 0 {
+			ng.HenryHub7dAvg = sum7 / float64(count7)
+		}
+
+		// 30-day average
+		sum30 := 0.0
+		count30 := 0
+		for i := 0; i < len(eiaData.HenryHubPrice) && i < 30; i++ {
+			sum30 += eiaData.HenryHubPrice[i].Value
+			count30++
+		}
+		if count30 > 0 {
+			ng.HenryHub30dAvg = sum30 / float64(count30)
+		}
+	}
+
+	return ng
 }
 
 func joinParts(parts []string) string {
