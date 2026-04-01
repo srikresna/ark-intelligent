@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -16,6 +17,7 @@ import (
 const (
 	historicalTVLURL = "https://api.llama.fi/v2/historicalChainTvl"
 	httpTimeout      = 15 * time.Second
+	cacheTTL         = 6 * time.Hour
 )
 
 // tvlPoint represents a single data point from the API.
@@ -34,18 +36,54 @@ type TVLSummary struct {
 	Available bool      // Whether data was successfully retrieved
 }
 
-// FetchHistoricalTVL fetches total DeFi TVL history and computes summary metrics.
-func FetchHistoricalTVL(ctx context.Context) *TVLSummary {
+// package-level cache (protected by cacheMu).
+var (
+	globalCache *TVLSummary    //nolint:gochecknoglobals
+	cacheMu     sync.RWMutex   //nolint:gochecknoglobals
+	httpClient  = &http.Client{Timeout: httpTimeout} //nolint:gochecknoglobals
+)
+
+// GetCachedOrFetch returns cached TVL data if within TTL, otherwise fetches
+// fresh data from DeFiLlama. Gracefully degrades: if fetch fails and a stale
+// cache exists, the stale data is returned rather than nil.
+func GetCachedOrFetch(ctx context.Context) *TVLSummary {
+	cacheMu.RLock()
+	if globalCache != nil && time.Since(globalCache.FetchedAt) < cacheTTL {
+		data := globalCache
+		cacheMu.RUnlock()
+		return data
+	}
+	cacheMu.RUnlock()
+
+	// Fetch fresh data.
+	fresh := fetchHistoricalTVL(ctx)
+
+	cacheMu.Lock()
+	if fresh.Available {
+		globalCache = fresh
+	} else if globalCache != nil {
+		// Return stale cache on failure instead of empty summary.
+		stale := globalCache
+		cacheMu.Unlock()
+		log.Warn().Msg("defillama: fetch failed, returning stale cache")
+		return stale
+	}
+	cacheMu.Unlock()
+
+	return fresh
+}
+
+// fetchHistoricalTVL fetches total DeFi TVL history and computes summary metrics.
+func fetchHistoricalTVL(ctx context.Context) *TVLSummary {
 	result := &TVLSummary{FetchedAt: time.Now()}
 
-	client := &http.Client{Timeout: httpTimeout}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, historicalTVLURL, nil)
 	if err != nil {
 		log.Warn().Err(err).Msg("defillama: failed to create request")
 		return result
 	}
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Warn().Err(err).Msg("defillama: failed to fetch TVL data")
 		return result
@@ -68,7 +106,7 @@ func FetchHistoricalTVL(ctx context.Context) *TVLSummary {
 		return result
 	}
 
-	// Use the last 31 entries (30-day window)
+	// Use the last 31 entries (30-day window).
 	start := 0
 	if len(points) > 31 {
 		start = len(points) - 31
@@ -79,7 +117,7 @@ func FetchHistoricalTVL(ctx context.Context) *TVLSummary {
 	result.Current = latest.TVL
 	result.Available = true
 
-	// Compute 7-day change
+	// Compute 7-day change.
 	if len(recent) > 7 {
 		p7d := recent[len(recent)-8] // ~7 days ago
 		if p7d.TVL > 0 {
@@ -87,7 +125,7 @@ func FetchHistoricalTVL(ctx context.Context) *TVLSummary {
 		}
 	}
 
-	// Compute 30-day change
+	// Compute 30-day change.
 	if len(recent) > 1 {
 		p30d := recent[0] // ~30 days ago
 		if p30d.TVL > 0 {
@@ -95,7 +133,7 @@ func FetchHistoricalTVL(ctx context.Context) *TVLSummary {
 		}
 	}
 
-	// Classify trend based on 7-day change
+	// Classify trend based on 7-day change.
 	switch {
 	case result.Change7D > 5:
 		result.Trend = "EXPANDING"

@@ -10,6 +10,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
@@ -36,6 +37,7 @@ type UnifiedOutlookData struct {
 	BISData            *bis.BISData
 	DeFiLlamaTVL       *defillama.TVLSummary
 	IMFData            *imf.IMFWEOData
+	FedWatchData       *fed.FedWatchData
 	Language           string
 }
 
@@ -247,6 +249,28 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 	}
 
 	// -----------------------------------------------------------------------
+	// Section X: CME FedWatch Implied Rate Probabilities
+	// -----------------------------------------------------------------------
+	if data.FedWatchData != nil && data.FedWatchData.Available {
+		b.WriteString(fmt.Sprintf("=== %d. CME FEDWATCH IMPLIED PROBABILITIES ===\n", section))
+		section++
+		fw := data.FedWatchData
+		b.WriteString(fmt.Sprintf("Next FOMC Meeting: %s\n", fw.NextMeetingDate))
+		b.WriteString(fmt.Sprintf("Probabilities: Hold=%.1f%% Cut25=%.1f%% Cut50+=%.1f%% Hike25=%.1f%%\n",
+			fw.HoldProbability, fw.Cut25Probability, fw.Cut50Probability, fw.Hike25Probability))
+		if fw.ImpliedYearEndRate > 0 {
+			b.WriteString(fmt.Sprintf("Market-Implied Year-End Rate: %.2f%%\n", fw.ImpliedYearEndRate))
+		}
+		if fw.MeetingCount > 0 {
+			b.WriteString(fmt.Sprintf("Remaining FOMC Meetings (to Dec): %d\n", fw.MeetingCount))
+		}
+		b.WriteString(fmt.Sprintf("Dominant Outcome: %s\n", fed.DominantOutcome(fw)))
+		b.WriteString("This is what the market is PRICING — discrepancies between FedWatch and actual Fed rhetoric create USD trade opportunities.\n")
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+
 	// Section X: Macro Composite Scores
 	// -----------------------------------------------------------------------
 	if data.MacroComposites != nil {

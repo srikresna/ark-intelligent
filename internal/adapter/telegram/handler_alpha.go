@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/factors"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
 )
@@ -305,7 +306,7 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		txt := alphaExplainHeader("⚡ Crypto Microstructure Alpha",
 			"Analisis microstructure dari orderbook dan funding rate. Konfirmasi = sinyal searah dengan flow.")
 		if len(state.crypto) > 0 {
-			txt += formatCryptoAlpha(state.crypto, state.cryptoSyms)
+			txt += formatCryptoAlpha(state.crypto, state.cryptoSyms, nil)
 		} else {
 			txt += "⚠️ No microstructure data available."
 		}
@@ -324,11 +325,11 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 				"Analisis microstructure dari orderbook dan funding rate. Konfirmasi = sinyal searah dengan flow.")
 			// Try from cache first
 			if sig, ok := state.crypto[sym]; ok {
-				txt += formatCryptoAlpha(map[string]*microstructure.Signal{sym: sig}, []string{sym})
+				txt += formatCryptoAlpha(map[string]*microstructure.Signal{sym: sig}, []string{sym}, nil)
 			} else if h.alpha.MicroEngine != nil {
 				// Fetch single symbol
 				results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", []string{sym})
-				txt += formatCryptoAlpha(results, []string{sym})
+				txt += formatCryptoAlpha(results, []string{sym}, nil)
 			} else {
 				txt += "⚠️ No data for " + sym
 			}
@@ -687,7 +688,8 @@ func (h *Handler) cmdCryptoAlpha(ctx context.Context, chatID string, _ int64, ar
 	}
 
 	results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", symbols)
-	_, err := h.bot.SendHTML(ctx, chatID, formatCryptoAlpha(results, symbols))
+	tvl := defillama.GetCachedOrFetch(ctx)
+	_, err := h.bot.SendHTML(ctx, chatID, formatCryptoAlpha(results, symbols, tvl))
 	return err
 }
 
@@ -967,7 +969,7 @@ Aset Terdampak: %s
 		affected)
 }
 
-func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []string) string {
+func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []string, tvl *defillama.TVLSummary) string {
 	if len(results) == 0 {
 		return "⚠️ Tidak ada data microstructure."
 	}
@@ -979,6 +981,19 @@ func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []stri
 	var sb strings.Builder
 	sb.WriteString("<b>⚡ Crypto Microstructure Alpha</b>\n")
 	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", time.Now().UTC().Format("02 Jan 15:04")))
+
+	// DeFi TVL context from DeFiLlama (graceful skip if unavailable)
+	if tvl != nil && tvl.Available {
+		trendEmoji := "➡️"
+		switch tvl.Trend {
+		case "EXPANDING":
+			trendEmoji = "📈"
+		case "CONTRACTING":
+			trendEmoji = "📉"
+		}
+		sb.WriteString(fmt.Sprintf("🏗️ DeFi TVL: %s (%+.1f%% 7d) — %s %s\n\n",
+			defillama.FormatTVLBillions(tvl.Current), tvl.Change7D, tvl.Trend, trendEmoji))
+	}
 
 	for _, sym := range sorted {
 		sig, ok := results[sym]
