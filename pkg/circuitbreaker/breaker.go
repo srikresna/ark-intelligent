@@ -78,10 +78,11 @@ func New(name string, maxFailures int, resetTimeout time.Duration) *Breaker {
 // Returns ErrCircuitOpen if the breaker is open.
 // On success, resets failure count. On failure, increments failure count.
 func (b *Breaker) Execute(fn func() error) error {
-	if !b.allowRequest() {
-		return fmt.Errorf("%s: %w (failures=%d, retry after %v)",
-			b.name, ErrCircuitOpen, b.failures,
-			b.resetTimeout-time.Since(b.lastFailure))
+	allowed, failures, retryAfter := b.checkRequest()
+	if !allowed {
+		return fmt.Errorf("%s: %w (failures=%d, retry after ~%ds)",
+			b.name, ErrCircuitOpen, failures,
+			int(retryAfter.Seconds()))
 	}
 
 	err := fn()
@@ -126,20 +127,26 @@ func (b *Breaker) Reset() {
 	}
 }
 
-// allowRequest checks if a request should be allowed through.
-func (b *Breaker) allowRequest() bool {
+// checkRequest checks if a request should be allowed through.
+// Returns the allow decision plus a snapshot of failure count and retry duration
+// (all read under the same lock to avoid races).
+func (b *Breaker) checkRequest() (allowed bool, failures int, retryAfter time.Duration) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	switch b.currentState() {
 	case Closed:
-		return true
+		return true, b.failures, 0
 	case HalfOpen:
-		return true // allow one probe
+		return true, b.failures, 0 // allow one probe
 	case Open:
-		return false
+		remaining := b.resetTimeout - time.Since(b.lastFailure)
+		if remaining < 0 {
+			remaining = 0
+		}
+		return false, b.failures, remaining
 	}
-	return true
+	return true, b.failures, 0
 }
 
 // currentState returns the effective state, handling Open→HalfOpen timeout transition.

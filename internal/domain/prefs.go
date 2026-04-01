@@ -96,9 +96,8 @@ type UserPrefs struct {
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
-	// DefaultTimeframe: preferred analysis timeframe when not specified.
-	// Valid: "daily" (default), "4h", "1h", "30m", "15m", "weekly".
-	DefaultTimeframe string `json:"default_timeframe,omitempty"`
+	// PinnedCommands stores user-customized pinned command shortcuts.
+	PinnedCommands []string `json:"pinned_commands,omitempty"`
 
 	// ExperienceLevel: user's self-reported trading experience.
 	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).

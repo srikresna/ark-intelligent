@@ -151,6 +151,25 @@ type TASignal struct {
 // Converter Functions
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// WyckoffSummary — lightweight Wyckoff result for embedding in FullResult.
+// Avoids circular import with the wyckoff package.
+// The caller (handler) converts wyckoff.WyckoffResult → WyckoffSummary.
+// ---------------------------------------------------------------------------
+
+// WyckoffSummary captures key Wyckoff analysis data without depending on the
+// wyckoff package (which imports ta).
+type WyckoffSummary struct {
+	Schematic     string     // "ACCUMULATION" | "DISTRIBUTION" | "UNKNOWN"
+	CurrentPhase  string     // "A", "B", "C", "D", "E", "UNDEFINED"
+	Confidence    string     // "HIGH", "MEDIUM", "LOW"
+	TradingRange  [2]float64 // [support, resistance]
+	CauseBuilt    float64    // composite cause energy score (0–100)
+	ProjectedMove float64    // estimated breakout magnitude in price units
+	Summary       string     // narrative summary ≤ 300 chars
+}
+
 // DailyPricesToOHLCV converts a slice of domain.DailyPrice to []OHLCV.
 // Both input and output are newest-first (index 0 = most recent).
 func DailyPricesToOHLCV(prices []domain.DailyPrice) []OHLCV {

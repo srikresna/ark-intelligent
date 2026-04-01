@@ -14,11 +14,12 @@ type Instrument struct {
 
 // BookSummary holds open-interest and volume data for a single instrument.
 type BookSummary struct {
-	InstrumentName string  `json:"instrument_name"`
-	OpenInterest   float64 `json:"open_interest"`
-	Volume         float64 `json:"volume"`
-	MarkPrice      float64 `json:"mark_price"`
+	InstrumentName  string  `json:"instrument_name"`
+	OpenInterest    float64 `json:"open_interest"`
+	Volume          float64 `json:"volume"`
+	MarkPrice       float64 `json:"mark_price"`
 	UnderlyingPrice float64 `json:"underlying_price"`
+	ExpirationTS    int64   `json:"expiration_timestamp"` // milliseconds, 0 if absent
 }
 
 // Ticker holds per-instrument Greeks and mark data.

@@ -7,13 +7,13 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
-	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -533,6 +533,38 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString("  - Central banks (BIS, IMF) watch REER for FX intervention thresholds\n")
 			b.WriteString("\n")
 		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 12: IMF WEO Forward-Looking Forecasts
+	// -----------------------------------------------------------------------
+	if data.IMFData != nil && data.IMFData.Available {
+		section++ //nolint:ineffassign // used if more sections follow
+		b.WriteString(fmt.Sprintf("=== %d. IMF WEO FORWARD-LOOKING FORECASTS ===\n", section))
+		b.WriteString("Source: IMF World Economic Outlook DataMapper (forward-looking, updated 2×/year)\n")
+		b.WriteString("Columns: Currency | GDP Growth (forecast)% | GDP Growth (next yr)% | CPI Inflation% | Current Account (%GDP)\n\n")
+		for _, c := range data.IMFData.Countries {
+			if !c.Available {
+				continue
+			}
+			b.WriteString(fmt.Sprintf("  %-3s: GDP=%+.1f%%/%+.1f%% CPI=%.1f%% CA=%+.1f%%GDP\n",
+				c.Currency, c.GDPGrowth, c.GDPGrowthNext, c.Inflation, c.CurrentAccount))
+		}
+		b.WriteString("\n")
+		if insight := imf.BuildPromptSection(data.IMFData); insight != "" {
+			// Extract just the insight line (2nd line)
+			lines := strings.Split(strings.TrimSpace(insight), "\n")
+			for _, l := range lines {
+				if strings.HasPrefix(l, "→") {
+					b.WriteString(l + "\n")
+				}
+			}
+		}
+		b.WriteString("\nNOTE: IMF forecasts reflect structural macro divergence:\n")
+		b.WriteString("  - Higher GDP growth → currency structural tailwind vs lower-growth peers\n")
+		b.WriteString("  - Current account surplus → persistent currency demand, structural support\n")
+		b.WriteString("  - These are FORWARD LOOKING (unlike World Bank historical data above)\n")
+		b.WriteString("\n")
 	}
 
 	// -----------------------------------------------------------------------

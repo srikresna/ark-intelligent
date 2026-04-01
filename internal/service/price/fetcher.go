@@ -15,6 +15,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -41,9 +42,7 @@ type Fetcher struct {
 // Both keys are optional — Yahoo Finance fallback requires no key.
 func NewFetcher(twelveDataKeys []string, avKeys []string) *Fetcher {
 	return &Fetcher{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		httpClient: httpclient.NewClient(30 * time.Second),
 		twelveDataKeys: twelveDataKeys,
 		avKeys:         avKeys,
 		cbTwelveData:   circuitbreaker.New("twelve-data", 3, 5*time.Minute),

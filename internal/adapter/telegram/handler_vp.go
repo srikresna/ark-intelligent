@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"bytes"
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
@@ -368,24 +369,31 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 	}
 
 	// Send chart photo
+	chartSent := false
 	if result.ChartPath != "" {
 		chartData, readErr := os.ReadFile(result.ChartPath)
 		if readErr == nil && len(chartData) > 0 {
 			caption := fmt.Sprintf("📊 VP %s — %s — %s",
 				strings.ToUpper(mode), html.EscapeString(state.symbol), tf)
 			_, _ = h.bot.SendPhoto(ctx, chatID, chartData, caption)
+			chartSent = true
 			_ = os.Remove(result.ChartPath)
-		} else if readErr != nil {
-			log.Warn().Err(readErr).Str("chart_path", result.ChartPath).
-				Str("symbol", state.symbol).Str("timeframe", tf).
-				Msg("vp: chart file unreadable")
+		} else {
+			if readErr != nil {
+				log.Error().Err(readErr).Str("symbol", state.symbol).Str("timeframe", tf).Str("mode", mode).Msg("VP chart read failed, falling back to text")
+			}
+			_ = os.Remove(result.ChartPath)
 		}
 	}
 
-	// Send text with keyboard
+	// Send text with keyboard — prepend chart failure notice if chart was expected but not sent
 	textToSend := result.TextOutput
 	if textToSend == "" {
 		textToSend = fmt.Sprintf("📊 Volume Profile: %s — %s\n(No output)", state.symbol, tf)
+	}
+	if result.ChartPath != "" && !chartSent {
+		fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
+		textToSend = fallbackNotice + textToSend
 	}
 	_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, textToSend, h.kb.VPMenu())
 	return sendErr
@@ -435,10 +443,14 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), "MPLBACKEND=Agg")
 
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("VP engine subprocess failed")
 		os.Remove(chartPath) // cleanup chart on failure
 		os.Remove(outputPath)
 		return nil, fmt.Errorf("VP engine failed: %w", err)
@@ -447,23 +459,25 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	resultJSON, err := os.ReadFile(outputPath)
 	os.Remove(outputPath)
 	if err != nil {
-		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("read output: %w", err)
 	}
 
 	var result vpEngineResult
 	if err := json.Unmarshal(resultJSON, &result); err != nil {
-		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("unmarshal output: %w", err)
 	}
 
 	if !result.Success {
-		os.Remove(chartPath) // cleanup chart on failure
 		return &result, fmt.Errorf("%s", result.Error)
 	}
 
-	if _, statErr := os.Stat(chartPath); statErr == nil {
-		result.ChartPath = chartPath
+	if fi, statErr := os.Stat(chartPath); statErr == nil {
+		if fi.Size() > 0 {
+			result.ChartPath = chartPath
+		} else {
+			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
+			os.Remove(chartPath)
+		}
 	}
 
 	return &result, nil

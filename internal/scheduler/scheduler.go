@@ -101,8 +101,12 @@ type Scheduler struct {
 	wg           sync.WaitGroup
 	running      bool
 	mu           sync.Mutex      // lifecycle mutex (Start/Stop)
-	fredMu       sync.Mutex      // protects lastFREDData
-	lastFREDData *fred.MacroData // previous FRED snapshot for alert diffing
+	fredMu          sync.Mutex      // protects lastFREDData + lastFREDBroadcast
+	lastFREDData    *fred.MacroData // previous FRED snapshot for alert diffing
+	lastFREDBroadcast time.Time    // last time FRED alerts were broadcast (dedup guard)
+
+	cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
+	lastCOTBroadcast time.Time  // last date successfully broadcast to prevent duplicates
 }
 
 // New creates a new Scheduler.
@@ -328,6 +332,16 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 
 // broadcastCOTRelease sends a notification to all active users when new data is available.
 func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, analyses []domain.COTAnalysis) {
+	// Dedup guard: prevent duplicate broadcasts for the same report date.
+	s.cotBroadcastMu.Lock()
+	if !date.After(s.lastCOTBroadcast) {
+		s.cotBroadcastMu.Unlock()
+		log.Debug().Str("date", date.Format("2006-01-02")).Msg("COT broadcast skipped — already sent for this date")
+		return
+	}
+	s.lastCOTBroadcast = date
+	s.cotBroadcastMu.Unlock()
+
 	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get active users for broadcast")
@@ -522,6 +536,17 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 	if len(alerts) == 0 {
 		return nil
 	}
+
+	// Dedup guard: prevent duplicate FRED broadcasts within a 10-minute window.
+	// (Handles edge case where concurrent job triggers fire before snapshot swap commits.)
+	s.fredMu.Lock()
+	if time.Since(s.lastFREDBroadcast) < 10*time.Minute {
+		s.fredMu.Unlock()
+		log.Debug().Msg("FRED broadcast skipped — already sent within dedup window")
+		return nil
+	}
+	s.lastFREDBroadcast = time.Now()
+	s.fredMu.Unlock()
 
 	log.Info().Int("alerts", len(alerts)).Msg("FRED alerts detected")
 

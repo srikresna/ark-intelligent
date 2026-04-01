@@ -2,13 +2,13 @@ package telegram
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // compile-time interface check
@@ -51,9 +51,7 @@ func NewBot(token, defaultChatID string) *Bot {
 		defaultID: defaultChatID,
 		ownerID:   ownerID,
 		apiBase:   fmt.Sprintf("https://api.telegram.org/bot%s", token),
-		httpClient: &http.Client{
-			Timeout: 60 * time.Second, // long-polling timeout + buffer
-		},
+		httpClient: httpclient.NewClient(60 * time.Second), // long-polling timeout + buffer
 		commands:    make(map[string]CommandHandler),
 		callbacks:   make(map[string]CallbackHandler),
 		userLimiter: newUserRateLimiter(),

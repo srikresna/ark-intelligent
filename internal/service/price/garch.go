@@ -180,8 +180,15 @@ func estimateGARCHFromReturns(returns []float64) (*GARCHResult, error) {
 	forecastVar1 := omega + alpha*lastReturn*lastReturn + beta*currentVar
 
 	// Multi-step ahead forecast (mean-reverting to long-run variance)
-	longRunVar := omega / (1 - alpha - beta)
+	// Guard: near unit root (alpha+beta ≈ 1) makes denominator near-zero → Inf
 	persistence := alpha + beta
+	longRunVar := 0.0
+	if denom := 1 - persistence; math.Abs(denom) > 1e-9 {
+		longRunVar = omega / denom
+		if math.IsNaN(longRunVar) || math.IsInf(longRunVar, 0) || longRunVar < 0 {
+			longRunVar = 0
+		}
+	}
 
 	// 5-step ahead variance forecast (variance at step 5, not cumulative)
 	forecastVar5 := forecastVar1
@@ -194,6 +201,9 @@ func estimateGARCHFromReturns(returns []float64) (*GARCHResult, error) {
 	volRatio := 0.0
 	if longRunVol > 0 {
 		volRatio = currentVol / longRunVol
+		if math.IsNaN(volRatio) || math.IsInf(volRatio, 0) {
+			volRatio = 0
+		}
 	}
 
 	// Classify forecast direction
@@ -282,6 +292,9 @@ func GARCHConfidenceMultiplier(g *GARCHResult) float64 {
 	forecastRatio := g.VolRatio
 	if g.LongRunVol > 0 {
 		forecastRatio = g.ForecastVol1 / g.LongRunVol
+		if math.IsNaN(forecastRatio) || math.IsInf(forecastRatio, 0) {
+			forecastRatio = 1.0
+		}
 	}
 
 	switch {
