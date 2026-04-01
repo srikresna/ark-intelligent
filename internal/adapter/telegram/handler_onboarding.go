@@ -191,6 +191,7 @@ func (h *Handler) cbOnboard(ctx context.Context, chatID string, msgID int, userI
 	// Persist experience level
 	prefs, _ := h.prefsRepo.Get(ctx, userID)
 	prefs.ExperienceLevel = level
+	prefs.OnboardingStep = 1 // Step 1: role chosen
 	_ = h.prefsRepo.Set(ctx, userID, prefs)
 
 	// Delete the role selector message

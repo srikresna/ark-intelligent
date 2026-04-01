@@ -286,7 +286,10 @@ func NewHandler(
 	bot.RegisterCallback("share:", h.cbShare)
 	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
 
-	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
+	// Onboarding completion tracking (TASK-204)
+	h.registerOnboardingProgress()
+
+	log.Info().Int("commands", 48).Int("callbacks", 11).Msg("registered commands and callback prefixes")
 	return h
 }
 // ---------------------------------------------------------------------------
