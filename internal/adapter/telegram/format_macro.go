@@ -1242,6 +1242,31 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		case "RISK_ON_COMPLACENT":
 			b.WriteString("<i>Steep contango — pasar complacent, VIX ETPs merugi. Bullish ekuitas tapi waspada pembalikan mendadak.</i>\n")
 		}
+		// --- MOVE Index (bond volatility) ---
+		if data.MOVEAvailable {
+			b.WriteString("\n<b>MOVE Index (Bond Vol)</b>\n")
+			b.WriteString(fmt.Sprintf("<code>MOVE  : %.1f (%+.1f%%)</code>\n", data.MOVELevel, data.MOVEChangePct))
+			if data.VIXMOVERatio > 0 {
+				var ratioEmoji string
+				switch {
+				case data.VIXMOVERatio > 0.35:
+					ratioEmoji = "📈" // equity vol elevated
+				case data.VIXMOVERatio < 0.12:
+					ratioEmoji = "📉" // bond vol elevated
+				default:
+					ratioEmoji = "↔️"
+				}
+				b.WriteString(fmt.Sprintf("<code>VIX/MOVE: %.3f %s</code>\n", data.VIXMOVERatio, ratioEmoji))
+			}
+			switch data.MOVEDivergence {
+			case "EQUITY_FEAR":
+				b.WriteString("<i>VIX tinggi vs MOVE rendah — ketakutan spesifik ekuitas, bukan sistemik.</i>\n")
+			case "BOND_STRESS":
+				b.WriteString("<i>MOVE tinggi vs VIX rendah — stres obligasi / risiko carry FX.</i>\n")
+			case "SYSTEMIC_STRESS":
+				b.WriteString("<i>VIX dan MOVE keduanya tinggi — stres sistemik luas.</i>\n")
+			}
+		}
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}

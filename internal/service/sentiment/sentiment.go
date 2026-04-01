@@ -133,6 +133,14 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		data.VIXSlopePct = ts.SlopePct
 		data.VIXRegime = ts.Regime
 		data.VIXAvailable = true
+		// MOVE index (bond volatility)
+		if ts.MOVE != nil && ts.MOVE.Available {
+			data.MOVELevel = ts.MOVE.Level
+			data.MOVEChangePct = ts.MOVE.DailyChangePct
+			data.VIXMOVERatio = ts.MOVE.VIXMOVERatio
+			data.MOVEDivergence = ts.MOVE.Divergence
+			data.MOVEAvailable = true
+		}
 		return nil
 	}); err != nil {
 		log.Debug().Str("source", "vix").Err(err).Msg("sentiment: VIX circuit breaker rejected or source unavailable")
@@ -195,6 +203,13 @@ type SentimentData struct {
 	VIXSlopePct  float64 // (M2-M1)/M1 * 100
 	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
 	VIXAvailable bool
+
+	// MOVE Index (bond volatility)
+	MOVELevel      float64 // ICE BofA MOVE index level
+	MOVEChangePct  float64 // Daily change %
+	VIXMOVERatio   float64 // VIX/MOVE — normal 0.15-0.30
+	MOVEDivergence string  // "EQUITY_FEAR", "BOND_STRESS", "SYSTEMIC_STRESS", "ALIGNED"
+	MOVEAvailable  bool
 
 	// Myfxbook Retail Positioning (Firecrawl)
 	MyfxbookPairs     []MyfxbookPairSentiment
