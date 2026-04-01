@@ -15,6 +15,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/pkg/format"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -393,14 +394,14 @@ func (f *Formatter) FormatCOTOverview(analyses []domain.COTAnalysis, convictions
 			// Line 2: Net | Idx | Conv (if available)
 			if cs, ok := convMap[a.Contract.Currency]; ok {
 				b.WriteString(fmt.Sprintf("<code>  Net:%-10s Idx:%.0f%% (%s)</code>\n",
-					fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex, idxLbl))
+					format.FormatInt(int64(a.NetPosition)), a.COTIndex, idxLbl))
 				b.WriteString(fmt.Sprintf("<code>  Chg:%-10s Mom:%-10s Conv:%s</code>\n",
 					fmtutil.FmtNumSigned(a.NetChange, 0),
 					f.momentumLabel(a.MomentumDir),
 					convictionMiniBar(cs.Score, cs.Direction)))
 			} else {
 				b.WriteString(fmt.Sprintf("<code>  Net:%-10s Idx:%.0f%% (%s)</code>\n",
-					fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex, idxLbl))
+					format.FormatInt(int64(a.NetPosition)), a.COTIndex, idxLbl))
 				b.WriteString(fmt.Sprintf("<code>  Chg:%-10s Mom:%s</code>\n",
 					fmtutil.FmtNumSigned(a.NetChange, 0),
 					f.momentumLabel(a.MomentumDir)))
@@ -427,7 +428,7 @@ func (f *Formatter) FormatCOTOverview(analyses []domain.COTAnalysis, convictions
 			}
 			b.WriteString(fmt.Sprintf("<b>%s</b> %s\n", a.Contract.Name, bias))
 			b.WriteString(fmt.Sprintf("<code>  Net: %s | Idx: %.0f%%</code>\n\n",
-				fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex))
+				format.FormatInt(int64(a.NetPosition)), a.COTIndex))
 		}
 	}
 
@@ -489,7 +490,7 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 
 	// Positioning
 	b.WriteString(fmt.Sprintf("<b>%s (Smart Money):</b>\n", smartMoneyLabel))
-	b.WriteString(fmt.Sprintf("<code>  Net Position:   %s</code>\n", fmtutil.FmtNumSigned(a.NetPosition, 0)))
+	b.WriteString(fmt.Sprintf("<code>  Net Position:   %s</code>\n", format.FormatNetPosition(int64(a.NetPosition))))
 	b.WriteString(fmt.Sprintf("<code>  Net Change:     %s</code>\n", fmtutil.FmtNumSigned(a.NetChange, 0)))
 	if a.LongShortRatio >= 999 {
 		b.WriteString("<code>  L/S Ratio:      ∞ (no shorts reported)</code>\n")
