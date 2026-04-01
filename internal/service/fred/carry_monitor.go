@@ -2,6 +2,7 @@ package fred
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"sync"
@@ -92,6 +93,52 @@ func (m *CarryMonitor) FetchCarryDashboard(ctx context.Context) (*domain.CarryMo
 	}
 
 	return result, nil
+}
+
+// CheckCarryAlerts compares two CarryMonitorResult snapshots and returns alerts
+// if the carry unwind risk has escalated.
+func CheckCarryAlerts(current, previous *domain.CarryMonitorResult) []MacroAlert {
+	if current == nil || previous == nil {
+		return nil
+	}
+
+	var alerts []MacroAlert
+
+	// Escalation: NORMAL → NARROWING
+	if previous.Risk == domain.UnwindNormal && current.Risk == domain.UnwindNarrow {
+		alerts = append(alerts, MacroAlert{
+			Type:  AlertCarryNarrowing,
+			Title: "⚠️ Carry Trade Spreads NARROWING",
+			Description: fmt.Sprintf(
+				"Carry spread range compressing: %.0fbps → %.0fbps (%.1f%% change). "+
+					"Best carry: %s, Worst: %s. "+
+					"Early warning — monitor for further compression.",
+				previous.SpreadRange, current.SpreadRange, current.RangeChange,
+				current.BestCarry, current.WorstCarry),
+			Severity: "MEDIUM",
+			Value:    current.SpreadRange,
+			Previous: previous.SpreadRange,
+		})
+	}
+
+	// Escalation to UNWIND (from any previous state)
+	if current.Risk == domain.UnwindAlert && previous.Risk != domain.UnwindAlert {
+		alerts = append(alerts, MacroAlert{
+			Type:  AlertCarryUnwind,
+			Title: "🔴 Carry Trade UNWIND Alert",
+			Description: fmt.Sprintf(
+				"Carry spread range collapsed: %.0fbps → %.0fbps (%.1f%% change). "+
+					"Best carry: %s, Worst: %s. "+
+					"Carry unwind in progress — expect JPY/CHF strengthening, EM currency stress.",
+				previous.SpreadRange, current.SpreadRange, current.RangeChange,
+				current.BestCarry, current.WorstCarry),
+			Severity: "HIGH",
+			Value:    current.SpreadRange,
+			Previous: previous.SpreadRange,
+		})
+	}
+
+	return alerts
 }
 
 // computeSpreadRange returns the difference between the highest and lowest carry spreads.

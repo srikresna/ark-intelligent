@@ -29,6 +29,8 @@ const (
 	AlertSKEWVIXExtreme    AlertType = "SKEW_VIX_EXTREME"     // SKEW/VIX ratio crosses extreme threshold
 	AlertSKEWVIXElevated   AlertType = "SKEW_VIX_ELEVATED"    // SKEW/VIX ratio crosses elevated threshold
 	AlertSKEWVIXNormal     AlertType = "SKEW_VIX_NORMAL"      // SKEW/VIX ratio returns to normal
+	AlertCarryUnwind       AlertType = "CARRY_UNWIND"         // Carry spread range collapses >30% — unwind alert
+	AlertCarryNarrowing    AlertType = "CARRY_NARROWING"      // Carry spread range compressing >15% — early warning
 )
 
 // MacroAlert represents a single triggered macro regime change event.

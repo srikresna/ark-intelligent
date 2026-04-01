@@ -109,6 +109,10 @@ type Scheduler struct {
 	regimeMu         sync.RWMutex // protects regimeEngine access
 		cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
 	lastCOTBroadcast time.Time  // last date successfully broadcast to prevent duplicates
+
+	carryMu          sync.Mutex               // protects lastCarryResult + lastCarryBroadcast
+	lastCarryResult  *domain.CarryMonitorResult // previous carry snapshot for alert diffing
+	lastCarryBroadcast time.Time               // last time carry alerts were broadcast (dedup guard)
 }
 
 // New creates a new Scheduler.
@@ -145,10 +149,13 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// FRED alert monitor (checks every hour for regime changes)
 	s.startJob(ctx, "fred-alerts", 1*time.Hour, s.jobFREDAlerts)
 
+	// Carry trade unwind monitor (checks every 4 hours)
+	s.startJob(ctx, "carry-alerts", 4*time.Hour, s.jobCarryAlerts)
+
 	// Data retention cleanup (runs daily at 03:00 WIB)
 	s.startJob(ctx, "retention-cleanup", 1*time.Hour, s.jobRetentionCleanup)
 
-	jobCount := 4
+	jobCount := 5
 
 	// Price fetch (if price fetcher is configured)
 	if s.deps.PriceFetcher != nil && s.deps.PriceRepo != nil {
@@ -640,6 +647,73 @@ func formatStrongSignalAlert(signals []cotsvc.Signal) string {
 	}
 	b.WriteString("<i>Use /bias for full bias list</i>")
 	return b.String()
+}
+
+// jobCarryAlerts checks for carry trade unwind events and broadcasts alerts to subscribed users.
+// Runs every 4 hours. Compares the freshly fetched CarryMonitorResult against the previous snapshot.
+func (s *Scheduler) jobCarryAlerts(ctx context.Context) error {
+	monitor := fred.GetCarryMonitor()
+	current, err := monitor.FetchCarryDashboard(ctx)
+	if err != nil {
+		return fmt.Errorf("carry dashboard fetch for alerts: %w", err)
+	}
+
+	s.carryMu.Lock()
+	previous := s.lastCarryResult
+	s.lastCarryResult = current
+	s.carryMu.Unlock()
+
+	alerts := fred.CheckCarryAlerts(current, previous)
+	if len(alerts) == 0 {
+		return nil
+	}
+
+	// Dedup guard: prevent duplicate carry broadcasts within a 10-minute window.
+	s.carryMu.Lock()
+	if time.Since(s.lastCarryBroadcast) < 10*time.Minute {
+		s.carryMu.Unlock()
+		log.Debug().Msg("carry broadcast skipped — already sent within dedup window")
+		return nil
+	}
+	s.lastCarryBroadcast = time.Now()
+	s.carryMu.Unlock()
+
+	log.Info().Int("alerts", len(alerts)).Msg("carry alerts detected")
+
+	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
+	if err != nil {
+		return fmt.Errorf("get active users for carry alerts: %w", err)
+	}
+
+	carryAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "💱 Lihat Carry", CallbackData: "cmd:carry"},
+			{Text: "🔕 Matikan Alert", CallbackData: "alert:off:fred"},
+		},
+	}}
+
+	for _, alert := range alerts {
+		msg := fred.FormatMacroAlert(alert)
+		count := 0
+		for userID, prefs := range activeUsers {
+			if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
+				continue
+			}
+			if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
+				continue
+			}
+			if s.deps.FREDAlertCheck != nil && !s.deps.FREDAlertCheck(ctx, userID) {
+				continue
+			}
+			if _, sendErr := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, carryAlertKB); sendErr == nil {
+				count++
+			}
+			time.Sleep(config.TelegramFloodDelay)
+		}
+		log.Info().Str("alert_type", string(alert.Type)).Int("users", count).Msg("carry alert sent")
+	}
+
+	return nil
 }
 
 // jobRetentionCleanup deletes expired data once per day at 03:00 WIB.
