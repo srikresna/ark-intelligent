@@ -414,6 +414,9 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 				}
 			}
 		}
+
+		// Additional per-category Z-scores (Dealer, LevFund, ManagedMoney, SwapDealer)
+		computeAllCategoryZScores(&analysis, history)
 	}
 
 	// 12-14. Individual trader signals

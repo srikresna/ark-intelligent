@@ -126,6 +126,19 @@ type Handler struct {
 	// May be nil — /ict command disabled if not configured.
 	ict      *ICTServices
 	ictCache *ictStateCache
+
+	// smc holds optional SMC analysis engine services.
+	// May be nil — /smc command disabled if not configured.
+	smc      *SMCServices
+	smcCache *smcStateCache
+
+	// gex holds the GEX engine for /gex command.
+	// May be nil — /gex command disabled if not configured.
+	gex *GEXServices
+
+	// wyckoff holds optional Wyckoff analysis engine services.
+	// May be nil — /wyckoff command disabled if not configured.
+	wyckoff *WyckoffServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
@@ -205,6 +218,20 @@ func NewHandler(
 	bot.RegisterCommand("/ban", h.cmdBan)
 	bot.RegisterCommand("/unban", h.cmdUnban)
 
+	// Short aliases for power users (mobile-friendly)
+	bot.RegisterCommand("/c", h.cmdCOT)
+	bot.RegisterCommand("/cal", h.cmdCalendar)
+	bot.RegisterCommand("/out", h.cmdOutlook)
+	bot.RegisterCommand("/m", h.cmdMacro)
+	bot.RegisterCommand("/b", h.cmdBias)
+	bot.RegisterCommand("/q", h.cmdQuant)
+	bot.RegisterCommand("/bt", h.cmdBacktest)
+	bot.RegisterCommand("/r", h.cmdRank)
+	bot.RegisterCommand("/s", h.cmdSentiment)
+	bot.RegisterCommand("/p", h.cmdPrice)
+	bot.RegisterCommand("/l", h.cmdLevels)
+
+
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
@@ -219,7 +246,7 @@ func NewHandler(
 	bot.RegisterCallback("nav:", h.cbNav)
 	bot.RegisterCallback("help:", h.cbHelp)
 
-	log.Info().Int("commands", 37).Int("callbacks", 10).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
 	return h
 }
 
@@ -394,6 +421,8 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /ctabt — Backtest Classical TA · <code>/ctabt EUR</code> · <code>/ctabt EUR 4h</code>
 /quant — Econometric analysis · <code>/quant EUR</code> · <code>/quant XAU 4h</code>
 /vp — Volume Profile institutional · <code>/vp EUR</code> · <code>/vp XAU 4h</code>
+/ict — ICT/SMC Smart Money Concepts · <code>/ict EURUSD</code> · <code>/ict XAUUSD H4</code>
+/gex — Gamma Exposure (crypto options) · <code>/gex BTC</code> · <code>/gex ETH</code>
 /backtest — Backtest dashboard (17 sub-views)
 /accuracy — Win rate summary
 /report — Weekly signal performance`
@@ -539,6 +568,7 @@ func (h *Handler) cmdCOT(ctx context.Context, chatID string, userID int64, args 
 		}
 
 		if code != "" {
+			h.saveLastCurrency(ctx, userID, code)
 			contractCode := currencyToContractCode(code)
 			return h.sendCOTDetail(ctx, chatID, contractCode, code, isRaw, 0)
 		}
@@ -1215,8 +1245,12 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 // ---------------------------------------------------------------------------
 
 func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args string) error {
+	loadingID, _ := h.bot.SendHTML(ctx, chatID, "🎯 Mendeteksi directional bias... ⏳")
 	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 	if err != nil || len(analyses) == 0 {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err = h.bot.SendHTML(ctx, chatID, "No COT data available for bias detection.")
 		return err
 	}
@@ -1261,6 +1295,9 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 	}
 
 	html := h.fmt.FormatBiasHTML(signals, filterCurrency)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, html)
 	return err
 }
@@ -1606,6 +1643,31 @@ func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID in
 	}
 }
 
+
+// saveLastCurrency persists the user's last viewed currency for context carry-over.
+func (h *Handler) saveLastCurrency(ctx context.Context, userID int64, currency string) {
+	if currency == "" {
+		return
+	}
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	prefs.LastCurrency = strings.ToUpper(currency)
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+}
+
+// getLastCurrency returns the user's last viewed currency, or empty string.
+func (h *Handler) getLastCurrency(ctx context.Context, userID int64) string {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	return prefs.LastCurrency
+}
+
+// resolveOrLastCurrency returns the given currency if non-empty, otherwise the user's last currency.
+func (h *Handler) resolveOrLastCurrency(ctx context.Context, userID int64, currency string) string {
+	if currency != "" {
+		return currency
+	}
+	return h.getLastCurrency(ctx, userID)
+}
+
 // cbViewToggle handles compact/full view toggle callbacks.
 // Callback data format: "view:<action>:<command>"
 func (h *Handler) cbViewToggle(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
@@ -1775,8 +1837,12 @@ func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, 
 // cmdRank handles the /rank command — weekly currency strength ranking.
 // Ranks 8 major currencies by COT SentimentScore and shows conviction scores (COT + FRED + Calendar).
 func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args string) error {
+	loadingID, _ := h.bot.SendHTML(ctx, chatID, "📈 Menghitung currency strength ranking... ⏳")
 	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 	if err != nil || len(analyses) == 0 {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err = h.bot.SendHTML(ctx, chatID,
 			"No COT data available for ranking. Data is fetched from CFTC every Friday.")
 		return err
@@ -1840,6 +1906,9 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		}
 	}
 
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendHTML(ctx, chatID, html)
 	return err
 }

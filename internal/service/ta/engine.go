@@ -14,6 +14,7 @@ type FullResult struct {
 	Zones       *ZoneResult
 	Patterns    []CandlePattern // from patterns.go
 	Divergences []Divergence    // from divergence.go
+	ICT         *ICTResult      // from ict.go — nil if insufficient data
 	ComputedAt  time.Time
 }
 
@@ -82,6 +83,10 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	snap.SuperTrend = CalcSuperTrend(bars, 10, 3.0)
 	snap.Fibonacci = CalcFibonacci(bars, 50)
 
+	// Killzone: classify current trading session
+	kz := ClassifyKillzone(time.Now())
+	snap.Killzone = &kz
+
 	return snap
 }
 
@@ -113,6 +118,7 @@ func (e *Engine) ComputeFull(bars []OHLCV) *FullResult {
 		Zones:       zones,
 		Patterns:    patterns,
 		Divergences: divergences,
+		ICT:         CalcICT(bars, snap.ATR),
 		ComputedAt:  time.Now(),
 	}
 }

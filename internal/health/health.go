@@ -72,7 +72,7 @@ func (c *Checker) Start(ctx context.Context, addr string) {
 func (c *Checker) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status": "alive",
 		"uptime": time.Since(c.started).String(),
 	})
@@ -111,7 +111,7 @@ func (c *Checker) handleReady(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status": statusStr,
 		"checks": checks,
 		"uptime": time.Since(c.started).String(),

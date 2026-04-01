@@ -15,6 +15,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/pkg/format"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -393,14 +394,14 @@ func (f *Formatter) FormatCOTOverview(analyses []domain.COTAnalysis, convictions
 			// Line 2: Net | Idx | Conv (if available)
 			if cs, ok := convMap[a.Contract.Currency]; ok {
 				b.WriteString(fmt.Sprintf("<code>  Net:%-10s Idx:%.0f%% (%s)</code>\n",
-					fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex, idxLbl))
+					format.FormatInt(int64(a.NetPosition)), a.COTIndex, idxLbl))
 				b.WriteString(fmt.Sprintf("<code>  Chg:%-10s Mom:%-10s Conv:%s</code>\n",
 					fmtutil.FmtNumSigned(a.NetChange, 0),
 					f.momentumLabel(a.MomentumDir),
 					convictionMiniBar(cs.Score, cs.Direction)))
 			} else {
 				b.WriteString(fmt.Sprintf("<code>  Net:%-10s Idx:%.0f%% (%s)</code>\n",
-					fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex, idxLbl))
+					format.FormatInt(int64(a.NetPosition)), a.COTIndex, idxLbl))
 				b.WriteString(fmt.Sprintf("<code>  Chg:%-10s Mom:%s</code>\n",
 					fmtutil.FmtNumSigned(a.NetChange, 0),
 					f.momentumLabel(a.MomentumDir)))
@@ -427,7 +428,7 @@ func (f *Formatter) FormatCOTOverview(analyses []domain.COTAnalysis, convictions
 			}
 			b.WriteString(fmt.Sprintf("<b>%s</b> %s\n", a.Contract.Name, bias))
 			b.WriteString(fmt.Sprintf("<code>  Net: %s | Idx: %.0f%%</code>\n\n",
-				fmtutil.FmtNum(a.NetPosition, 0), a.COTIndex))
+				format.FormatInt(int64(a.NetPosition)), a.COTIndex))
 		}
 	}
 
@@ -483,13 +484,46 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 	if a.CommExtremeBear {
 		b.WriteString("🔴 <b>Commercial COT Extreme SHORT</b> (contrarian bearish signal)\n")
 	}
-	if a.AssetMgrAlert || a.ThinMarketAlert || a.SmartDumbDivergence || a.CommExtremeBull || a.CommExtremeBear {
+	if a.CategoryDivergence {
+		b.WriteString(fmt.Sprintf("⚡ <b>Category Divergence:</b> %s\n", a.CategoryDivergenceDesc))
+	}
+	if a.AssetMgrAlert || a.ThinMarketAlert || a.SmartDumbDivergence || a.CommExtremeBull || a.CommExtremeBear || a.CategoryDivergence {
+		b.WriteString("\n")
+	}
+
+	// Category Z-Score Breakdown (show if any alert or divergence exists)
+	hasZAlert := a.DealerAlert || a.LevFundAlert || a.ManagedMoneyAlert || a.SwapDealerAlert || a.CategoryDivergence
+	if hasZAlert {
+		b.WriteString("📊 <b>Category Z-Scores (WoW Change vs 52W):</b>\n")
+		zScoreEmoji := func(z float64, alert bool) string {
+			if !alert {
+				return "  "
+			}
+			if z > 0 {
+				return "🟢"
+			}
+			return "🔴"
+		}
+		if rt == "TFF" {
+			b.WriteString(fmt.Sprintf("<code>  Dealer:       %+.2fσ %s</code>\n", a.DealerZScore, zScoreEmoji(a.DealerZScore, a.DealerAlert)))
+			b.WriteString(fmt.Sprintf("<code>  LevFund:      %+.2fσ %s</code>\n", a.LevFundZScore, zScoreEmoji(a.LevFundZScore, a.LevFundAlert)))
+			b.WriteString(fmt.Sprintf("<code>  AssetMgr:     %+.2fσ %s</code>\n", a.AssetMgrZScore, zScoreEmoji(a.AssetMgrZScore, a.AssetMgrAlert)))
+			b.WriteString(fmt.Sprintf("<code>  ManagedMoney: %+.2fσ %s</code>\n", a.ManagedMoneyZScore, zScoreEmoji(a.ManagedMoneyZScore, a.ManagedMoneyAlert)))
+		} else {
+			// DISAGGREGATED: SwapDealer and ManagedMoney are primary
+			b.WriteString(fmt.Sprintf("<code>  ManagedMoney: %+.2fσ %s</code>\n", a.ManagedMoneyZScore, zScoreEmoji(a.ManagedMoneyZScore, a.ManagedMoneyAlert)))
+			b.WriteString(fmt.Sprintf("<code>  SwapDealer:   %+.2fσ %s</code>\n", a.SwapDealerZScore, zScoreEmoji(a.SwapDealerZScore, a.SwapDealerAlert)))
+			b.WriteString(fmt.Sprintf("<code>  LevFund:      %+.2fσ %s</code>\n", a.LevFundZScore, zScoreEmoji(a.LevFundZScore, a.LevFundAlert)))
+		}
+		b.WriteString(fmt.Sprintf("<i>  Alert threshold: |z| ≥ 2.0σ  |  max |z|: %.2f</i>\n",
+			math.Max(math.Max(math.Abs(a.DealerZScore), math.Abs(a.LevFundZScore)),
+				math.Max(math.Abs(a.ManagedMoneyZScore), math.Abs(a.SwapDealerZScore)))))
 		b.WriteString("\n")
 	}
 
 	// Positioning
 	b.WriteString(fmt.Sprintf("<b>%s (Smart Money):</b>\n", smartMoneyLabel))
-	b.WriteString(fmt.Sprintf("<code>  Net Position:   %s</code>\n", fmtutil.FmtNumSigned(a.NetPosition, 0)))
+	b.WriteString(fmt.Sprintf("<code>  Net Position:   %s</code>\n", format.FormatNetPosition(int64(a.NetPosition))))
 	b.WriteString(fmt.Sprintf("<code>  Net Change:     %s</code>\n", fmtutil.FmtNumSigned(a.NetChange, 0)))
 	if a.LongShortRatio >= 999 {
 		b.WriteString("<code>  L/S Ratio:      ∞ (no shorts reported)</code>\n")
@@ -3635,6 +3669,22 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear often precedes rallies\n")
 		} else if data.CNNFearGreed >= 75 {
 			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed often precedes pullbacks\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable</code>\n")
+	}
+
+	// --- Crypto Fear & Greed Index (alternative.me) ---
+	b.WriteString("\n<b>Crypto Fear &amp; Greed Index</b>\n")
+	if data.CryptoFearGreedAvailable {
+		gauge := sentimentGauge(data.CryptoFearGreed, 15)
+		emoji := fearGreedEmoji(data.CryptoFearGreed)
+		b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", gauge))
+		b.WriteString(fmt.Sprintf("<code>Score : %.0f / 100  %s %s</code>\n", data.CryptoFearGreed, emoji, data.CryptoFearGreedLabel))
+		if data.CryptoFearGreed <= 25 {
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear in crypto may signal accumulation zone\n")
+		} else if data.CryptoFearGreed >= 75 {
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed in crypto often precedes corrections\n")
 		}
 	} else {
 		b.WriteString("<code>Data unavailable</code>\n")

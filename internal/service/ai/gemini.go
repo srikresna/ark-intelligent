@@ -73,7 +73,11 @@ func (gc *GeminiClient) Generate(ctx context.Context, prompt string) (string, er
 		if attempt > 0 {
 			backoff := time.Duration(attempt*attempt) * time.Second
 			geminiLog.Warn().Int("attempt", attempt).Dur("backoff", backoff).Msg("retrying request")
-			time.Sleep(backoff)
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(backoff):
+			}
 		}
 
 		resp, err := gc.model.GenerateContent(ctx, genai.Text(prompt))
@@ -117,7 +121,12 @@ func (gc *GeminiClient) GenerateWithSystem(ctx context.Context, systemPrompt, us
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt*attempt) * time.Second)
+			backoff := time.Duration(attempt*attempt) * time.Second
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(backoff):
+			}
 		}
 
 		resp, err := model.GenerateContent(ctx, genai.Text(userPrompt))

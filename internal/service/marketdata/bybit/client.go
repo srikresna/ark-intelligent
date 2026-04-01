@@ -340,8 +340,20 @@ func (c *Client) GetTicker(ctx context.Context, category, symbol string) (*Ticke
 	}
 	t := resp.Result.List[0]
 
-	toF := func(s string) float64 { v, _ := strconv.ParseFloat(s, 64); return v }
-	toI := func(s string) int64 { v, _ := strconv.ParseInt(s, 10, 64); return v }
+	toF := func(s string) float64 {
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil && s != "" {
+			log.Warn().Str("value", s).Err(err).Msg("bybit ticker: float parse failed")
+		}
+		return v
+	}
+	toI := func(s string) int64 {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil && s != "" {
+			log.Warn().Str("value", s).Err(err).Msg("bybit ticker: int parse failed")
+		}
+		return v
+	}
 
 	return &Ticker{
 		Symbol:            t.Symbol,
@@ -407,8 +419,20 @@ func (c *Client) GetKline(ctx context.Context, category, symbol, interval string
 		if len(row) < 7 {
 			continue
 		}
-		toF := func(s string) float64 { v, _ := strconv.ParseFloat(s, 64); return v }
-		toI := func(s string) int64 { v, _ := strconv.ParseInt(s, 10, 64); return v }
+		toF := func(s string) float64 {
+			v, err := strconv.ParseFloat(s, 64)
+			if err != nil && s != "" {
+				log.Warn().Str("value", s).Err(err).Msg("bybit kline: float parse failed")
+			}
+			return v
+		}
+		toI := func(s string) int64 {
+			v, err := strconv.ParseInt(s, 10, 64)
+			if err != nil && s != "" {
+				log.Warn().Str("value", s).Err(err).Msg("bybit kline: int parse failed")
+			}
+			return v
+		}
 		klines = append(klines, Kline{
 			StartTime: toI(row[0]),
 			Open:      toF(row[1]),
