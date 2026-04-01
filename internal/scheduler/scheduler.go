@@ -105,7 +105,8 @@ type Scheduler struct {
 	lastFREDData    *fred.MacroData // previous FRED snapshot for alert diffing
 	lastFREDBroadcast time.Time    // last time FRED alerts were broadcast (dedup guard)
 
-	cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
+	lastTailRisk     string     // previous VolSuite TailRisk state for SKEW/VIX alert diffing
+		cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
 	lastCOTBroadcast time.Time  // last date successfully broadcast to prevent duplicates
 }
 
@@ -613,6 +614,11 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 	if len(alerts) > 0 && s.deps.CachedAI != nil {
 		s.deps.CachedAI.InvalidateOnFREDUpdate(ctx)
 	}
+
+	// --- SKEW/VIX tail risk alert (TASK-208) ---
+	// Fetch VIX term structure (includes VolSuite with SKEW data) and check
+	// for tail risk state transitions. Runs in goroutine to not block FRED job.
+	go s.checkSKEWVIXAlert(ctx)
 
 	return nil
 }

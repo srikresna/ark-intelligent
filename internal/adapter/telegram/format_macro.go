@@ -1399,7 +1399,14 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			if data.SKEWVIXRatio > 8.0 {
 				ratioEmoji = " 🔴"
 			}
-			b.WriteString(fmt.Sprintf("<code>SKEW/VIX: %.1f%s</code>\n", data.SKEWVIXRatio, ratioEmoji))
+			pctStr := ""
+			if data.SKEWVIXPctile > 0 {
+				pctStr = fmt.Sprintf(" (P%.0f)", data.SKEWVIXPctile)
+			}
+			b.WriteString(fmt.Sprintf("<code>SKEW/VIX: %.1f%s%s</code>\n", data.SKEWVIXRatio, pctStr, ratioEmoji))
+		}
+		if data.SKEWPctile > 0 && data.VolSKEW > 0 {
+			b.WriteString(fmt.Sprintf("<code>SKEW Pct: P%.0f</code>\n", data.SKEWPctile))
 		}
 		if data.RVXVIXRatio > 0 {
 			b.WriteString(fmt.Sprintf("<code>RVX/VIX : %.2f</code>\n", data.RVXVIXRatio))
@@ -1407,8 +1414,14 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		switch data.VolTailRisk {
 		case "EXTREME":
 			b.WriteString("<i>🔴 TAIL RISK EXTREME — SKEW/VIX historically dangerous.</i>\n")
+			if data.TailRiskCtx != "" {
+				b.WriteString(fmt.Sprintf("<i>%s</i>\n", data.TailRiskCtx))
+			}
 		case "ELEVATED":
 			b.WriteString("<i>⚠️ Tail risk elevated — SKEW tinggi vs VIX rendah.</i>\n")
+			if data.TailRiskCtx != "" {
+				b.WriteString(fmt.Sprintf("<i>%s</i>\n", data.TailRiskCtx))
+			}
 		}
 		for _, d := range data.VolDivergences {
 			b.WriteString(fmt.Sprintf("<i>📊 %s</i>\n", d))

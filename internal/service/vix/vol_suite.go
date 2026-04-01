@@ -35,6 +35,8 @@ type VolSuite struct {
 
 	// Analysis
 	TailRisk    string // "NORMAL", "ELEVATED", "EXTREME"
+	SKEWVIXPercentile float64 // Historical percentile of current SKEW/VIX ratio (0-100)
+	SKEWPercentile    float64 // Historical percentile of current SKEW level (0-100)
 	Divergences []string // detected vol divergences
 
 	Available bool
@@ -109,6 +111,9 @@ func FetchVolSuite(ctx context.Context, vixSpot float64) *VolSuite {
 
 	// Divergence detection
 	vs.detectDivergences(vixSpot)
+
+	// Historical percentile (uses fetched SKEW+VIX CSVs)
+	vs.computeHistoricalPercentile(ctx, client, vixSpot)
 
 	return vs
 }

@@ -173,6 +173,9 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 			data.RVXVIXRatio = ts.VolSuite.RVXVIXRatio
 			data.VIX9D30Ratio = ts.VolSuite.VIX9D30Ratio
 			data.VolTailRisk = ts.VolSuite.TailRisk
+			data.SKEWVIXPctile = ts.VolSuite.SKEWVIXPercentile
+			data.SKEWPctile = ts.VolSuite.SKEWPercentile
+			data.TailRiskCtx = ts.VolSuite.TailRiskContext()
 			data.VolDivergences = ts.VolSuite.Divergences
 			data.VolSuiteAvail = true
 		}
@@ -306,6 +309,9 @@ type SentimentData struct {
 	RVXVIXRatio    float64  // RVX/VIX — >1.3 risk appetite declining
 	VIX9D30Ratio   float64  // VIX9D/VIX — >1 near-term event
 	VolTailRisk    string   // "NORMAL", "ELEVATED", "EXTREME"
+	SKEWVIXPctile  float64  // Historical percentile of SKEW/VIX ratio (0-100)
+	SKEWPctile     float64  // Historical percentile of SKEW level (0-100)
+	TailRiskCtx    string   // Human-readable tail risk historical context
 	VolDivergences []string // detected cross-asset divergences
 	VolSuiteAvail  bool
 

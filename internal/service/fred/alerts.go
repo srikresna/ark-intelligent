@@ -26,6 +26,9 @@ const (
 	AlertCurveUninversion AlertType = "CURVE_UNINVERSION"  // Yield spread crosses from negative to positive
 	AlertInflationDivergence AlertType = "INFLATION_DIVERGENCE" // Market breakevens vs realized CPI divergence
 	AlertHousingContraction  AlertType = "HOUSING_CONTRACTION"   // Housing market entering contraction
+	AlertSKEWVIXExtreme    AlertType = "SKEW_VIX_EXTREME"     // SKEW/VIX ratio crosses extreme threshold
+	AlertSKEWVIXElevated   AlertType = "SKEW_VIX_ELEVATED"    // SKEW/VIX ratio crosses elevated threshold
+	AlertSKEWVIXNormal     AlertType = "SKEW_VIX_NORMAL"      // SKEW/VIX ratio returns to normal
 )
 
 // MacroAlert represents a single triggered macro regime change event.
