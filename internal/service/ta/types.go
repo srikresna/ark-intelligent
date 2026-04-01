@@ -134,6 +134,7 @@ type IndicatorSnapshot struct {
 	Ichimoku   *IchimokuResult    // nil if insufficient data
 	SuperTrend *SuperTrendResult  // nil if insufficient data
 	Fibonacci  *FibResult         // nil if insufficient data
+	Killzone   *KillzoneResult    // current ICT killzone classification (always populated)
 }
 
 // TASignal represents a normalized signal from one indicator.
