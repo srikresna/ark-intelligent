@@ -1055,12 +1055,12 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 
 		// Contrarian signal
 		if data.CNNFearGreed <= 25 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear often precedes rallies\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear sering mendahului kenaikan\n")
 		} else if data.CNNFearGreed >= 75 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed often precedes pullbacks\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed sering mendahului koreksi\n")
 		}
 	} else {
-		b.WriteString("<code>Data unavailable</code>\n")
+		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
 	// --- Crypto Fear & Greed Index (alternative.me) ---
@@ -1071,19 +1071,19 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", gauge))
 		b.WriteString(fmt.Sprintf("<code>Score : %.0f / 100  %s %s</code>\n", data.CryptoFearGreed, emoji, data.CryptoFearGreedLabel))
 		if data.CryptoFearGreed <= 25 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear in crypto may signal accumulation zone\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear di crypto bisa jadi zona akumulasi\n")
 		} else if data.CryptoFearGreed >= 75 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed in crypto often precedes corrections\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed di crypto sering mendahului koreksi\n")
 		}
 	} else {
-		b.WriteString("<code>Data unavailable</code>\n")
+		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
 	// --- AAII Investor Sentiment Survey ---
 	b.WriteString("\n<b>AAII Investor Sentiment Survey</b>\n")
 	if data.AAIIAvailable {
 		if data.AAIIWeekDate != "" {
-			b.WriteString(fmt.Sprintf("<i>Week ending %s</i>\n", data.AAIIWeekDate))
+			b.WriteString(fmt.Sprintf("<i>Minggu berakhir %s</i>\n", data.AAIIWeekDate))
 		}
 		b.WriteString(fmt.Sprintf("<code>Bullish : %5.1f%%</code>  %s\n", data.AAIIBullish, sentimentBar(data.AAIIBullish, "🟢")))
 		b.WriteString(fmt.Sprintf("<code>Neutral : %5.1f%%</code>  %s\n", data.AAIINeutral, sentimentBar(data.AAIINeutral, "⚪")))
@@ -1091,29 +1091,29 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString(fmt.Sprintf("<code>Bull/Bear: %.2f</code>", data.AAIIBullBear))
 		if data.AAIIBullBear > 0 {
 			if data.AAIIBullBear >= 2.0 {
-				b.WriteString("  — ⚠️ Elevated optimism")
+				b.WriteString("  — ⚠️ Optimisme tinggi")
 			} else if data.AAIIBullBear <= 0.5 {
-				b.WriteString("  — 🟢 Deep pessimism (contrarian bullish)")
+				b.WriteString("  — 🟢 Pesimisme dalam (contrarian bullish)")
 			}
 		}
 		b.WriteString("\n")
 
 		// Historical context: AAII long-term averages are ~37.5% bull, 31% bear, 31.5% neutral
 		if data.AAIIBullish >= 50 {
-			b.WriteString("<code>Note   : Bullish reading well above historical avg (~37.5%%)</code>\n")
+			b.WriteString("<code>Catatan: Bullish jauh di atas rata-rata historis (~37.5%%)</code>\n")
 		} else if data.AAIIBearish >= 50 {
-			b.WriteString("<code>Note   : Bearish reading well above historical avg (~31%%)</code>\n")
+			b.WriteString("<code>Catatan: Bearish jauh di atas rata-rata historis (~31%%)</code>\n")
 		}
 	} else {
-		b.WriteString("<code>Data unavailable — set FIRECRAWL_API_KEY to enable</code>\n")
+		b.WriteString("<code>Data tidak tersedia — set FIRECRAWL_API_KEY untuk mengaktifkan</code>\n")
 	}
 
 	// --- AAII contrarian signal ---
 	if data.AAIIAvailable {
 		if data.AAIIBearish >= 50 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Bearish >50%% historically precedes rallies\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Bearish >50%% secara historis mendahului rally\n")
 		} else if data.AAIIBullish >= 50 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Bullish >50%% historically precedes pullbacks\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Bullish >50%% secara historis mendahului koreksi\n")
 		}
 	}
 
@@ -1144,15 +1144,15 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		// Context interpretation
 		if data.PutCallIndex > 0 && data.PutCallEquity > 0 {
 			if data.PutCallIndex > 1.0 && data.PutCallEquity < 0.8 {
-				b.WriteString("<i>Index P/C elevated → institutions hedging. Equity P/C normal → retail not panicking yet.</i>\n")
+				b.WriteString("<i>Index P/C tinggi → institusi melakukan hedging. Equity P/C normal → retail belum panik.</i>\n")
 			} else if data.PutCallTotal >= 1.2 {
-				b.WriteString("<i>Extreme put buying across the board — strong contrarian bullish signal.</i>\n")
+				b.WriteString("<i>Pembelian put ekstrem di semua instrumen — sinyal contrarian bullish kuat.</i>\n")
 			} else if data.PutCallTotal < 0.7 {
-				b.WriteString("<i>Very low protection buying — complacency warning. Contrarian bearish.</i>\n")
+				b.WriteString("<i>Pembelian proteksi sangat rendah — peringatan complacency. Contrarian bearish.</i>\n")
 			}
 		}
 	} else {
-		b.WriteString("<code>Data unavailable</code>\n")
+		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
 	// --- Myfxbook Retail Positioning ---
@@ -1182,13 +1182,13 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			} else if signalLabel == "LEAN_BEARISH" {
 				signalLabel = "Lean Bearish"
 			} else {
-				signalLabel = "Neutral"
+				signalLabel = "Netral"
 			}
 			b.WriteString(fmt.Sprintf("<code>%-8s: %4.1f%% L / %4.1f%% S</code> %s %s\n", mp.Symbol, mp.LongPct, mp.ShortPct, signalEmoji, signalLabel))
 		}
-		b.WriteString("<i>Retail positioning is a contrarian indicator — extreme readings suggest reversal potential.</i>\n")
+		b.WriteString("<i>Retail positioning adalah indikator contrarian — pembacaan ekstrem mengindikasikan potensi reversal.</i>\n")
 	} else {
-		b.WriteString("<code>Data unavailable</code>\n")
+		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
 	// --- VIX Term Structure (CBOE) ---
@@ -1239,16 +1239,16 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		case "EXTREME_FEAR":
 			b.WriteString("<i>VIX backwardation ekstrem — pasar panik, hedging demand tinggi. Historically contrarian bullish.</i>\n")
 		case "FEAR":
-			b.WriteString("<i>VIX backwardation — near-term fear elevated, market pricing near-term risk.</i>\n")
+			b.WriteString("<i>VIX backwardation — ketakutan jangka pendek tinggi, pasar memperhitungkan risiko dekat.</i>\n")
 		case "RISK_ON_COMPLACENT":
-			b.WriteString("<i>Steep contango — market complacent, VIX ETPs bleed. Equity-bullish tapi waspada sudden reversal.</i>\n")
+			b.WriteString("<i>Steep contango — pasar complacent, VIX ETPs merugi. Bullish ekuitas tapi waspada pembalikan mendadak.</i>\n")
 		}
 	} else {
-		b.WriteString("<code>Data unavailable</code>\n")
+		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
 	// --- Composite reading ---
-	b.WriteString("\n<b>Combined Reading</b>\n")
+	b.WriteString("\n<b>Pembacaan Gabungan</b>\n")
 	compositeWritten := false
 
 	// Cross-source agreement amplifies the signal
@@ -1278,8 +1278,8 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 	}
 
 	if !compositeWritten {
-		b.WriteString("<i>Sentiment surveys are contrarian indicators.\n")
-		b.WriteString("Extreme readings often mark turning points.</i>\n")
+		b.WriteString("<i>Sentiment survey adalah indikator contrarian.\n")
+		b.WriteString("Pembacaan ekstrem sering menandai titik balik.</i>\n")
 	}
 
 	// --- Regime context ---
