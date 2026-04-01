@@ -4,6 +4,7 @@ package telegram
 // Chart types, Python chart renderer, and data-preparation utilities.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -227,8 +228,12 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 	cmdCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("CTA chart renderer subprocess failed")
 		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed (timeout 90s): %w", err)
 	}
@@ -266,8 +271,12 @@ func runChartScript(ctx context.Context, input any) ([]byte, error) {
 	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("CTA detail chart renderer subprocess failed")
 		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed: %w", err)
 	}

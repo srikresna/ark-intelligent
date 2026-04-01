@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"bytes"
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
@@ -435,10 +436,14 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), "MPLBACKEND=Agg")
 
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("VP engine subprocess failed")
 		os.Remove(chartPath) // cleanup chart on failure
 		os.Remove(outputPath)
 		return nil, fmt.Errorf("VP engine failed: %w", err)
