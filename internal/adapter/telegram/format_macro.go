@@ -1078,6 +1078,47 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
+
+	// --- Crypto Global Market Data (alternative.me v2) ---
+	if data.CryptoGlobalAvailable {
+		b.WriteString("\n<b>🌐 Crypto Global Market</b>\n")
+		mcapT := data.CryptoTotalMarketCap / 1e12
+		b.WriteString(fmt.Sprintf("<code>Total Mcap   : $%.2fT</code>\n", mcapT))
+		b.WriteString(fmt.Sprintf("<code>BTC Dominance: %.1f%%</code>", data.CryptoBTCDominance))
+		if data.CryptoBTCDominance >= 55 {
+			b.WriteString(" — BTC season")
+		} else if data.CryptoBTCDominance <= 40 {
+			b.WriteString(" — 🔥 Alt season")
+		}
+		b.WriteString("\n")
+		b.WriteString(fmt.Sprintf("<code>Currencies   : %d</code>\n", data.CryptoActiveCurrencies))
+		b.WriteString(fmt.Sprintf("<code>Markets      : %d</code>\n", data.CryptoActiveMarkets))
+	}
+
+	// --- Crypto Top Movers (alternative.me v2) ---
+	if data.CryptoTickersAvailable && len(data.CryptoTopTickers) > 0 {
+		b.WriteString("\n<b>📊 Crypto Top 10 (24h)</b>\n")
+		topN := 10
+		if len(data.CryptoTopTickers) < topN {
+			topN = len(data.CryptoTopTickers)
+		}
+		for _, t := range data.CryptoTopTickers[:topN] {
+			arrow := "⬆️"
+			if t.PercentChange24h < 0 {
+				arrow = "⬇️"
+			}
+			priceStr := ""
+			if t.PriceUSD >= 1000 {
+				priceStr = fmt.Sprintf("$%.0f", t.PriceUSD)
+			} else if t.PriceUSD >= 1 {
+				priceStr = fmt.Sprintf("$%.2f", t.PriceUSD)
+			} else {
+				priceStr = fmt.Sprintf("$%.4f", t.PriceUSD)
+			}
+			b.WriteString(fmt.Sprintf("<code>%s %-5s %8s %+.1f%%</code>\n", arrow, t.Symbol, priceStr, t.PercentChange24h))
+		}
+	}
+
 	// --- AAII Investor Sentiment Survey ---
 	b.WriteString("\n<b>AAII Investor Sentiment Survey</b>\n")
 	if data.AAIIAvailable {
