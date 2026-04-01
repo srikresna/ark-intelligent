@@ -383,7 +383,13 @@ type backtestChartParams struct {
 	PF          float64 `json:"pf"`
 }
 
-func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.BacktestResult, symbol, timeframe string) ([]byte, error) {
+func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.BacktestResult, symbol, timeframe string) (pngData []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in generateBacktestChart: %v", r)
+			log.Error().Interface("panic", r).Str("symbol", symbol).Str("timeframe", timeframe).Msg("recovered panic in generateBacktestChart")
+		}
+	}()
 	if result == nil {
 		return nil, fmt.Errorf("no backtest result")
 	}
@@ -480,10 +486,10 @@ func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.Backtest
 		return nil, fmt.Errorf("backtest chart renderer failed (timeout 90s): %w", err)
 	}
 
-	pngData, err := os.ReadFile(outputPath)
+	pngData, readErr := os.ReadFile(outputPath)
 	os.Remove(outputPath)
-	if err != nil {
-		return nil, fmt.Errorf("read chart output: %w", err)
+	if readErr != nil {
+		return nil, fmt.Errorf("read chart output: %w", readErr)
 	}
 
 	return pngData, nil

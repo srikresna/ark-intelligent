@@ -92,7 +92,13 @@ type chartPattern struct {
 	Direction string `json:"direction"`
 }
 
-func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, error) {
+func (h *Handler) generateCTAChart(state *ctaState, timeframe string) (pngData []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in generateCTAChart: %v", r)
+			log.Error().Interface("panic", r).Str("timeframe", timeframe).Msg("recovered panic in generateCTAChart")
+		}
+	}()
 	ctx := context.Background()
 	bars, ok := state.bars[timeframe]
 	if !ok || len(bars) == 0 {
@@ -239,7 +245,7 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 	}
 
 	// Read output PNG
-	pngData, err := os.ReadFile(outputPath)
+	pngData, err = os.ReadFile(outputPath)
 	os.Remove(outputPath)
 	if err != nil {
 		return nil, fmt.Errorf("read chart output: %w", err)
@@ -252,7 +258,13 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 }
 
 // runChartScript marshals input to JSON, runs cta_chart.py, and returns PNG bytes.
-func runChartScript(ctx context.Context, input any) ([]byte, error) {
+func runChartScript(ctx context.Context, input any) (pngData []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in runChartScript: %v", r)
+			log.Error().Interface("panic", r).Msg("recovered panic in runChartScript")
+		}
+	}()
 	jsonData, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("marshal chart input: %w", err)
@@ -293,7 +305,13 @@ func runChartScript(ctx context.Context, input any) ([]byte, error) {
 }
 
 // generateCTADetailChart creates a mode-specific chart (ichimoku, fibonacci, zones).
-func (h *Handler) generateCTADetailChart(ctx context.Context, state *ctaState, timeframe string, mode string) ([]byte, error) {
+func (h *Handler) generateCTADetailChart(ctx context.Context, state *ctaState, timeframe string, mode string) (pngData []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in generateCTADetailChart: %v", r)
+			log.Error().Interface("panic", r).Str("timeframe", timeframe).Str("mode", mode).Msg("recovered panic in generateCTADetailChart")
+		}
+	}()
 	bars, ok := state.bars[timeframe]
 	if !ok || len(bars) == 0 {
 		// Fallback to daily
