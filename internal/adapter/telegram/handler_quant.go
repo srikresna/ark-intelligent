@@ -490,15 +490,17 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	outData, err := os.ReadFile(outputPath)
 	os.Remove(outputPath)
 	if err != nil {
+		os.Remove(chartPath) // cleanup chart if output unreadable
 		return nil, fmt.Errorf("read quant output: %w", err)
 	}
 
 	var result quantEngineResult
 	if err := json.Unmarshal(outData, &result); err != nil {
+		os.Remove(chartPath) // cleanup chart if output unparseable
 		return nil, fmt.Errorf("parse quant output: %w", err)
 	}
 
-	// Check if chart was actually generated
+	// Check if chart was actually generated; caller owns cleanup when ChartPath is set.
 	if fi, err := os.Stat(chartPath); err == nil {
 		if fi.Size() > 0 {
 			result.ChartPath = chartPath

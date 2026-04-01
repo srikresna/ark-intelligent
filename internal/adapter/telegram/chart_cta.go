@@ -226,6 +226,7 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) (pngData [
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
+	defer os.Remove(outputPath) // ensure PNG is cleaned up on all return paths
 
 	// Find the script path relative to the binary
 	scriptPath := findCTAScript()
@@ -240,13 +241,11 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) (pngData [
 		log.Error().Err(err).
 			Str("stderr", stderr.String()).
 			Msg("CTA chart renderer subprocess failed")
-		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed (timeout 90s): %w", err)
 	}
 
 	// Read output PNG
 	pngData, err = os.ReadFile(outputPath)
-	os.Remove(outputPath)
 	if err != nil {
 		return nil, fmt.Errorf("read chart output: %w", err)
 	}
@@ -278,6 +277,7 @@ func runChartScript(ctx context.Context, input any) (pngData []byte, err error) 
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
+	defer os.Remove(outputPath) // ensure PNG is cleaned up on all return paths
 
 	scriptPath := findCTAScript()
 	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -289,12 +289,10 @@ func runChartScript(ctx context.Context, input any) (pngData []byte, err error) 
 		log.Error().Err(err).
 			Str("stderr", stderr.String()).
 			Msg("CTA detail chart renderer subprocess failed")
-		os.Remove(outputPath)
 		return nil, fmt.Errorf("chart renderer failed: %w", err)
 	}
 
 	pngBytes, readErr := os.ReadFile(outputPath)
-	os.Remove(outputPath)
 	if readErr != nil {
 		return nil, fmt.Errorf("read chart output: %w", readErr)
 	}
