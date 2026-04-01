@@ -39,9 +39,8 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 
 		pattern, err := analyzer.AnalyzeContractAdvanced(ctx, mapping.ContractCode, mapping.Currency, deps)
 		if err != nil {
-			_, sendErr := h.bot.SendHTML(ctx, chatID,
-				fmt.Sprintf("No seasonal data for %s: %s", html.EscapeString(args), html.EscapeString(err.Error())))
-			return sendErr
+			h.sendUserError(ctx, chatID, err, "seasonal")
+			return nil
 		}
 
 		htmlOut := h.fmt.FormatSeasonalSingle(*pattern)
@@ -53,9 +52,8 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 	// All contracts mode
 	patterns, err := analyzer.AnalyzeAllAdvanced(ctx, deps)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID,
-			fmt.Sprintf("Seasonal analysis unavailable: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "seasonal")
+		return nil
 	}
 
 	htmlOut := h.fmt.FormatSeasonalPatterns(patterns)
