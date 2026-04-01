@@ -1723,6 +1723,12 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 	if regime.FedBalance != "N/A" && regime.FedBalance != "" {
 		b.WriteString(fmt.Sprintf("<code>Fed Balance  : %s</code>\n", regime.FedBalance))
 	}
+	if regime.TGALabel != "N/A" && regime.TGALabel != "" {
+		b.WriteString(fmt.Sprintf("<code>TGA Balance  : %s</code>\n", regime.TGALabel))
+	}
+	if regime.LiquidityLabel != "" {
+		b.WriteString(fmt.Sprintf("<code>Net Liquidity: %s</code>\n", regime.LiquidityLabel))
+	}
 
 	// --- Financial Stress ---
 	b.WriteString(fmt.Sprintf("\n<code>Fin. Stress  : %s</code>\n", regime.FinStress))
