@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
@@ -112,4 +113,24 @@ func (c *Client) GetTicker(ctx context.Context, instrument string) (*Ticker, err
 		return nil, err
 	}
 	return &result.Result, nil
+}
+
+// GetIndexPrice returns the current Deribit index price for a currency (e.g. "btc_usd").
+// This is the canonical spot price source when UnderlyingPrice is unavailable in book summaries.
+// Deribit index name format: lowercase currency + "_usd" (e.g. "btc_usd", "eth_usd").
+func (c *Client) GetIndexPrice(ctx context.Context, currency string) (float64, error) {
+	// Deribit index names are lowercase: btc_usd, eth_usd, etc.
+	indexName := strings.ToLower(currency) + "_usd"
+	params := url.Values{
+		"index_name": {indexName},
+	}
+	var result indexPriceResult
+	if err := c.get(ctx, "get_index_price", params, &result); err != nil {
+		return 0, fmt.Errorf("deribit: get_index_price %s: %w", indexName, err)
+	}
+	if result.Result.IndexPrice <= 0 {
+		return 0, fmt.Errorf("deribit: invalid index price (%.4f) for %s", result.Result.IndexPrice, indexName)
+	}
+	log.Debug().Str("index", indexName).Float64("price", result.Result.IndexPrice).Msg("index price fetched")
+	return result.Result.IndexPrice, nil
 }
