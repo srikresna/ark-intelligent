@@ -44,18 +44,26 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 	utadIdx := indexByName(EventUTAD)
 	sowIdx := indexByName(EventSOW)
 
+	lastBar := n - 1
+	if lastBar < 0 {
+		lastBar = 0
+	}
+
 	isAccum := scIdx >= 0 || springIdx >= 0 || sosIdx >= 0
 	isDist := bcIdx >= 0 || utadIdx >= 0 || sowIdx >= 0
 
 	if isAccum && !isDist {
 		// Phase A
-		phA := WyckoffPhase{Phase: "A", Start: 0, End: -1}
+		phA := WyckoffPhase{Phase: "A", Start: 0, End: 0}
 		if psIdx >= 0 {
 			phA.Start = psIdx
 		}
 		end := stIdx
 		if end < 0 {
 			end = arIdx
+		}
+		if end < 0 {
+			end = lastBar
 		}
 		phA.End = end
 		phA.Events = eventsInRange(events, phA.Start, phA.End)
@@ -66,13 +74,18 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 		// Phase B
 		if arIdx >= 0 {
 			phBStart := arIdx + 1
-			phBEnd := -1
+			phBEnd := lastBar
 			if springIdx >= 0 {
 				phBEnd = springIdx - 1
 			}
+			if phBEnd < 0 {
+				phBEnd = lastBar
+			}
 			phB := WyckoffPhase{Phase: "B", Start: phBStart, End: phBEnd}
 			phB.Events = eventsInRange(events, phBStart, phBEnd)
-			phases = append(phases, phB)
+			if len(phB.Events) > 0 {
+				phases = append(phases, phB)
+			}
 		}
 
 		// Phase C
@@ -88,9 +101,12 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 		// Phase D
 		if sosIdx >= 0 {
 			phDStart := sosIdx
-			phDEnd := -1
+			phDEnd := lastBar
 			if lpsIdx >= 0 {
 				phDEnd = lpsIdx + 5
+			}
+			if phDEnd >= n {
+				phDEnd = lastBar
 			}
 			phD := WyckoffPhase{Phase: "D", Start: phDStart, End: phDEnd}
 			phD.Events = eventsInRange(events, phDStart, phDEnd)
@@ -99,8 +115,8 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 
 		// Phase E — markup
 		if lpsIdx >= 0 {
-			phE := WyckoffPhase{Phase: "E", Start: lpsIdx + 1, End: -1}
-			phE.Events = eventsInRange(events, phE.Start, -1)
+			phE := WyckoffPhase{Phase: "E", Start: lpsIdx + 1, End: lastBar}
+			phE.Events = eventsInRange(events, phE.Start, phE.End)
 			if len(phE.Events) > 0 {
 				phases = append(phases, phE)
 			}
@@ -108,7 +124,11 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 
 	} else if isDist {
 		// Phase A (Distribution)
-		phA := WyckoffPhase{Phase: "A", Start: 0, End: arDistIdx}
+		phAEnd := arDistIdx
+		if phAEnd < 0 {
+			phAEnd = lastBar
+		}
+		phA := WyckoffPhase{Phase: "A", Start: 0, End: phAEnd}
 		phA.Events = eventsInRange(events, phA.Start, phA.End)
 		if len(phA.Events) > 0 {
 			phases = append(phases, phA)
@@ -116,9 +136,12 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 
 		// Phase B
 		if arDistIdx >= 0 {
-			phBEnd := -1
+			phBEnd := lastBar
 			if utadIdx >= 0 {
 				phBEnd = utadIdx - 1
+			}
+			if phBEnd < 0 {
+				phBEnd = lastBar
 			}
 			phB := WyckoffPhase{Phase: "B", Start: arDistIdx + 1, End: phBEnd}
 			phB.Events = eventsInRange(events, phB.Start, phB.End)
@@ -129,15 +152,19 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 
 		// Phase C
 		if utadIdx >= 0 {
-			phC := WyckoffPhase{Phase: "C", Start: utadIdx, End: utadIdx + 5}
+			phCEnd := utadIdx + 5
+			if phCEnd >= n {
+				phCEnd = lastBar
+			}
+			phC := WyckoffPhase{Phase: "C", Start: utadIdx, End: phCEnd}
 			phC.Events = eventsInRange(events, phC.Start, phC.End)
 			phases = append(phases, phC)
 		}
 
 		// Phase D
 		if sowIdx >= 0 {
-			phD := WyckoffPhase{Phase: "D", Start: sowIdx, End: -1}
-			phD.Events = eventsInRange(events, phD.Start, -1)
+			phD := WyckoffPhase{Phase: "D", Start: sowIdx, End: lastBar}
+			phD.Events = eventsInRange(events, phD.Start, phD.End)
 			phases = append(phases, phD)
 		}
 	}
@@ -146,14 +173,17 @@ func buildPhases(events []WyckoffEvent, n int) []WyckoffPhase {
 }
 
 // eventsInRange returns events whose BarIndex falls in [start, end].
-// end == -1 means "to the last bar."
+// If start < 0 or end < 0 or end < start, returns an empty slice.
 func eventsInRange(events []WyckoffEvent, start, end int) []WyckoffEvent {
+	if start < 0 || end < 0 || end < start {
+		return nil
+	}
 	var out []WyckoffEvent
 	for _, e := range events {
 		if e.BarIndex < start {
 			continue
 		}
-		if end >= 0 && e.BarIndex > end {
+		if e.BarIndex > end {
 			continue
 		}
 		out = append(out, e)
