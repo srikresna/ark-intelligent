@@ -211,7 +211,7 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 	state := h.ctaCache.get(chatID)
 	if state == nil {
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-		_, err := h.bot.SendHTML(ctx, chatID, "⏳ Data expired. Gunakan /cta untuk refresh.")
+		_, err := h.bot.SendHTML(ctx, chatID, sessionExpiredMessage("cta"))
 		return err
 	}
 

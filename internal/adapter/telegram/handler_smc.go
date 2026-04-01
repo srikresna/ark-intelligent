@@ -249,7 +249,7 @@ func (h *Handler) handleSMCCallback(ctx context.Context, chatID string, msgID in
 	case "refresh":
 		state := h.smcCache.get(chatID)
 		if state == nil {
-			_, err := h.bot.SendHTML(ctx, chatID, "⏰ Session expired. Gunakan <code>/smc</code> lagi.")
+			_, err := h.bot.SendHTML(ctx, chatID, sessionExpiredMessage("smc"))
 			return err
 		}
 		mapping := domain.FindPriceMappingByCurrency(state.symbol)
