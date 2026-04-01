@@ -250,7 +250,10 @@ func ConfluenceScoreV3(
 	surpriseScore := mathutil.Clamp(surpriseSigma*20, -100, 100)
 	macroScore := computeMacroComponentScore(macroData)
 
-	// Enhanced macro component: use per-currency differential if composites available
+	// Enhanced macro component: use per-currency differential if composites available.
+	// Falls back to the unified US-centric macro score (computeMacroComponentScore)
+	// when composites is nil (data unavailable) or when all country scores are zero
+	// (empty MacroData — fresh install with no FRED data yet).
 	if macroData != nil {
 		composites := fred.ComputeComposites(macroData)
 		if composites != nil {
@@ -266,6 +269,8 @@ func ConfluenceScoreV3(
 				macroScore = mathutil.Clamp(differential/2, -100, 100)
 			}
 		}
+		// If composites == nil (only happens when macroData itself is nil, which is
+		// guarded above) we retain the fallback macroScore from computeMacroComponentScore.
 	}
 
 	// Price momentum component (30%)
@@ -361,7 +366,9 @@ func ComputeConvictionScoreV3(
 	cs.CalendarComponent = mathutil.Clamp(surpriseSigma*20, -100, 100)
 	cs.MacroComponent = computeMacroComponentScore(macroData)
 
-	// Enhanced macro breakdown: use per-currency differential if composites available
+	// Enhanced macro breakdown: use per-currency differential if composites available.
+	// Falls back to the unified US-centric macro score (MacroComponent already set above)
+	// when composites is nil or country data is unavailable.
 	if macroData != nil {
 		composites := fred.ComputeComposites(macroData)
 		if composites != nil {
@@ -374,6 +381,7 @@ func ComputeConvictionScoreV3(
 				cs.MacroComponent = mathutil.Clamp(differential/2, -100, 100)
 			}
 		}
+		// If composites == nil, retain the fallback MacroComponent already assigned above.
 	}
 	if priceContext != nil {
 		// Recompute price component for breakdown (same logic as V3)

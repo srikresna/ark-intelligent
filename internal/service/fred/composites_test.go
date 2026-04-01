@@ -608,3 +608,82 @@ func TestComputeComposites(t *testing.T) {
 		}
 	})
 }
+
+// TestComputeComposites_NilAndEmptyDataGuard verifies that ComputeComposites
+// never panics and returns well-defined values for edge-case inputs.
+// Covers TASK-173: FRED Composites Nil Pointer Guard.
+func TestComputeComposites_NilAndEmptyDataGuard(t *testing.T) {
+	t.Run("nil_input_returns_nil", func(t *testing.T) {
+		got := ComputeComposites(nil)
+		if got != nil {
+			t.Error("ComputeComposites(nil) must return nil")
+		}
+	})
+
+	t.Run("empty_macrodata_no_panic", func(t *testing.T) {
+		// Fresh install: all fields zero — should never panic
+		got := ComputeComposites(&MacroData{})
+		if got == nil {
+			t.Fatal("expected non-nil composites for empty MacroData")
+		}
+		// Country scores must be finite
+		scores := map[string]float64{
+			"USScore": got.USScore,
+			"EZScore": got.EZScore,
+			"UKScore": got.UKScore,
+			"JPScore": got.JPScore,
+			"AUScore": got.AUScore,
+			"CAScore": got.CAScore,
+			"NZScore": got.NZScore,
+		}
+		for name, v := range scores {
+			if v < -100 || v > 100 {
+				t.Errorf("%s out of range [-100,100]: %.2f", name, v)
+			}
+		}
+	})
+
+	t.Run("partial_data_country_scores_finite", func(t *testing.T) {
+		// Only US data available; foreign country scores should fall back to 0
+		data := &MacroData{
+			UnemployRate: 4.1,
+			CorePCE:      2.4,
+			GDPGrowth:    2.1,
+			FedFundsRate: 4.5,
+		}
+		got := ComputeComposites(data)
+		if got == nil {
+			t.Fatal("expected non-nil composites for partial MacroData")
+		}
+		if got.USScore == 0 {
+			t.Error("USScore should be non-zero when US data is present")
+		}
+		// Foreign scores should be 0 (no data)
+		if got.EZScore != 0 {
+			t.Errorf("EZScore should be 0 (no EZ data), got %.2f", got.EZScore)
+		}
+	})
+
+	t.Run("vix_term_regime_defaults_to_na", func(t *testing.T) {
+		got := ComputeComposites(&MacroData{})
+		if got.VIXTermRegime != "N/A" {
+			t.Errorf("empty VIXTermRegime should default to N/A, got %q", got.VIXTermRegime)
+		}
+	})
+
+	t.Run("sanitize_does_not_alter_valid_scores", func(t *testing.T) {
+		data := &MacroData{
+			UnemployRate: 4.1,
+			CorePCE:      2.4,
+			GDPGrowth:    2.1,
+			FedFundsRate: 4.5,
+		}
+		got := ComputeComposites(data)
+		// sanitizeCompositeScores must preserve valid finite values
+		before := got.USScore
+		sanitizeCompositeScores(got)
+		if got.USScore != before {
+			t.Errorf("sanitizeCompositeScores altered a valid USScore: %.2f -> %.2f", before, got.USScore)
+		}
+	})
+}
