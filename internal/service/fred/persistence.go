@@ -91,6 +91,9 @@ func (ps *PersistenceService) PersistSnapshot(ctx context.Context, data *MacroDa
 	addObs("SOFR", data.SOFR)
 	addObs("IORB", data.IORB)
 	addObs("FEDFUNDS", data.FedFundsRate)
+	addObs("FEDTARMD", data.FedDotMedian)
+	addObs("FEDTARH", data.FedDotHigh)
+	addObs("FEDTARL", data.FedDotLow)
 
 	// VIX
 	addObs("VIXCLS", data.VIX)

@@ -196,6 +196,19 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString("\n")
 		}
 
+		// Fed Dot Plot (SEP projections)
+		if m.FedDotMedian > 0 {
+			b.WriteString(fmt.Sprintf("Fed Dot Plot: Median=%.2f%% | High=%.2f%% | Low=%.2f%%\n", m.FedDotMedian, m.FedDotHigh, m.FedDotLow))
+			if m.SOFR > 0 {
+				gap := (m.SOFR - m.FedDotMedian) * 100
+				direction := "hawkish"
+				if gap < 0 {
+					direction = "dovish"
+				}
+				b.WriteString(fmt.Sprintf("Dots vs SOFR Gap: %+.0fbps (market %s vs Fed)\n", gap, direction))
+			}
+		}
+
 		// Financial stress
 		b.WriteString(fmt.Sprintf("NFCI: %.3f %s (%s)\n", m.NFCI, m.NFCITrend.Arrow(), regime.FinStress))
 

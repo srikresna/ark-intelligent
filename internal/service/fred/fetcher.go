@@ -96,6 +96,11 @@ type MacroData struct {
 	M2Growth     float64 // M2SL — computed YoY growth % (NOT level)
 	M2GrowthTrend SeriesTrend
 
+	// Fed Dot Plot (Summary of Economic Projections)
+	FedDotMedian float64 // FEDTARMD — Fed median projected policy rate (%)
+	FedDotHigh   float64 // FEDTARH  — Fed high projection (%)
+	FedDotLow    float64 // FEDTARL  — Fed low projection (%)
+
 	// Growth
 	GDPGrowth float64 // A191RL1Q225SBEA — Real GDP Growth Rate (QoQ annualized %)
 
@@ -308,6 +313,8 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		{"CES0500000003", 5}, {"CEU0500000008", 5},
 		// Monetary policy
 		{"FEDFUNDS", 5}, {"M2SL", 14},
+		// Fed Dot Plot (quarterly SEP projections)
+		{"FEDTARMD", 6}, {"FEDTARH", 6}, {"FEDTARL", 6},
 		// Growth
 		{"A191RL1Q225SBEA", 5}, {"SAHMCURRENT", 5}, {"NAPMNOI", 3}, {"UMCSENT", 3},
 		// Fed balance sheet
@@ -528,6 +535,11 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		data.M2GrowthTrend = computeTrend(obs[0], obs[1], 50)
 	}
 
+	// Fed Dot Plot (SEP projections — quarterly, may be 0 between updates)
+	data.FedDotMedian = single("FEDTARMD")
+	data.FedDotHigh = single("FEDTARH")
+	data.FedDotLow = single("FEDTARL")
+
 	// Growth & recession
 	data.GDPGrowth = single("A191RL1Q225SBEA")
 	data.SahmRule = single("SAHMCURRENT")
@@ -625,6 +637,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	sanitizeFloat(&data.FedFundsRate)
 	sanitizeFloat(&data.SOFR)
 	sanitizeFloat(&data.IORB)
+	sanitizeFloat(&data.FedDotMedian)
+	sanitizeFloat(&data.FedDotHigh)
+	sanitizeFloat(&data.FedDotLow)
 	sanitizeFloat(&data.NFCI)
 	sanitizeFloat(&data.InitialClaims)
 	sanitizeFloat(&data.UnemployRate)
