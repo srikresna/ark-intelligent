@@ -1,6 +1,6 @@
 package telegram
 
-// handler_auction.go — /auction command: AMT Day Type Classification (Dalton's 6 types).
+// handler_auction.go — /auction command: AMT Day Type + Opening Type Analysis.
 // Requires VP services to be configured (IntradayRepo for 30-minute bars).
 
 import (
@@ -85,7 +85,10 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		return nil
 	}
 
-	msg := formatAuctionResult(mapping.Currency, result)
+	// Opening type analysis (Module 2) — best-effort, nil-safe.
+	openingResult := ta.ClassifyOpening(bars, 2, 10)
+
+	msg := formatAuctionResult(mapping.Currency, result, openingResult)
 	_, err = h.bot.SendHTML(ctx, chatID, msg)
 	return err
 }
@@ -94,7 +97,7 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 // Formatter
 // ---------------------------------------------------------------------------
 
-func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult) string {
+func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult, opening *ta.AMTOpeningResult) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("🏛️ <b>AMT DAY TYPE: %s</b>\n", html.EscapeString(symbol)))
@@ -142,6 +145,39 @@ func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult) string {
 
 	if r.ConsecutiveTrendDays >= 2 {
 		sb.WriteString(fmt.Sprintf("⚡ <b>%d consecutive Trend Days</b> — strong directional conviction\n", r.ConsecutiveTrendDays))
+	}
+
+	// Opening Type Analysis (Module 2) — only if available.
+	if opening != nil {
+		sb.WriteString("\n─────────────────────\n")
+		sb.WriteString("🚪 <b>OPENING TYPE ANALYSIS</b>\n\n")
+		oc := opening.Today
+		locEmoji := "➡️"
+		switch oc.OpenLocation {
+		case "ABOVE_VA":
+			locEmoji = "⬆️"
+		case "BELOW_VA":
+			locEmoji = "⬇️"
+		}
+		sb.WriteString(fmt.Sprintf("%s <b>%s</b>\n", locEmoji, html.EscapeString(string(oc.Type))))
+		sb.WriteString(fmt.Sprintf("  Open: <code>%.5f</code> | Location: <i>%s</i>\n", oc.OpenPrice, html.EscapeString(oc.OpenLocation)))
+		if oc.Implication != "" {
+			sb.WriteString(fmt.Sprintf("  💡 %s\n", html.EscapeString(oc.Implication)))
+		}
+		if oc.Confidence != "" {
+			confEmoji := "🟡"
+			if oc.Confidence == "HIGH" {
+				confEmoji = "🟢"
+			} else if oc.Confidence == "LOW" {
+				confEmoji = "🔴"
+			}
+			sb.WriteString(fmt.Sprintf("  %s Confidence: <b>%s</b>\n", confEmoji, oc.Confidence))
+		}
+		if len(opening.WinRates) > 0 {
+			if wr, ok := opening.WinRates[oc.Type]; ok {
+				sb.WriteString(fmt.Sprintf("  📊 Historical win rate: <b>%.0f%%</b>\n", wr*100))
+			}
+		}
 	}
 
 	return sb.String()
