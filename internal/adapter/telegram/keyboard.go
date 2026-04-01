@@ -1442,3 +1442,41 @@ func (kb *KeyboardBuilder) ShareRow(callbackBase string) []ports.InlineButton {
 		{Text: "📤 Share", CallbackData: callbackBase},
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Alert Action Keyboards
+// ---------------------------------------------------------------------------
+
+// AlertActionKeyboard builds an inline keyboard for alert messages,
+// providing quick actions: view details, mute this alert type, or open settings.
+//
+// alertType identifies the alert category (e.g. "cot", "fred", "signal").
+// detailCmd is the suggested command to view details (e.g. "/cot", "/macro").
+func (kb *KeyboardBuilder) AlertActionKeyboard(alertType, detailCmd string) ports.InlineKeyboard {
+	rows := [][]ports.InlineButton{
+		{
+			{Text: "📊 Lihat Detail", CallbackData: "cmd:" + detailCmd},
+			{Text: "🔕 Matikan Alert Ini", CallbackData: "alert:off:" + alertType},
+		},
+		{
+			{Text: "⚙️ Pengaturan Alert", CallbackData: "set:alerts"},
+		},
+	}
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// SignalAlertKeyboard builds an inline keyboard for strong signal alert messages.
+// currency is the COT currency code, e.g. "EUR".
+func (kb *KeyboardBuilder) SignalAlertKeyboard(currency string) ports.InlineKeyboard {
+	rows := [][]ports.InlineButton{
+		{
+			{Text: "📊 Detail COT", CallbackData: "cot:" + currency},
+			{Text: "🎯 Bias " + currency, CallbackData: "cmd:bias " + currency},
+		},
+		{
+			{Text: "🔕 Matikan Signal Alert", CallbackData: "alert:off:signal"},
+			{Text: "⚙️ Pengaturan", CallbackData: "set:alerts"},
+		},
+	}
+	return ports.InlineKeyboard{Rows: rows}
+}

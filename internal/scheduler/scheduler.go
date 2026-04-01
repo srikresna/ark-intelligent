@@ -348,8 +348,19 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 		return
 	}
 
-	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nLatest positioning data has been fetched and analyzed. Use /cot to view the new insights.",
+	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nData positioning terbaru sudah di-fetch dan dianalisis.\n\nð Tap <b>Lihat Detail</b> untuk melihat insight terbaru.",
 		date.Format("Monday, 02 Jan 2006"))
+
+	cotAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "ð Lihat Detail", CallbackData: "cmd:cot"},
+			{Text: "ð Matikan Alert", CallbackData: "alert:off:cot"},
+		},
+		{
+			{Text: "âï¸ Pengaturan Alert", CallbackData: "set:alerts"},
+		},
+	}}
+
 
 	count := 0
 	for userID, prefs := range activeUsers {
@@ -360,7 +371,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 		if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 			continue
 		}
-		if _, err := s.deps.Bot.SendHTML(ctx, prefs.ChatID, msg); err == nil {
+		if _, err := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, cotAlertKB); err == nil {
 			count++
 		}
 		// Avoid flooding Telegram API
@@ -423,12 +434,22 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	if len(strongSignals) > 0 {
 		signalHTML := formatStrongSignalAlert(strongSignals)
+		signalAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+			{
+				{Text: "ð Lihat COT", CallbackData: "cmd:cot"},
+				{Text: "ð¯ Lihat Bias", CallbackData: "cmd:bias"},
+			},
+			{
+				{Text: "ð Matikan Signal Alert", CallbackData: "alert:off:signal"},
+				{Text: "âï¸ Pengaturan", CallbackData: "set:alerts"},
+			},
+		}}
 		for userID, prefs := range activeUsers {
 			if prefs.COTAlertsEnabled && prefs.ChatID != "" {
 				if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 					continue
 				}
-				_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, signalHTML)
+				_, _ = s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, signalHTML, signalAlertKB)
 			}
 		}
 		log.Info().Int("signals", len(strongSignals)).Msg("sent strong signal alert to active users")
@@ -555,6 +576,16 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 		return fmt.Errorf("get active users for fred alerts: %w", err)
 	}
 
+	fredAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "ð Lihat Macro", CallbackData: "cmd:macro"},
+			{Text: "ð Matikan Alert", CallbackData: "alert:off:fred"},
+		},
+		{
+			{Text: "âï¸ Pengaturan Alert", CallbackData: "set:alerts"},
+		},
+	}}
+
 	for _, alert := range alerts {
 		msg := fred.FormatMacroAlert(alert)
 		count := 0
@@ -570,7 +601,7 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 			if s.deps.FREDAlertCheck != nil && !s.deps.FREDAlertCheck(ctx, userID) {
 				continue
 			}
-			if _, sendErr := s.deps.Bot.SendHTML(ctx, prefs.ChatID, msg); sendErr == nil {
+			if _, sendErr := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, fredAlertKB); sendErr == nil {
 				count++
 			}
 			time.Sleep(config.TelegramFloodDelay)
