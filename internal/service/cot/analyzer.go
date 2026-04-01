@@ -47,7 +47,7 @@ func (a *Analyzer) AnalyzeAll(ctx context.Context) ([]domain.COTAnalysis, error)
 
 	// Save raw records
 	if err := a.cotRepo.SaveRecords(ctx, records); err != nil {
-		log.Warn().Err(err).Msg("failed to save records")
+		log.Warn().Str("op", "save-records").Err(err).Msg("failed to save records")
 	}
 
 	// Gap B — Best-effort FRED regime fetch for RegimeAdjustedScore population

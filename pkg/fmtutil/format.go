@@ -232,6 +232,9 @@ func BulletList(items []string) string {
 // wib is the WIB (Western Indonesia Time) timezone, UTC+7.
 var wib = time.FixedZone("WIB", 7*60*60)
 
+// WIB returns the WIB timezone location (UTC+7) for external callers.
+func WIB() *time.Location { return wib }
+
 // UpdatedAt returns a standardized "Updated: DD MMM HH:MM WIB" HTML string.
 // Suitable for appending as a footer to analysis messages.
 func UpdatedAt(t time.Time) string {
@@ -246,6 +249,11 @@ func UpdatedAtShort(t time.Time) string {
 // FormatDateWIB returns "02 Jan 2006" in WIB timezone.
 func FormatDateWIB(t time.Time) string {
 	return t.In(wib).Format("02 Jan 2006")
+}
+
+// FormatDateShortWIB returns "02 Jan" (day + month) in WIB timezone.
+func FormatDateShortWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan")
 }
 
 // FormatDateTimeWIB returns "02 Jan 15:04 WIB" in WIB timezone.
