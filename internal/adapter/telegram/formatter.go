@@ -3640,6 +3640,22 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data unavailable</code>\n")
 	}
 
+	// --- Crypto Fear & Greed Index (alternative.me) ---
+	b.WriteString("\n<b>Crypto Fear &amp; Greed Index</b>\n")
+	if data.CryptoFearGreedAvailable {
+		gauge := sentimentGauge(data.CryptoFearGreed, 15)
+		emoji := fearGreedEmoji(data.CryptoFearGreed)
+		b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", gauge))
+		b.WriteString(fmt.Sprintf("<code>Score : %.0f / 100  %s %s</code>\n", data.CryptoFearGreed, emoji, data.CryptoFearGreedLabel))
+		if data.CryptoFearGreed <= 25 {
+			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear in crypto may signal accumulation zone\n")
+		} else if data.CryptoFearGreed >= 75 {
+			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed in crypto often precedes corrections\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable</code>\n")
+	}
+
 	// --- AAII Investor Sentiment Survey ---
 	b.WriteString("\n<b>AAII Investor Sentiment Survey</b>\n")
 	if data.AAIIAvailable {

@@ -50,6 +50,11 @@ type SentimentData struct {
 	PutCallSignal  string  // "EXTREME FEAR", "FEAR", "NEUTRAL", "COMPLACENCY", "EXTREME COMPLACENCY"
 	PutCallAvailable bool
 
+	// Crypto Fear & Greed Index (alternative.me)
+	CryptoFearGreed          float64 // 0-100 (0=Extreme Fear, 100=Extreme Greed)
+	CryptoFearGreedLabel     string  // "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
+	CryptoFearGreedAvailable bool
+
 	FetchedAt time.Time
 }
 
@@ -69,6 +74,9 @@ func FetchSentiment(ctx context.Context) (*SentimentData, error) {
 	// Fetch CBOE Put/Call Ratios (via Firecrawl if API key available)
 	pcData := FetchCBOEPutCall(ctx)
 	IntegratePutCallIntoSentiment(data, pcData)
+
+	// Fetch Crypto Fear & Greed Index (alternative.me — no API key needed)
+	fetchCryptoFearGreed(ctx, client, data)
 
 	return data, nil
 }
@@ -281,4 +289,71 @@ func fetchAAIISentiment(ctx context.Context, client *http.Client, data *Sentimen
 		Float64("neutral", data.AAIINeutral).
 		Str("week", data.AAIIWeekDate).
 		Msg("AAII fetched via Firecrawl")
+}
+
+// ---------------------------------------------------------------------------
+// Crypto Fear & Greed Index (alternative.me — no API key required)
+// ---------------------------------------------------------------------------
+
+// cryptoFGURL is the alternative.me public JSON endpoint.
+const cryptoFGURL = "https://api.alternative.me/fng/?limit=2"
+
+// cryptoFGResponse models the alternative.me Fear & Greed API response.
+type cryptoFGResponse struct {
+	Name string `json:"name"`
+	Data []struct {
+		Value               string `json:"value"`
+		ValueClassification string `json:"value_classification"`
+		Timestamp           string `json:"timestamp"`
+	} `json:"data"`
+}
+
+// fetchCryptoFearGreed fetches the Crypto Fear & Greed Index from alternative.me.
+// Scale: 0-24 Extreme Fear, 25-44 Fear, 45-55 Neutral, 56-74 Greed, 75-100 Extreme Greed.
+func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *SentimentData) {
+	req, err := http.NewRequestWithContext(ctx, "GET", cryptoFGURL, nil)
+	if err != nil {
+		log.Warn().Err(err).Msg("Crypto F&G: failed to build request")
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
+
+	fgClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := fgClient.Do(req)
+	if err != nil {
+		log.Warn().Err(err).Msg("Crypto F&G: request failed")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Warn().Int("status", resp.StatusCode).Msg("Crypto F&G: non-2xx response")
+		return
+	}
+
+	var result cryptoFGResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Warn().Err(err).Msg("Crypto F&G: decode failed")
+		return
+	}
+
+	if len(result.Data) == 0 || result.Data[0].Value == "" {
+		log.Warn().Msg("Crypto F&G: empty data from alternative.me")
+		return
+	}
+
+	var score float64
+	if _, err := fmt.Sscanf(result.Data[0].Value, "%f", &score); err != nil {
+		log.Warn().Err(err).Str("raw", result.Data[0].Value).Msg("Crypto F&G: failed to parse score")
+		return
+	}
+
+	data.CryptoFearGreed = score
+	data.CryptoFearGreedLabel = normalizeFearGreedLabel(result.Data[0].ValueClassification)
+	data.CryptoFearGreedAvailable = true
+
+	log.Debug().
+		Float64("score", data.CryptoFearGreed).
+		Str("label", data.CryptoFearGreedLabel).
+		Msg("Crypto F&G fetched from alternative.me")
 }

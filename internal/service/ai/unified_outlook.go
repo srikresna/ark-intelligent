@@ -275,6 +275,9 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString(fmt.Sprintf("=== %d. MARKET SENTIMENT ===\n", section))
 			section++
 			b.WriteString(fmt.Sprintf("CNN Fear & Greed: %.0f/100 (%s)\n", sd.CNNFearGreed, sd.CNNFearGreedLabel))
+			if sd.CryptoFearGreedAvailable {
+				b.WriteString(fmt.Sprintf("Crypto Fear & Greed: %.0f/100 (%s)\n", sd.CryptoFearGreed, sd.CryptoFearGreedLabel))
+			}
 			if sd.AAIIAvailable {
 				b.WriteString(fmt.Sprintf("AAII: Bull=%.1f%% Bear=%.1f%% Neutral=%.1f%% (B/B Ratio=%.2f)\n",
 					sd.AAIIBullish, sd.AAIIBearish, sd.AAIINeutral, sd.AAIIBullBear))
