@@ -29,4 +29,7 @@ type VIXTermStructure struct {
 	Available bool      // false if data could not be fetched/parsed
 	AsOf      time.Time // UTC timestamp of data
 	Error     string    // non-empty if fetching failed
+
+	// MOVE Index (bond volatility) — cross-asset vol comparison
+	MOVE *MOVEData // nil if MOVE data unavailable
 }

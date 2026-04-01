@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +42,7 @@ type SentimentFetcher struct {
 	cbCrypto   *circuitbreaker.Breaker
 	cbVIX      *circuitbreaker.Breaker
 	cbMyfxbook *circuitbreaker.Breaker
+	cbCryptoGlobal *circuitbreaker.Breaker
 	vixCache   *vix.Cache
 }
 
@@ -54,6 +57,7 @@ func NewSentimentFetcher() *SentimentFetcher {
 		cbCrypto:   circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
 		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
 		cbMyfxbook: circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
+		cbCryptoGlobal: circuitbreaker.New("sentiment-crypto-global", 3, 5*time.Minute),
 		vixCache:   vix.NewCache(),
 	}
 }
@@ -116,6 +120,18 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		log.Debug().Str("source", "crypto-fg").Err(err).Msg("sentiment: crypto F&G circuit breaker rejected or source unavailable")
 	}
 
+	// Crypto Global Market Data + Top Tickers (alternative.me v2) — wrapped in circuit breaker
+	if err := f.cbCryptoGlobal.Execute(func() error {
+		fetchCryptoGlobal(ctx, f.httpClient, data)
+		fetchCryptoTopTickers(ctx, f.httpClient, data)
+		if !data.CryptoGlobalAvailable && !data.CryptoTickersAvailable {
+			return fmt.Errorf("crypto global + tickers unavailable")
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Str("source", "crypto-global").Err(err).Msg("sentiment: crypto global circuit breaker rejected or source unavailable")
+	}
+
 	// VIX Term Structure (CBOE CSV — no API key) — wrapped in circuit breaker
 	if err := f.cbVIX.Execute(func() error {
 		ts, vixErr := f.vixCache.Get(ctx)
@@ -133,6 +149,14 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		data.VIXSlopePct = ts.SlopePct
 		data.VIXRegime = ts.Regime
 		data.VIXAvailable = true
+		// MOVE index (bond volatility)
+		if ts.MOVE != nil && ts.MOVE.Available {
+			data.MOVELevel = ts.MOVE.Level
+			data.MOVEChangePct = ts.MOVE.DailyChangePct
+			data.VIXMOVERatio = ts.MOVE.VIXMOVERatio
+			data.MOVEDivergence = ts.MOVE.Divergence
+			data.MOVEAvailable = true
+		}
 		return nil
 	}); err != nil {
 		log.Debug().Str("source", "vix").Err(err).Msg("sentiment: VIX circuit breaker rejected or source unavailable")
@@ -186,6 +210,17 @@ type SentimentData struct {
 	CryptoFearGreedLabel     string  // "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
 	CryptoFearGreedAvailable bool
 
+	// Crypto Global Market Data (alternative.me v2)
+	CryptoTotalMarketCap    float64 // Total crypto market cap USD
+	CryptoBTCDominance      float64 // BTC dominance %
+	CryptoActiveCurrencies  int     // Number of active currencies
+	CryptoActiveMarkets     int     // Number of active markets
+	CryptoGlobalAvailable   bool
+
+	// Crypto Top Tickers (alternative.me v2)
+	CryptoTopTickers       []CryptoTicker // Top 20 cryptos by rank
+	CryptoTickersAvailable bool
+
 	// VIX Term Structure (CBOE)
 	VIXSpot      float64 // VIX spot index level
 	VIXM1        float64 // Front-month VIX futures settle
@@ -195,6 +230,13 @@ type SentimentData struct {
 	VIXSlopePct  float64 // (M2-M1)/M1 * 100
 	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
 	VIXAvailable bool
+
+	// MOVE Index (bond volatility)
+	MOVELevel      float64 // ICE BofA MOVE index level
+	MOVEChangePct  float64 // Daily change %
+	VIXMOVERatio   float64 // VIX/MOVE — normal 0.15-0.30
+	MOVEDivergence string  // "EQUITY_FEAR", "BOND_STRESS", "SYSTEMIC_STRESS", "ALIGNED"
+	MOVEAvailable  bool
 
 	// Myfxbook Retail Positioning (Firecrawl)
 	MyfxbookPairs     []MyfxbookPairSentiment
@@ -488,4 +530,176 @@ func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *Sentim
 		Float64("score", data.CryptoFearGreed).
 		Str("label", data.CryptoFearGreedLabel).
 		Msg("Crypto F&G fetched from alternative.me")
+}
+
+// ---------------------------------------------------------------------------
+// Crypto Global Market Data + Top Tickers (alternative.me v2 — no API key)
+// ---------------------------------------------------------------------------
+
+// CryptoTicker represents a single cryptocurrency ticker from alternative.me v2.
+type CryptoTicker struct {
+	Name            string  // e.g. "Bitcoin"
+	Symbol          string  // e.g. "BTC"
+	Rank            int     // CoinMarketCap rank
+	PriceUSD        float64 // Current price in USD
+	PercentChange1h float64 // 1-hour % change
+	PercentChange24h float64 // 24-hour % change
+	PercentChange7d float64 // 7-day % change
+	MarketCapUSD    float64 // Market cap in USD
+	Volume24hUSD    float64 // 24h volume in USD
+	VolToMcapRatio  float64 // Volume / MarketCap (liquidity health)
+}
+
+const (
+	cryptoGlobalURL = "https://api.alternative.me/v2/global/"
+	cryptoTickerURL = "https://api.alternative.me/v2/ticker/?limit=20&sort=rank&structure=array"
+)
+
+// cryptoGlobalResponse models the alternative.me v2 global response.
+type cryptoGlobalResponse struct {
+	Data struct {
+		ActiveCurrencies    int    `json:"active_cryptocurrencies"`
+		ActiveMarkets       int    `json:"active_markets"`
+		BTCPercentage       float64 `json:"bitcoin_percentage_of_market_cap"`
+		TotalMarketCapUSD   map[string]float64 `json:"total_market_cap"`
+		TotalVolume24hUSD   map[string]float64 `json:"total_24h_volume"`
+	} `json:"data"`
+}
+
+// cryptoTickerResponse models the alternative.me v2 ticker (array) response.
+type cryptoTickerResponse struct {
+	Data []struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Symbol   string `json:"symbol"`
+		Rank     int    `json:"rank"`
+		Quotes   map[string]struct {
+			Price            float64 `json:"price"`
+			Volume24h        float64 `json:"volume_24h"`
+			MarketCap        float64 `json:"market_cap"`
+			PercentChange1h  float64 `json:"percentage_change_1h"`
+			PercentChange24h float64 `json:"percentage_change_24h"`
+			PercentChange7d  float64 `json:"percentage_change_7d"`
+		} `json:"quotes"`
+	} `json:"data"`
+}
+
+// fetchCryptoGlobal fetches global crypto market data from alternative.me v2.
+func fetchCryptoGlobal(ctx context.Context, client *http.Client, data *SentimentData) {
+	req, err := http.NewRequestWithContext(ctx, "GET", cryptoGlobalURL, nil)
+	if err != nil {
+		log.Warn().Str("source", "crypto-global").Err(err).Msg("crypto global: failed to build request")
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Warn().Str("source", "crypto-global").Err(err).Msg("crypto global: request failed")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Warn().Str("source", "crypto-global").Int("status", resp.StatusCode).Msg("crypto global: non-2xx response")
+		return
+	}
+
+	var result cryptoGlobalResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Warn().Str("source", "crypto-global").Err(err).Msg("crypto global: decode failed")
+		return
+	}
+
+	data.CryptoBTCDominance = result.Data.BTCPercentage
+	data.CryptoActiveCurrencies = result.Data.ActiveCurrencies
+	data.CryptoActiveMarkets = result.Data.ActiveMarkets
+	if usd, ok := result.Data.TotalMarketCapUSD["USD"]; ok {
+		data.CryptoTotalMarketCap = usd
+	}
+	data.CryptoGlobalAvailable = true
+
+	log.Debug().
+		Float64("btc_dominance", data.CryptoBTCDominance).
+		Float64("total_mcap", data.CryptoTotalMarketCap).
+		Int("currencies", data.CryptoActiveCurrencies).
+		Msg("crypto global fetched from alternative.me v2")
+}
+
+// fetchCryptoTopTickers fetches top 20 crypto tickers from alternative.me v2.
+func fetchCryptoTopTickers(ctx context.Context, client *http.Client, data *SentimentData) {
+	req, err := http.NewRequestWithContext(ctx, "GET", cryptoTickerURL, nil)
+	if err != nil {
+		log.Warn().Str("source", "crypto-tickers").Err(err).Msg("crypto tickers: failed to build request")
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Warn().Str("source", "crypto-tickers").Err(err).Msg("crypto tickers: request failed")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Warn().Str("source", "crypto-tickers").Int("status", resp.StatusCode).Msg("crypto tickers: non-2xx response")
+		return
+	}
+
+	var result cryptoTickerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Warn().Str("source", "crypto-tickers").Err(err).Msg("crypto tickers: decode failed")
+		return
+	}
+
+	if len(result.Data) == 0 {
+		log.Warn().Str("source", "crypto-tickers").Msg("crypto tickers: empty data")
+		return
+	}
+
+	tickers := make([]CryptoTicker, 0, len(result.Data))
+	for _, d := range result.Data {
+		t := CryptoTicker{
+			Name:   d.Name,
+			Symbol: d.Symbol,
+			Rank:   d.Rank,
+		}
+		if q, ok := d.Quotes["USD"]; ok {
+			t.PriceUSD = q.Price
+			t.PercentChange1h = q.PercentChange1h
+			t.PercentChange24h = q.PercentChange24h
+			t.PercentChange7d = q.PercentChange7d
+			t.MarketCapUSD = q.MarketCap
+			t.Volume24hUSD = q.Volume24h
+			if q.MarketCap > 0 {
+				t.VolToMcapRatio = q.Volume24h / q.MarketCap
+			}
+		}
+		tickers = append(tickers, t)
+	}
+
+	// Sort by rank (should already be sorted, but ensure)
+	sort.Slice(tickers, func(i, j int) bool {
+		return tickers[i].Rank < tickers[j].Rank
+	})
+
+	data.CryptoTopTickers = tickers
+	data.CryptoTickersAvailable = true
+
+	log.Debug().
+		Int("count", len(tickers)).
+		Msg("crypto top tickers fetched from alternative.me v2")
+}
+
+// FormatCryptoGlobalBrief returns a one-line summary of crypto global data.
+func FormatCryptoGlobalBrief(data *SentimentData) string {
+	if !data.CryptoGlobalAvailable {
+		return ""
+	}
+	mcapT := data.CryptoTotalMarketCap / 1e12 // trillions
+	return fmt.Sprintf("Total Mcap: $%.2fT | BTC Dom: %.1f%% | Coins: %s | Markets: %s",
+		mcapT, data.CryptoBTCDominance,
+		strconv.Itoa(data.CryptoActiveCurrencies),
+		strconv.Itoa(data.CryptoActiveMarkets))
 }

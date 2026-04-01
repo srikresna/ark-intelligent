@@ -57,6 +57,15 @@ func FetchTermStructure(ctx context.Context) (*VIXTermStructure, error) {
 
 	computeDerivedFields(ts)
 	ts.Available = true
+
+	// Fetch MOVE index for cross-asset vol comparison (non-fatal)
+	moveData, moveErr := FetchMOVE(ctx, ts.Spot)
+	if moveErr != nil {
+		stdlog.Printf("MOVE fetch failed (non-fatal): %v", moveErr)
+	} else if moveData.Available {
+		ts.MOVE = moveData
+	}
+
 	return ts, nil
 }
 

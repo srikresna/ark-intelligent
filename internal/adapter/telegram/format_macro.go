@@ -1078,6 +1078,47 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
+
+	// --- Crypto Global Market Data (alternative.me v2) ---
+	if data.CryptoGlobalAvailable {
+		b.WriteString("\n<b>🌐 Crypto Global Market</b>\n")
+		mcapT := data.CryptoTotalMarketCap / 1e12
+		b.WriteString(fmt.Sprintf("<code>Total Mcap   : $%.2fT</code>\n", mcapT))
+		b.WriteString(fmt.Sprintf("<code>BTC Dominance: %.1f%%</code>", data.CryptoBTCDominance))
+		if data.CryptoBTCDominance >= 55 {
+			b.WriteString(" — BTC season")
+		} else if data.CryptoBTCDominance <= 40 {
+			b.WriteString(" — 🔥 Alt season")
+		}
+		b.WriteString("\n")
+		b.WriteString(fmt.Sprintf("<code>Currencies   : %d</code>\n", data.CryptoActiveCurrencies))
+		b.WriteString(fmt.Sprintf("<code>Markets      : %d</code>\n", data.CryptoActiveMarkets))
+	}
+
+	// --- Crypto Top Movers (alternative.me v2) ---
+	if data.CryptoTickersAvailable && len(data.CryptoTopTickers) > 0 {
+		b.WriteString("\n<b>📊 Crypto Top 10 (24h)</b>\n")
+		topN := 10
+		if len(data.CryptoTopTickers) < topN {
+			topN = len(data.CryptoTopTickers)
+		}
+		for _, t := range data.CryptoTopTickers[:topN] {
+			arrow := "⬆️"
+			if t.PercentChange24h < 0 {
+				arrow = "⬇️"
+			}
+			priceStr := ""
+			if t.PriceUSD >= 1000 {
+				priceStr = fmt.Sprintf("$%.0f", t.PriceUSD)
+			} else if t.PriceUSD >= 1 {
+				priceStr = fmt.Sprintf("$%.2f", t.PriceUSD)
+			} else {
+				priceStr = fmt.Sprintf("$%.4f", t.PriceUSD)
+			}
+			b.WriteString(fmt.Sprintf("<code>%s %-5s %8s %+.1f%%</code>\n", arrow, t.Symbol, priceStr, t.PercentChange24h))
+		}
+	}
+
 	// --- AAII Investor Sentiment Survey ---
 	b.WriteString("\n<b>AAII Investor Sentiment Survey</b>\n")
 	if data.AAIIAvailable {
@@ -1241,6 +1282,31 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			b.WriteString("<i>VIX backwardation — ketakutan jangka pendek tinggi, pasar memperhitungkan risiko dekat.</i>\n")
 		case "RISK_ON_COMPLACENT":
 			b.WriteString("<i>Steep contango — pasar complacent, VIX ETPs merugi. Bullish ekuitas tapi waspada pembalikan mendadak.</i>\n")
+		}
+		// --- MOVE Index (bond volatility) ---
+		if data.MOVEAvailable {
+			b.WriteString("\n<b>MOVE Index (Bond Vol)</b>\n")
+			b.WriteString(fmt.Sprintf("<code>MOVE  : %.1f (%+.1f%%)</code>\n", data.MOVELevel, data.MOVEChangePct))
+			if data.VIXMOVERatio > 0 {
+				var ratioEmoji string
+				switch {
+				case data.VIXMOVERatio > 0.35:
+					ratioEmoji = "📈" // equity vol elevated
+				case data.VIXMOVERatio < 0.12:
+					ratioEmoji = "📉" // bond vol elevated
+				default:
+					ratioEmoji = "↔️"
+				}
+				b.WriteString(fmt.Sprintf("<code>VIX/MOVE: %.3f %s</code>\n", data.VIXMOVERatio, ratioEmoji))
+			}
+			switch data.MOVEDivergence {
+			case "EQUITY_FEAR":
+				b.WriteString("<i>VIX tinggi vs MOVE rendah — ketakutan spesifik ekuitas, bukan sistemik.</i>\n")
+			case "BOND_STRESS":
+				b.WriteString("<i>MOVE tinggi vs VIX rendah — stres obligasi / risiko carry FX.</i>\n")
+			case "SYSTEMIC_STRESS":
+				b.WriteString("<i>VIX dan MOVE keduanya tinggi — stres sistemik luas.</i>\n")
+			}
 		}
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
