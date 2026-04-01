@@ -25,25 +25,28 @@ type CTAServices struct {
 	DailyPriceRepo pricesvc.DailyPriceStore
 	IntradayRepo   pricesvc.IntradayStore
 	PriceMapping   []domain.PriceSymbolMapping
+	RegimeEngine   RegimeOverlayEngine // optional — nil disables overlay header
 }
 
 // ctaState — cached computation results
 
 type ctaState struct {
-	symbol     string
-	currency   string
-	daily      *ta.FullResult
-	h4         *ta.FullResult
-	h1         *ta.FullResult
-	m15        *ta.FullResult
-	m30        *ta.FullResult
-	h6         *ta.FullResult
-	h12        *ta.FullResult
-	weekly     *ta.FullResult
-	mtf        *ta.MTFResult
-	bars       map[string][]ta.OHLCV // timeframe -> bars
-	chartData  map[string][]byte     // timeframe -> PNG bytes (lazy-generated)
-	computedAt time.Time
+	symbol        string
+	currency      string
+	contractCode  string
+	daily         *ta.FullResult
+	h4            *ta.FullResult
+	h1            *ta.FullResult
+	m15           *ta.FullResult
+	m30           *ta.FullResult
+	h6            *ta.FullResult
+	h12           *ta.FullResult
+	weekly        *ta.FullResult
+	mtf           *ta.MTFResult
+	bars          map[string][]ta.OHLCV // timeframe -> bars
+	chartData     map[string][]byte     // timeframe -> PNG bytes (lazy-generated)
+	regimeOverlay RegimeHeaderProvider  // optional regime overlay header
+	computedAt    time.Time
 }
 
 var ctaStateTTL = config.CTAStateTTL
@@ -169,6 +172,13 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	h.ctaCache.set(chatID, state)
 	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
+	// Compute regime overlay (best-effort, non-blocking)
+	if h.cta.RegimeEngine != nil {
+		if overlay, rErr := h.cta.RegimeEngine.ComputeOverlay(ctx, mapping.ContractCode, mapping.Currency, "daily"); rErr == nil {
+			state.regimeOverlay = overlay
+		}
+	}
+
 	// Generate chart for daily timeframe
 	chartPNG, chartErr := h.generateCTAChart(state, "daily")
 	if chartErr != nil {
@@ -179,7 +189,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	prog.Stop(ctx)
 
 	// Format summary
-	summary := formatCTASummary(state)
+	summary := formatCTASummary(state, state.regimeOverlay)
 	kb := h.kb.CTAMenu()
 
 	// Send photo with keyboard if chart available, otherwise text + notification
@@ -463,20 +473,21 @@ func (h *Handler) computeCTAState(ctx context.Context, mapping *domain.PriceSymb
 	}
 
 	return &ctaState{
-		symbol:     displaySymbol,
-		currency:   mapping.Currency,
-		daily:      daily,
-		h4:         h4,
-		h1:         h1,
-		m15:        m15,
-		m30:        m30,
-		h6:         h6,
-		h12:        h12,
-		weekly:     weekly,
-		mtf:        mtf,
-		bars:       barsByTF,
-		chartData:  make(map[string][]byte),
-		computedAt: time.Now(),
+		symbol:       displaySymbol,
+		currency:     mapping.Currency,
+		contractCode: mapping.ContractCode,
+		daily:        daily,
+		h4:           h4,
+		h1:           h1,
+		m15:          m15,
+		m30:          m30,
+		h6:           h6,
+		h12:          h12,
+		weekly:       weekly,
+		mtf:          mtf,
+		bars:         barsByTF,
+		chartData:    make(map[string][]byte),
+		computedAt:   time.Now(),
 	}, nil
 }
 

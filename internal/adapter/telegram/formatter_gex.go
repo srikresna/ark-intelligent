@@ -1,6 +1,6 @@
 package telegram
 
-// formatter_gex.go — GEX (Gamma Exposure) result formatting for Telegram HTML messages.
+// formatter_gex.go — GEX (Gamma Exposure) + IV Surface formatting for Telegram HTML messages.
 
 import (
 	"fmt"
@@ -185,4 +185,129 @@ func gexWrapText(text string, maxLen int) string {
 		cut = maxLen
 	}
 	return text[:cut] + "…\n"
+}
+
+// ---------------------------------------------------------------------------
+// IV Surface formatter
+// ---------------------------------------------------------------------------
+
+// FormatIVSurface formats an IVSurfaceResult as a Telegram HTML message.
+// Sections: header, market signal, term structure, per-expiry skew table.
+func FormatIVSurface(r *gexsvc.IVSurfaceResult) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmtutil.AnalysisHeader("📈", "IV SURFACE", r.Symbol, ""))
+	sb.WriteString(fmt.Sprintf("💰 Spot: <code>%s</code>\n", gexFormatPrice(r.SpotPrice)))
+	sb.WriteString(fmt.Sprintf("📅 %s UTC\n\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
+
+	// Market signal
+	signalEmoji := ivSignalEmoji(r.MarketSignal)
+	sb.WriteString(fmt.Sprintf("🌡️ <b>IV SIGNAL:</b> %s %s\n", signalEmoji, r.MarketSignal))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", r.SignalReason))
+
+	// Term structure summary
+	sb.WriteString("📉 <b>TERM STRUCTURE</b>")
+	if r.Backwardation {
+		sb.WriteString(" ⚠️ <i>(backwardation)</i>")
+	}
+	sb.WriteString("\n")
+	if len(r.TermStructure) == 0 {
+		sb.WriteString("  <i>no ATM IV data</i>\n")
+	} else {
+		sb.WriteString(ivTermStructureChart(r.TermStructure))
+	}
+	sb.WriteString("\n")
+
+	// Per-expiry skew table (up to 8 expiries)
+	sb.WriteString("🔀 <b>SKEW PER EXPIRY</b>\n")
+	sb.WriteString("<code>Expiry     DTE  ATM-IV  Skew  Signal</code>\n")
+	count := 0
+	for _, sl := range r.Expiries {
+		if sl.ATMIV <= 0 && sl.PointCount < 5 {
+			continue
+		}
+		if count >= 8 {
+			break
+		}
+		sb.WriteString(ivSkewRow(sl))
+		count++
+	}
+	if count == 0 {
+		sb.WriteString("  <i>insufficient data</i>\n")
+	}
+	sb.WriteString("\n")
+
+	// Smile legend
+	sb.WriteString("<i>📖 Skew = Put wing IV − Call wing IV. Positive = bearish fear (put demand). Negative = call demand / bullish.</i>\n")
+
+	return sb.String()
+}
+
+// ivSignalEmoji returns an emoji for the IV market signal.
+func ivSignalEmoji(signal string) string {
+	switch signal {
+	case "FEAR":
+		return "🔴"
+	case "GREED":
+		return "🟢"
+	default:
+		return "🟡"
+	}
+}
+
+// ivTermStructureChart renders a compact ASCII bar chart of ATM IV vs DTE.
+// Shows up to 8 data points.
+func ivTermStructureChart(pts []gexsvc.TermPoint) string {
+	if len(pts) == 0 {
+		return "  <i>no data</i>\n"
+	}
+	// Find max IV for scaling.
+	maxIV := 1.0
+	for _, p := range pts {
+		if p.ATMIV > maxIV {
+			maxIV = p.ATMIV
+		}
+	}
+
+	limit := 8
+	if len(pts) < limit {
+		limit = len(pts)
+	}
+
+	var sb strings.Builder
+	for i := 0; i < limit; i++ {
+		p := pts[i]
+		ratio := p.ATMIV / maxIV
+		bar := fmtutil.ProgressBar(ratio, 1, 10, "▓", "░")
+		sb.WriteString(fmt.Sprintf("  %3dD [%s] <code>%.0f%%</code>\n", p.DTE, bar, p.ATMIV))
+	}
+	return sb.String()
+}
+
+// ivSkewRow formats a single expiry slice as a table row.
+func ivSkewRow(sl gexsvc.ExpirySlice) string {
+	expiryStr := sl.Expiry.Format("02Jan")
+	atmStr := "  N/A"
+	if sl.ATMIV > 0 {
+		atmStr = fmt.Sprintf("%5.0f%%", sl.ATMIV)
+	}
+	skewStr := "  N/A"
+	if sl.PutWingIV > 0 || sl.CallWingIV > 0 {
+		skewStr = fmt.Sprintf("%+5.1f%%", sl.Skew25Delta)
+	}
+	smileEmoji := ivSmileEmoji(sl.SmileLabel)
+	return fmt.Sprintf("<code>%-9s %3d  %s  %s</code> %s\n",
+		expiryStr, sl.DTE, atmStr, skewStr, smileEmoji)
+}
+
+// ivSmileEmoji maps SmileLabel to an emoji indicator.
+func ivSmileEmoji(label string) string {
+	switch label {
+	case "PUT_SKEW":
+		return "📉 PUT"
+	case "CALL_SKEW":
+		return "📈 CALL"
+	default:
+		return "➖ FLAT"
+	}
 }

@@ -18,6 +18,7 @@ type BookSummary struct {
 	OpenInterest    float64 `json:"open_interest"`
 	Volume          float64 `json:"volume"`
 	MarkPrice       float64 `json:"mark_price"`
+	MarkIV          float64 `json:"mark_iv"`              // implied volatility of mark price (annualised %)
 	UnderlyingPrice float64 `json:"underlying_price"`
 	ExpirationTS    int64   `json:"expiration_timestamp"` // milliseconds, 0 if absent
 }

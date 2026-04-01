@@ -161,6 +161,10 @@ type Bot struct {
 	// Default capacity is config.MaxConcurrentHandlers (20).
 	// Overridable via HANDLER_CONCURRENCY env var.
 	workerSem chan struct{}
+
+	// Chunk tracker: records overflow message IDs for multi-part messages
+	// so that subsequent edits can clean up old overflow chunks.
+	chunks *chunkTracker
 }
 
 // ---------------------------------------------------------------------------

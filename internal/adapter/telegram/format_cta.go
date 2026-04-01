@@ -11,8 +11,20 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
-func formatCTASummary(state *ctaState) string {
+// RegimeHeaderProvider is a minimal interface for overlay types to provide a header line.
+type RegimeHeaderProvider interface {
+	HeaderLine() string
+}
+
+// formatCTASummary formats the CTA analysis summary.
+// overlayHeader is optional — pass nil to omit the regime overlay line.
+func formatCTASummary(state *ctaState, overlayHeader ...RegimeHeaderProvider) string {
 	var sb strings.Builder
+
+	// Optional regime overlay header
+	if len(overlayHeader) > 0 && overlayHeader[0] != nil {
+		sb.WriteString(overlayHeader[0].HeaderLine() + "\n")
+	}
 
 	sb.WriteString(fmt.Sprintf("<b>⚡ Technical Analysis: %s</b>\n", html.EscapeString(state.symbol)))
 	sb.WriteString(fmt.Sprintf("📅 <i>%s</i>\n\n", state.computedAt.UTC().Format("02 Jan 2006 15:04 UTC")))

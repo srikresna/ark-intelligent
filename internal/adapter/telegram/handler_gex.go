@@ -1,7 +1,8 @@
 package telegram
 
-// handler_gex.go — /gex command: Gamma Exposure (GEX) analysis via Deribit public API.
+// handler_gex.go — /gex and /ivol commands: Gamma Exposure + IV Surface via Deribit public API.
 //   /gex [SYMBOL]   — e.g. /gex BTC  (default: BTC)
+//   /ivol [SYMBOL]  — e.g. /ivol BTC (default: BTC)
 
 import (
 	"context"
@@ -33,6 +34,8 @@ func (h *Handler) WithGEX(svc *GEXServices) *Handler {
 	if svc != nil {
 		h.bot.RegisterCommand("/gex", h.cmdGEX)
 		h.bot.RegisterCallback("gex:", h.handleGEXCallback)
+		h.bot.RegisterCommand("/ivol", h.cmdIVSurface)
+		h.bot.RegisterCallback("ivol:", h.handleIVolCallback)
 	}
 	return h
 }
@@ -170,4 +173,107 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// /ivol — IV Surface command
+// ---------------------------------------------------------------------------
+
+// cmdIVSurface handles the /ivol [SYMBOL] command.
+func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.gex == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ <b>IV Surface</b> engine tidak tersedia. Hubungi admin.")
+		return err
+	}
+
+	sym := "BTC"
+	if parts := strings.Fields(args); len(parts) > 0 {
+		sym = strings.ToUpper(strings.TrimSpace(parts[0]))
+	}
+
+	if _, ok := validGEXSymbols[sym]; !ok {
+		keys := make([]string, 0, len(validGEXSymbols))
+		for k := range validGEXSymbols {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
+				"Tersedia: <code>%s</code>\n\n"+
+				"Contoh: <code>/ivol BTC</code>, <code>/ivol ETH</code>",
+			sym, strings.Join(keys, "</code>, <code>"),
+		))
+		return err
+	}
+
+	loadID, err := h.bot.SendLoading(ctx, chatID,
+		fmt.Sprintf("⏳ Fetching IV Surface for <b>%s</b> from Deribit...\n<i>Analysing implied volatility across all strikes and expiries</i>", sym))
+	if err != nil {
+		return fmt.Errorf("ivol: send loading: %w", err)
+	}
+
+	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
+	if err != nil {
+		h.editUserError(ctx, chatID, loadID, err, "ivol")
+		return nil
+	}
+
+	html := FormatIVSurface(result)
+	kb := ivolKeyboard(sym)
+
+	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
+		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+		return sendErr
+	}
+	return nil
+}
+
+// ivolKeyboard builds the inline keyboard for the /ivol response.
+func ivolKeyboard(currentSym string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	symbols := []string{"BTC", "ETH", "SOL", "XRP", "AVAX"}
+	var symRow []ports.InlineButton
+	for _, s := range symbols {
+		label := s
+		if s == currentSym {
+			label = "● " + s
+		}
+		symRow = append(symRow, ports.InlineButton{
+			Text:         label,
+			CallbackData: "ivol:sym:" + s,
+		})
+	}
+	rows = append(rows, symRow)
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔄 Refresh", CallbackData: "ivol:refresh:" + currentSym},
+		{Text: "📊 GEX", CallbackData: "gex:sym:" + currentSym},
+	})
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// handleIVolCallback handles /ivol inline keyboard presses.
+// data format: "ivol:<action>:<symbol>"
+func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	if h.gex == nil {
+		return nil
+	}
+	parts := strings.SplitN(data, ":", 3)
+	if len(parts) < 3 {
+		return nil
+	}
+	sym := strings.ToUpper(parts[2])
+	if _, ok := validGEXSymbols[sym]; !ok {
+		return nil
+	}
+	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
+	if err != nil {
+		errHTML := fmt.Sprintf("⚠️ <b>IV Surface failed for %s</b>\n\n<i>%s</i>", sym, err.Error())
+		kb := ivolKeyboard(sym)
+		_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+		return nil
+	}
+	html := FormatIVSurface(result)
+	kb := ivolKeyboard(sym)
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 }

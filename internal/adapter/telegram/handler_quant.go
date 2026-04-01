@@ -30,6 +30,12 @@ type QuantServices struct {
 	DailyPriceRepo pricesvc.DailyPriceStore
 	IntradayRepo   pricesvc.IntradayStore
 	PriceMapping   []domain.PriceSymbolMapping
+	RegimeEngine   RegimeOverlayEngine // optional — nil disables overlay header
+}
+
+// RegimeOverlayEngine is the minimal interface the quant handler needs from the regime package.
+type RegimeOverlayEngine interface {
+	ComputeOverlay(ctx context.Context, contractCode, symbol, timeframe string) (RegimeHeaderProvider, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -37,12 +43,14 @@ type QuantServices struct {
 // ---------------------------------------------------------------------------
 
 type quantState struct {
-	symbol    string
-	currency  string
-	timeframe string
-	bars      map[string][]ta.OHLCV // tf → bars
-	volCone   *pricesvc.VolCone     // cached vol cone result
-	createdAt time.Time
+	symbol         string
+	currency       string
+	timeframe      string
+	contractCode   string
+	bars           map[string][]ta.OHLCV  // tf → bars
+	volCone        *pricesvc.VolCone      // cached vol cone result
+	regimeOverlay  RegimeHeaderProvider   // optional regime overlay header
+	createdAt      time.Time
 }
 
 var quantStateTTL = config.QuantStateTTL
@@ -221,14 +229,24 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 	// Compute volatility cone (cached in state, TTL via quantStateTTL)
 	volCone := pricesvc.ComputeVolCone(dailyRecords)
 
-	return &quantState{
-		symbol:    mapping.Currency,
-		currency:  mapping.Currency,
-		timeframe: timeframe,
-		bars:      barsByTF,
-		volCone:   volCone,
-		createdAt: time.Now(),
-	}, nil
+	state := &quantState{
+		symbol:       mapping.Currency,
+		currency:     mapping.Currency,
+		timeframe:    timeframe,
+		contractCode: code,
+		bars:         barsByTF,
+		volCone:      volCone,
+		createdAt:    time.Now(),
+	}
+
+	// Compute regime overlay if engine available (best-effort, non-blocking)
+	if h.quant.RegimeEngine != nil {
+		if overlay, rErr := h.quant.RegimeEngine.ComputeOverlay(ctx, code, mapping.Currency, timeframe); rErr == nil {
+			state.regimeOverlay = overlay
+		}
+	}
+
+	return state, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +259,12 @@ func (h *Handler) formatQuantDashboard(state *quantState) string {
 		volConeSection = "\n" + h.fmt.FormatVolCone(state.volCone)
 	}
 
-	return fmt.Sprintf(`📊 <b>QUANT DASHBOARD: %s</b>
+	regimeHeader := ""
+	if state.regimeOverlay != nil {
+		regimeHeader = state.regimeOverlay.HeaderLine() + "\n"
+	}
+
+	return fmt.Sprintf(`%s📊 <b>QUANT DASHBOARD: %s</b>
 📅 %s — %s
 %s
 Pilih model analisis di bawah.
@@ -257,6 +280,7 @@ Setiap model akan menghasilkan chart + analisis detail.
   HMM Regime Detection
 
 Klik tombol untuk mulai analisis.`,
+		regimeHeader,
 		html.EscapeString(state.symbol),
 		time.Now().Format("02 Jan 2006"),
 		state.timeframe,

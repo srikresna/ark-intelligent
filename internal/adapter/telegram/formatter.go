@@ -294,3 +294,13 @@ func (f *Formatter) FormatTrackedEvents(events []string) string {
 	b.WriteString("Example: <code>/impact Non-Farm Employment Change</code>")
 	return b.String()
 }
+
+// FormatRegimeOverlayHeader formats a one-line regime overlay header for embedding
+// at the top of analysis output (e.g. /cta, /quant).
+// Returns empty string if overlay is nil.
+func (f *Formatter) FormatRegimeOverlayHeader(overlay interface{ HeaderLine() string }) string {
+	if overlay == nil {
+		return ""
+	}
+	return overlay.HeaderLine() + "\n"
+}

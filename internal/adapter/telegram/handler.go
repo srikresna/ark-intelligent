@@ -149,6 +149,10 @@ type Handler struct {
 
 	// adminConfirm stores pending admin action confirmations with TTL.
 	adminConfirm *adminConfirmStore
+
+	// orderFlow holds optional price repos for the /orderflow command.
+	// May be nil — /orderflow command disabled if not configured.
+	orderFlow *OrderFlowServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
@@ -223,7 +227,9 @@ func NewHandler(
 	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
+	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
 	bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
+	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)

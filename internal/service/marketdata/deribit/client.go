@@ -134,6 +134,12 @@ func (c *Client) GetBookSummary(ctx context.Context, currency string) ([]BookSum
 // instrument name like "BTC-28MAR25-80000-C". The expiry is at 08:00 UTC
 // on the given date per Deribit convention.
 func parseExpiryFromInstrument(name string) (time.Time, error) {
+	return ParseExpiryFromInstrument(name)
+}
+
+// ParseExpiryFromInstrument is the exported version of parseExpiryFromInstrument,
+// used by other packages (e.g. gex) to parse expiry from instrument names.
+func ParseExpiryFromInstrument(name string) (time.Time, error) {
 	parts := strings.SplitN(name, "-", 4)
 	if len(parts) < 4 {
 		return time.Time{}, fmt.Errorf("invalid instrument name: %s", name)

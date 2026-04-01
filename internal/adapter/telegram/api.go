@@ -57,6 +57,8 @@ func (b *Bot) SendMessage(ctx context.Context, chatID string, text string) (int,
 // SendHTML sends an HTML-formatted message with link preview disabled.
 // When the message is split into multiple chunks, each chunk receives a
 // "Page X/Y" footer so the reader knows where they are.
+// Overflow chunk IDs are tracked internally so that future EditMessage calls
+// on the first chunk's ID can clean up the overflow messages.
 func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, error) {
 	if chatID == "" {
 		chatID = b.defaultID
@@ -66,7 +68,8 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 
 	chunks := splitMessage(html, config.TelegramMaxMessageLen)
 	total := len(chunks)
-	var lastMsgID int
+	var firstMsgID int
+	var overflowIDs []int
 
 	for i, chunk := range chunks {
 		text := chunk
@@ -82,12 +85,29 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 
 		var msg sentMessage
 		if err := b.apiCallWithRetry(ctx, "sendMessage", params, &msg); err != nil {
-			return lastMsgID, fmt.Errorf("sendHTML: %w", err)
+			// Track whatever overflow we sent so far.
+			if firstMsgID != 0 {
+				b.chunks.Record(chatID, firstMsgID, overflowIDs)
+			}
+			return firstMsgID, fmt.Errorf("sendHTML: %w", err)
 		}
-		lastMsgID = msg.MessageID
+		if i == 0 {
+			firstMsgID = msg.MessageID
+		} else {
+			overflowIDs = append(overflowIDs, msg.MessageID)
+		}
 	}
 
-	return lastMsgID, nil
+	// Track overflow chunk IDs keyed by the first message ID.
+	b.chunks.Record(chatID, firstMsgID, overflowIDs)
+
+	// Return the last message ID for backward compatibility.
+	// Callers that only care about the final message (e.g., for keyboard
+	// attachment) still get the expected value.
+	if len(overflowIDs) > 0 {
+		return overflowIDs[len(overflowIDs)-1], nil
+	}
+	return firstMsgID, nil
 }
 
 // sendHTMLRaw sends a single HTML message without splitting or page indicators.
@@ -140,6 +160,14 @@ func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text st
 		chatID = b.defaultID
 	}
 
+	// Delete any previously tracked overflow chunks for this message.
+	// This prevents orphaned messages when a long response is re-edited.
+	if oldOverflow := b.chunks.Pop(chatID, msgID); len(oldOverflow) > 0 {
+		for _, id := range oldOverflow {
+			_ = b.DeleteMessage(ctx, chatID, id) // best-effort cleanup
+		}
+	}
+
 	chunks := splitMessage(text, config.TelegramMaxMessageLen)
 
 	// Edit the original message with the first chunk.
@@ -155,12 +183,20 @@ func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text st
 		return err
 	}
 
-	// Send any remaining chunks as new messages.
+	// Send any remaining chunks as new messages and track their IDs.
+	var overflowIDs []int
 	for _, chunk := range chunks[1:] {
-		if _, err := b.SendHTML(ctx, chatID, chunk); err != nil {
+		id, err := b.SendHTML(ctx, chatID, chunk)
+		if err != nil {
+			// Record whatever we managed to send so far for future cleanup.
+			b.chunks.Record(chatID, msgID, overflowIDs)
 			return fmt.Errorf("editMessage overflow chunk: %w", err)
 		}
+		overflowIDs = append(overflowIDs, id)
 	}
+
+	// Track overflow IDs so future edits of msgID can clean them up.
+	b.chunks.Record(chatID, msgID, overflowIDs)
 
 	return nil
 }
@@ -627,7 +663,8 @@ func detectUnclosedTags(text string) []string {
 // SendWithKeyboardChunked sends a potentially long HTML message with a keyboard.
 // If the message exceeds 4000 chars, it sends intermediate chunks as plain HTML
 // messages and attaches the keyboard only to the last chunk.
-// Returns the message ID of the last sent message.
+// Returns the message ID of the last sent message. Overflow chunk IDs are
+// tracked so that future edits can clean up the extra messages.
 func (b *Bot) SendWithKeyboardChunked(ctx context.Context, chatID string, html string, kb ports.InlineKeyboard) (int, error) {
 	if chatID == "" {
 		chatID = b.defaultID
@@ -640,31 +677,52 @@ func (b *Bot) SendWithKeyboardChunked(ctx context.Context, chatID string, html s
 		return b.SendWithKeyboard(ctx, chatID, chunks[0], kb)
 	}
 
-	// Send all but the last chunk as plain HTML (page indicator added by SendHTML).
-	var lastID int
+	// Send all but the last chunk as plain HTML with page indicators.
+	var firstID int
+	var overflowIDs []int
 	for i, chunk := range chunks[:total-1] {
 		text := chunk + fmt.Sprintf("\n\n<i>— %d/%d —</i>", i+1, total)
 		id, err := b.sendHTMLRaw(ctx, chatID, text)
 		if err != nil {
-			return lastID, err
+			if firstID != 0 {
+				b.chunks.Record(chatID, firstID, overflowIDs)
+			}
+			return firstID, err
 		}
-		lastID = id
+		if i == 0 {
+			firstID = id
+		} else {
+			overflowIDs = append(overflowIDs, id)
+		}
 	}
 
 	// Last chunk gets the keyboard + page indicator.
 	lastChunk := chunks[total-1] + fmt.Sprintf("\n\n<i>— %d/%d —</i>", total, total)
 	id, err := b.SendWithKeyboard(ctx, chatID, lastChunk, kb)
 	if err != nil {
-		return lastID, err
+		b.chunks.Record(chatID, firstID, overflowIDs)
+		return firstID, err
 	}
+	overflowIDs = append(overflowIDs, id)
+
+	// Track overflow keyed by first message ID.
+	b.chunks.Record(chatID, firstID, overflowIDs)
 	return id, nil
 }
 
 // EditWithKeyboardChunked edits the given message with the first chunk and sends
 // additional chunks as new messages. Keyboard is attached to the last message.
+// Old overflow chunks are cleaned up automatically via the chunk tracker.
 func (b *Bot) EditWithKeyboardChunked(ctx context.Context, chatID string, msgID int, html string, kb ports.InlineKeyboard) error {
 	if chatID == "" {
 		chatID = b.defaultID
+	}
+
+	// Delete any previously tracked overflow chunks for this message.
+	if oldOverflow := b.chunks.Pop(chatID, msgID); len(oldOverflow) > 0 {
+		for _, id := range oldOverflow {
+			_ = b.DeleteMessage(ctx, chatID, id)
+		}
 	}
 
 	chunks := splitMessage(html, 4000)
@@ -676,22 +734,43 @@ func (b *Bot) EditWithKeyboardChunked(ctx context.Context, chatID string, msgID 
 
 	// Edit the original message with the first chunk + page indicator.
 	first := chunks[0] + fmt.Sprintf("\n\n<i>— 1/%d —</i>", total)
-	if err := b.EditMessage(ctx, chatID, msgID, first); err != nil {
+	// Use apiCallNoResult directly to avoid EditMessage's own chunk-pop
+	// (we already popped above).
+	params := map[string]any{
+		"message_id":               msgID,
+		"text":                     first,
+		"parse_mode":               "HTML",
+		"disable_web_page_preview": true,
+	}
+	b.setChatID(params, chatID)
+	if err := b.apiCallNoResult(ctx, "editMessageText", params); err != nil {
 		return err
 	}
 
-	// Send intermediate chunks as new messages with page indicators.
+	// Send intermediate chunks and track their IDs.
+	var overflowIDs []int
 	for i, chunk := range chunks[1 : total-1] {
 		text := chunk + fmt.Sprintf("\n\n<i>— %d/%d —</i>", i+2, total)
-		if _, err := b.sendHTMLRaw(ctx, chatID, text); err != nil {
+		id, err := b.sendHTMLRaw(ctx, chatID, text)
+		if err != nil {
+			b.chunks.Record(chatID, msgID, overflowIDs)
 			return err
 		}
+		overflowIDs = append(overflowIDs, id)
 	}
 
 	// Last chunk as new message with keyboard + page indicator.
 	lastChunk := chunks[total-1] + fmt.Sprintf("\n\n<i>— %d/%d —</i>", total, total)
-	_, err := b.SendWithKeyboard(ctx, chatID, lastChunk, kb)
-	return err
+	id, err := b.SendWithKeyboard(ctx, chatID, lastChunk, kb)
+	if err != nil {
+		b.chunks.Record(chatID, msgID, overflowIDs)
+		return err
+	}
+	overflowIDs = append(overflowIDs, id)
+
+	// Track all overflow IDs for future cleanup.
+	b.chunks.Record(chatID, msgID, overflowIDs)
+	return nil
 }
 
 // ---------------------------------------------------------------------------

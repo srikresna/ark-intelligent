@@ -177,7 +177,19 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 			data.SKEWPctile = ts.VolSuite.SKEWPercentile
 			data.TailRiskCtx = ts.VolSuite.TailRiskContext()
 			data.VolDivergences = ts.VolSuite.Divergences
+			data.OVXVIXRatio = ts.VolSuite.OVXVIXRatio
+			data.GVZVIXRatio = ts.VolSuite.GVZVIXRatio
 			data.VolSuiteAvail = true
+			// Cross-asset vol dashboard
+			if ts.VolSuite.CrossVol != nil {
+				data.CrossVolRegime = string(ts.VolSuite.CrossVol.Regime)
+				data.CrossVolRegimeLabel = ts.VolSuite.CrossVol.RegimeLabel
+				data.OVXVIXPctile = ts.VolSuite.CrossVol.OVXVIXPercentile
+				data.GVZVIXPctile = ts.VolSuite.CrossVol.GVZVIXPercentile
+				data.RVXVIXPctile = ts.VolSuite.CrossVol.RVXVIXPercentile
+				data.VIX9D30Pctile = ts.VolSuite.CrossVol.VIX9D30Percentile
+				data.CrossVolAvail = true
+			}
 		}
 		return nil
 	}); err != nil {
@@ -313,7 +325,18 @@ type SentimentData struct {
 	SKEWPctile     float64  // Historical percentile of SKEW level (0-100)
 	TailRiskCtx    string   // Human-readable tail risk historical context
 	VolDivergences []string // detected cross-asset divergences
-	VolSuiteAvail  bool
+	OVXVIXRatio    float64  // OVX/VIX — oil vol vs equity vol
+	GVZVIXRatio    float64  // GVZ/VIX — gold vol vs equity vol
+
+	// Cross-asset vol dashboard
+	CrossVolRegime      string  // regime classification
+	CrossVolRegimeLabel string  // human-readable regime
+	OVXVIXPctile        float64 // historical percentile
+	GVZVIXPctile        float64 // historical percentile
+	RVXVIXPctile        float64 // historical percentile
+	VIX9D30Pctile       float64 // historical percentile
+	CrossVolAvail       bool
+	VolSuiteAvail       bool
 
 	// Myfxbook Retail Positioning (Firecrawl)
 	MyfxbookPairs     []MyfxbookPairSentiment

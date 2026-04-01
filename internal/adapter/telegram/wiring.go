@@ -57,5 +57,6 @@ func NewBot(token, defaultChatID string) *Bot {
 		callbacks:   make(map[string]CallbackHandler),
 		userLimiter: newUserRateLimiter(),
 		workerSem:   make(chan struct{}, concurrency),
+		chunks:      newChunkTracker(),
 	}
 }
