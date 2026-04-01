@@ -328,15 +328,17 @@ func TestCalcBollinger_Basic(t *testing.T) {
 }
 
 func TestCalcBollinger_SqueezeDetection(t *testing.T) {
-	// Create data: first 20 bars volatile, then 20 bars tight range
+	// Create data: first 20 bars very tight range, then 20 bars volatile.
+	// Slice is newest-first, so tight bars are index 0-19 (recent),
+	// volatile bars are index 20-39 (older).
 	closes := make([]float64, 40)
 	for i := 0; i < 40; i++ {
 		if i < 20 {
-			// Recent: tight range
-			closes[i] = 100 + math.Sin(float64(i)*0.5)*0.1
+			// Recent: very tight range → should trigger squeeze
+			closes[i] = 100.0 + float64(i)*0.001
 		} else {
-			// Older: wide range
-			closes[i] = 100 + math.Sin(float64(i)*0.5)*5
+			// Older: wide swings
+			closes[i] = 100.0 + math.Sin(float64(i)*0.8)*10.0
 		}
 	}
 	bars := makeBarsFromCloses(closes)
@@ -347,7 +349,29 @@ func TestCalcBollinger_SqueezeDetection(t *testing.T) {
 	}
 
 	t.Logf("Bandwidth=%.4f, Squeeze=%v", result.Bandwidth, result.Squeeze)
-	// We can't strictly guarantee squeeze with synthetic data but verify no crash
+	if !result.Squeeze {
+		t.Error("Expected squeeze=true for tight-range data following volatile data")
+	}
+}
+
+func TestCalcBollinger_NoSqueeze(t *testing.T) {
+	// Uniform volatility — no squeeze expected.
+	closes := make([]float64, 40)
+	for i := 0; i < 40; i++ {
+		closes[i] = 100.0 + math.Sin(float64(i)*0.5)*3.0
+	}
+	bars := makeBarsFromCloses(closes)
+
+	result := CalcBollinger(bars, 20, 2.0)
+	if result == nil {
+		t.Fatal("CalcBollinger returned nil")
+	}
+
+	t.Logf("Bandwidth=%.4f, Squeeze=%v", result.Bandwidth, result.Squeeze)
+	// With uniform volatility, current bandwidth ≈ average → no squeeze
+	if result.Squeeze {
+		t.Error("Expected squeeze=false for uniform volatility data")
+	}
 }
 
 func TestCalcBollingerSeries(t *testing.T) {

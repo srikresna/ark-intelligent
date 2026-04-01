@@ -485,15 +485,21 @@ func CalcBollinger(bars []OHLCV, period int, stddev float64) *BollingerResult {
 		pctB = (bars[0].Close - l0) / denom
 	}
 
-	// Squeeze detection: bandwidth < 75% of period-bar average bandwidth
+	// Squeeze detection: current bandwidth < 75% of recent average bandwidth.
+	// Collect bandwidth values from the most recent valid bars (newest-first slice).
 	squeeze := false
-	bwSeries := make([]float64, 0)
+	bwSeries := make([]float64, 0, period)
 	for i := 0; i < len(upper) && i < period; i++ {
 		if !math.IsNaN(upper[i]) && !math.IsNaN(middle[i]) && !math.IsNaN(lower[i]) && middle[i] != 0 {
 			bwSeries = append(bwSeries, (upper[i]-lower[i])/middle[i]*100)
 		}
 	}
-	if len(bwSeries) >= period {
+	// Require at least half the period for a meaningful average (fixes always-false bug).
+	minSamples := period / 2
+	if minSamples < 2 {
+		minSamples = 2
+	}
+	if len(bwSeries) >= minSamples {
 		avgBW := 0.0
 		for _, v := range bwSeries {
 			avgBW += v
