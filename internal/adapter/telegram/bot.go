@@ -596,6 +596,22 @@ func (b *Bot) SendTyping(ctx context.Context, chatID string) {
 	_ = b.apiCallNoResult(ctx, "sendChatAction", params)
 }
 
+// SendChatAction sends a chat action indicator to the given chat.
+// Valid actions: "typing", "upload_photo", "record_video", "upload_video",
+// "record_voice", "upload_voice", "upload_document", "choose_sticker",
+// "find_location", "record_video_note", "upload_video_note".
+// The indicator automatically disappears after ~5 seconds or when a message is sent.
+func (b *Bot) SendChatAction(ctx context.Context, chatID string, action string) error {
+	if chatID == "" {
+		chatID = b.defaultID
+	}
+	params := map[string]interface{}{
+		"action": action,
+	}
+	b.setChatID(params, chatID)
+	return b.apiCallNoResult(ctx, "sendChatAction", params)
+}
+
 // SendLoading sends a loading message and returns the message ID so it can be
 // edited later with the final result. This provides immediate feedback for
 // commands that take >2 seconds.
