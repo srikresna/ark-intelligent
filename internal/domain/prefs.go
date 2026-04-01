@@ -96,6 +96,10 @@ type UserPrefs struct {
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
+	// DefaultTimeframe: preferred analysis timeframe when not specified.
+	// Valid: "daily" (default), "4h", "1h", "30m", "15m", "weekly".
+	DefaultTimeframe string `json:"default_timeframe,omitempty"`
+
 	// ExperienceLevel: user's self-reported trading experience.
 	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).
 	ExperienceLevel string `json:"experience_level,omitempty"`
@@ -115,4 +119,47 @@ func DefaultPrefs() UserPrefs {
 		CalendarFilter:   "all",
 		CalendarView:     "day",
 	}
+}
+
+// ValidTimeframes returns the list of valid analysis timeframes.
+func ValidTimeframes() []string {
+	return []string{"daily", "4h", "1h", "30m", "15m", "weekly"}
+}
+
+// IsValidTimeframe returns true if the timeframe string is recognized.
+func IsValidTimeframe(tf string) bool {
+	for _, v := range ValidTimeframes() {
+		if v == tf {
+			return true
+		}
+	}
+	return false
+}
+
+// TimeframeLabel returns a human-friendly label for the timeframe.
+func TimeframeLabel(tf string) string {
+	switch tf {
+	case "weekly":
+		return "Weekly"
+	case "daily":
+		return "Daily"
+	case "4h":
+		return "4H"
+	case "1h":
+		return "1H"
+	case "30m":
+		return "30m"
+	case "15m":
+		return "15m"
+	default:
+		return "Daily"
+	}
+}
+
+// ResolveDefaultTimeframe returns the user preference or "daily" if empty/invalid.
+func ResolveDefaultTimeframe(pref string) string {
+	if pref != "" && IsValidTimeframe(pref) {
+		return pref
+	}
+	return "daily"
 }

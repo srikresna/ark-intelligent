@@ -104,7 +104,7 @@ func (h *Handler) registerQuantCommands() {
 // /quant — Main command
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args string) error {
+func (h *Handler) cmdQuant(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.quant == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Quant Engine not configured.")
 		return err
@@ -136,9 +136,13 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	symbol := parts[0]
-	timeframe := "daily"
+	timeframe := ""
 	if len(parts) > 1 {
 		timeframe = strings.ToLower(parts[1])
+	}
+	if timeframe == "" {
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		timeframe = domain.ResolveDefaultTimeframe(prefs.DefaultTimeframe)
 	}
 
 	mapping := domain.FindPriceMappingByCurrency(symbol)

@@ -1188,6 +1188,13 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 	case "cur_reset":
 		prefs.CurrencyFilter = nil
 	default:
+		// Handle tf_XXX (default timeframe preference)
+		if strings.HasPrefix(action, "tf_") {
+			tf := strings.TrimPrefix(action, "tf_")
+			if domain.IsValidTimeframe(tf) {
+				prefs.DefaultTimeframe = tf
+			}
+		} else
 		// Handle cur_toggle:XXX dynamically
 		if strings.HasPrefix(action, "cur_toggle:") {
 			cur := strings.ToUpper(strings.TrimPrefix(action, "cur_toggle:"))
