@@ -128,6 +128,14 @@ func main() {
 	// -----------------------------------------------------------------------
 	bot := tgbot.NewBot(cfg.BotToken, cfg.ChatID)
 
+	// Check Python chart rendering dependencies at startup.
+	// Log a warning but do not fail — chart commands gracefully degrade to text.
+	if err := tgbot.CheckPythonChartDeps(); err != nil {
+		log.Warn().Err(err).Msg("Python chart dependencies check failed — chart rendering disabled")
+	} else {
+		log.Info().Msg("Python chart dependencies OK")
+	}
+
 	// User management middleware (tiered access control + quotas)
 	authMiddleware := tgbot.NewMiddleware(userRepo, bot.OwnerID())
 	bot.SetMiddleware(authMiddleware)

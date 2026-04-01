@@ -238,6 +238,9 @@ func (h *Handler) generateCTAChart(state *ctaState, timeframe string) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("read chart output: %w", err)
 	}
+	if len(pngData) == 0 {
+		return nil, fmt.Errorf("chart renderer produced empty output (0 bytes)")
+	}
 
 	return pngData, nil
 }
@@ -268,7 +271,14 @@ func runChartScript(ctx context.Context, input any) ([]byte, error) {
 		return nil, fmt.Errorf("chart renderer failed: %w", err)
 	}
 
-	return os.ReadFile(outputPath)
+	pngBytes, readErr := os.ReadFile(outputPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("read chart output: %w", readErr)
+	}
+	if len(pngBytes) == 0 {
+		return nil, fmt.Errorf("chart renderer produced empty output (0 bytes)")
+	}
+	return pngBytes, nil
 }
 
 // generateCTADetailChart creates a mode-specific chart (ichimoku, fibonacci, zones).
@@ -427,3 +437,18 @@ func reverseStringsToOldestFirst(s []string) []string {
 }
 
 // ---------------------------------------------------------------------------
+
+// CheckPythonChartDeps verifies that the required Python packages for chart
+// rendering are importable. Should be called at startup; logs a warning but
+// does not fail — chart commands will gracefully degrade to text-only output
+// when dependencies are missing.
+//
+// Required packages: mplfinance, matplotlib, numpy, pandas
+func CheckPythonChartDeps() error {
+	cmd := exec.Command("python3", "-c",
+		"import mplfinance; import matplotlib; import numpy; import pandas")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("python chart dependencies missing (mplfinance/matplotlib/numpy/pandas): %w", err)
+	}
+	return nil
+}
