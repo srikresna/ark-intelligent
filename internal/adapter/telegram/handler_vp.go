@@ -82,6 +82,7 @@ func (h *Handler) WithVP(svc VPServices) {
 	h.vpCache = newVPStateCache()
 	h.bot.RegisterCommand("/vp", h.cmdVP)
 	h.bot.RegisterCallback("vp:", h.handleVPCallback)
+	h.registerAuctionCommand()
 }
 
 // ---------------------------------------------------------------------------
