@@ -263,7 +263,7 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 	// Generate chart
 	chartPNG, chartErr := h.generateBacktestChart(ctx, result, mapping.Currency, timeframe)
 	if chartErr != nil {
-		log.Warn().Err(chartErr).Str("symbol", symbol).Msg("backtest chart generation failed")
+		log.Error().Err(chartErr).Str("symbol", symbol).Str("timeframe", timeframe).Msg("backtest chart generation failed, falling back to text")
 	}
 
 	// Delete loading
