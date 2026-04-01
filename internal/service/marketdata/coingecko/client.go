@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -39,7 +40,7 @@ func NewClient(apiKey string) *Client {
 		base = demoBase // demo + pro keys use pro subdomain
 	}
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: httpclient.NewClient(defaultTimeout),
 		apiKey:     apiKey,
 		base:       base,
 	}

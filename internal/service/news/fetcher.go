@@ -12,6 +12,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -27,10 +28,8 @@ type MQL5Fetcher struct {
 // NewMQL5Fetcher creates a new MQL5Fetcher.
 func NewMQL5Fetcher() *MQL5Fetcher {
 	return &MQL5Fetcher{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		cb: circuitbreaker.New("mql5", 5, 3*time.Minute),
+		httpClient: httpclient.NewClient(30 * time.Second),
+		cb:         circuitbreaker.New("mql5", 5, 3*time.Minute),
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -31,10 +32,8 @@ type Client struct {
 // NewClient creates a Deribit public API client with the default base URL.
 func NewClient() *Client {
 	return &Client{
-		baseURL: defaultBaseURL,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
+		baseURL:    defaultBaseURL,
+		httpClient: httpclient.NewClient(defaultTimeout),
 	}
 }
 
