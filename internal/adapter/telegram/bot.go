@@ -13,6 +13,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/metrics"
 )
 
 var log = logger.Component("telegram")
@@ -114,8 +115,6 @@ type sentMessage struct {
 // Bot — Core Telegram bot engine
 // ---------------------------------------------------------------------------
 
-// slowCommandThreshold triggers a warning log when a command handler takes too long.
-const slowCommandThreshold = 10 * time.Second
 
 // CommandHandler handles a specific bot command.
 type CommandHandler func(ctx context.Context, chatID string, userID int64, args string) error
@@ -327,17 +326,12 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 	err := handler(ctx, chatID, userID, args)
 	elapsed := time.Since(start)
 
-	// Log command latency for observability
-	logEvent := log.Info().Str("command", cmd).Int64("user_id", userID).Dur("latency_ms", elapsed)
+	// Structured metrics logging (see pkg/metrics for format docs)
+	metrics.RecordCommand(cmd, userID, elapsed, err)
+
 	if err != nil {
-		logEvent.Err(err).Msg("command completed with error")
 		_, _ = b.SendHTML(ctx, chatID,
 			fmt.Sprintf("Error processing <code>%s</code>. Please try again later.", html.EscapeString(cmd)))
-	} else {
-		logEvent.Msg("command handled")
-	}
-	if elapsed > slowCommandThreshold {
-		log.Warn().Str("command", cmd).Int64("user_id", userID).Dur("latency_ms", elapsed).Msg("slow command response")
 	}
 }
 
@@ -372,15 +366,15 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 	for prefix, handler := range b.callbacks {
 		if strings.HasPrefix(cb.Data, prefix) {
 			cbStart := time.Now()
-			if err := handler(ctx, chatID, msgID, userID, cb.Data); err != nil {
-				log.Error().Err(err).Str("data", cb.Data).Dur("latency_ms", time.Since(cbStart)).Msg("callback handler error")
+			cbErr := handler(ctx, chatID, msgID, userID, cb.Data)
+			cbElapsed := time.Since(cbStart)
+
+			// Structured metrics logging (see pkg/metrics for format docs)
+			metrics.RecordCallback(cb.Data, userID, cbElapsed, cbErr)
+
+			if cbErr != nil {
 				_ = b.AnswerCallback(ctx, cb.ID, "Error processing request")
 				return
-			}
-			cbElapsed := time.Since(cbStart)
-			log.Info().Str("callback", cb.Data).Int64("user_id", userID).Dur("latency_ms", cbElapsed).Msg("callback handled")
-			if cbElapsed > slowCommandThreshold {
-				log.Warn().Str("callback", cb.Data).Int64("user_id", userID).Dur("latency_ms", cbElapsed).Msg("slow callback response")
 			}
 			_ = b.AnswerCallback(ctx, cb.ID, "")
 			return
