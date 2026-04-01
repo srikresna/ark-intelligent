@@ -1408,9 +1408,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		if data.SKEWPctile > 0 && data.VolSKEW > 0 {
 			b.WriteString(fmt.Sprintf("<code>SKEW Pct: P%.0f</code>\n", data.SKEWPctile))
 		}
-		if data.RVXVIXRatio > 0 {
-			b.WriteString(fmt.Sprintf("<code>RVX/VIX : %.2f</code>\n", data.RVXVIXRatio))
-		}
+// (RVX/VIX ratio moved to cross-vol dashboard below)
+
+
 		switch data.VolTailRisk {
 		case "EXTREME":
 			b.WriteString("<i>🔴 TAIL RISK EXTREME — SKEW/VIX historically dangerous.</i>\n")
@@ -1425,6 +1425,51 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		}
 		for _, d := range data.VolDivergences {
 			b.WriteString(fmt.Sprintf("<i>📊 %s</i>\n", d))
+		}
+
+		// --- Cross-Asset Vol Dashboard (bar chart + regime) ---
+		if data.CrossVolAvail {
+			b.WriteString("\n<b>📊 Cross-Asset Vol Dashboard</b>\n")
+			// Regime header
+			regimeEmoji := "🟢"
+			switch data.CrossVolRegime {
+			case "SYSTEMIC":
+				regimeEmoji = "🔴"
+			case "BROAD_RISK_OFF":
+				regimeEmoji = "🟠"
+			case "ENERGY_RISK", "SMALL_CAP_STRESS":
+				regimeEmoji = "🟡"
+			}
+			b.WriteString(fmt.Sprintf("%s <b>%s</b>\n\n", regimeEmoji, data.CrossVolRegimeLabel))
+
+			// Visual bar chart for each cross-asset ratio
+			type volBarEntry struct {
+				label  string
+				ratio  float64
+				pctile float64
+				fmtR   string
+			}
+			barEntries := []volBarEntry{}
+			if data.OVXVIXRatio > 0 {
+				barEntries = append(barEntries, volBarEntry{"OVX/VIX", data.OVXVIXRatio, data.OVXVIXPctile, fmt.Sprintf("%.1f", data.OVXVIXRatio)})
+			}
+			if data.GVZVIXRatio > 0 {
+				barEntries = append(barEntries, volBarEntry{"GVZ/VIX", data.GVZVIXRatio, data.GVZVIXPctile, fmt.Sprintf("%.2f", data.GVZVIXRatio)})
+			}
+			if data.RVXVIXRatio > 0 {
+				barEntries = append(barEntries, volBarEntry{"RVX/VIX", data.RVXVIXRatio, data.RVXVIXPctile, fmt.Sprintf("%.2f", data.RVXVIXRatio)})
+			}
+			if data.VIX9D30Ratio > 0 {
+				barEntries = append(barEntries, volBarEntry{"9D/30D ", data.VIX9D30Ratio, data.VIX9D30Pctile, fmt.Sprintf("%.2f", data.VIX9D30Ratio)})
+			}
+			for _, e := range barEntries {
+				bar := vixVolBar(e.pctile, 10)
+				pStr := ""
+				if e.pctile > 0 {
+					pStr = fmt.Sprintf(" P%.0f", e.pctile)
+				}
+				b.WriteString(fmt.Sprintf("<code>%s %s %s%s</code>\n", e.label, bar, e.fmtR, pStr))
+			}
 		}
 	}
 
@@ -1533,4 +1578,31 @@ func (f *Formatter) FormatWorldBankFundamentals(wb *fred.WorldBankData) string {
 		fmtutil.FormatDateTimeWIB(wb.FetchedAt)))
 
 	return b.String()
+}
+
+// vixVolBar generates a simple text bar chart for Telegram <code> blocks.
+// pct should be 0-100, width is the max bar width in characters.
+func vixVolBar(pct float64, width int) string {
+	if width <= 0 {
+		width = 10
+	}
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	filled := int(pct / 100.0 * float64(width))
+	if filled > width {
+		filled = width
+	}
+	bar := make([]rune, width)
+	for i := 0; i < width; i++ {
+		if i < filled {
+			bar[i] = '█' // filled block
+		} else {
+			bar[i] = '░' // light shade
+		}
+	}
+	return string(bar)
 }

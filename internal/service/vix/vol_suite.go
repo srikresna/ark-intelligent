@@ -39,6 +39,9 @@ type VolSuite struct {
 	SKEWPercentile    float64 // Historical percentile of current SKEW level (0-100)
 	Divergences []string // detected vol divergences
 
+	// Cross-asset vol dashboard result (percentiles + regime)
+	CrossVol *CrossVolResult // nil if not computed
+
 	Available bool
 	FetchedAt time.Time
 }
@@ -114,6 +117,9 @@ func FetchVolSuite(ctx context.Context, vixSpot float64) *VolSuite {
 
 	// Historical percentile (uses fetched SKEW+VIX CSVs)
 	vs.computeHistoricalPercentile(ctx, client, vixSpot)
+
+	// Cross-asset vol dashboard: percentiles + regime classification
+	vs.CrossVol = vs.computeCrossVolPercentiles(ctx, client, vixSpot)
 
 	return vs
 }
