@@ -1,12 +1,14 @@
-# Agent Status — last updated: 2026-04-01 12:48 WIB
+# Agent Status — last updated: 2026-04-01 12:58 WIB
 
 ## Dev-B
-- **Last run:** 2026-04-01 12:48 WIB
+- **Last run:** 2026-04-01 12:58 WIB
 - **Current:** standby
 - **Files changed:**
-  - `internal/service/sentiment/sentiment.go` — add SentimentFetcher struct with 3 per-source circuit breakers (cbCNN, cbAAII, cbCBOE); FetchSentiment() now delegates to defaultFetcher.Fetch(); public API unchanged, zero callers updated
-- **PRs today:** PR #38 feat(TASK-066): add circuit breakers to sentiment service → agents/main
-- **Note:** TASK-066 done — circuit breakers added to sentiment service matching news/fetcher.go pattern. Each source independently wrapped: cbCNN open → AAII+CBOE still run (partial data). go build + go vet clean.
+  - `internal/service/ta/ict.go` — new: CalcICT() with FVG, OrderBlock, BreakerBlock, LiquidityLevel, Killzone, Premium/Discount, Equilibrium
+  - `internal/service/ta/ict_test.go` — new: 8 test cases all passing
+  - `internal/service/ta/engine.go` — add ICT *ICTResult to FullResult, wire CalcICT() in ComputeFull()
+- **PRs today:** PR #38 feat(TASK-066), PR #40 feat(TASK-035): ICT FVG + Order Block engine → agents/main
+- **Note:** TASK-035 done — ICT engine with FVG/OB/Breaker/Liquidity detection. go build + go vet clean, 8/8 tests pass, zero new deps.
 
 
 ## Dev-C
