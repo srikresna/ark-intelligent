@@ -7,6 +7,9 @@
 // CNN uses a public JSON endpoint. AAII is behind Imperva bot protection and
 // requires Firecrawl API to scrape. If FIRECRAWL_API_KEY is not set, AAII is
 // skipped gracefully. Each source has an Available flag for callers to check.
+//
+// Circuit breakers are applied per-source: if CNN fails 3 times, cbCNN opens
+// and CNN fetch is skipped for 5 minutes — AAII and CBOE still proceed normally.
 package sentiment
 
 import (
@@ -19,10 +22,94 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
 var log = logger.Component("sentiment")
+
+// SentimentFetcher holds the HTTP client and per-source circuit breakers.
+// Use NewSentimentFetcher() to construct, or use the package-level defaultFetcher.
+type SentimentFetcher struct {
+	httpClient *http.Client
+	cbCNN      *circuitbreaker.Breaker
+	cbAAII     *circuitbreaker.Breaker
+	cbCBOE     *circuitbreaker.Breaker
+	cbCrypto   *circuitbreaker.Breaker
+}
+
+// NewSentimentFetcher creates a SentimentFetcher with per-source circuit breakers.
+// Each breaker opens after 3 consecutive failures and resets after 5 minutes.
+func NewSentimentFetcher() *SentimentFetcher {
+	return &SentimentFetcher{
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+		cbCNN:      circuitbreaker.New("sentiment-cnn", 3, 5*time.Minute),
+		cbAAII:     circuitbreaker.New("sentiment-aaii", 3, 5*time.Minute),
+		cbCBOE:     circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
+		cbCrypto:   circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
+	}
+}
+
+// defaultFetcher is the package-level instance used by FetchSentiment.
+var defaultFetcher = NewSentimentFetcher()
+
+// Fetch fetches sentiment data from all supported sources with circuit breakers.
+// Individual source failures are logged but do not cause an overall error;
+// callers should check the Available flags on the returned data.
+func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
+	data := &SentimentData{FetchedAt: time.Now()}
+
+	// CNN Fear & Greed — wrapped in circuit breaker
+	if err := f.cbCNN.Execute(func() error {
+		fetchCNNFearGreed(ctx, f.httpClient, data)
+		if !data.CNNAvailable {
+			return fmt.Errorf("CNN F&G unavailable")
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Err(err).Msg("sentiment: CNN circuit breaker rejected or source unavailable")
+	}
+
+	// AAII Sentiment — wrapped in circuit breaker
+	if err := f.cbAAII.Execute(func() error {
+		fetchAAIISentiment(ctx, f.httpClient, data)
+		if !data.AAIIAvailable {
+			// Only count as breaker failure if FIRECRAWL_API_KEY is set
+			// (if no key, it's expected skip — don't penalise the breaker)
+			if os.Getenv("FIRECRAWL_API_KEY") != "" {
+				return fmt.Errorf("AAII sentiment unavailable")
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Err(err).Msg("sentiment: AAII circuit breaker rejected or source unavailable")
+	}
+
+	// CBOE Put/Call — wrapped in circuit breaker
+	if err := f.cbCBOE.Execute(func() error {
+		pcData := FetchCBOEPutCall(ctx)
+		IntegratePutCallIntoSentiment(data, pcData)
+		if !data.PutCallAvailable {
+			return fmt.Errorf("CBOE Put/Call unavailable")
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Err(err).Msg("sentiment: CBOE circuit breaker rejected or source unavailable")
+	}
+
+	// Crypto Fear & Greed Index (alternative.me) — wrapped in circuit breaker
+	if err := f.cbCrypto.Execute(func() error {
+		fetchCryptoFearGreed(ctx, f.httpClient, data)
+		if !data.CryptoFearGreedAvailable {
+			return fmt.Errorf("crypto fear & greed unavailable")
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Err(err).Msg("sentiment: crypto F&G circuit breaker rejected or source unavailable")
+	}
+
+	return data, nil
+}
 
 // SentimentData holds the latest readings from all sentiment sources.
 type SentimentData struct {
@@ -61,24 +148,11 @@ type SentimentData struct {
 // FetchSentiment fetches sentiment data from all supported sources.
 // Individual source failures are logged but do not cause an overall error;
 // callers should check the Available flags on the returned data.
+//
+// Uses the package-level defaultFetcher which has per-source circuit breakers.
+// For direct control over circuit breakers, use NewSentimentFetcher().Fetch().
 func FetchSentiment(ctx context.Context) (*SentimentData, error) {
-	data := &SentimentData{FetchedAt: time.Now()}
-	client := &http.Client{Timeout: 15 * time.Second}
-
-	// Fetch CNN Fear & Greed
-	fetchCNNFearGreed(ctx, client, data)
-
-	// Fetch AAII Sentiment (via Firecrawl if API key available)
-	fetchAAIISentiment(ctx, client, data)
-
-	// Fetch CBOE Put/Call Ratios (via Firecrawl if API key available)
-	pcData := FetchCBOEPutCall(ctx)
-	IntegratePutCallIntoSentiment(data, pcData)
-
-	// Fetch Crypto Fear & Greed Index (alternative.me — no API key needed)
-	fetchCryptoFearGreed(ctx, client, data)
-
-	return data, nil
+	return defaultFetcher.Fetch(ctx)
 }
 
 // ---------------------------------------------------------------------------
