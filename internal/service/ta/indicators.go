@@ -796,11 +796,18 @@ func CalcOBV(bars []OHLCV) *OBVResult {
 				}
 			}
 		}
-	} else if len(series) >= 5 {
-		// With fewer bars, use a simple linear regression slope approximation
-		// Compare the average of the newest 2 vs oldest 2 OBV values
-		newestAvg := (series[0] + series[1]) / 2
-		oldestAvg := (series[len(series)-1] + series[len(series)-2]) / 2
+	} else if len(series) >= 2 {
+		// Fallback: compare newest vs oldest OBV values.
+		// For 5+ bars, average the 2 newest and 2 oldest for smoothing.
+		// For 2-4 bars, compare single newest vs oldest (no panic on short slices).
+		var newestAvg, oldestAvg float64
+		if len(series) >= 5 {
+			newestAvg = (series[0] + series[1]) / 2
+			oldestAvg = (series[len(series)-1] + series[len(series)-2]) / 2
+		} else {
+			newestAvg = series[0]
+			oldestAvg = series[len(series)-1]
+		}
 		if newestAvg > oldestAvg*1.01 {
 			trend = "RISING"
 		} else if newestAvg < oldestAvg*0.99 {
