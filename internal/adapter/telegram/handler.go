@@ -198,6 +198,7 @@ func NewHandler(
 	bot.RegisterCommand("/calendar", h.cmdCalendar)
 	bot.RegisterCommand("/rank", h.cmdRank)
 	bot.RegisterCommand("/macro", h.cmdMacro)
+	bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
 	bot.RegisterCommand("/bias", h.cmdBias)
 	bot.RegisterCommand("/backtest", h.cmdBacktest)
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
@@ -205,8 +206,8 @@ func NewHandler(
 	bot.RegisterCommand("/impact", h.cmdImpact)
 	bot.RegisterCommand("/sentiment", h.cmdSentiment)
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
-	bot.RegisterCommand("/price", h.cmdPrice)       // Daily price context
-	bot.RegisterCommand("/levels", h.cmdLevels)     // Support/resistance levels + position sizing
+	bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
+	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 
 	// Membership & upgrade info
@@ -235,7 +236,6 @@ func NewHandler(
 	bot.RegisterCommand("/l", h.cmdLevels)
 	bot.RegisterCommand("/history", h.cmdHistory)
 	bot.RegisterCommand("/h", h.cmdHistory)
-
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)

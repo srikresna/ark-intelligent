@@ -141,9 +141,13 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	symbol := parts[0]
-	timeframe := "daily"
+	timeframe := ""
 	if len(parts) > 1 {
 		timeframe = strings.ToLower(parts[1])
+	}
+	if timeframe == "" {
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		timeframe = domain.ResolveDefaultTimeframe(prefs.DefaultTimeframe)
 	}
 
 	mapping := domain.FindPriceMappingByCurrency(symbol)

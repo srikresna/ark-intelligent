@@ -146,8 +146,8 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 	}
 
 	// --- Cross-Asset vs FX (top 4 FX pairs) ---
-	if len(crossAssets) > 0 && len(fxCurrencies) >= 4 {
-		topFX := fxCurrencies[:4]
+	if len(crossAssets) > 0 && len(fxCurrencies) > 0 {
+		topFX := fxCurrencies[:min(4, len(fxCurrencies))]
 
 		// Group cross-assets by category for readability.
 		type assetGroup struct {

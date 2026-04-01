@@ -549,7 +549,11 @@ func (h *Handler) renderCOTOverview(ctx context.Context, chatID string, userID i
 
 	var htmlOut string
 	var toggleBtn ports.InlineButton
-	if prefs.OutputMode == domain.OutputFull {
+	if prefs.MobileMode {
+		// Mobile mode: sparkline + one-liner per currency (no wide tables)
+		htmlOut = h.fmt.FormatCOTOverviewSparkline(analyses, convictions)
+		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:cot"}
+	} else if prefs.OutputMode == domain.OutputFull {
 		htmlOut = h.fmt.FormatCOTOverview(analyses, convictions)
 		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:cot"}
 	} else {
