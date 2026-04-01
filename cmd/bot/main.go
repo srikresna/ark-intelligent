@@ -139,7 +139,7 @@ func main() {
 	var cachedAI *aisvc.CachedInterpreter
 
 	if cfg.HasGemini() {
-		gemini, err := aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.AIMaxRPM, cfg.AIMaxDaily)
+		gemini, err := aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.GeminiModel, cfg.AIMaxRPM, cfg.AIMaxDaily)
 		if err != nil {
 			log.Warn().Err(err).Msg("Gemini init failed, AI features disabled")
 		} else {
@@ -187,7 +187,7 @@ func main() {
 		// Reuse existing Gemini client as fallback (if available)
 		if cfg.HasGemini() {
 			// Create a separate Gemini instance for chat fallback
-			geminiForFallback, err = aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.AIMaxRPM, cfg.AIMaxDaily)
+			geminiForFallback, err = aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.GeminiModel, cfg.AIMaxRPM, cfg.AIMaxDaily)
 			if err != nil {
 				log.Warn().Err(err).Msg("Gemini fallback init failed — Claude-only mode")
 				geminiForFallback = nil
