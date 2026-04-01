@@ -284,6 +284,19 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 				b.WriteString(fmt.Sprintf("AAII: Bull=%.1f%% Bear=%.1f%% Neutral=%.1f%% (B/B Ratio=%.2f)\n",
 					sd.AAIIBullish, sd.AAIIBearish, sd.AAIINeutral, sd.AAIIBullBear))
 			}
+			if sd.PutCallAvailable {
+				b.WriteString(fmt.Sprintf("CBOE P/C: Total=%.2f", sd.PutCallTotal))
+				if sd.PutCallEquity > 0 {
+					b.WriteString(fmt.Sprintf(" Equity=%.2f", sd.PutCallEquity))
+				}
+				if sd.PutCallIndex > 0 {
+					b.WriteString(fmt.Sprintf(" Index=%.2f", sd.PutCallIndex))
+				}
+				if sd.PutCallSignal != "" {
+					b.WriteString(fmt.Sprintf(" Signal=%s", sd.PutCallSignal))
+				}
+				b.WriteString("\n")
+			}
 			b.WriteString("\n")
 		}
 	}
