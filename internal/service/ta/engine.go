@@ -12,9 +12,11 @@ type FullResult struct {
 	Snapshot    *IndicatorSnapshot
 	Confluence  *ConfluenceResult
 	Zones       *ZoneResult
-	Patterns    []CandlePattern // from patterns.go
-	Divergences []Divergence    // from divergence.go
-	ICT         *ICTResult      // from ict.go — nil if insufficient data
+	Patterns    []CandlePattern   // from patterns.go
+	Divergences []Divergence      // from divergence.go
+	ICT         *ICTResult        // from ict.go — nil if insufficient data
+	SMC         *SMCResult        // convenience accessor — same as Snapshot.SMC
+	Wyckoff     *WyckoffSummary   // populated by caller (avoids circular import with wyckoff pkg)
 	ComputedAt  time.Time
 }
 
@@ -129,6 +131,7 @@ func (e *Engine) ComputeFull(bars []OHLCV) *FullResult {
 		Patterns:    patterns,
 		Divergences: divergences,
 		ICT:         CalcICT(bars, snap.ATR),
+		SMC:         snap.SMC,
 		ComputedAt:  time.Now(),
 	}
 }

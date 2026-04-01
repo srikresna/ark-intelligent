@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	"github.com/arkcode369/ark-intelligent/internal/config"
-
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
@@ -48,6 +48,10 @@ type Handler struct {
 	signalRepo     ports.SignalRepository
 	dailyPriceRepo pricesvc.DailyPriceStore
 	intradayRepo   pricesvc.IntradayStore // 4H intraday — may be nil
+
+	// feedbackRepo stores thumbs-up/down feedback on AI analyses.
+	// May be nil — feedback buttons disabled if not wired.
+	feedbackRepo *storage.FeedbackRepo
 
 	aiAnalyzer ports.AIAnalyzer
 
@@ -251,7 +255,6 @@ func NewHandler(
 	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
 	return h
 }
-
 // ---------------------------------------------------------------------------
 // AI cooldown helper
 // ---------------------------------------------------------------------------
@@ -327,7 +330,6 @@ func currencyToContractCode(currency string) string {
 	}
 	return currency // Return as-is if not mapped
 }
-
 // cbShare handles "share:<type>:<key>" callbacks.
 // Generates a plain-text, copy-paste friendly version of the analysis
 // and sends it wrapped in <code> tags for easy copying in Telegram.

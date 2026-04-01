@@ -30,8 +30,8 @@ type ECBData struct {
 	MRRValue float64 // percent
 
 	// M3 money supply growth (year-over-year, percent)
-	M3Date time.Time
-	M3YoY  float64
+	M3Date  time.Time
+	M3YoY   float64
 
 	// EUR/USD official exchange rate (monthly average)
 	EURUSDDate  time.Time
@@ -84,7 +84,7 @@ func (c *ECBClient) GetData(ctx context.Context) (*ECBData, error) {
 
 // fetchAll fetches all ECB data series concurrently.
 func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
-	type seriesResult struct {
+	type result struct {
 		name string
 		date time.Time
 		val  float64
@@ -96,17 +96,29 @@ func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
 		flowID string
 		key    string
 	}{
-		{name: "mrr", flowID: "FM", key: "B.U2.EUR.4F.KR.MRR_FR.LEV"},
-		{name: "m3", flowID: "BSI", key: "M.U2.Y.V.M30.X.I.U2.2300.Z01.E"},
-		{name: "eurusd", flowID: "EXR", key: "M.USD.EUR.SP00.A"},
+		{
+			name:   "mrr",
+			flowID: "FM",
+			key:    "B.U2.EUR.4F.KR.MRR_FR.LEV",
+		},
+		{
+			name:   "m3",
+			flowID: "BSI",
+			key:    "M.U2.Y.V.M30.X.I.U2.2300.Z01.E",
+		},
+		{
+			name:   "eurusd",
+			flowID: "EXR",
+			key:    "M.USD.EUR.SP00.A",
+		},
 	}
 
-	results := make(chan seriesResult, len(series))
+	results := make(chan result, len(series))
 	for _, s := range series {
 		s := s
 		go func() {
 			date, val, err := c.fetchLatestObservation(ctx, s.flowID, s.key)
-			results <- seriesResult{name: s.name, date: date, val: val, err: err}
+			results <- result{name: s.name, date: date, val: val, err: err}
 		}()
 	}
 
@@ -131,6 +143,7 @@ func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
 		}
 	}
 
+	// Return partial data with a warning if some series failed.
 	if len(errs) > 0 && data.MRRValue == 0 && data.M3YoY == 0 && data.EURUSDValue == 0 {
 		return nil, fmt.Errorf("all ECB series failed: %s", strings.Join(errs, "; "))
 	}
@@ -142,6 +155,7 @@ func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
 }
 
 // fetchLatestObservation fetches the most recent observation for a given ECB series.
+// Uses the ECB SDW REST API CSV format.
 func (c *ECBClient) fetchLatestObservation(ctx context.Context, flowID, key string) (time.Time, float64, error) {
 	url := fmt.Sprintf("%s/%s/%s?lastNObservations=1&format=csvdata", ecbAPIBase, flowID, key)
 
@@ -165,6 +179,7 @@ func (c *ECBClient) fetchLatestObservation(ctx context.Context, flowID, key stri
 }
 
 // parseECBCSV parses the ECB SDW CSV response and returns the latest observation.
+// ECB CSV format: header row + data rows with columns including TIME_PERIOD and OBS_VALUE.
 func parseECBCSV(r io.Reader) (time.Time, float64, error) {
 	reader := csv.NewReader(r)
 	reader.TrimLeadingSpace = true
@@ -185,9 +200,10 @@ func parseECBCSV(r io.Reader) (time.Time, float64, error) {
 		}
 	}
 	if timeIdx == -1 || valueIdx == -1 {
-		return time.Time{}, 0, fmt.Errorf("missing TIME_PERIOD or OBS_VALUE in ECB CSV headers: %v", headers)
+		return time.Time{}, 0, fmt.Errorf("missing TIME_PERIOD or OBS_VALUE column in ECB CSV (headers: %v)", headers)
 	}
 
+	// Read all rows, use the last one (most recent with lastNObservations=1 there's only 1).
 	var lastDate time.Time
 	var lastVal float64
 	found := false
@@ -198,7 +214,7 @@ func parseECBCSV(r io.Reader) (time.Time, float64, error) {
 			break
 		}
 		if err != nil {
-			continue
+			continue // skip malformed rows
 		}
 		if timeIdx >= len(row) || valueIdx >= len(row) {
 			continue
@@ -264,6 +280,7 @@ func FormatECBData(d *ECBData) string {
 	sb.WriteString("🏦 <b>ECB Monetary Policy Dashboard</b>\n")
 	sb.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
+	// Key Rate
 	if d.MRRValue != 0 {
 		sb.WriteString("📊 <b>Key Interest Rate (MRR)</b>\n")
 		sb.WriteString(fmt.Sprintf("   Rate: <b>%.2f%%</b>", d.MRRValue))
@@ -273,6 +290,7 @@ func FormatECBData(d *ECBData) string {
 		sb.WriteString("\n\n")
 	}
 
+	// M3 Money Supply
 	if d.M3YoY != 0 {
 		m3Arrow := "→"
 		if d.M3YoY > 5 {
@@ -288,6 +306,7 @@ func FormatECBData(d *ECBData) string {
 		sb.WriteString("\n\n")
 	}
 
+	// EUR/USD Rate
 	if d.EURUSDValue != 0 {
 		sb.WriteString("💱 <b>EUR/USD Official Rate</b>\n")
 		sb.WriteString(fmt.Sprintf("   Rate: <b>%.4f</b>", d.EURUSDValue))
@@ -297,8 +316,9 @@ func FormatECBData(d *ECBData) string {
 		sb.WriteString("\n\n")
 	}
 
+	// Interpretation
 	sb.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	sb.WriteString("📝 <i>Sumber: ECB Statistical Data Warehouse</i>\n")
+	sb.WriteString("📝 <i>Sumber: ECB Statistical Data Warehouse (sdw.ecb.europa.eu)</i>\n")
 	sb.WriteString("<i>Data bulanan, diperbarui setiap bulan oleh ECB</i>")
 
 	return sb.String()
