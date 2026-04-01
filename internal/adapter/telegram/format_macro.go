@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
@@ -1348,8 +1347,8 @@ func (f *Formatter) FormatWorldBankFundamentals(wb *fred.WorldBankData) string {
 		b.WriteString(fmt.Sprintf("<b>%s</b>%s: %s\n", currency, yearStr, strings.Join(parts, " | ")))
 	}
 
-	b.WriteString(fmt.Sprintf("<i>Source: World Bank API • %s WIB</i>\n",
-		wb.FetchedAt.In(time.FixedZone("WIB", 7*60*60)).Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>Source: World Bank API • %s</i>\n",
+		fmtutil.FormatDateTimeWIB(wb.FetchedAt)))
 
 	return b.String()
 }

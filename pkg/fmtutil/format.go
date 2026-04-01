@@ -261,6 +261,11 @@ func FormatDateTimeWIB(t time.Time) string {
 	return t.In(wib).Format("02 Jan 15:04") + " WIB"
 }
 
+// FormatDateTimeUTC returns "DD MMM HH:MM UTC" in UTC timezone.
+func FormatDateTimeUTC(t time.Time) string {
+	return t.UTC().Format("02 Jan 15:04") + " UTC"
+}
+
 // ---------------------------------------------------------------------------
 // Telegram Message Structure Helpers
 // ---------------------------------------------------------------------------
