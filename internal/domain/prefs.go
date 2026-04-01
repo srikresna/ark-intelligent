@@ -109,6 +109,13 @@ type UserPrefs struct {
 	// MobileMode collapses wide tables into sparkline + one-liner summaries.
 	// Optimised for narrow screens (320px mobile).
 	MobileMode bool `json:"mobile_mode,omitempty"`
+
+	// ReferrerID stores the user ID of whoever referred this user via deep link.
+	// Set when /start is invoked with ?start=ref_<userID>.
+	ReferrerID int64 `json:"referrer_id,omitempty"`
+
+	// ReferredAt is when the referral was recorded.
+	ReferredAt string `json:"referred_at,omitempty"`
 }
 
 // DefaultPrefs returns the default user preferences.

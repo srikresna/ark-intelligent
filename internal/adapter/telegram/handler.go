@@ -73,6 +73,9 @@ type Handler struct {
 	// Per-user chat cooldown (separate from AI command cooldown to avoid interference).
 	chatCooldownMu sync.Mutex
 	chatCooldown   map[int64]time.Time // userID -> last chat message time
+	// deepLinks caches command intents from deep link parameters (t.me/bot?start=cmd_cot_EUR).
+	// Intent is auto-executed after onboarding completes. TTL 10 minutes.
+	deepLinks *deepLinkCache
 
 	// Authorization middleware for tiered access control.
 	middleware *Middleware
@@ -183,6 +186,7 @@ func NewHandler(
 		newsScheduler:  newsScheduler,
 		aiCooldown:     make(map[int64]time.Time),
 		chatCooldown:   make(map[int64]time.Time),
+		deepLinks:      newDeepLinkCache(),
 		middleware:     middleware,
 		priceRepo:      priceRepo,
 		signalRepo:     signalRepo,
