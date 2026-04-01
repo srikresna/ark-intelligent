@@ -205,6 +205,20 @@ func NewHandler(
 	bot.RegisterCommand("/ban", h.cmdBan)
 	bot.RegisterCommand("/unban", h.cmdUnban)
 
+	// Short aliases for power users (mobile-friendly)
+	bot.RegisterCommand("/c", h.cmdCOT)
+	bot.RegisterCommand("/cal", h.cmdCalendar)
+	bot.RegisterCommand("/out", h.cmdOutlook)
+	bot.RegisterCommand("/m", h.cmdMacro)
+	bot.RegisterCommand("/b", h.cmdBias)
+	bot.RegisterCommand("/q", h.cmdQuant)
+	bot.RegisterCommand("/bt", h.cmdBacktest)
+	bot.RegisterCommand("/r", h.cmdRank)
+	bot.RegisterCommand("/s", h.cmdSentiment)
+	bot.RegisterCommand("/p", h.cmdPrice)
+	bot.RegisterCommand("/l", h.cmdLevels)
+
+
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
@@ -219,7 +233,7 @@ func NewHandler(
 	bot.RegisterCallback("nav:", h.cbNav)
 	bot.RegisterCallback("help:", h.cbHelp)
 
-	log.Info().Int("commands", 37).Int("callbacks", 10).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
 	return h
 }
 
