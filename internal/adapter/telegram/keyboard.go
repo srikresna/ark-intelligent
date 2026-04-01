@@ -36,7 +36,7 @@ func NewKeyboardBuilder() *KeyboardBuilder {
 // ---------------------------------------------------------------------------
 
 const (
-	// Navigation
+	// Navigation — generic
 	btnBack       = "◀ Kembali"
 	btnHome       = "🏠 Menu Utama"
 	btnPrevDay    = "◀ Kemarin"
@@ -45,6 +45,12 @@ const (
 	btnNextWeek   = "Minggu Depan ▶"
 	btnPrevMonth  = "◀ Bulan Lalu"
 	btnNextMonth  = "Bulan Depan ▶"
+
+	// Navigation — context-specific back buttons (Indonesian, per UX standard)
+	btnBackRingkasan = "◀ Ringkasan"   // back to summary/overview
+	btnBackDashboard = "◀ Dashboard"   // back to main section dashboard
+	btnBackKategori  = "◀ Kategori"    // back to category list
+	btnBackGrid      = "◀ Grid"        // back to seasonal grid overview
 
 	// Calendar
 	btnThisMonth = "Bulan Ini"
@@ -251,7 +257,7 @@ func (kb *KeyboardBuilder) MacroDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "macro:summary"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "macro:summary"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -267,7 +273,7 @@ func (kb *KeyboardBuilder) MacroDrillDownMenu() ports.InlineKeyboard {
 			},
 			{
 				{Text: "🧮 Composites", CallbackData: "macro:composites"},
-				{Text: btnBack, CallbackData: "macro:summary"},
+				{Text: btnBackRingkasan, CallbackData: "macro:summary"},
 				{Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
@@ -526,7 +532,7 @@ func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKe
 	rows = append(rows, kb.ShareRow(fmt.Sprintf("share:cot:%s", code)))
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
+		{Text: btnBackRingkasan, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -621,7 +627,7 @@ func (kb *KeyboardBuilder) ImpactEventMenu(category string) ports.InlineKeyboard
 	}
 	// Add back button
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnBack, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
+		{Text: btnBackKategori, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -632,7 +638,7 @@ func (kb *KeyboardBuilder) ImpactBackMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackKategori, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -763,7 +769,7 @@ func (kb *KeyboardBuilder) SeasonalDetailMenu(currency string) ports.InlineKeybo
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "cmd:seasonal"},
+				{Text: btnBackGrid, CallbackData: "cmd:seasonal"},
 				{Text: "💹 Price", CallbackData: fmt.Sprintf("cmd:price:%s", currency)},
 				{Text: btnHome, CallbackData: "nav:home"},
 			},
@@ -807,7 +813,7 @@ func (kb *KeyboardBuilder) COTDetailMenuWithBias(code string, isRaw bool, signal
 	rows = append(rows, kb.ShareRow(fmt.Sprintf("share:cot:%s", code)))
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
+		{Text: btnBackRingkasan, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -870,7 +876,7 @@ func (kb *KeyboardBuilder) AlphaDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -888,7 +894,7 @@ func (kb *KeyboardBuilder) AlphaCryptoDetailMenu() ports.InlineKeyboard {
 				{Text: "🔶 BNB", CallbackData: "alpha:crypto:BNB"},
 			},
 			{
-				{Text: btnBack, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -935,7 +941,7 @@ func (kb *KeyboardBuilder) CTADetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -957,7 +963,7 @@ func (kb *KeyboardBuilder) CTATimeframeMenu() ports.InlineKeyboard {
 				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
 			},
 			{
-				{Text: btnBack, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1093,7 +1099,7 @@ func (kb *KeyboardBuilder) QuantDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "quant:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackDashboard, CallbackData: "quant:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1144,7 +1150,7 @@ func (kb *KeyboardBuilder) VPDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "vp:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackDashboard, CallbackData: "vp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1206,7 +1212,7 @@ func (kb *KeyboardBuilder) HelpSubMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: btnBack, CallbackData: "help:back"}, {Text: btnHome, CallbackData: "nav:home"},
+				{Text: btnBackRingkasan, CallbackData: "help:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1441,4 +1447,64 @@ func (kb *KeyboardBuilder) ShareRow(callbackBase string) []ports.InlineButton {
 	return []ports.InlineButton{
 		{Text: "📤 Share", CallbackData: callbackBase},
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Related "Next Steps" Command Suggestions
+// ---------------------------------------------------------------------------
+
+// relatedCommands maps a command name to 2–3 related commands.
+// Each entry is {label, callbackBase} where callbackBase uses "cmd:" prefix.
+var relatedCommands = map[string][]struct {
+	Label    string
+	Callback string
+}{
+	"cot":         {{Label: "📈 Bias", Callback: "bias"}, {Label: "📊 Rank", Callback: "rank"}, {Label: "🔬 Alpha", Callback: "alpha"}},
+	"bias":        {{Label: "📉 COT", Callback: "cot"}, {Label: "🎯 CTA", Callback: "cta"}, {Label: "🌐 Macro", Callback: "macro"}},
+	"cta":         {{Label: "📊 Quant", Callback: "quant"}, {Label: "🔑 Levels", Callback: "levels"}, {Label: "🎯 Playbook", Callback: "playbook"}},
+	"macro":       {{Label: "📅 Calendar", Callback: "calendar"}, {Label: "🔄 Transition", Callback: "transition"}, {Label: "📊 Sentiment", Callback: "sentiment"}},
+	"quant":       {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Backtest", Callback: "backtest"}, {Label: "📈 Price", Callback: "price"}},
+	"calendar":    {{Label: "💥 Impact", Callback: "impact"}, {Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}},
+	"gex":         {{Label: "🔬 Alpha", Callback: "alpha"}, {Label: "📊 Sentiment", Callback: "sentiment"}, {Label: "📈 CryptoAlpha", Callback: "cryptoalpha"}},
+	"sentiment":   {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Bias", Callback: "bias"}, {Label: "📊 Rank", Callback: "rank"}},
+	"price":       {{Label: "🔑 Levels", Callback: "levels"}, {Label: "📊 Quant", Callback: "quant"}, {Label: "🎯 CTA", Callback: "cta"}},
+	"levels":      {{Label: "📈 Price", Callback: "price"}, {Label: "🎯 CTA", Callback: "cta"}, {Label: "📊 Quant", Callback: "quant"}},
+	"alpha":       {{Label: "📊 Rank", Callback: "rank"}, {Label: "📈 Bias", Callback: "bias"}, {Label: "🎯 CTA", Callback: "cta"}},
+	"rank":        {{Label: "📈 Bias", Callback: "bias"}, {Label: "📉 COT", Callback: "cot"}, {Label: "🔬 Alpha", Callback: "alpha"}},
+	"outlook":     {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📅 Calendar", Callback: "calendar"}, {Label: "📈 Bias", Callback: "bias"}},
+	"impact":      {{Label: "📅 Calendar", Callback: "calendar"}, {Label: "🌐 Macro", Callback: "macro"}},
+	"seasonal":    {{Label: "📉 COT", Callback: "cot"}, {Label: "📊 Backtest", Callback: "backtest"}, {Label: "📈 Bias", Callback: "bias"}},
+	"backtest":    {{Label: "📊 Quant", Callback: "quant"}, {Label: "🎯 CTA", Callback: "cta"}, {Label: "📈 Seasonal", Callback: "seasonal"}},
+	"intermarket": {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}, {Label: "📊 Sentiment", Callback: "sentiment"}},
+}
+
+// RelatedCommandsRow returns a keyboard row with 2–3 related command buttons.
+// command is the base command name (e.g. "cot", "bias").
+// currency, if non-empty, is appended to each callback (e.g. "cmd:bias:EUR").
+func (kb *KeyboardBuilder) RelatedCommandsRow(command, currency string) []ports.InlineButton {
+	related, ok := relatedCommands[command]
+	if !ok {
+		return nil
+	}
+	row := make([]ports.InlineButton, 0, len(related))
+	for _, r := range related {
+		cb := "cmd:" + r.Callback
+		label := r.Label
+		if currency != "" {
+			cb += ":" + currency
+			label += " " + currency
+		}
+		row = append(row, ports.InlineButton{Text: label, CallbackData: cb})
+	}
+	return row
+}
+
+// RelatedCommandsKeyboard returns a full keyboard with just the related row.
+// Useful for commands that don't have their own keyboard.
+func (kb *KeyboardBuilder) RelatedCommandsKeyboard(command, currency string) ports.InlineKeyboard {
+	row := kb.RelatedCommandsRow(command, currency)
+	if len(row) == 0 {
+		return ports.InlineKeyboard{}
+	}
+	return ports.InlineKeyboard{Rows: [][]ports.InlineButton{row}}
 }

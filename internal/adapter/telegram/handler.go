@@ -141,6 +141,9 @@ type Handler struct {
 	// elliott holds optional Elliott Wave engine services.
 	// May be nil — /elliott command disabled if not configured.
 	elliott *ElliottServices
+
+	// adminConfirm stores pending admin action confirmations with TTL.
+	adminConfirm *adminConfirmStore
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
@@ -186,6 +189,7 @@ func NewHandler(
 		impactProvider: impactProvider,
 		dailyPriceRepo: dailyPriceRepo,
 		intradayRepo:   intradayRepo,
+		adminConfirm:   newAdminConfirmStore(),
 	}
 
 	// Register all commands
@@ -259,6 +263,7 @@ func NewHandler(
 	bot.RegisterCallback("nav:", h.cbNav)
 	bot.RegisterCallback("help:", h.cbHelp)
 	bot.RegisterCallback("share:", h.cbShare)
+	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
 
 	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
 	return h

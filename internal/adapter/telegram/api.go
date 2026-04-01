@@ -55,6 +55,8 @@ func (b *Bot) SendMessage(ctx context.Context, chatID string, text string) (int,
 }
 
 // SendHTML sends an HTML-formatted message with link preview disabled.
+// When the message is split into multiple chunks, each chunk receives a
+// "Page X/Y" footer so the reader knows where they are.
 func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, error) {
 	if chatID == "" {
 		chatID = b.defaultID
@@ -63,11 +65,16 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 	b.rateLimit()
 
 	chunks := splitMessage(html, config.TelegramMaxMessageLen)
+	total := len(chunks)
 	var lastMsgID int
 
-	for _, chunk := range chunks {
+	for i, chunk := range chunks {
+		text := chunk
+		if total > 1 {
+			text += fmt.Sprintf("\n\n<i>— %d/%d —</i>", i+1, total)
+		}
 		params := map[string]any{
-			"text":                     chunk,
+			"text":                     text,
 			"parse_mode":               "HTML",
 			"disable_web_page_preview": true,
 		}
@@ -81,6 +88,23 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 	}
 
 	return lastMsgID, nil
+}
+
+// sendHTMLRaw sends a single HTML message without splitting or page indicators.
+// Used internally by chunked senders that handle their own splitting.
+func (b *Bot) sendHTMLRaw(ctx context.Context, chatID string, html string) (int, error) {
+	b.rateLimit()
+	params := map[string]any{
+		"text":                     html,
+		"parse_mode":               "HTML",
+		"disable_web_page_preview": true,
+	}
+	b.setChatID(params, chatID)
+	var msg sentMessage
+	if err := b.apiCallWithRetry(ctx, "sendMessage", params, &msg); err != nil {
+		return 0, fmt.Errorf("sendHTMLRaw: %w", err)
+	}
+	return msg.MessageID, nil
 }
 
 // SendWithKeyboard sends a message with an inline keyboard.
@@ -610,23 +634,26 @@ func (b *Bot) SendWithKeyboardChunked(ctx context.Context, chatID string, html s
 	}
 
 	chunks := splitMessage(html, 4000)
+	total := len(chunks)
 
-	if len(chunks) == 1 {
+	if total == 1 {
 		return b.SendWithKeyboard(ctx, chatID, chunks[0], kb)
 	}
 
-	// Send all but the last chunk as plain HTML
+	// Send all but the last chunk as plain HTML (page indicator added by SendHTML).
 	var lastID int
-	for _, chunk := range chunks[:len(chunks)-1] {
-		id, err := b.SendHTML(ctx, chatID, chunk)
+	for i, chunk := range chunks[:total-1] {
+		text := chunk + fmt.Sprintf("\n\n<i>— %d/%d —</i>", i+1, total)
+		id, err := b.sendHTMLRaw(ctx, chatID, text)
 		if err != nil {
 			return lastID, err
 		}
 		lastID = id
 	}
 
-	// Last chunk gets the keyboard
-	id, err := b.SendWithKeyboard(ctx, chatID, chunks[len(chunks)-1], kb)
+	// Last chunk gets the keyboard + page indicator.
+	lastChunk := chunks[total-1] + fmt.Sprintf("\n\n<i>— %d/%d —</i>", total, total)
+	id, err := b.SendWithKeyboard(ctx, chatID, lastChunk, kb)
 	if err != nil {
 		return lastID, err
 	}
@@ -641,25 +668,29 @@ func (b *Bot) EditWithKeyboardChunked(ctx context.Context, chatID string, msgID 
 	}
 
 	chunks := splitMessage(html, 4000)
+	total := len(chunks)
 
-	if len(chunks) == 1 {
+	if total == 1 {
 		return b.EditWithKeyboard(ctx, chatID, msgID, chunks[0], kb)
 	}
 
-	// Edit the original message with the first chunk (no keyboard yet)
-	if err := b.EditMessage(ctx, chatID, msgID, chunks[0]); err != nil {
+	// Edit the original message with the first chunk + page indicator.
+	first := chunks[0] + fmt.Sprintf("\n\n<i>— 1/%d —</i>", total)
+	if err := b.EditMessage(ctx, chatID, msgID, first); err != nil {
 		return err
 	}
 
-	// Send intermediate chunks as new messages (no keyboard)
-	for _, chunk := range chunks[1 : len(chunks)-1] {
-		if _, err := b.SendHTML(ctx, chatID, chunk); err != nil {
+	// Send intermediate chunks as new messages with page indicators.
+	for i, chunk := range chunks[1 : total-1] {
+		text := chunk + fmt.Sprintf("\n\n<i>— %d/%d —</i>", i+2, total)
+		if _, err := b.sendHTMLRaw(ctx, chatID, text); err != nil {
 			return err
 		}
 	}
 
-	// Last chunk as new message with keyboard
-	_, err := b.SendWithKeyboard(ctx, chatID, chunks[len(chunks)-1], kb)
+	// Last chunk as new message with keyboard + page indicator.
+	lastChunk := chunks[total-1] + fmt.Sprintf("\n\n<i>— %d/%d —</i>", total, total)
+	_, err := b.SendWithKeyboard(ctx, chatID, lastChunk, kb)
 	return err
 }
 

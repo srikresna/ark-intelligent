@@ -257,6 +257,26 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdQuant(ctx, chatID, userID, args)
 	case "vp":
 		return h.cmdVP(ctx, chatID, userID, args)
+	case "cot":
+		return h.cmdCOT(ctx, chatID, userID, args)
+	case "cta":
+		return h.cmdCTA(ctx, chatID, userID, args)
+	case "alpha":
+		return h.cmdAlpha(ctx, chatID, 0, args)
+	case "gex":
+		return h.cmdGEX(ctx, chatID, userID, args)
+	case "impact":
+		return h.cmdImpact(ctx, chatID, 0, args)
+	case "outlook":
+		return h.cmdOutlook(ctx, chatID, userID, args)
+	case "intermarket":
+		return h.cmdIntermarket(ctx, chatID, 0, args)
+	case "playbook":
+		return h.cmdPlaybook(ctx, chatID, 0, args)
+	case "transition":
+		return h.cmdTransition(ctx, chatID, 0, args)
+	case "cryptoalpha":
+		return h.cmdCryptoAlpha(ctx, chatID, 0, args)
 	default:
 		return nil
 	}

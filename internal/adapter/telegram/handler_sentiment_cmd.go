@@ -41,5 +41,9 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 	}
 
 	htmlMsg := h.fmt.FormatSentiment(data, h.currentMacroRegimeName(ctx))
+	kb := h.kb.RelatedCommandsKeyboard("sentiment", "")
+	if len(kb.Rows) > 0 {
+		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
+	}
 	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }

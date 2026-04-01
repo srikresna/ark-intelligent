@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // FormatICTResult formats an ICTResult as a Telegram HTML message.
@@ -14,16 +15,16 @@ import (
 func FormatICTResult(r *ictsvc.ICTResult) string {
 	var sb strings.Builder
 
-	// Header
-	biasEmoji := biasToEmoji(r.Bias)
-	sb.WriteString(fmt.Sprintf("🔷 <b>ICT/SMC ANALYSIS — %s %s</b>\n", r.Symbol, r.Timeframe))
+	// Header — uses fmtutil.AnalysisHeader for consistency.
+	sb.WriteString(fmtutil.AnalysisHeader("🔷", "ICT/SMC ANALYSIS", r.Symbol, r.Timeframe))
 	sb.WriteString(fmt.Sprintf("📅 %s", r.AnalyzedAt.Format("2006-01-02 15:04 UTC")))
 	if r.Killzone != "" {
 		sb.WriteString(fmt.Sprintf("\n⏰ <b>Killzone:</b> %s", r.Killzone))
 	}
 	sb.WriteString("\n\n")
 
-	// Market Structure
+	// Market Structure — uses fmtutil.BiasIcon.
+	biasEmoji := fmtutil.BiasIcon(r.Bias)
 	sb.WriteString(fmt.Sprintf("📐 <b>MARKET STRUCTURE:</b> %s %s\n", biasEmoji, r.Bias))
 	structCount := 0
 	for i := len(r.Structure) - 1; i >= 0 && structCount < 3; i-- {
@@ -40,10 +41,7 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 		for _, ob := range r.OrderBlocks {
 			status := "valid"
 			suffix := ""
-			icon := "🟢"
-			if ob.Kind == "BEARISH" {
-				icon = "🔴"
-			}
+			icon := fmtutil.BiasIcon(ob.Kind)
 			if ob.Broken {
 				status = "broken → Breaker"
 				suffix = " ⚡"
@@ -65,10 +63,7 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 			if z.Filled {
 				fillStr = "100% filled ✓"
 			}
-			arrow := "⬆️"
-			if z.Kind == "BEARISH" {
-				arrow = "⬇️"
-			}
+			arrow := fmtutil.DirectionIcon(z.Kind)
 			fvgLines = append(fvgLines, fmt.Sprintf("  %s %s FVG: %.5f–%.5f (%s)",
 				arrow, z.Kind, z.Bottom, z.Top, fillStr))
 			shown++
@@ -107,18 +102,6 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 	sb.WriteString(fmt.Sprintf("🎯 <b>SUMMARY:</b> %s\n", r.Summary))
 
 	return sb.String()
-}
-
-// biasToEmoji returns an emoji for the structural bias.
-func biasToEmoji(bias string) string {
-	switch bias {
-	case "BULLISH":
-		return "🟢"
-	case "BEARISH":
-		return "🔴"
-	default:
-		return "⚪"
-	}
 }
 
 // structureIcon returns a status icon for a structure event.

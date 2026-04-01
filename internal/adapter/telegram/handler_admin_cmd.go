@@ -125,7 +125,7 @@ func (h *Handler) cmdUsers(ctx context.Context, chatID string, userID int64, arg
 	return err
 }
 
-// cmdSetRole changes a user's role.
+// cmdSetRole changes a user's role (with confirmation step).
 // Usage: /setrole <userID> <role>
 func (h *Handler) cmdSetRole(ctx context.Context, chatID string, userID int64, args string) error {
 	if !h.requireAdmin(ctx, chatID, userID) {
@@ -179,18 +179,26 @@ func (h *Handler) cmdSetRole(ctx context.Context, chatID string, userID int64, a
 		return err
 	}
 
-	if err := h.middleware.SetUserRole(ctx, targetID, newRole); err != nil {
-		log.Error().Err(err).Int64("target", targetID).Str("role", string(newRole)).Msg("cmdSetRole: failed")
-		_, err = h.bot.SendHTML(ctx, chatID, "Failed to set role. Check server logs.")
-		return err
-	}
+	// Show confirmation instead of executing immediately.
+	key := h.adminConfirm.add(adminAction{
+		Action:   "setrole",
+		CallerID: userID,
+		TargetID: targetID,
+		NewRole:  newRole,
+	})
 
-	_, err := h.bot.SendHTML(ctx, chatID,
-		fmt.Sprintf("User <code>%d</code> role set to <b>%s</b>.", targetID, newRole))
+	preview := fmt.Sprintf(
+		"\xf0\x9f\x9b\xa1 <b>Confirm Set Role</b>\n\n"+
+			"Target: <code>%d</code>\n"+
+			"Current role: <b>%s</b>\n"+
+			"New role: <b>%s</b>\n\n"+
+			"<i>Auto-cancels in 60s.</i>",
+		targetID, targetRole, newRole)
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, preview, adminConfirmKeyboard(key))
 	return err
 }
 
-// cmdBan bans a user.
+// cmdBan bans a user (with confirmation step).
 // Usage: /ban <userID>
 func (h *Handler) cmdBan(ctx context.Context, chatID string, userID int64, args string) error {
 	if !h.requireAdmin(ctx, chatID, userID) {
@@ -227,17 +235,25 @@ func (h *Handler) cmdBan(ctx context.Context, chatID string, userID int64, args 
 		return err
 	}
 
-	if err := h.middleware.SetUserRole(ctx, targetID, domain.RoleBanned); err != nil {
-		log.Error().Err(err).Int64("target", targetID).Msg("cmdBan: failed")
-		_, err = h.bot.SendHTML(ctx, chatID, "Failed to ban user. Check server logs.")
-		return err
-	}
+	// Show confirmation instead of executing immediately.
+	key := h.adminConfirm.add(adminAction{
+		Action:   "ban",
+		CallerID: userID,
+		TargetID: targetID,
+	})
 
-	_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("User <code>%d</code> has been banned.", targetID))
+	preview := fmt.Sprintf(
+		"\xf0\x9f\x9a\xab <b>Confirm Ban</b>\n\n"+
+			"Target: <code>%d</code>\n"+
+			"Current role: <b>%s</b>\n\n"+
+			"\xe2\x9a\xa0\xef\xb8\x8f This will immediately revoke all access.\n"+
+			"<i>Auto-cancels in 60s.</i>",
+		targetID, targetRole)
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, preview, adminConfirmKeyboard(key))
 	return err
 }
 
-// cmdUnban unbans a user (sets them back to Free).
+// cmdUnban unbans a user (with role selection).
 // Usage: /unban <userID>
 func (h *Handler) cmdUnban(ctx context.Context, chatID string, userID int64, args string) error {
 	if !h.requireAdmin(ctx, chatID, userID) {
@@ -260,13 +276,20 @@ func (h *Handler) cmdUnban(ctx context.Context, chatID string, userID int64, arg
 		return err
 	}
 
-	if err := h.middleware.SetUserRole(ctx, targetID, domain.RoleFree); err != nil {
-		log.Error().Err(err).Int64("target", targetID).Msg("cmdUnban: failed")
-		_, err = h.bot.SendHTML(ctx, chatID, "Failed to unban user. Check server logs.")
-		return err
-	}
+	// Show role selection instead of defaulting to Free.
+	key := h.adminConfirm.add(adminAction{
+		Action:   "unban",
+		CallerID: userID,
+		TargetID: targetID,
+	})
 
-	_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("User <code>%d</code> has been unbanned (set to Free).", targetID))
+	preview := fmt.Sprintf(
+		"\xf0\x9f\x94\x93 <b>Unban User</b>\n\n"+
+			"Target: <code>%d</code>\n\n"+
+			"Restore as which role?\n"+
+			"<i>Auto-cancels in 60s.</i>",
+		targetID)
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, preview, unbanRoleKeyboard(key))
 	return err
 }
 
