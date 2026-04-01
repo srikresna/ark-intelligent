@@ -3,17 +3,19 @@ package telegram
 import (
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/internal/config"
 )
 
 // ---------------------------------------------------------------------------
 // Per-user rate limiter (sliding window)
 // ---------------------------------------------------------------------------
 
-const (
-	rateLimitWindow  = 60 * time.Second // sliding window duration
-	rateLimitMax     = 10               // max commands per window
-	staleEntryTTL    = 5 * time.Minute  // cleanup threshold for idle users
-	cleanupInterval  = 2 * time.Minute  // how often the cleanup goroutine runs
+var (
+	rateLimitWindow = config.RateLimitWindow
+	rateLimitMax    = config.RateLimitMax
+	staleEntryTTL   = config.StaleEntryTTL
+	cleanupInterval = config.CleanupInterval
 )
 
 // userWindow tracks command timestamps for a single user.

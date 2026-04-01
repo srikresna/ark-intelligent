@@ -10,6 +10,7 @@ package telegram
 //   /cryptoalpha — Bybit microstructure confirmation for top crypto signals
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"fmt"
 	"html"
@@ -60,7 +61,7 @@ type alphaState struct {
 	computedAt time.Time
 }
 
-const alphaStateTTL = 60 * time.Second
+var alphaStateTTL = config.AlphaStateTTL
 
 // alphaStateCache stores per-chat alpha state with TTL.
 type alphaStateCache struct {

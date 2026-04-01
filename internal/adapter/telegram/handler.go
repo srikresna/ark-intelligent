@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"errors"
 	"fmt"
@@ -1146,7 +1147,7 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 // ---------------------------------------------------------------------------
 
 // aiCooldownDuration is the minimum interval between AI-heavy commands per user.
-const aiCooldownDuration = 30 * time.Second
+var aiCooldownDuration = config.AICooldownDefault
 
 // checkAICooldown returns true if the user is allowed to make an AI call,
 // and records the current time. Returns false if the user is still in cooldown.

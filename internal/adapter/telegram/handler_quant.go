@@ -4,6 +4,7 @@ package telegram
 //   /quant [SYMBOL] [TIMEFRAME]  — Quant dashboard with inline keyboard
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,7 +43,7 @@ type quantState struct {
 	createdAt time.Time
 }
 
-const quantStateTTL = 30 * time.Minute
+var quantStateTTL = config.QuantStateTTL
 
 // ---------------------------------------------------------------------------
 // quantStateCache

@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -48,7 +49,7 @@ func newVPStateCache() *vpStateCache {
 	return &vpStateCache{store: make(map[string]*vpState)}
 }
 
-const vpStateTTL = 30 * time.Minute
+var vpStateTTL = config.VPStateTTL
 
 func (c *vpStateCache) get(chatID string) *vpState {
 	c.mu.Lock()
