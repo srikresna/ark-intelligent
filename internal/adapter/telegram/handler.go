@@ -18,6 +18,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -929,6 +930,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		}
 	}
 
+	// World Bank cross-country macro fundamentals (graceful degradation on error)
+	wbData, _ := worldbank.GetCachedOrFetch(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -968,6 +972,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		SeasonalData:       seasonalData,
 		BacktestStats:      backtestStats,
 		CurrencyStrength:   currencyStrength,
+		WorldBankData:      wbData,
 		Language:           prefs.Language,
 	}
 

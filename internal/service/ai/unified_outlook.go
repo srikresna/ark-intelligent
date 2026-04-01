@@ -9,6 +9,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -28,6 +29,7 @@ type UnifiedOutlookData struct {
 	SeasonalData       map[string]*pricesvc.SeasonalPattern
 	BacktestStats      *domain.BacktestStats
 	CurrencyStrength   []pricesvc.CurrencyStrength
+	WorldBankData      *worldbank.WorldBankData
 	Language           string
 }
 
@@ -325,7 +327,7 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 	if data.BacktestStats != nil && data.BacktestStats.Evaluated > 0 {
 		bs := data.BacktestStats
 		b.WriteString(fmt.Sprintf("=== %d. SIGNAL ACCURACY CONTEXT ===\n", section))
-		section++ //nolint:ineffassign // section may be used in future extensions
+		section++
 		b.WriteString(fmt.Sprintf("Historical signals: %d evaluated\n", bs.Evaluated))
 		b.WriteString(fmt.Sprintf("Win rates: 1W=%.0f%% 2W=%.0f%% 4W=%.0f%%\n", bs.WinRate1W, bs.WinRate2W, bs.WinRate4W))
 		b.WriteString(fmt.Sprintf("Best holding period: %s (%.0f%% win rate)\n", bs.BestPeriod, bs.BestWinRate))
@@ -334,6 +336,39 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		}
 		b.WriteString("NOTE: Weight your conviction based on historical accuracy. High-strength signals have proven more reliable.\n")
 		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 10: Cross-Country Macro Fundamentals (World Bank)
+	// -----------------------------------------------------------------------
+	if data.WorldBankData != nil {
+		available := make([]worldbank.CountryMacro, 0, len(data.WorldBankData.Countries))
+		for _, c := range data.WorldBankData.Countries {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. CROSS-COUNTRY MACRO FUNDAMENTALS (World Bank, Annual) ===\n", section))
+			section++ //nolint:ineffassign // section may be used in future extensions
+			b.WriteString(fmt.Sprintf("%-6s  %6s  %12s  %8s  %4s\n",
+				"CCY", "GDP%", "CA(USDbn)", "CPI%", "Year"))
+			b.WriteString(strings.Repeat("-", 46) + "\n")
+			for _, c := range available {
+				caSign := "+"
+				if c.CurrentAccount < 0 {
+					caSign = ""
+				}
+				b.WriteString(fmt.Sprintf("%-6s  %+6.2f  %s%11.1f  %+8.2f  %4d\n",
+					c.Currency, c.GDPGrowth, caSign, c.CurrentAccount, c.CPIInflation, c.Year))
+			}
+			b.WriteString("\n")
+			b.WriteString("NOTE: Use differentials for fundamental FX bias:\n")
+			b.WriteString("  - Higher GDP growth differential → currency structural tailwind\n")
+			b.WriteString("  - Current Account surplus → structural currency demand\n")
+			b.WriteString("  - Lower inflation → PPP-based currency strength over time\n")
+			b.WriteString("\n")
+		}
 	}
 
 	// -----------------------------------------------------------------------
