@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -222,4 +223,32 @@ func BulletList(items []string) string {
 		sb.WriteByte('\n')
 	}
 	return sb.String()
+}
+
+// ---------------------------------------------------------------------------
+// Timestamp Formatting
+// ---------------------------------------------------------------------------
+
+// wib is the WIB (Western Indonesia Time) timezone, UTC+7.
+var wib = time.FixedZone("WIB", 7*60*60)
+
+// UpdatedAt returns a standardized "Updated: DD MMM HH:MM WIB" HTML string.
+// Suitable for appending as a footer to analysis messages.
+func UpdatedAt(t time.Time) string {
+	return fmt.Sprintf("<i>Updated: %s WIB</i>", t.In(wib).Format("02 Jan 15:04"))
+}
+
+// UpdatedAtShort returns "HH:MM WIB" only (for inline use).
+func UpdatedAtShort(t time.Time) string {
+	return t.In(wib).Format("15:04 WIB")
+}
+
+// FormatDateWIB returns "02 Jan 2006" in WIB timezone.
+func FormatDateWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan 2006")
+}
+
+// FormatDateTimeWIB returns "02 Jan 15:04 WIB" in WIB timezone.
+func FormatDateTimeWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan 15:04") + " WIB"
 }
