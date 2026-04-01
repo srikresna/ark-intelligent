@@ -37,5 +37,9 @@ type GEXResult struct {
 	Regime     string // "POSITIVE_GEX" | "NEGATIVE_GEX"
 	Implication string // human-readable interpretation
 
+	// LowLiquidity is true when the number of instruments with meaningful
+	// open interest is below a usable threshold (e.g. <20 strikes with OI).
+	LowLiquidity bool
+
 	AnalyzedAt time.Time
 }

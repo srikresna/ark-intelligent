@@ -20,7 +20,11 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	// Header — uses fmtutil.AnalysisHeader.
 	sb.WriteString(fmtutil.AnalysisHeader("📊", "GAMMA EXPOSURE", r.Symbol, ""))
 	sb.WriteString(fmt.Sprintf("💰 Spot: <code>%s</code>\n", gexFormatPrice(r.SpotPrice)))
-	sb.WriteString(fmt.Sprintf("📅 %s UTC\n\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
+	sb.WriteString(fmt.Sprintf("📅 %s UTC\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
+	if r.LowLiquidity {
+		sb.WriteString("⚠️ <i>Low liquidity — data may be less reliable</i>\n")
+	}
+	sb.WriteString("\n")
 
 	// GEX Regime — uses fmtutil.RegimeEmoji.
 	regimeEmoji := fmtutil.RegimeEmoji(r.Regime)

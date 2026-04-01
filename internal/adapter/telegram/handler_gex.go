@@ -43,8 +43,11 @@ func (h *Handler) WithGEX(svc *GEXServices) *Handler {
 
 // validGEXSymbols lists the crypto symbols supported by Deribit options.
 var validGEXSymbols = map[string]struct{}{
-	"BTC": {},
-	"ETH": {},
+	"BTC":  {},
+	"ETH":  {},
+	"SOL":  {},
+	"AVAX": {},
+	"XRP":  {},
 }
 
 // cmdGEX handles the /gex [SYMBOL] command.
@@ -70,7 +73,7 @@ func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args 
 		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
 			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
 				"Tersedia: <code>%s</code>\n\n"+
-				"Contoh: <code>/gex BTC</code> atau <code>/gex ETH</code>",
+				"Contoh: <code>/gex BTC</code>, <code>/gex SOL</code>",
 			sym, strings.Join(keys, "</code>, <code>"),
 		))
 		return err
@@ -108,7 +111,7 @@ func gexKeyboard(currentSym string) ports.InlineKeyboard {
 	var rows [][]ports.InlineButton
 
 	// Symbol switcher
-	symbols := []string{"BTC", "ETH"}
+	symbols := []string{"BTC", "ETH", "SOL", "XRP", "AVAX"}
 	var symbolRow []ports.InlineButton
 	for _, s := range symbols {
 		label := s

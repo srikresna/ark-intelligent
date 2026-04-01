@@ -20,6 +20,29 @@ const (
 	cacheTTL = 15 * time.Minute
 )
 
+// assetConfig maps a user-facing symbol to the Deribit API parameters needed
+// to fetch its options data. BTC/ETH use their own currency; altcoin USDC-settled
+// options all share currency=USDC but have different instrument prefixes.
+type assetConfig struct {
+	// Currency param sent to Deribit API (e.g. "BTC", "ETH", "USDC").
+	APICurrency string
+	// InstrumentPrefix filters instruments when APICurrency covers multiple
+	// assets (e.g. "SOL_USDC" for SOL within the USDC umbrella). Empty means
+	// no filtering (BTC/ETH own their currency).
+	InstrumentPrefix string
+	// IndexName for get_index_price (e.g. "btc_usd", "sol_usdc").
+	IndexName string
+}
+
+// supportedAssets maps user-facing symbols to their Deribit fetch config.
+var supportedAssets = map[string]assetConfig{
+	"BTC":  {APICurrency: "BTC", IndexName: "btc_usd"},
+	"ETH":  {APICurrency: "ETH", IndexName: "eth_usd"},
+	"SOL":  {APICurrency: "USDC", InstrumentPrefix: "SOL_USDC", IndexName: "sol_usdc"},
+	"AVAX": {APICurrency: "USDC", InstrumentPrefix: "AVAX_USDC", IndexName: "avax_usdc"},
+	"XRP":  {APICurrency: "USDC", InstrumentPrefix: "XRP_USDC", IndexName: "xrp_usdc"},
+}
+
 // cachedResult wraps a GEXResult with a timestamp for cache invalidation.
 type cachedResult struct {
 	result    *GEXResult
@@ -54,21 +77,47 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 		return cached, nil
 	}
 
-	log.Info().Str("symbol", sym).Msg("fetching GEX data from Deribit")
+	cfg, ok := supportedAssets[sym]
+	if !ok {
+		return nil, fmt.Errorf("gex: unsupported symbol %s", sym)
+	}
+
+	log.Info().Str("symbol", sym).Str("currency", cfg.APICurrency).Msg("fetching GEX data from Deribit")
 
 	// 1. Instruments (for contract metadata)
-	instruments, err := e.client.GetInstruments(ctx, sym)
+	allInstruments, err := e.client.GetInstruments(ctx, cfg.APICurrency)
 	if err != nil {
 		return nil, fmt.Errorf("gex: get instruments: %w", err)
+	}
+	// Filter instruments by prefix for USDC-settled altcoins
+	instruments := allInstruments
+	if cfg.InstrumentPrefix != "" {
+		instruments = make([]deribit.Instrument, 0, len(allInstruments))
+		for _, inst := range allInstruments {
+			if strings.HasPrefix(inst.InstrumentName, cfg.InstrumentPrefix) {
+				instruments = append(instruments, inst)
+			}
+		}
 	}
 	if len(instruments) == 0 {
 		return nil, fmt.Errorf("gex: no active instruments for %s", sym)
 	}
 
 	// 2. Book summary (OI + underlying price)
-	summaries, err := e.client.GetBookSummary(ctx, sym)
+	allSummaries, err := e.client.GetBookSummary(ctx, cfg.APICurrency)
 	if err != nil {
 		return nil, fmt.Errorf("gex: get book summary: %w", err)
+	}
+
+	// Filter summaries by prefix for USDC-settled altcoins
+	summaries := allSummaries
+	if cfg.InstrumentPrefix != "" {
+		summaries = make([]deribit.BookSummary, 0, len(allSummaries))
+		for _, s := range allSummaries {
+			if strings.HasPrefix(s.InstrumentName, cfg.InstrumentPrefix) {
+				summaries = append(summaries, s)
+			}
+		}
 	}
 
 	// Index by instrument name for fast lookup
@@ -93,7 +142,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 		// Fallback 1: try to get the Deribit index price directly.
 		// This is the canonical spot source — far more reliable than MarkPrice.
 		log.Warn().Str("symbol", sym).Msg("no UnderlyingPrice in book summaries, fetching index price as fallback")
-		indexSpot, indexErr := e.client.GetIndexPrice(ctx, sym)
+		indexSpot, indexErr := e.client.GetIndexPriceByName(ctx, cfg.IndexName)
 		if indexErr == nil && indexSpot > 0 {
 			spot = indexSpot
 			log.Info().Str("symbol", sym).Float64("spot", spot).Msg("using Deribit index price as spot fallback")
@@ -111,7 +160,11 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 	callCount := make(map[float64]int)
 	putCount := make(map[float64]int)
 
-	contractSize := 1.0 // Deribit BTC/ETH options: 1 contract = 1 underlying
+	// contractSize from first instrument; USDC-settled altcoins typically use 10.
+	contractSize := 1.0
+	if len(instruments) > 0 && instruments[0].ContractSize > 0 {
+		contractSize = instruments[0].ContractSize
+	}
 
 	fetched := 0
 	for name, inst := range instrMap {
@@ -213,6 +266,9 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 
 	regime, impl := regimeAndImplication(totalGEX, flipLevel)
 
+	// Flag low liquidity for USDC-settled altcoins with thin markets
+	lowLiq := len(strikes) < 20
+
 	result := &GEXResult{
 		Symbol:      sym,
 		SpotPrice:   spot,
@@ -223,9 +279,10 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 		GammaWall:   gwall,
 		PutWall:     pwall,
 		MaxPain:     maxPain,
-		Regime:      regime,
-		Implication: impl,
-		AnalyzedAt:  time.Now().UTC(),
+		Regime:       regime,
+		Implication:  impl,
+		LowLiquidity: lowLiq,
+		AnalyzedAt:   time.Now().UTC(),
 	}
 
 	e.storeCache(sym, result)
