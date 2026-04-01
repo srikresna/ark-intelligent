@@ -67,7 +67,7 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		}
 		return nil
 	}); err != nil {
-		log.Debug().Err(err).Msg("sentiment: CNN circuit breaker rejected or source unavailable")
+		log.Debug().Str("source", "cnn").Err(err).Msg("sentiment: CNN circuit breaker rejected or source unavailable")
 	}
 
 	// AAII Sentiment — wrapped in circuit breaker
@@ -82,7 +82,7 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		}
 		return nil
 	}); err != nil {
-		log.Debug().Err(err).Msg("sentiment: AAII circuit breaker rejected or source unavailable")
+		log.Debug().Str("source", "aaii").Err(err).Msg("sentiment: AAII circuit breaker rejected or source unavailable")
 	}
 
 	// CBOE Put/Call — wrapped in circuit breaker
@@ -94,7 +94,7 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		}
 		return nil
 	}); err != nil {
-		log.Debug().Err(err).Msg("sentiment: CBOE circuit breaker rejected or source unavailable")
+		log.Debug().Str("source", "cboe").Err(err).Msg("sentiment: CBOE circuit breaker rejected or source unavailable")
 	}
 
 	// Crypto Fear & Greed Index (alternative.me) — wrapped in circuit breaker
@@ -105,7 +105,7 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		}
 		return nil
 	}); err != nil {
-		log.Debug().Err(err).Msg("sentiment: crypto F&G circuit breaker rejected or source unavailable")
+		log.Debug().Str("source", "crypto-fg").Err(err).Msg("sentiment: crypto F&G circuit breaker rejected or source unavailable")
 	}
 
 	return data, nil
@@ -188,7 +188,7 @@ type cnnResponse struct {
 func fetchCNNFearGreed(ctx context.Context, client *http.Client, data *SentimentData) {
 	req, err := http.NewRequestWithContext(ctx, "GET", cnnFearGreedURL, nil)
 	if err != nil {
-		log.Warn().Err(err).Msg("CNN F&G: failed to build request")
+		log.Warn().Str("source", "cnn").Err(err).Msg("CNN F&G: failed to build request")
 		return
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
@@ -196,19 +196,19 @@ func fetchCNNFearGreed(ctx context.Context, client *http.Client, data *Sentiment
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Warn().Err(err).Msg("CNN F&G: request failed")
+		log.Warn().Str("source", "cnn").Err(err).Msg("CNN F&G: request failed")
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Warn().Int("status", resp.StatusCode).Msg("CNN F&G: non-2xx response")
+		log.Warn().Str("source", "cnn").Int("status", resp.StatusCode).Msg("CNN F&G: non-2xx response")
 		return
 	}
 
 	var result cnnResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Warn().Err(err).Msg("CNN F&G: decode failed")
+		log.Warn().Str("source", "cnn").Err(err).Msg("CNN F&G: decode failed")
 		return
 	}
 
@@ -297,7 +297,7 @@ var aaiiFCSchema = json.RawMessage(`{
 func fetchAAIISentiment(ctx context.Context, client *http.Client, data *SentimentData) {
 	apiKey := os.Getenv("FIRECRAWL_API_KEY")
 	if apiKey == "" {
-		log.Debug().Msg("AAII: skipping — FIRECRAWL_API_KEY not set")
+		log.Debug().Str("source", "aaii").Msg("AAII: skipping — FIRECRAWL_API_KEY not set")
 		data.AAIIAvailable = false
 		return
 	}
@@ -314,7 +314,7 @@ func fetchAAIISentiment(ctx context.Context, client *http.Client, data *Sentimen
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		log.Warn().Err(err).Msg("AAII: failed to marshal Firecrawl request")
+		log.Warn().Str("source", "aaii").Err(err).Msg("AAII: failed to marshal Firecrawl request")
 		data.AAIIAvailable = false
 		return
 	}
@@ -323,7 +323,7 @@ func fetchAAIISentiment(ctx context.Context, client *http.Client, data *Sentimen
 	fcClient := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequestWithContext(ctx, "POST", firecrawlScrapeURL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		log.Warn().Err(err).Msg("AAII: failed to build Firecrawl request")
+		log.Warn().Str("source", "aaii").Err(err).Msg("AAII: failed to build Firecrawl request")
 		data.AAIIAvailable = false
 		return
 	}
@@ -332,27 +332,27 @@ func fetchAAIISentiment(ctx context.Context, client *http.Client, data *Sentimen
 
 	resp, err := fcClient.Do(req)
 	if err != nil {
-		log.Warn().Err(err).Msg("AAII: Firecrawl request failed")
+		log.Warn().Str("source", "aaii").Err(err).Msg("AAII: Firecrawl request failed")
 		data.AAIIAvailable = false
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Warn().Int("status", resp.StatusCode).Msg("AAII: Firecrawl non-2xx response")
+		log.Warn().Str("source", "aaii").Int("status", resp.StatusCode).Msg("AAII: Firecrawl non-2xx response")
 		data.AAIIAvailable = false
 		return
 	}
 
 	var result aaiiFCResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Warn().Err(err).Msg("AAII: Firecrawl decode failed")
+		log.Warn().Str("source", "aaii").Err(err).Msg("AAII: Firecrawl decode failed")
 		data.AAIIAvailable = false
 		return
 	}
 
 	if !result.Success || result.Data.JSON.BullishPct == 0 {
-		log.Warn().Msg("AAII: Firecrawl returned empty or failed result")
+		log.Warn().Str("source", "aaii").Msg("AAII: Firecrawl returned empty or failed result")
 		data.AAIIAvailable = false
 		return
 	}
@@ -397,7 +397,7 @@ type cryptoFGResponse struct {
 func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *SentimentData) {
 	req, err := http.NewRequestWithContext(ctx, "GET", cryptoFGURL, nil)
 	if err != nil {
-		log.Warn().Err(err).Msg("Crypto F&G: failed to build request")
+		log.Warn().Str("source", "crypto-fg").Err(err).Msg("Crypto F&G: failed to build request")
 		return
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
@@ -405,30 +405,30 @@ func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *Sentim
 	fgClient := &http.Client{Timeout: 10 * time.Second}
 	resp, err := fgClient.Do(req)
 	if err != nil {
-		log.Warn().Err(err).Msg("Crypto F&G: request failed")
+		log.Warn().Str("source", "crypto-fg").Err(err).Msg("Crypto F&G: request failed")
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Warn().Int("status", resp.StatusCode).Msg("Crypto F&G: non-2xx response")
+		log.Warn().Str("source", "crypto-fg").Int("status", resp.StatusCode).Msg("Crypto F&G: non-2xx response")
 		return
 	}
 
 	var result cryptoFGResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Warn().Err(err).Msg("Crypto F&G: decode failed")
+		log.Warn().Str("source", "crypto-fg").Err(err).Msg("Crypto F&G: decode failed")
 		return
 	}
 
 	if len(result.Data) == 0 || result.Data[0].Value == "" {
-		log.Warn().Msg("Crypto F&G: empty data from alternative.me")
+		log.Warn().Str("source", "crypto-fg").Msg("Crypto F&G: empty data from alternative.me")
 		return
 	}
 
 	var score float64
 	if _, err := fmt.Sscanf(result.Data[0].Value, "%f", &score); err != nil {
-		log.Warn().Err(err).Str("raw", result.Data[0].Value).Msg("Crypto F&G: failed to parse score")
+		log.Warn().Str("source", "crypto-fg").Err(err).Str("raw", result.Data[0].Value).Msg("Crypto F&G: failed to parse score")
 		return
 	}
 
