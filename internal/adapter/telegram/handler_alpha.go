@@ -183,8 +183,8 @@ func (h *Handler) cmdAlpha(ctx context.Context, chatID string, _ int64, _ string
 
 	state, err := h.computeAlphaState(ctx)
 	if err != nil {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		h.sendUserError(ctx, chatID, err, "alpha")
+		return nil
 	}
 
 	h.alphaCache.set(chatID, state)
@@ -206,7 +206,8 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		var err error
 		state, err = h.computeAlphaState(ctx)
 		if err != nil {
-			return h.bot.EditMessage(ctx, chatID, msgID, "❌ "+html.EscapeString(err.Error()))
+			h.editUserError(ctx, chatID, msgID, err, "alpha")
+			return nil
 		}
 		h.alphaCache.set(chatID, state)
 	}
@@ -222,7 +223,8 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		// Force recompute
 		newState, err := h.computeAlphaState(ctx)
 		if err != nil {
-			return h.bot.EditMessage(ctx, chatID, msgID, "❌ "+html.EscapeString(err.Error()))
+			h.editUserError(ctx, chatID, msgID, err, "alpha")
+			return nil
 		}
 		h.alphaCache.set(chatID, newState)
 		summary := formatAlphaSummary(newState)
@@ -516,8 +518,8 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build asset profiles: "+alphaErr(err))
-		return err2
+		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build asset profiles: "+alphaErr(err))
+		return nil
 	}
 
 	result := h.alpha.FactorEngine.Rank(profiles)
@@ -537,8 +539,8 @@ func (h *Handler) cmdPlaybook(ctx context.Context, chatID string, _ int64, _ str
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
+		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		return nil
 	}
 
 	ranking := h.alpha.FactorEngine.Rank(profiles)
@@ -571,8 +573,8 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
+		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		return nil
 	}
 	ranking := h.alpha.FactorEngine.Rank(profiles)
 	tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
@@ -602,8 +604,8 @@ func (h *Handler) cmdRankX(ctx context.Context, chatID string, _ int64, _ string
 
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
+		_, _ = h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
+		return nil
 	}
 	result := h.alpha.FactorEngine.Rank(profiles)
 	_, err = h.bot.SendHTML(ctx, chatID, formatRankX(result))
@@ -638,8 +640,8 @@ func (h *Handler) cmdTransition(ctx context.Context, chatID string, _ int64, _ s
 				TransitionFrom: tFrom,
 				TransitionTo:   tTo,
 			})
-			_, err2 := h.bot.SendHTML(ctx, chatID, formatTransition(result.Transition, macroRegime))
-			return err2
+			_, _ = h.bot.SendHTML(ctx, chatID, formatTransition(result.Transition, macroRegime))
+			return nil
 		}
 	}
 
