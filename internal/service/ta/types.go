@@ -136,6 +136,7 @@ type IndicatorSnapshot struct {
 	Fibonacci  *FibResult         // nil if insufficient data
 	Killzone   *KillzoneResult    // current ICT killzone classification (always populated)
 	VWAP       *VWAPSet           // anchored VWAP (daily, weekly, swing anchors) — nil if insufficient volume data
+	SMC        *SMCResult         // Smart Money Concepts: BOS, CHOCH, premium/discount — nil if insufficient data
 }
 
 // TASignal represents a normalized signal from one indicator.

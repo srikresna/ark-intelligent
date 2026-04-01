@@ -92,6 +92,11 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	if hasVolume(bars) {
 		snap.VWAP = CalcVWAPSet(bars)
 	}
+
+	// SMC: Smart Money Concepts (BOS, CHOCH, premium/discount zones)
+	if len(bars) >= 20 && snap.ATR > 0 {
+		snap.SMC = CalcSMC(bars, snap.ATR)
+	}
 	return snap
 }
 

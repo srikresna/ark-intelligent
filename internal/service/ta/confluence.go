@@ -53,6 +53,8 @@ var defaultWeights = map[string]indicatorWeight{
 	// Volatility (10%)
 	"BOLLINGER":   {category: "volatility", weight: 0.06},
 	"WILLIAMS_R":  {category: "volatility", weight: 0.04},
+	// Structure (SMC) — additional signal, does not replace existing categories
+	"SMC":          {category: "trend", weight: 0.15},
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +294,12 @@ func CalcConfluence(snap *IndicatorSnapshot) *ConfluenceResult {
 		raw["SUPERTREND"] = rawSig{stSig, stNote, true}
 	}
 
+	// SMC: Smart Money Concepts (BOS, CHOCH, structure)
+	smcSig, smcNote := signalSMCFromSnap(snap)
+	if smcNote != "" {
+		raw["SMC"] = rawSig{smcSig, smcNote, true}
+	}
+
 	// Compute category totals for redistribution
 	catTotal := map[string]float64{}   // sum of default weights per category
 	catAvail := map[string]float64{}   // sum of available weights per category
@@ -477,4 +485,56 @@ func signalSuperTrendFromSnap(snap *IndicatorSnapshot) (float64, string) {
 	default:
 		return 0, "SuperTrend neutral"
 	}
+}
+
+// signalSMCFromSnap extracts a market structure signal from the SMC analysis.
+// BOS confirms trend continuation; CHOCH signals reversal.
+// Returns (0, "") if SMC data is not available.
+func signalSMCFromSnap(snap *IndicatorSnapshot) (float64, string) {
+	if snap.SMC == nil {
+		return 0, ""
+	}
+	smc := snap.SMC
+
+	// Base signal from overall structure
+	sig := 0.0
+	switch smc.Structure {
+	case StructureBullish:
+		sig = 0.5
+	case StructureBearish:
+		sig = -0.5
+	}
+
+	// Boost if there is a recent CHOCH (reversal signal -- stronger weight)
+	if len(smc.RecentCHOCH) > 0 {
+		choch := smc.RecentCHOCH[0]
+		if choch.Dir == "BULLISH" {
+			sig = 0.8
+		} else if choch.Dir == "BEARISH" {
+			sig = -0.8
+		}
+	}
+
+	// Boost if there is a recent BOS (continuation signal)
+	if len(smc.RecentBOS) > 0 {
+		bos := smc.RecentBOS[0]
+		if bos.Dir == "BULLISH" && sig >= 0 {
+			sig = 0.6
+		} else if bos.Dir == "BEARISH" && sig <= 0 {
+			sig = -0.6
+		}
+	}
+
+	// Build note
+	zone := smc.CurrentZone
+	note := fmt.Sprintf("SMC %s (structure=%s, zone=%s", smc.Trend, smc.Structure, zone)
+	if len(smc.RecentCHOCH) > 0 {
+		note += fmt.Sprintf(", CHOCH %s", smc.RecentCHOCH[0].Dir)
+	}
+	if len(smc.RecentBOS) > 0 {
+		note += fmt.Sprintf(", BOS %s", smc.RecentBOS[0].Dir)
+	}
+	note += ")"
+
+	return sig, note
 }
