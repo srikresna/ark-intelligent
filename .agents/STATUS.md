@@ -1,11 +1,12 @@
-# Agent Status — last updated: 2026-04-01 11:18 WIB
+# Agent Status — last updated: 2026-04-01 11:38 WIB
 
 ## Dev-B
-- **Last run:** 2026-04-01 11:18 WIB
-- **Current:** standby — completed TASK-011 (Wyckoff Structure Detection Engine), PR #27 opened → agents/main
-- **Files edited:** internal/service/wyckoff/ (5 new files), internal/adapter/telegram/handler_wyckoff.go (new), internal/adapter/telegram/formatter_wyckoff.go (new), internal/adapter/telegram/handler.go
-- **PRs today:** 18 (PR #1 through #26 + PR #27)
-- **Note:** TASK-011 HIGH complexity — new wyckoff package (types, engine, events, phase, classifier), /wyckoff Telegram command, FormatWyckoffResult formatter. 6 unit tests all passing. go build + go vet clean.
+- **Last run:** 2026-04-01 11:38 WIB
+- **Current:** standby — completed TASK-012 (GEX Engine via Deribit public API), PR #28 opened → agents/main
+- **Files created:** internal/service/marketdata/deribit/{client,types}.go, internal/service/gex/{types,calculator,calculator_test,engine}.go, internal/adapter/telegram/{formatter_gex,handler_gex}.go
+- **Files edited:** internal/adapter/telegram/handler.go (GEXServices field + help text), cmd/bot/main.go (wiring + import)
+- **PRs today:** 19 (PR #1 through #27 + PR #28)
+- **Note:** TASK-012 HIGH priority — Deribit public client, GEX calculation engine with 15-min cache, /gex Telegram command with inline keyboard, 9 unit tests all passing. go build + go vet clean.
 
 ## Dev-C
 - **Last run:** 2026-04-01 08:30 WIB
