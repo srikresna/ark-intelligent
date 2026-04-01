@@ -158,7 +158,8 @@ type Bot struct {
 
 	// Worker pool semaphore: limits concurrent handleUpdate goroutines.
 	// Buffered channel used as semaphore; capacity = max concurrent handlers.
-	// Configured via HANDLER_CONCURRENCY env var (default 20).
+	// Default capacity is config.MaxConcurrentHandlers (20).
+	// Overridable via HANDLER_CONCURRENCY env var.
 	workerSem chan struct{}
 }
 
@@ -213,6 +214,13 @@ func (b *Bot) StartPolling(ctx context.Context) error {
 			// Acquire a worker slot before spawning the goroutine.
 			// The select ensures the polling loop exits immediately on context
 			// cancellation even when all slots are occupied.
+			// Log a warning when the pool is at capacity (backpressure indicator).
+			if len(b.workerSem) == cap(b.workerSem) {
+				log.Warn().
+					Int("pool_capacity", cap(b.workerSem)).
+					Int("pool_used", len(b.workerSem)).
+					Msg("worker pool full — update queued (backpressure)")
+			}
 			select {
 			case b.workerSem <- struct{}{}:
 			case <-ctx.Done():
