@@ -135,7 +135,11 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 			b.WriteString(fmt.Sprintf("<code>%-6s ", truncLabel(a, 3)))
 			for _, c := range fxCurrencies {
 				corr := m.Matrix[a][c]
-				b.WriteString(fmt.Sprintf("%+.1f ", corr))
+				if math.IsNaN(corr) {
+					b.WriteString(" N/A ")
+				} else {
+					b.WriteString(fmt.Sprintf("%+.1f ", corr))
+				}
 			}
 			b.WriteString("</code>\n")
 		}
@@ -168,8 +172,12 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 				var pairs []string
 				for _, fx := range topFX {
 					if corr, ok := m.Matrix[asset][fx]; ok {
-						icon := corrIcon(corr)
-						pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", truncLabel(fx, 3), corr, icon))
+						if math.IsNaN(corr) {
+							pairs = append(pairs, fmt.Sprintf("%s: N/A", truncLabel(fx, 3)))
+						} else {
+							icon := corrIcon(corr)
+							pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", truncLabel(fx, 3), corr, icon))
+						}
 					}
 				}
 				if len(pairs) > 0 {
@@ -189,7 +197,7 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 		for i := 0; i < len(crossAssets); i++ {
 			for j := i + 1; j < len(crossAssets); j++ {
 				a, bb := crossAssets[i], crossAssets[j]
-				if corr, ok := m.Matrix[a][bb]; ok && math.Abs(corr) >= 0.40 {
+				if corr, ok := m.Matrix[a][bb]; ok && !math.IsNaN(corr) && math.Abs(corr) >= 0.40 {
 					notable = append(notable, corrPair{a, bb, corr})
 				}
 			}

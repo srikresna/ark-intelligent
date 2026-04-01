@@ -179,7 +179,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	summary := formatCTASummary(state)
 	kb := h.kb.CTAMenu()
 
-	// Send photo with keyboard if chart available, otherwise text
+	// Send photo with keyboard if chart available, otherwise text + notification
 	if chartPNG != nil && len(chartPNG) > 0 {
 		state.chartData["daily"] = chartPNG
 
@@ -197,9 +197,11 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 		return err
 	}
 
-	// Fallback: send text only with chart failure notification
-	fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
-	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, fallbackNotice+summary, kb)
+	// Chart unavailable: prepend notification so user knows chart exists but failed
+	if chartErr != nil {
+		summary = "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n" + summary
+	}
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
 

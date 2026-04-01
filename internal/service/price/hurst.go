@@ -125,6 +125,14 @@ func computeHurstFromReturns(returns []float64) (*HurstResult, error) {
 	// OLS regression: log(R/S) = H * log(n) + c
 	h, _, r2 := simpleLinearRegression(logN, logRS)
 
+	// Guard NaN/Inf from OLS (e.g. degenerate input)
+	if math.IsNaN(h) || math.IsInf(h, 0) {
+		h = 0.5
+	}
+	if math.IsNaN(r2) || math.IsInf(r2, 0) {
+		r2 = 0
+	}
+
 	// Clamp H to reasonable range
 	rawH := h
 	if h < 0 {

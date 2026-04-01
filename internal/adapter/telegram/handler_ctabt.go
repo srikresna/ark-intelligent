@@ -281,9 +281,11 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 		return err
 	}
 
-	// Fallback: text only with chart failure notification
-	fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
-	_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, fallbackNotice+summary, kb)
+	// Chart unavailable: prepend notification so user knows chart exists but failed
+	if chartErr != nil {
+		summary = "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n" + summary
+	}
+	_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
 
@@ -466,7 +468,6 @@ func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.Backtest
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
-	defer os.Remove(outputPath)
 
 	scriptPath := findBacktestScript()
 
@@ -475,10 +476,12 @@ func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.Backtest
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		os.Remove(outputPath)
 		return nil, fmt.Errorf("backtest chart renderer failed (timeout 90s): %w", err)
 	}
 
 	pngData, err := os.ReadFile(outputPath)
+	os.Remove(outputPath)
 	if err != nil {
 		return nil, fmt.Errorf("read chart output: %w", err)
 	}

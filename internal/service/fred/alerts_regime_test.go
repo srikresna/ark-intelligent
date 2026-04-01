@@ -5,16 +5,16 @@ import (
 )
 
 func TestClassifyMacroRegime_NilData(t *testing.T) {
-	// ClassifyMacroRegime(nil) currently panics — this is a known issue.
-	// When TASK-173 nil guards are applied, this test should pass without recover.
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("ClassifyMacroRegime(nil) panics: %v — needs nil guard", r)
-		}
-	}()
+	// TASK-173: ClassifyMacroRegime(nil) should return a safe default instead of panicking.
 	r := ClassifyMacroRegime(nil)
 	if r.Name == "" {
-		t.Error("should return a regime name")
+		t.Error("should return a regime name for nil data")
+	}
+	if r.Name != "UNKNOWN" {
+		t.Errorf("expected UNKNOWN regime for nil data, got %q", r.Name)
+	}
+	if r.Bias != "NEUTRAL" {
+		t.Errorf("expected NEUTRAL bias for nil data, got %q", r.Bias)
 	}
 }
 

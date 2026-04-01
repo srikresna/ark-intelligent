@@ -179,8 +179,11 @@ func (a *SmartMoneyAnalyzer) AnalyzeContract(ctx context.Context, contract domai
 	}
 
 	// Pearson correlation
-	if len(netChanges) >= 3 {
-		acc.Correlation = pearsonCorrelation(netChanges, priceChanges1W)
+	if len(netChanges) >= 5 {
+		r := pearsonCorrelation(netChanges, priceChanges1W)
+		if !math.IsNaN(r) {
+			acc.Correlation = r
+		}
 	}
 
 	// Best horizon
@@ -210,8 +213,8 @@ func (a *SmartMoneyAnalyzer) AnalyzeContract(ctx context.Context, contract domai
 // pearsonCorrelation computes Pearson correlation coefficient between two slices.
 func pearsonCorrelation(x, y []float64) float64 {
 	n := len(x)
-	if n != len(y) || n < 2 {
-		return 0
+	if n != len(y) || n < 5 {
+		return math.NaN()
 	}
 
 	meanX := mathutil.Mean(x)

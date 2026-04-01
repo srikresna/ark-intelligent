@@ -4,6 +4,7 @@ package telegram
 //   /quant [SYMBOL] [TIMEFRAME]  — Quant dashboard with inline keyboard
 
 import (
+	"bytes"
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
@@ -112,6 +113,10 @@ func (h *Handler) cmdQuant(ctx context.Context, chatID string, userID int64, arg
 
 	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
 	if len(parts) == 0 {
+		// Fallback to last currency if available
+		if lc := h.getLastCurrency(ctx, userID); lc != "" {
+			return h.cmdQuant(ctx, chatID, userID, lc)
+		}
 		// Show symbol selector with description
 		_, err := h.bot.SendWithKeyboard(ctx, chatID,
 			`🔬 <b>Quant Engine — Econometric Analysis</b>
@@ -149,6 +154,9 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		))
 		return err
 	}
+
+	// Save last currency for context carry-over
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
 	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
 
@@ -329,21 +337,18 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 		if readErr == nil && len(chartData) > 0 {
 			shortCaption := fmt.Sprintf("📊 %s — %s — %s", strings.ToUpper(action), html.EscapeString(state.symbol), state.timeframe)
 			_, _ = h.bot.SendPhoto(ctx, chatID, chartData, shortCaption)
-			chartSent = true
 		} else if readErr != nil {
-			log.Error().Err(readErr).Str("symbol", state.symbol).Str("timeframe", state.timeframe).Str("mode", action).Msg("quant chart read failed, falling back to text")
+			log.Warn().Err(readErr).Str("chart_path", result.ChartPath).
+				Str("symbol", state.symbol).Str("timeframe", state.timeframe).
+				Msg("quant: chart file unreadable")
 		}
 		os.Remove(result.ChartPath) // cleanup
 	}
 
-	// Send text — prepend chart failure notice if chart was expected but not sent
-	if result.TextOutput != "" {
-		textToSend := result.TextOutput
-		if result.ChartPath != "" && !chartSent {
-			fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
-			textToSend = fallbackNotice + textToSend
-		}
-		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, textToSend, kb)
+	// Send text with chart-failure note if chart was expected but unavailable
+	textOut := result.TextOutput
+	if textOut != "" {
+		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, textOut, kb)
 	} else if !result.Success {
 		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, "❌ "+html.EscapeString(result.Error), kb)
 	}
@@ -456,7 +461,6 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 		return nil, fmt.Errorf("write quant input: %w", err)
 	}
 	defer os.Remove(inputPath)
-	defer os.Remove(outputPath)
 
 	scriptPath := findQuantScript()
 
@@ -464,15 +468,23 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	cmdCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Str("symbol", state.symbol).
+			Str("mode", mode).
+			Msg("quant engine subprocess failed")
 		os.Remove(chartPath) // cleanup chart on failure
+		os.Remove(outputPath)
 		return nil, fmt.Errorf("quant engine failed: %w", err)
 	}
 
 	// Read output
 	outData, err := os.ReadFile(outputPath)
+	os.Remove(outputPath)
 	if err != nil {
 		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("read quant output: %w", err)
@@ -485,8 +497,13 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	}
 
 	// Check if chart was actually generated
-	if _, err := os.Stat(chartPath); err == nil {
-		result.ChartPath = chartPath
+	if fi, err := os.Stat(chartPath); err == nil {
+		if fi.Size() > 0 {
+			result.ChartPath = chartPath
+		} else {
+			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
+			os.Remove(chartPath)
+		}
 	}
 
 	return &result, nil

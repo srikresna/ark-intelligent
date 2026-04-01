@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -87,12 +88,22 @@ func (d *DB) gc() {
 }
 
 // DropAll removes all data from the database.
-func (d *DB) DropAll() error {
-	if err := d.db.DropAll(); err != nil {
-		return fmt.Errorf("badger drop all: %w", err)
+// It respects the provided context for cancellation/timeout to prevent
+// indefinite blocking when concurrent readers hold transactions.
+func (d *DB) DropAll(ctx context.Context) error {
+	done := make(chan error, 1)
+	go func() { done <- d.db.DropAll() }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("badger drop all: %w", err)
+		}
+		log.Info().Msg("all data dropped")
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("badger drop all: %w", ctx.Err())
 	}
-	log.Info().Msg("all data dropped")
-	return nil
 }
 
 // Size returns the LSM and value log sizes in bytes.

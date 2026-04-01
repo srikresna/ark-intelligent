@@ -1,0 +1,147 @@
+package telegram
+
+// /settings — User Preferences
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/arkcode369/ark-intelligent/internal/domain"
+)
+
+// ---------------------------------------------------------------------------
+// /settings — User preferences
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdSettings(ctx context.Context, chatID string, userID int64, args string) error {
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+
+	html := h.fmt.FormatSettings(prefs)
+	kb := h.kb.SettingsMenu(prefs)
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	return err
+}
+
+// cbSettings handles settings toggle callbacks.
+func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "set:")
+
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	switch action {
+	case "lang_toggle":
+		if prefs.Language == "en" {
+			prefs.Language = "id"
+		} else {
+			prefs.Language = "en"
+		}
+	case "changelog_view":
+		if h.changelog == "" {
+			return h.bot.EditMessage(ctx, chatID, msgID, "Changelog unavailable.")
+		}
+		html := fmt.Sprintf("🦅 <b>ARK Intelligence Changelog</b>\n\n%s", h.changelog)
+		kb := h.kb.SettingsMenu(prefs)
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+
+	case "alerts_toggle":
+		prefs.AlertsEnabled = !prefs.AlertsEnabled
+	case "cot_toggle":
+		prefs.COTAlertsEnabled = !prefs.COTAlertsEnabled
+	case "ai_toggle":
+		prefs.AIReportsEnabled = !prefs.AIReportsEnabled
+	case "model_claude":
+		prefs.PreferredModel = "claude"
+	case "model_gemini":
+		prefs.PreferredModel = "gemini"
+	case "impact_high_only":
+		prefs.AlertImpacts = []string{"High"}
+	case "impact_high_med":
+		prefs.AlertImpacts = []string{"High", "Medium"}
+	case "impact_all":
+		prefs.AlertImpacts = []string{"High", "Medium", "Low"}
+	case "time_60_15_5":
+		prefs.AlertMinutes = []int{60, 15, 5}
+	case "time_15_5_1":
+		prefs.AlertMinutes = []int{15, 5, 1}
+	case "time_5_1":
+		prefs.AlertMinutes = []int{5, 1}
+	case "cur_reset":
+		prefs.CurrencyFilter = nil
+	default:
+		// Handle cur_toggle:XXX dynamically
+		if strings.HasPrefix(action, "cur_toggle:") {
+			cur := strings.ToUpper(strings.TrimPrefix(action, "cur_toggle:"))
+			if cur != "" {
+				found := false
+				newFilter := make([]string, 0, len(prefs.CurrencyFilter))
+				for _, c := range prefs.CurrencyFilter {
+					if strings.ToUpper(c) == cur {
+						found = true
+						// Skip it (remove)
+					} else {
+						newFilter = append(newFilter, c)
+					}
+				}
+				if !found {
+					newFilter = append(newFilter, cur)
+				}
+				prefs.CurrencyFilter = newFilter
+			}
+		} else if strings.HasPrefix(action, "claude_model:") {
+			// Handle set:claude_model:claude-opus-4-5 etc (specific Claude variant)
+			modelID := domain.ClaudeModelID(strings.TrimPrefix(action, "claude_model:"))
+			if domain.IsValidClaudeModel(modelID) {
+				prefs.ClaudeModel = modelID
+				// Automatically switch provider to Claude when a Claude model is selected
+				prefs.PreferredModel = "claude"
+				log.Info().Str("model", string(modelID)).Int64("user_id", userID).Msg("user selected Claude model variant")
+			} else {
+				log.Warn().Str("model", string(modelID)).Msg("unknown Claude model ID in settings callback")
+				return nil
+			}
+		} else {
+			log.Warn().Str("action", action).Msg("unknown settings action")
+			return nil
+		}
+	}
+
+	if err := h.prefsRepo.Set(ctx, userID, prefs); err != nil {
+		return fmt.Errorf("save preferences: %w", err)
+	}
+
+	// Update the message with new settings state
+	html := h.fmt.FormatSettings(prefs)
+	kb := h.kb.SettingsMenu(prefs)
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+}
+
+// cbAlertToggle handles quick alert toggle from notification messages.
+func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "alert:")
+
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	switch action {
+	case "mute_1h", "disable":
+		// Disable alerts until manually re-enabled via /settings.
+		// Note: "mute_1h" is a legacy callback key retained for backward compatibility.
+		prefs.AlertsEnabled = false
+		_ = h.prefsRepo.Set(ctx, userID, prefs)
+		return h.bot.EditMessage(ctx, chatID, msgID,
+			"Alerts disabled. Use /settings to re-enable.")
+	case "dismiss":
+		return h.bot.DeleteMessage(ctx, chatID, msgID)
+	}
+
+	return nil
+}
