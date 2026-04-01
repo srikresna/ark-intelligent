@@ -186,7 +186,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		if newTF != state.timeframe {
 			mapping := domain.FindPriceMappingByCurrency(state.currency)
@@ -208,7 +208,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		summary := fmt.Sprintf("📊 <b>Volume Profile: %s — %s</b>\n\nPilih mode analisis:",
 			html.EscapeString(state.symbol), state.timeframe)
@@ -219,7 +219,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		mapping := domain.FindPriceMappingByCurrency(state.currency)
 		if mapping == nil {
@@ -244,7 +244,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		return h.vpRunMode(ctx, chatID, msgID, state, action)
 	}

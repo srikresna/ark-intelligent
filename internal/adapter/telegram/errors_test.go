@@ -104,3 +104,40 @@ func TestSuggestRetry_WithCommand(t *testing.T) {
 		t.Errorf("expected /price in suggestion, got %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// sessionExpiredMessage tests
+// ---------------------------------------------------------------------------
+
+func TestSessionExpiredMessage_ContainsCommand(t *testing.T) {
+	msg := sessionExpiredMessage("cta")
+	if !strings.Contains(msg, "/cta") {
+		t.Errorf("expected /cta in message, got %q", msg)
+	}
+	if !strings.Contains(msg, "⏳") {
+		t.Errorf("expected ⏳ emoji, got %q", msg)
+	}
+	if !strings.Contains(msg, "Sesi berakhir") {
+		t.Errorf("expected 'Sesi berakhir', got %q", msg)
+	}
+}
+
+func TestSessionExpiredMessage_HTMLFormatted(t *testing.T) {
+	msg := sessionExpiredMessage("quant")
+	if !strings.Contains(msg, "<code>/quant</code>") {
+		t.Errorf("expected HTML code tag around command, got %q", msg)
+	}
+	if !strings.Contains(msg, "<b>") {
+		t.Errorf("expected bold tag, got %q", msg)
+	}
+}
+
+func TestSessionExpiredMessage_AllHandlers(t *testing.T) {
+	commands := []string{"cta", "ict", "quant", "smc", "vp", "alpha", "wyckoff", "gex"}
+	for _, cmd := range commands {
+		msg := sessionExpiredMessage(cmd)
+		if !strings.Contains(msg, "/"+cmd) {
+			t.Errorf("sessionExpiredMessage(%q) missing /%s: %q", cmd, cmd, msg)
+		}
+	}
+}

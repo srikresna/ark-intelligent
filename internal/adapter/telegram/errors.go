@@ -102,3 +102,16 @@ func (h *Handler) editUserError(ctx context.Context, chatID string, msgID int, e
 		log.Error().Err(editErr).Str("chat_id", chatID).Msg("failed to edit error message")
 	}
 }
+
+// sessionExpiredMessage returns a unified HTML-formatted message for session/data
+// expiry across all handlers. Use this wherever a cached state is nil and the user
+// needs to re-run a command.
+//
+// Example output:
+//
+//	⏳ <b>Sesi berakhir</b>
+//
+//	Data sudah expired. Ketik <code>/cta</code> untuk memulai ulang.
+func sessionExpiredMessage(command string) string {
+	return "⏳ <b>Sesi berakhir</b>\n\nData sudah expired. Ketik <code>/" + command + "</code> untuk memulai ulang."
+}

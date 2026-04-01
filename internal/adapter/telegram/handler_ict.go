@@ -256,7 +256,7 @@ func (h *Handler) handleICTCallback(ctx context.Context, chatID string, msgID in
 		// Refresh current state.
 		state := h.ictCache.get(chatID)
 		if state == nil {
-			_, err := h.bot.SendHTML(ctx, chatID, "⏰ Session expired. Gunakan <code>/ict</code> lagi.")
+			_, err := h.bot.SendHTML(ctx, chatID, sessionExpiredMessage("ict"))
 			return err
 		}
 		mapping := domain.FindPriceMappingByCurrency(state.symbol)
