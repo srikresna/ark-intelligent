@@ -3716,6 +3716,45 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data unavailable</code>\n")
 	}
 
+	// --- Market Breadth ---
+	b.WriteString("\n<b>Market Breadth</b>\n")
+	if data.MarketBreadth != nil && data.MarketBreadth.Available {
+		mb := data.MarketBreadth
+		regime := mb.BreadthRegime()
+		var regimeEmoji string
+		switch regime {
+		case "RISK-ON":
+			regimeEmoji = "🟢"
+		case "NEUTRAL":
+			regimeEmoji = "🟡"
+		case "CAUTION":
+			regimeEmoji = "🟠"
+		default:
+			regimeEmoji = "🔴"
+		}
+		b.WriteString(fmt.Sprintf("<code>Above 50MA : %.1f%%</code>\n", mb.PctAbove50MA))
+		b.WriteString(fmt.Sprintf("<code>Above 200MA: %.1f%%</code>\n", mb.PctAbove200MA))
+		if mb.AdvanceDeclineRatio > 0 {
+			b.WriteString(fmt.Sprintf("<code>Adv/Dec    : %.2f</code>\n", mb.AdvanceDeclineRatio))
+		}
+		if mb.New52WkHighs > 0 || mb.New52WkLows > 0 {
+			b.WriteString(fmt.Sprintf("<code>52Wk H/L   : %d / %d</code>\n", mb.New52WkHighs, mb.New52WkLows))
+		}
+		b.WriteString(fmt.Sprintf("<code>Regime     : %s %s</code>\n", regimeEmoji, regime))
+		// Breadth context
+		if mb.PctAbove200MA < 30 {
+			b.WriteString("<i>Breadth sangat lemah — kurang dari 30%% saham di atas 200MA → risk-off bias.</i>\n")
+		} else if mb.PctAbove200MA >= 70 {
+			b.WriteString("<i>Breadth kuat — lebih dari 70%% saham di atas 200MA → risk-on bias.</i>\n")
+		}
+		// Divergence warning: 50MA divergence from 200MA
+		if mb.PctAbove50MA < 40 && mb.PctAbove200MA >= 60 {
+			b.WriteString("⚠️ <i>Breadth divergence: banyak saham patah di bawah 50MA meski 200MA masih kuat — distribusi dini.</i>\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable — set FIRECRAWL_API_KEY to enable</code>\n")
+	}
+
 	// --- Composite reading ---
 	b.WriteString("\n<b>Combined Reading</b>\n")
 	compositeWritten := false

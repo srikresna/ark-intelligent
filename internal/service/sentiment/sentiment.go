@@ -3,9 +3,11 @@
 // Currently supported:
 //   - CNN Fear & Greed Index (daily, 0-100 scale)
 //   - AAII Investor Sentiment Survey (weekly, bull/bear/neutral % via Firecrawl)
+//   - CBOE Put/Call Ratios (daily, via Firecrawl)
+//   - Market Breadth data from barchart.com (% above 50/200 MA, A/D ratio, 52wk highs/lows via Firecrawl)
 //
-// CNN uses a public JSON endpoint. AAII is behind Imperva bot protection and
-// requires Firecrawl API to scrape. If FIRECRAWL_API_KEY is not set, AAII is
+// CNN uses a public JSON endpoint. AAII and barchart.com are behind bot protection and
+// require Firecrawl API to scrape. If FIRECRAWL_API_KEY is not set, those sources are
 // skipped gracefully. Each source has an Available flag for callers to check.
 package sentiment
 
@@ -19,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -50,6 +53,9 @@ type SentimentData struct {
 	PutCallSignal  string  // "EXTREME FEAR", "FEAR", "NEUTRAL", "COMPLACENCY", "EXTREME COMPLACENCY"
 	PutCallAvailable bool
 
+	// Market Breadth (barchart.com/stocks/market-pulse via Firecrawl)
+	MarketBreadth *domain.MarketBreadthData
+
 	FetchedAt time.Time
 }
 
@@ -69,6 +75,14 @@ func FetchSentiment(ctx context.Context) (*SentimentData, error) {
 	// Fetch CBOE Put/Call Ratios (via Firecrawl if API key available)
 	pcData := FetchCBOEPutCall(ctx)
 	IntegratePutCallIntoSentiment(data, pcData)
+
+	// Fetch Market Breadth (via Firecrawl if API key available)
+	breadthData, err := FetchMarketBreadth(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("Market Breadth: fetch failed")
+	} else {
+		data.MarketBreadth = breadthData
+	}
 
 	return data, nil
 }
