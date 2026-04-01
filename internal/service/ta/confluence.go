@@ -48,11 +48,13 @@ var defaultWeights = map[string]indicatorWeight{
 	"STOCHASTIC":  {category: "momentum", weight: 0.08},
 	"CCI":         {category: "momentum", weight: 0.05},
 	// Volume (15%)
-	"OBV":         {category: "volume", weight: 0.08},
-	"MFI":         {category: "volume", weight: 0.07},
+	"OBV":         {category: "volume", weight: 0.06},
+	"MFI":         {category: "volume", weight: 0.05},
+	"DELTA":       {category: "volume", weight: 0.04}, // tick-rule estimated delta
 	// Volatility (10%)
-	"BOLLINGER":   {category: "volatility", weight: 0.06},
-	"WILLIAMS_R":  {category: "volatility", weight: 0.04},
+	"BOLLINGER":   {category: "volatility", weight: 0.04},
+	"WILLIAMS_R":  {category: "volatility", weight: 0.03},
+	"VWAP":        {category: "volatility", weight: 0.03}, // price position vs VWAP
 	// Structure (SMC) — additional signal, does not replace existing categories
 	"SMC":          {category: "trend", weight: 0.15},
 }
@@ -219,6 +221,98 @@ func signalMFI(m *MFIResult) (float64, string) {
 	}
 }
 
+// signalVWAP extracts a directional signal from the VWAPSet.
+// Position relative to daily VWAP is used as primary signal.
+// Weekly VWAP is used as confirmation if daily is unavailable.
+func signalVWAP(vs *VWAPSet) (float64, string) {
+	if vs == nil {
+		return 0, ""
+	}
+
+	// Prefer daily VWAP; fall back to weekly.
+	ref := vs.Daily
+	label := "Daily"
+	if ref == nil && vs.Weekly != nil {
+		ref = vs.Weekly
+		label = "Weekly"
+	}
+	if ref == nil {
+		return 0, ""
+	}
+
+	// Signal based on sigma deviation from VWAP.
+	dev := ref.Deviation
+	var sig float64
+	switch {
+	case dev <= -2.0:
+		sig = 0.8 // deeply below VWAP → potential bounce (bullish bias)
+	case dev <= -1.0:
+		sig = 0.4
+	case dev < 0:
+		sig = 0.1
+	case dev == 0:
+		sig = 0
+	case dev < 1.0:
+		sig = -0.1
+	case dev < 2.0:
+		sig = -0.4
+	default:
+		sig = -0.8 // deeply above VWAP → potential reversion (bearish bias)
+	}
+
+	return sig, fmt.Sprintf("%s VWAP %.5f (%s, %.1fσ)", label, ref.VWAP, ref.Position, dev)
+}
+
+// signalDelta extracts a directional signal from the DeltaResult.
+// Buying pressure → bullish; selling pressure → bearish.
+// Divergences amplify or invert the base signal.
+func signalDelta(d *DeltaResult) (float64, string) {
+	if d == nil {
+		return 0, ""
+	}
+
+	var sig float64
+	switch d.Bias {
+	case "BUYING_PRESSURE":
+		sig = d.BiasStrength * 0.6
+	case "SELLING_PRESSURE":
+		sig = -d.BiasStrength * 0.6
+	default:
+		sig = 0
+	}
+
+	// Divergences: price/delta disagreement strengthens the counter-trend signal.
+	switch d.DeltaDivergence {
+	case "BEARISH_DIVERGENCE":
+		// Price up but delta down → bearish lean
+		if sig > 0 {
+			sig = -sig * 0.5 // flip weakly bearish
+		} else {
+			sig -= 0.2 // amplify bearish
+		}
+	case "BULLISH_DIVERGENCE":
+		// Price down but delta up → bullish lean
+		if sig < 0 {
+			sig = -sig * 0.5 // flip weakly bullish
+		} else {
+			sig += 0.2 // amplify bullish
+		}
+	}
+
+	// Clamp to [-1, 1].
+	if sig > 1 {
+		sig = 1
+	} else if sig < -1 {
+		sig = -1
+	}
+
+	note := fmt.Sprintf("Delta %s (strength=%.2f)", d.Bias, d.BiasStrength)
+	if d.DeltaDivergence != "NONE" {
+		note += " ⚠ " + d.DeltaDivergence
+	}
+	return sig, note
+}
+
 // ---------------------------------------------------------------------------
 // CalcConfluence — main multi-indicator confluence scoring
 // ---------------------------------------------------------------------------
@@ -298,6 +392,18 @@ func CalcConfluence(snap *IndicatorSnapshot) *ConfluenceResult {
 	smcSig, smcNote := signalSMCFromSnap(snap)
 	if smcNote != "" {
 		raw["SMC"] = rawSig{smcSig, smcNote, true}
+	}
+
+	// VWAP: price position relative to volume-weighted average price
+	vwapSig, vwapNote := signalVWAP(snap.VWAP)
+	if vwapNote != "" {
+		raw["VWAP"] = rawSig{vwapSig, vwapNote, true}
+	}
+
+	// Delta: tick-rule estimated cumulative buy/sell pressure
+	deltaSig, deltaNote := signalDelta(snap.Delta)
+	if deltaNote != "" {
+		raw["DELTA"] = rawSig{deltaSig, deltaNote, true}
 	}
 
 	// Compute category totals for redistribution

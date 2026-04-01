@@ -930,6 +930,7 @@ func (kb *KeyboardBuilder) CTAMenu() ports.InlineKeyboard {
 				{Text: "🎯 Zones", CallbackData: "cta:zones"},
 			},
 			{
+				{Text: "📏 VWAP+Delta", CallbackData: "cta:vwap_delta"},
 				{Text: "🔄 Refresh", CallbackData: "cta:refresh"},
 			},
 		},

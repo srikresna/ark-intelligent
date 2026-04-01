@@ -95,6 +95,11 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 		snap.VWAP = CalcVWAPSet(bars)
 	}
 
+	// Delta: tick-rule estimated cumulative buy/sell pressure
+	if len(bars) >= 2 {
+		snap.Delta = CalcDelta(bars)
+	}
+
 	// SMC: Smart Money Concepts (BOS, CHOCH, premium/discount zones)
 	if len(bars) >= 20 && snap.ATR > 0 {
 		snap.SMC = CalcSMC(bars, snap.ATR)

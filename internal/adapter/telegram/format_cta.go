@@ -650,6 +650,94 @@ func formatCTAZones(state *ctaState) string {
 	return sb.String()
 }
 
+// formatCTAVWAPDelta formats VWAP + estimated delta analysis for /cta output.
+func formatCTAVWAPDelta(state *ctaState) string {
+	var sb strings.Builder
+	sb.WriteString("<b>📏 VWAP + Estimated Delta</b>\n")
+	sb.WriteString(fmt.Sprintf("<i>%s — Daily</i>\n", html.EscapeString(state.symbol)))
+	sb.WriteString("<i>VWAP = price level weighted by volume. Delta = estimated buy/sell pressure via tick rule.</i>\n\n")
+
+	if state.daily == nil || state.daily.Snapshot == nil {
+		sb.WriteString("⚠️ Data tidak cukup untuk VWAP/Delta.\n")
+		return sb.String()
+	}
+
+	snap := state.daily.Snapshot
+
+	// --- VWAP Section ---
+	if snap.VWAP == nil {
+		sb.WriteString("📏 <b>VWAP:</b> Data volume tidak tersedia.\n")
+	} else {
+		sb.WriteString("📏 <b>VWAP (Anchored)</b>\n")
+
+		vwapLine := func(label string, r *ta.VWAPResult) {
+			if r == nil {
+				return
+			}
+			posEmoji := "⚪"
+			switch r.Position {
+			case "ABOVE":
+				posEmoji = "🟢"
+			case "BELOW":
+				posEmoji = "🔴"
+			}
+			sb.WriteString(fmt.Sprintf("  %s <b>%s:</b> %.5f (%s, %.1fσ)\n",
+				posEmoji, label, r.VWAP, r.Position, r.Deviation))
+			sb.WriteString(fmt.Sprintf("     Bands ±1σ: [%.5f – %.5f]\n",
+				r.Band1Lower, r.Band1Upper))
+			sb.WriteString(fmt.Sprintf("     Bands ±2σ: [%.5f – %.5f]\n",
+				r.Band2Lower, r.Band2Upper))
+		}
+
+		vwapLine("Daily", snap.VWAP.Daily)
+		vwapLine("Weekly", snap.VWAP.Weekly)
+		if snap.VWAP.SwingLow != nil {
+			vwapLine("Swing Low", snap.VWAP.SwingLow)
+		}
+		if snap.VWAP.SwingHigh != nil {
+			vwapLine("Swing High", snap.VWAP.SwingHigh)
+		}
+	}
+
+	sb.WriteString("\n")
+
+	// --- Delta Section ---
+	if snap.Delta == nil {
+		sb.WriteString("📈 <b>Delta:</b> Data tidak cukup.\n")
+	} else {
+		d := snap.Delta
+
+		biasEmoji := "⚪"
+		switch d.Bias {
+		case "BUYING_PRESSURE":
+			biasEmoji = "🟢"
+		case "SELLING_PRESSURE":
+			biasEmoji = "🔴"
+		}
+
+		sb.WriteString("📈 <b>Estimated Delta (Tick Rule)</b>\n")
+		sb.WriteString(fmt.Sprintf("  %s <b>Bias:</b> %s (strength: %.0f%%)\n",
+			biasEmoji, d.Bias, d.BiasStrength*100))
+		sb.WriteString(fmt.Sprintf("  Cumulative Delta: %+.0f\n", d.CumulativeDelta))
+		sb.WriteString(fmt.Sprintf("  Current Bar Delta: %+.0f\n", d.CurrentDelta))
+
+		if d.DeltaDivergence != "NONE" {
+			divEmoji := "⚠️"
+			sb.WriteString(fmt.Sprintf("  %s <b>Divergence:</b> %s\n", divEmoji, d.DeltaDivergence))
+			if d.DeltaDivergence == "BEARISH_DIVERGENCE" {
+				sb.WriteString("  <i>Price naik tapi delta turun — tekanan beli melemah.</i>\n")
+			} else {
+				sb.WriteString("  <i>Price turun tapi delta naik — tekanan jual melemah.</i>\n")
+			}
+		}
+
+		sb.WriteString(fmt.Sprintf("  <i>Bars used: %d</i>\n", d.BarsUsed))
+	}
+
+	return sb.String()
+}
+
+
 func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult) string {
 	var sb strings.Builder
 	tfLabel := strings.ToUpper(tf)

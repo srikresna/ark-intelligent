@@ -295,6 +295,13 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
 		return err
 
+	case action == "vwap_delta":
+		txt := formatCTAVWAPDelta(state)
+		kb := h.kb.CTADetailMenu()
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, txt, kb)
+		return err
+
 	case action == "zones":
 		txt := formatCTAZones(state)
 		kb := h.kb.CTADetailMenu()
