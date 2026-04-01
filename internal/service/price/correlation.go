@@ -8,6 +8,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 )
 
 var corrLog = logger.Component("price-correlation")
@@ -356,9 +357,5 @@ func pearsonCorrelation(x, y []float64) float64 {
 	}
 
 	denom := math.Sqrt(sumX2 * sumY2)
-	if denom == 0 {
-		return 0
-	}
-
-	return roundN(sumXY/denom, 4)
+	return roundN(mathutil.SafeDiv(sumXY, denom, 0), 4)
 }
