@@ -252,12 +252,11 @@ func (b *Bot) sendPhotoInternal(ctx context.Context, chatID string, photoData []
 	// Build multipart body
 	var body bytes.Buffer
 	boundary := fmt.Sprintf("----TGBoundary%d", time.Now().UnixNano())
-	writer := fmt.Sprintf
 
 	// Helper to write a form field
 	writeField := func(name, value string) {
-		body.WriteString(writer("--%s\r\n", boundary))
-		body.WriteString(writer("Content-Disposition: form-data; name=\"%s\"\r\n\r\n", name))
+		body.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+		body.WriteString(fmt.Sprintf("Content-Disposition: form-data; name=\"%s\"\r\n\r\n", name))
 		body.WriteString(value)
 		body.WriteString("\r\n")
 	}
@@ -291,14 +290,14 @@ func (b *Bot) sendPhotoInternal(ctx context.Context, chatID string, photoData []
 	}
 
 	// photo file field
-	body.WriteString(writer("--%s\r\n", boundary))
+	body.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 	body.WriteString("Content-Disposition: form-data; name=\"photo\"; filename=\"chart.png\"\r\n")
 	body.WriteString("Content-Type: image/png\r\n\r\n")
 	body.Write(photoData)
 	body.WriteString("\r\n")
 
 	// closing boundary
-	body.WriteString(writer("--%s--\r\n", boundary))
+	body.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
 
 	url := fmt.Sprintf("%s/sendPhoto", b.apiBase)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
