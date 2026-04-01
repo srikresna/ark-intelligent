@@ -321,3 +321,23 @@ func (h *Handler) cmdECB(ctx context.Context, chatID string, _ int64, _ string) 
 	htmlMsg := macro.FormatECBData(data)
 	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
+
+// ---------------------------------------------------------------------------
+// /snb — SNB Balance Sheet / FX Intervention Proxy Dashboard
+// ---------------------------------------------------------------------------
+
+// cmdSNB handles the /snb command — fetches and displays SNB balance sheet data,
+// focusing on foreign currency investments as a CHF intervention proxy.
+func (h *Handler) cmdSNB(ctx context.Context, chatID string, _ int64, _ string) error {
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "🏦 Fetching SNB balance sheet data... ⏳")
+
+	data, err := macro.GetSNBData(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("SNB data fetch failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"❌ Gagal mengambil data SNB. Silakan coba lagi nanti.")
+	}
+
+	htmlMsg := macro.FormatSNBData(data)
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+}
