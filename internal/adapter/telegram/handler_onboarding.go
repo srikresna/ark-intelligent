@@ -229,7 +229,12 @@ Use /settings to configure:
 • Claude Model: Opus / Sonnet / Haiku
 • COT &amp; AI report alerts on/off
 • Currency filter for alerts
-• Alert timing presets`
+• Alert timing presets
+
+<b>⚡ Shortcuts:</b>
+<code>/c</code> cot · <code>/q</code> quant · <code>/b</code> bias · <code>/bt</code> backtest
+<code>/ce</code> cot · <code>/ca</code> cta · <code>/qe</code> quant (with currency arg)
+<code>/bta</code> backtest all · <code>/of</code> outlook fred`
 
 	case "admin":
 		// Only show admin section to admins

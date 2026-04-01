@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
 )
 
 // ecbHTTPTimeout for ECB SDW API requests.
@@ -123,11 +125,11 @@ func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
 	}
 
 	data := &ECBData{FetchedAt: time.Now()}
-	var errs []string
+	var fetchErrs []string
 	for range series {
 		r := <-results
 		if r.err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", r.name, r.err))
+			fetchErrs = append(fetchErrs, fmt.Sprintf("%s: %v", r.name, r.err))
 			continue
 		}
 		switch r.name {
@@ -144,11 +146,11 @@ func (c *ECBClient) fetchAll(ctx context.Context) (*ECBData, error) {
 	}
 
 	// Return partial data with a warning if some series failed.
-	if len(errs) > 0 && data.MRRValue == 0 && data.M3YoY == 0 && data.EURUSDValue == 0 {
-		return nil, fmt.Errorf("all ECB series failed: %s", strings.Join(errs, "; "))
+	if len(fetchErrs) > 0 && data.MRRValue == 0 && data.M3YoY == 0 && data.EURUSDValue == 0 {
+		return nil, errs.Wrapf(errs.ErrUpstream, "all ECB series failed: %s", strings.Join(fetchErrs, "; "))
 	}
-	if len(errs) > 0 {
-		log.Warn().Strs("errors", errs).Msg("some ECB series failed, returning partial data")
+	if len(fetchErrs) > 0 {
+		log.Warn().Strs("errors", fetchErrs).Msg("some ECB series failed, returning partial data")
 	}
 
 	return data, nil
@@ -172,7 +174,7 @@ func (c *ECBClient) fetchLatestObservation(ctx context.Context, flowID, key stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return time.Time{}, 0, fmt.Errorf("ECB API status %d for %s/%s", resp.StatusCode, flowID, key)
+		return time.Time{}, 0, errs.Wrapf(errs.ErrUpstream, "ECB API status %d for %s/%s", resp.StatusCode, flowID, key)
 	}
 
 	return parseECBCSV(resp.Body)
@@ -200,7 +202,7 @@ func parseECBCSV(r io.Reader) (time.Time, float64, error) {
 		}
 	}
 	if timeIdx == -1 || valueIdx == -1 {
-		return time.Time{}, 0, fmt.Errorf("missing TIME_PERIOD or OBS_VALUE column in ECB CSV (headers: %v)", headers)
+		return time.Time{}, 0, errs.Wrapf(errs.ErrInvalidFormat, "ECB CSV missing TIME_PERIOD or OBS_VALUE column (headers: %v)", headers)
 	}
 
 	// Read all rows, use the last one (most recent with lastNObservations=1 there's only 1).
@@ -242,7 +244,7 @@ func parseECBCSV(r io.Reader) (time.Time, float64, error) {
 	}
 
 	if !found {
-		return time.Time{}, 0, fmt.Errorf("no valid observations in ECB CSV")
+		return time.Time{}, 0, errs.Wrap(errs.ErrNoData, "ECB CSV: no valid observations")
 	}
 
 	return lastDate, lastVal, nil

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -102,7 +103,7 @@ func (c *TreasuryClient) fetchBreakevens(ctx context.Context) (*Breakevens, erro
 			return nil, fmt.Errorf("fetch TIPS yields: %w", err)
 		}
 		if len(realRows) == 0 {
-			return nil, fmt.Errorf("no TIPS yield data available")
+			return nil, errs.Wrap(errs.ErrNoData, "TIPS yield")
 		}
 	}
 
@@ -116,7 +117,7 @@ func (c *TreasuryClient) fetchBreakevens(ctx context.Context) (*Breakevens, erro
 			return nil, fmt.Errorf("fetch nominal yields: %w", err)
 		}
 		if len(nomRows) == 0 {
-			return nil, fmt.Errorf("no nominal yield data available")
+			return nil, errs.Wrap(errs.ErrNoData, "nominal yield")
 		}
 	}
 
@@ -170,7 +171,7 @@ func (c *TreasuryClient) fetchYields(ctx context.Context, year int, rateType str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Treasury API returned HTTP %d for %s", resp.StatusCode, rateType)
+		return nil, errs.Wrapf(errs.ErrUpstream, "Treasury API HTTP %d for %s", resp.StatusCode, rateType)
 	}
 
 	return parseYieldCSV(resp.Body)
@@ -208,7 +209,7 @@ func parseYieldCSV(r io.Reader) ([]YieldRow, error) {
 	}
 
 	if dateIdx < 0 {
-		return nil, fmt.Errorf("no 'Date' column found in Treasury CSV (headers: %v)", headers)
+		return nil, errs.Wrapf(errs.ErrInvalidFormat, "Treasury CSV: no 'Date' column (headers: %v)", headers)
 	}
 
 	var rows []YieldRow

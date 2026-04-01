@@ -39,6 +39,52 @@ var (
 	// ErrUpstream indicates a generic upstream failure (non-200 status,
 	// connection error, etc.) that doesn't fit a more specific sentinel.
 	ErrUpstream = errors.New("upstream error")
+
+	// ErrInsufficientData indicates not enough data points to run the analysis
+	// (e.g. fewer bars than the lookback period requires).
+	ErrInsufficientData = errors.New("insufficient data for analysis")
+
+	// ErrStaleData indicates the data is too old to be useful (exceeds
+	// freshness threshold for the operation).
+	ErrStaleData = errors.New("data is stale")
+
+	// ErrAPIUnavailable indicates the external API service is down or
+	// returning unexpected errors beyond a simple rate limit or auth issue.
+	ErrAPIUnavailable = errors.New("API service unavailable")
+
+	// ErrNoAPIKey indicates the required API key is not configured in the
+	// application config (empty string or missing env var).
+	ErrNoAPIKey = errors.New("API key not configured")
+
+	// ErrFeatureDisabled indicates the feature is intentionally disabled
+	// via configuration (e.g. HasClaude() == false).
+	ErrFeatureDisabled = errors.New("feature disabled")
+
+	// ErrUnauthorized indicates the API key or credentials were rejected
+	// by the upstream service (HTTP 401 or equivalent).
+	ErrUnauthorized = errors.New("unauthorized")
+
+	// ErrParseFailed indicates a parsing step failed — e.g. XML/JSON decode
+	// succeeded but the resulting structure was semantically invalid.
+	ErrParseFailed = errors.New("data parsing failed")
+
+	// ErrInvalidFormat indicates the input or output did not match the
+	// expected schema or format (e.g. wrong column count in CSV).
+	ErrInvalidFormat = errors.New("invalid data format")
+
+	// ErrCacheMiss indicates the requested key was not found in the cache.
+	ErrCacheMiss = errors.New("cache miss")
+
+	// ErrDivisionByZero indicates a computation attempted to divide by zero.
+	ErrDivisionByZero = errors.New("division by zero")
+
+	// ErrNaN indicates a computation produced a NaN result that cannot be
+	// used downstream (e.g. in chart rendering or JSON serialization).
+	ErrNaN = errors.New("NaN result")
+
+	// ErrConvergenceFail indicates an iterative model (GARCH, HMM, etc.)
+	// failed to converge within the allowed iterations.
+	ErrConvergenceFail = errors.New("model did not converge")
 )
 
 // Wrap wraps a sentinel (or any) error with contextual information.
@@ -68,5 +114,15 @@ func Wrapf(err error, format string, args ...any) error {
 func IsRetryable(err error) bool {
 	return errors.Is(err, ErrRateLimited) ||
 		errors.Is(err, ErrTimeout) ||
-		errors.Is(err, ErrUpstream)
+		errors.Is(err, ErrUpstream) ||
+		errors.Is(err, ErrAPIUnavailable)
+}
+
+// IsDataError returns true if the error relates to missing, insufficient, or
+// stale data — as opposed to a network or auth failure.
+func IsDataError(err error) bool {
+	return errors.Is(err, ErrNoData) ||
+		errors.Is(err, ErrInsufficientData) ||
+		errors.Is(err, ErrStaleData) ||
+		errors.Is(err, ErrCacheMiss)
 }

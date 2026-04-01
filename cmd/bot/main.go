@@ -168,6 +168,7 @@ func main() {
 	var chatService *aisvc.ChatService
 	var claudeAnalyzer *aisvc.ClaudeAnalyzer
 	var geminiForFallback *aisvc.GeminiClient
+	var contextBuilder *aisvc.ContextBuilder
 
 	if cfg.HasClaude() {
 		claudeClient := aisvc.NewClaudeClient(cfg.ClaudeEndpoint, cfg.ClaudeTimeout, cfg.ClaudeMaxTokens)
@@ -192,7 +193,7 @@ func main() {
 
 		convRepo := storage.NewConversationRepo(db, cfg.ChatHistoryLimit, cfg.ChatHistoryTTL)
 		toolConfig := aisvc.NewToolConfig()
-		contextBuilder := aisvc.NewContextBuilder(cotRepo, newsRepo, priceRepo)
+		contextBuilder = aisvc.NewContextBuilder(cotRepo, newsRepo, priceRepo)
 
 		// Reuse existing Gemini client as fallback (if available)
 		if cfg.HasGemini() {
@@ -321,6 +322,25 @@ func main() {
 	newsSched.SetImpactRecorder(impactRecorder)
 
 	newsSched.Start(ctx)
+
+	// Wire Fed speech provider into AI context builder for enriched chatbot prompts.
+	// newsSched caches the latest Fed speeches in-memory after each poll; contextBuilder
+	// reads them on demand during prompt construction (nil-safe: skipped if not set).
+	if contextBuilder != nil {
+		contextBuilder.SetFedSpeechProvider(func(n int) []aisvc.FedSpeechSummary {
+			speeches := newsSched.LatestFedSpeeches(n)
+			summaries := make([]aisvc.FedSpeechSummary, 0, len(speeches))
+			for _, s := range speeches {
+				summaries = append(summaries, aisvc.FedSpeechSummary{
+					Speaker:     s.Speaker,
+					Title:       s.Title,
+					PublishedAt: s.PublishedAt.Format("Jan 2"),
+				})
+			}
+			return summaries
+		})
+		log.Info().Msg("Fed RSS speech provider wired into AI context builder")
+	}
 
 	// Wire surprise accumulator to main scheduler for ConvictionScoreV3 (fixes BUG-5)
 	sched.SetSurpriseProvider(newsSched)

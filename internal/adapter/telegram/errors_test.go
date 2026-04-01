@@ -184,3 +184,53 @@ func TestCallbackFriendlyError_AllUnder200Chars(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// sessionExpiredMessage tests
+// ---------------------------------------------------------------------------
+
+func TestSessionExpiredMessage_ContainsCommand(t *testing.T) {
+	commands := []string{"cta", "ict", "quant", "smc", "vp", "alpha", "wyckoff"}
+	for _, cmd := range commands {
+		msg := sessionExpiredMessage(cmd)
+		if !strings.Contains(msg, "/"+cmd) {
+			t.Errorf("sessionExpiredMessage(%q) missing /<command>, got %q", cmd, msg)
+		}
+	}
+}
+
+func TestSessionExpiredMessage_ConsistentEmoji(t *testing.T) {
+	// All expired messages must use the canonical ⏳ emoji, not ⏰ or others.
+	for _, cmd := range []string{"cta", "ict", "quant"} {
+		msg := sessionExpiredMessage(cmd)
+		if !strings.Contains(msg, "⏳") {
+			t.Errorf("sessionExpiredMessage(%q) missing ⏳ emoji, got %q", cmd, msg)
+		}
+		if strings.Contains(msg, "⏰") {
+			t.Errorf("sessionExpiredMessage(%q) uses non-canonical ⏰ emoji, got %q", cmd, msg)
+		}
+	}
+}
+
+func TestSessionExpiredMessage_IndonesianLanguage(t *testing.T) {
+	msg := sessionExpiredMessage("cta")
+	// Must contain Indonesian "Sesi berakhir" or equivalent.
+	if !strings.Contains(msg, "Sesi berakhir") {
+		t.Errorf("sessionExpiredMessage missing Indonesian 'Sesi berakhir', got %q", msg)
+	}
+}
+
+func TestSessionExpiredMessage_CodeTagFormat(t *testing.T) {
+	// Command must be wrapped in <code> HTML tags for Telegram formatting.
+	msg := sessionExpiredMessage("quant")
+	if !strings.Contains(msg, "<code>/quant</code>") {
+		t.Errorf("sessionExpiredMessage missing <code>/quant</code>, got %q", msg)
+	}
+}
+
+func TestSessionExpiredMessage_NotEmpty(t *testing.T) {
+	msg := sessionExpiredMessage("")
+	if msg == "" {
+		t.Error("sessionExpiredMessage(\"\") returned empty string")
+	}
+}
