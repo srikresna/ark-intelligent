@@ -402,6 +402,15 @@ type vpEngineResult struct {
 }
 
 func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// This panic is caught by handleUpdate's outer recovery too,
+			// but logging here gives more specific context.
+			log.Error().
+				Interface("panic", r).
+				Msg("panic in runVPEngine — subprocess may have failed")
+		}
+	}()
 	ts := time.Now().UnixNano()
 	inputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_in_%d.json", ts))
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_out_%d.json", ts))
