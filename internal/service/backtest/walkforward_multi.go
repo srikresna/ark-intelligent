@@ -76,6 +76,13 @@ func runWalkForward(evaluated []domain.PersistedSignal, trainWeeks, testWeeks in
 		return evaluated[i].ReportDate.Before(evaluated[j].ReportDate)
 	})
 
+	// Defensive guard at point-of-use.
+	if len(evaluated) == 0 {
+		return &WalkForwardResult{
+			Recommendation: "No evaluated signals available for walk-forward analysis.",
+		}
+	}
+
 	earliest := evaluated[0].ReportDate
 	latest := evaluated[len(evaluated)-1].ReportDate
 

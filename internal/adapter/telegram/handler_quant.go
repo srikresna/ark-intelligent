@@ -104,7 +104,7 @@ func (h *Handler) registerQuantCommands() {
 // /quant — Main command
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args string) error {
+func (h *Handler) cmdQuant(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.quant == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Quant Engine not configured.")
 		return err
@@ -112,6 +112,10 @@ func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args str
 
 	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
 	if len(parts) == 0 {
+		// Fallback to last currency if available
+		if lc := h.getLastCurrency(ctx, userID); lc != "" {
+			return h.cmdQuant(ctx, chatID, userID, lc)
+		}
 		// Show symbol selector with description
 		_, err := h.bot.SendWithKeyboard(ctx, chatID,
 			`🔬 <b>Quant Engine — Econometric Analysis</b>
@@ -149,6 +153,9 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		))
 		return err
 	}
+
+	// Save last currency for context carry-over
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
 	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
 

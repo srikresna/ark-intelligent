@@ -106,6 +106,32 @@ func (kb *KeyboardBuilder) COTCurrencySelector(analyses []domain.COTAnalysis) po
 	return ports.InlineKeyboard{Rows: rows}
 }
 
+// COTCurrencySelectorWithLast is like COTCurrencySelector but prepends a shortcut
+// row for the user's last viewed currency if it is non-empty.
+func (kb *KeyboardBuilder) COTCurrencySelectorWithLast(analyses []domain.COTAnalysis, lastCurrency string) ports.InlineKeyboard {
+	base := kb.COTCurrencySelector(analyses)
+	if lastCurrency == "" {
+		return base
+	}
+	// Find contract code for lastCurrency
+	contractCode := ""
+	for _, a := range analyses {
+		label := kb.contractLabel(a.Contract.Name, a.Contract.Code)
+		if strings.EqualFold(label, lastCurrency) || strings.EqualFold(a.Contract.Code, lastCurrency) {
+			contractCode = a.Contract.Code
+			break
+		}
+	}
+	if contractCode == "" {
+		return base
+	}
+	lastRow := []ports.InlineButton{
+		{Text: "🔄 Same as last: " + strings.ToUpper(lastCurrency), CallbackData: fmt.Sprintf("cot:analysis:%s", contractCode)},
+	}
+	rows := append([][]ports.InlineButton{lastRow}, base.Rows...)
+	return ports.InlineKeyboard{Rows: rows}
+}
+
 // ---------------------------------------------------------------------------
 // Calendar Keyboards
 // ---------------------------------------------------------------------------
@@ -1283,6 +1309,33 @@ func (kb *KeyboardBuilder) buildSymbolMenu(prefix string) ports.InlineKeyboard {
 			},
 		},
 	}
+}
+
+// buildSymbolMenuWithLast is like buildSymbolMenu but prepends a "Same as last" row
+// if lastCurrency is non-empty and recognized.
+func (kb *KeyboardBuilder) buildSymbolMenuWithLast(prefix, lastCurrency string) ports.InlineKeyboard {
+	base := kb.buildSymbolMenu(prefix)
+	if lastCurrency == "" {
+		return base
+	}
+	// Build label for last currency button
+	label := "🔄 Same as last: " + lastCurrency
+	lastRow := []ports.InlineButton{
+		{Text: label, CallbackData: prefix + ":sym:" + lastCurrency},
+	}
+	// Prepend the shortcut row
+	rows := append([][]ports.InlineButton{lastRow}, base.Rows...)
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// CTASymbolMenuWithLast builds a CTA symbol menu with a "same as last" shortcut.
+func (kb *KeyboardBuilder) CTASymbolMenuWithLast(lastCurrency string) ports.InlineKeyboard {
+	return kb.buildSymbolMenuWithLast("cta", lastCurrency)
+}
+
+// QuantSymbolMenuWithLast builds a Quant symbol menu with a "same as last" shortcut.
+func (kb *KeyboardBuilder) QuantSymbolMenuWithLast(lastCurrency string) ports.InlineKeyboard {
+	return kb.buildSymbolMenuWithLast("quant", lastCurrency)
 }
 
 // ---------------------------------------------------------------------------
