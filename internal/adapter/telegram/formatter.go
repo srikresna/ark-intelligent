@@ -3766,6 +3766,62 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data unavailable</code>\n")
 	}
 
+	// --- VIX Term Structure (CBOE) ---
+	b.WriteString("\n<b>VIX Term Structure</b>\n")
+	if data.VIXAvailable {
+		b.WriteString(fmt.Sprintf("<code>Spot  : %.2f</code>\n", data.VIXSpot))
+		if data.VIXM1 > 0 {
+			b.WriteString(fmt.Sprintf("<code>M1    : %.2f</code>\n", data.VIXM1))
+		}
+		if data.VIXM2 > 0 {
+			b.WriteString(fmt.Sprintf("<code>M2    : %.2f</code>\n", data.VIXM2))
+		}
+		if data.VVIX > 0 {
+			b.WriteString(fmt.Sprintf("<code>VVIX  : %.1f</code>\n", data.VVIX))
+		}
+		var structLabel, structEmoji string
+		if data.VIXContango {
+			structLabel = "CONTANGO"
+			structEmoji = "✅"
+		} else {
+			structLabel = "BACKWARDATION"
+			structEmoji = "🔴"
+		}
+		if data.VIXSlopePct != 0 {
+			b.WriteString(fmt.Sprintf("<code>Shape : %s (%+.1f%%) %s</code>\n", structLabel, data.VIXSlopePct, structEmoji))
+		} else {
+			b.WriteString(fmt.Sprintf("<code>Shape : %s %s</code>\n", structLabel, structEmoji))
+		}
+		if data.VIXRegime != "" {
+			var regimeEmoji string
+			switch data.VIXRegime {
+			case "EXTREME_FEAR":
+				regimeEmoji = "😱"
+			case "FEAR":
+				regimeEmoji = "😟"
+			case "ELEVATED":
+				regimeEmoji = "⚠️"
+			case "RISK_ON_NORMAL":
+				regimeEmoji = "🟢"
+			case "RISK_ON_COMPLACENT":
+				regimeEmoji = "😏"
+			default:
+				regimeEmoji = "🟡"
+			}
+			b.WriteString(fmt.Sprintf("<code>Regime: %s %s</code>\n", data.VIXRegime, regimeEmoji))
+		}
+		switch data.VIXRegime {
+		case "EXTREME_FEAR":
+			b.WriteString("<i>VIX backwardation ekstrem — pasar panik, hedging demand tinggi. Historically contrarian bullish.</i>\n")
+		case "FEAR":
+			b.WriteString("<i>VIX backwardation — near-term fear elevated, market pricing near-term risk.</i>\n")
+		case "RISK_ON_COMPLACENT":
+			b.WriteString("<i>Steep contango — market complacent, VIX ETPs bleed. Equity-bullish tapi waspada sudden reversal.</i>\n")
+		}
+	} else {
+		b.WriteString("<code>Data unavailable</code>\n")
+	}
+
 	// --- Composite reading ---
 	b.WriteString("\n<b>Combined Reading</b>\n")
 	compositeWritten := false
