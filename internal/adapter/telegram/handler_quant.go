@@ -443,13 +443,11 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	defer os.Remove(outputPath)
 
 	scriptPath := findQuantScript()
-	cmd := exec.CommandContext(context.Background(), "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
 
 	// Timeout: 60s for complex models
 	cmdCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd = exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
+	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
