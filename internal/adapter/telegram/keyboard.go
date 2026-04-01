@@ -470,11 +470,9 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		claudeModelBtn(domain.ClaudeModelHaiku4),
 	})
 
-	// Row 11: Output Mode toggle (compact vs full)
-	outputLabel := "📊 Output: Compact -> Full"
-	if prefs.OutputMode == domain.OutputFull {
-		outputLabel = "📖 Output: Full -> Compact"
-	}
+	// Row 11: Output Mode toggle (compact / full / minimal)
+	nextMode := domain.NextOutputMode(prefs.OutputMode)
+	outputLabel := fmt.Sprintf("%s → %s", domain.OutputModeLabel(prefs.OutputMode), domain.OutputModeLabel(nextMode))
 	rows = append(rows, []ports.InlineButton{{
 		Text:         outputLabel,
 		CallbackData: "set:output_mode_toggle",

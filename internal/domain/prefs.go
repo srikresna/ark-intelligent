@@ -43,9 +43,34 @@ func IsValidClaudeModel(m ClaudeModelID) bool {
 type OutputMode string
 
 const (
-	OutputCompact OutputMode = "compact"
-	OutputFull    OutputMode = "full"
+	OutputCompact  OutputMode = "compact"
+	OutputFull     OutputMode = "full"
+	OutputMinimal  OutputMode = "minimal"
 )
+
+// NextOutputMode cycles: compact -> full -> minimal -> compact.
+func NextOutputMode(m OutputMode) OutputMode {
+	switch m {
+	case OutputCompact:
+		return OutputFull
+	case OutputFull:
+		return OutputMinimal
+	default:
+		return OutputCompact
+	}
+}
+
+// OutputModeLabel returns a display label for the mode.
+func OutputModeLabel(m OutputMode) string {
+	switch m {
+	case OutputFull:
+		return "Full Detail \U0001f4d6"
+	case OutputMinimal:
+		return "Minimal \u26a1"
+	default:
+		return "Compact \U0001f4ca"
+	}
+}
 
 // UserPrefs stores per-user notification preferences.
 type UserPrefs struct {
@@ -68,7 +93,7 @@ type UserPrefs struct {
 	ChatID         string `json:"chat_id"`         // Telegram chat ID (set on /start, used for push alerts)
 	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
 	CalendarView   string     `json:"calendar_view"`   // Last used view: "day", "week", "month"
-	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default) or "full"
+	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
 	// ExperienceLevel: user's self-reported trading experience.

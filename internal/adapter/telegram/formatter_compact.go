@@ -97,3 +97,63 @@ func strengthDot(score float64) string {
 	}
 	return "●○○"
 }
+
+// FormatCOTOverviewMinimal returns a one-line-per-currency ultra-minimal COT view.
+// Designed for traders who only need signal direction at a glance.
+func (f *Formatter) FormatCOTOverviewMinimal(analyses []domain.COTAnalysis, convictions []cot.ConvictionScore) string {
+	var b strings.Builder
+	b.WriteString("\u26a1 <b>COT Signal</b>\n")
+
+	convMap := make(map[string]cot.ConvictionScore, len(convictions))
+	for _, c := range convictions {
+		convMap[c.Currency] = c
+	}
+
+	for _, a := range analyses {
+		code := a.Contract.Currency
+		if code == "" {
+			code = contractCodeToFriendly(a.Contract.Code)
+		}
+
+		dir := "\u2194\ufe0f"
+		if conv, ok := convMap[code]; ok {
+			switch {
+			case conv.Score >= 0.4:
+				dir = "\U0001f7e2 LONG"
+			case conv.Score <= -0.4:
+				dir = "\U0001f534 SHORT"
+			default:
+				dir = "\u2b1c NEUTRAL"
+			}
+		}
+
+		b.WriteString(fmt.Sprintf("<b>%s</b>: %s\n", code, dir))
+	}
+
+	return b.String()
+}
+
+// FormatMacroSummaryMinimal returns a 2-3 line macro regime summary.
+func (f *Formatter) FormatMacroSummaryMinimal(regime fred.MacroRegime, data *fred.MacroData) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("\u26a1 <b>Macro</b>: %s", regime.Name))
+	if regime.MonPolicy != "" {
+		b.WriteString(fmt.Sprintf(" | %s", regime.MonPolicy))
+	}
+	b.WriteString("\n")
+
+	if data != nil {
+		if v := data.Yield10Y; v != 0 {
+			b.WriteString(fmt.Sprintf("10Y %.2f%%", v))
+		}
+		if v := data.CPI; v != 0 {
+			b.WriteString(fmt.Sprintf(" | CPI %.1f%%", v))
+		}
+		if v := data.UnemployRate; v != 0 {
+			b.WriteString(fmt.Sprintf(" | UE %.1f%%", v))
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}

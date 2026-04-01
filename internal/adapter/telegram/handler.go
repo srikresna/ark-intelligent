@@ -212,8 +212,9 @@ func NewHandler(
 	bot.RegisterCommand("/impact", h.cmdImpact)
 	bot.RegisterCommand("/sentiment", h.cmdSentiment)
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
-	bot.RegisterCommand("/price", h.cmdPrice) // Daily price context
-	bot.RegisterCommand("/levels", h.cmdLevels) // Support/resistance levels + position sizing
+	bot.RegisterCommand("/price", h.cmdPrice)       // Daily price context
+	bot.RegisterCommand("/levels", h.cmdLevels)     // Support/resistance levels + position sizing
+	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -1150,11 +1151,7 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 	case "model_gemini":
 		prefs.PreferredModel = "gemini"
 	case "output_mode_toggle":
-		if prefs.OutputMode == domain.OutputFull {
-			prefs.OutputMode = domain.OutputCompact
-		} else {
-			prefs.OutputMode = domain.OutputFull
-		}
+		prefs.OutputMode = domain.NextOutputMode(prefs.OutputMode)
 	case "impact_high_only":
 		prefs.AlertImpacts = []string{"High"}
 	case "impact_high_med":
@@ -2053,6 +2050,8 @@ func (h *Handler) cbViewToggle(ctx context.Context, chatID string, msgID int, us
 		prefs.OutputMode = domain.OutputFull
 	case "compact":
 		prefs.OutputMode = domain.OutputCompact
+	case "minimal":
+		prefs.OutputMode = domain.OutputMinimal
 	default:
 		return nil
 	}
@@ -2090,18 +2089,30 @@ func (h *Handler) renderCOTOverview(ctx context.Context, chatID string, userID i
 	}
 
 	var htmlOut string
-	var toggleBtn ports.InlineButton
-	if prefs.OutputMode == domain.OutputFull {
+	var toggleBtns []ports.InlineButton
+	switch prefs.OutputMode {
+	case domain.OutputFull:
 		htmlOut = h.fmt.FormatCOTOverview(analyses, convictions)
-		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:cot"}
-	} else {
+		toggleBtns = []ports.InlineButton{
+			{Text: btnCompact, CallbackData: "view:compact:cot"},
+			{Text: "⚡ Minimal", CallbackData: "view:minimal:cot"},
+		}
+	case domain.OutputMinimal:
+		htmlOut = h.fmt.FormatCOTOverviewMinimal(analyses, convictions)
+		toggleBtns = []ports.InlineButton{
+			{Text: btnCompact, CallbackData: "view:compact:cot"},
+			{Text: btnExpand, CallbackData: "view:full:cot"},
+		}
+	default: // compact
 		htmlOut = h.fmt.FormatCOTOverviewCompact(analyses, convictions)
-		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:cot"}
+		toggleBtns = []ports.InlineButton{
+			{Text: btnExpand, CallbackData: "view:full:cot"},
+			{Text: "⚡ Minimal", CallbackData: "view:minimal:cot"},
+		}
 	}
 
 	kb := h.kb.COTCurrencySelector(analyses)
-	toggleRow := []ports.InlineButton{toggleBtn}
-	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+	kb.Rows = append([][]ports.InlineButton{toggleBtns}, kb.Rows...)
 
 	if editMsgID > 0 {
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
@@ -2122,19 +2133,31 @@ func (h *Handler) renderMacroSummary(ctx context.Context, chatID string, userID 
 	regime := fred.ClassifyMacroRegime(data, composites)
 
 	var htmlOut string
-	var toggleBtn ports.InlineButton
-	if prefs.OutputMode == domain.OutputFull {
+	var toggleBtns []ports.InlineButton
+	switch prefs.OutputMode {
+	case domain.OutputFull:
 		implications := fred.DeriveTradingImplications(regime, data)
 		htmlOut = h.fmt.FormatMacroSummary(regime, data, implications)
-		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:macro"}
-	} else {
+		toggleBtns = []ports.InlineButton{
+			{Text: btnCompact, CallbackData: "view:compact:macro"},
+			{Text: "⚡ Minimal", CallbackData: "view:minimal:macro"},
+		}
+	case domain.OutputMinimal:
+		htmlOut = h.fmt.FormatMacroSummaryMinimal(regime, data)
+		toggleBtns = []ports.InlineButton{
+			{Text: btnCompact, CallbackData: "view:compact:macro"},
+			{Text: btnExpand, CallbackData: "view:full:macro"},
+		}
+	default: // compact
 		htmlOut = h.fmt.FormatMacroSummaryCompact(regime, data)
-		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:macro"}
+		toggleBtns = []ports.InlineButton{
+			{Text: btnExpand, CallbackData: "view:full:macro"},
+			{Text: "⚡ Minimal", CallbackData: "view:minimal:macro"},
+		}
 	}
 
 	kb := h.kb.MacroMenu(false)
-	toggleRow := []ports.InlineButton{toggleBtn}
-	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+	kb.Rows = append([][]ports.InlineButton{toggleBtns}, kb.Rows...)
 
 	if editMsgID > 0 {
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
