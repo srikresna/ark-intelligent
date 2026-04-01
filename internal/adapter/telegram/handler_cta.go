@@ -167,7 +167,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	// Generate chart for daily timeframe
 	chartPNG, chartErr := h.generateCTAChart(state, "daily")
 	if chartErr != nil {
-		log.Warn().Err(chartErr).Str("symbol", symbol).Msg("chart generation failed")
+		log.Error().Err(chartErr).Str("symbol", symbol).Str("timeframe", "daily").Msg("CTA chart generation failed, falling back to text")
 	}
 
 	// Delete loading message
@@ -310,12 +310,16 @@ func (h *Handler) handleCTACallback(ctx context.Context, chatID string, msgID in
 
 // ctaShowSummaryChart deletes old message and sends new photo (can't edit text→photo).
 func (h *Handler) ctaShowSummaryChart(ctx context.Context, chatID string, msgID int, state *ctaState, tf string) error {
-	chartPNG, err := h.getCTAChart(state, tf)
-	if err != nil || len(chartPNG) == 0 {
-		// Fallback to text
+	chartPNG, chartErr := h.getCTAChart(state, tf)
+	if chartErr != nil || len(chartPNG) == 0 {
+		if chartErr != nil {
+			log.Error().Err(chartErr).Str("symbol", state.symbol).Str("timeframe", tf).Msg("CTA summary chart failed, falling back to text")
+		}
+		// Fallback to text with chart failure notification
+		fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
 		summary := formatCTASummary(state)
 		kb := h.kb.CTAMenu()
-		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, summary, kb)
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, fallbackNotice+summary, kb)
 	}
 
 	// Delete old and send new photo
@@ -339,7 +343,10 @@ func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int
 		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Data %s tidak tersedia.", tf))
 	}
 
-	chartPNG, _ := h.getCTAChart(state, tf)
+	chartPNG, chartErr := h.getCTAChart(state, tf)
+	if chartErr != nil {
+		log.Error().Err(chartErr).Str("symbol", state.symbol).Str("timeframe", tf).Msg("CTA timeframe chart failed, falling back to text")
+	}
 
 	txt := formatCTATimeframeDetail(state, tf, result)
 	kb := h.kb.CTATimeframeMenu()
@@ -357,6 +364,11 @@ func (h *Handler) ctaShowTimeframe(ctx context.Context, chatID string, msgID int
 		return err
 	}
 
+	// Text fallback with chart failure notification
+	if chartErr != nil {
+		fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
+		txt = fallbackNotice + txt
+	}
 	return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
 }
 
