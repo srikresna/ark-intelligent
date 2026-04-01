@@ -142,6 +142,16 @@ type SentimentData struct {
 	CryptoFearGreedLabel     string  // "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
 	CryptoFearGreedAvailable bool
 
+	// VIX Term Structure (CBOE)
+	VIXSpot      float64 // VIX spot index level
+	VIXM1        float64 // Front-month VIX futures settle
+	VIXM2        float64 // Second-month VIX futures settle
+	VVIX         float64 // VIX of VIX
+	VIXContango  bool    // true if M1 > Spot (normal/risk-on)
+	VIXSlopePct  float64 // (M2-M1)/M1 * 100
+	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
+	VIXAvailable bool
+
 	FetchedAt time.Time
 }
 
