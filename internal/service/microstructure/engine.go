@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -105,7 +106,7 @@ func (e *Engine) Analyze(ctx context.Context, category, symbol string) (*Signal,
 
 	// --- 6. Derive bias ---
 	sig.Bias, sig.Strength = deriveBias(sig)
-	sig.ConfirmEntry = sig.Strength >= 0.50
+	sig.ConfirmEntry = sig.Strength >= config.MicroConfirmEntryThreshold
 
 	return sig, nil
 }

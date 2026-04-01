@@ -73,4 +73,43 @@ const (
 	// TelegramFloodDelay is the minimum pause between consecutive Telegram
 	// API calls to avoid hitting flood-control limits.
 	TelegramFloodDelay = 50 * time.Millisecond
+
+	// TelegramRateLimitDelay is the minimum gap between consecutive sends
+	// to the same chat (~28 msg/sec, under Telegram's 30 limit).
+	TelegramRateLimitDelay = 35 * time.Millisecond
+
+	// TelegramMaxMessageLen is Telegram's maximum message length in characters.
+	TelegramMaxMessageLen = 4096
+)
+
+// ---------------------------------------------------------------------------
+// External API Rate Limits
+// ---------------------------------------------------------------------------
+
+const (
+	// PriceFetchDelay is the pause between consecutive price API calls
+	// to avoid hitting provider rate limits.
+	PriceFetchDelay = 300 * time.Millisecond
+
+	// COTFetchDelay is the pause between consecutive COT data API calls.
+	COTFetchDelay = 200 * time.Millisecond
+)
+
+// ---------------------------------------------------------------------------
+// AI Model Defaults
+// ---------------------------------------------------------------------------
+
+const (
+	// AIDefaultMaxTokens is the default maximum output tokens for AI models.
+	AIDefaultMaxTokens = 4096
+)
+
+// ---------------------------------------------------------------------------
+// Microstructure Thresholds
+// ---------------------------------------------------------------------------
+
+const (
+	// MicroConfirmEntryThreshold is the minimum signal strength for
+	// confirming an entry in microstructure analysis.
+	MicroConfirmEntryThreshold = 0.50
 )

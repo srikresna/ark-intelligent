@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
@@ -680,13 +681,13 @@ func (f *Fetcher) fetchCoinGecko(ctx context.Context, mapping domain.PriceSymbol
 		if err != nil {
 			return fmt.Errorf("coingecko btc: %w", err)
 		}
-		time.Sleep(300 * time.Millisecond) // Rate limit
+		time.Sleep(config.PriceFetchDelay) // Rate limit
 
 		ethData, err := f.fetchCoinGeckoMarketChart(ctx, "ethereum", daysParam, headers)
 		if err != nil {
 			return fmt.Errorf("coingecko eth: %w", err)
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(config.PriceFetchDelay)
 
 		// Get current total market cap from /global to establish the ratio
 		globalBody, err := f.doGet(ctx, "https://api.coingecko.com/api/v3/global", headers)
