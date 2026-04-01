@@ -576,6 +576,150 @@ func (c *Client) GetOpenInterestHistory(ctx context.Context, category, symbol, i
 	return data, nil
 }
 
+
+// ---------------------------------------------------------------------------
+// Funding Rate History
+// ---------------------------------------------------------------------------
+
+// FundingRate holds one funding rate settlement record.
+type FundingRate struct {
+	Symbol               string
+	FundingRate          float64
+	FundingRateTimestamp int64 // Unix ms
+}
+
+// FundingRateStats holds computed funding rate statistics.
+type FundingRateStats struct {
+	Symbol     string
+	Current    float64
+	Avg7D      float64
+	Avg30D     float64
+	Max30D     float64
+	Min30D     float64
+	Regime     string  // "POSITIVE_BIAS", "NEGATIVE_BIAS", "NEUTRAL"
+	Percentile float64 // percentile of current rate in 30d history (0-100)
+	History    []FundingRate
+}
+
+// GetFundingHistory fetches historical funding rate settlements.
+// category: "linear" for USDT perpetuals
+// symbol: e.g. "BTCUSDT"
+// limit: max 200
+func (c *Client) GetFundingHistory(ctx context.Context, category, symbol string, limit int) ([]FundingRate, error) {
+	params := url.Values{
+		"category": {category},
+		"symbol":   {symbol},
+		"limit":    {strconv.Itoa(limit)},
+	}
+	body, err := c.getPublic(ctx, "/v5/market/funding/history", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Result struct {
+			List []struct {
+				Symbol               string `json:"symbol"`
+				FundingRate          string `json:"fundingRate"`
+				FundingRateTimestamp string `json:"fundingRateTimestamp"`
+			} `json:"list"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("bybit: parse funding history: %w", err)
+	}
+
+	rates := make([]FundingRate, 0, len(resp.Result.List))
+	for _, r := range resp.Result.List {
+		rate, errR := strconv.ParseFloat(r.FundingRate, 64)
+		if errR != nil {
+			log.Warn().Str("raw_rate", r.FundingRate).Str("symbol", r.Symbol).
+				Msg("funding-history: parse rate failed, skipping entry")
+			continue
+		}
+		ts, errTs := strconv.ParseInt(r.FundingRateTimestamp, 10, 64)
+		if errTs != nil {
+			log.Warn().Str("raw_ts", r.FundingRateTimestamp).Str("symbol", r.Symbol).
+				Msg("funding-history: parse timestamp failed, skipping entry")
+			continue
+		}
+		rates = append(rates, FundingRate{
+			Symbol:               r.Symbol,
+			FundingRate:          rate,
+			FundingRateTimestamp: ts,
+		})
+	}
+	return rates, nil
+}
+
+// ComputeFundingStats computes funding rate statistics from historical data.
+// It calculates current rate, 7d/30d averages, min/max, regime, and percentile.
+func ComputeFundingStats(symbol string, rates []FundingRate) *FundingRateStats {
+	if len(rates) == 0 {
+		return &FundingRateStats{Symbol: symbol, Regime: "NEUTRAL"}
+	}
+
+	stats := &FundingRateStats{
+		Symbol:  symbol,
+		Current: rates[0].FundingRate, // newest first from Bybit
+		History: rates,
+	}
+
+	// Bybit settles funding 3x/day (every 8h)
+	// 7d = 21 settlements, 30d = 90 settlements
+	n7d := 21
+	n30d := 90
+	if n7d > len(rates) {
+		n7d = len(rates)
+	}
+	if n30d > len(rates) {
+		n30d = len(rates)
+	}
+
+	// 7-day average
+	sum7 := 0.0
+	for _, r := range rates[:n7d] {
+		sum7 += r.FundingRate
+	}
+	stats.Avg7D = sum7 / float64(n7d)
+
+	// 30-day average, min, max
+	sum30 := 0.0
+	stats.Max30D = rates[0].FundingRate
+	stats.Min30D = rates[0].FundingRate
+	for _, r := range rates[:n30d] {
+		sum30 += r.FundingRate
+		if r.FundingRate > stats.Max30D {
+			stats.Max30D = r.FundingRate
+		}
+		if r.FundingRate < stats.Min30D {
+			stats.Min30D = r.FundingRate
+		}
+	}
+	stats.Avg30D = sum30 / float64(n30d)
+
+	// Percentile: what % of 30d rates are below current
+	below := 0
+	for _, r := range rates[:n30d] {
+		if r.FundingRate < stats.Current {
+			below++
+		}
+	}
+	stats.Percentile = float64(below) / float64(n30d) * 100
+
+	// Regime classification
+	switch {
+	case stats.Avg7D > 0.0003: // > 3bps avg = strong positive bias
+		stats.Regime = "POSITIVE_BIAS"
+	case stats.Avg7D < -0.0001: // < -1bps avg = negative bias
+		stats.Regime = "NEGATIVE_BIAS"
+	default:
+		stats.Regime = "NEUTRAL"
+	}
+
+	return stats
+}
+
 // ---------------------------------------------------------------------------
 // HMAC signing (for private endpoints — future use)
 // ---------------------------------------------------------------------------
