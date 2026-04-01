@@ -54,3 +54,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 
 ## Files to Modify
 - `internal/adapter/telegram/bot.go`
+
+## Resolution
+
+Task sudah diimplementasikan via TASK-195 (feat/TASK-195-callback-nil-chatid-guard, PR #130). Guard chatID == "" sudah ada di bot.go lines 385-391. Task ini duplicate — marked as done.
