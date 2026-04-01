@@ -114,6 +114,9 @@ type sentMessage struct {
 // Bot — Core Telegram bot engine
 // ---------------------------------------------------------------------------
 
+// slowCommandThreshold triggers a warning log when a command handler takes too long.
+const slowCommandThreshold = 10 * time.Second
+
 // CommandHandler handles a specific bot command.
 type CommandHandler func(ctx context.Context, chatID string, userID int64, args string) error
 
@@ -320,10 +323,21 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 	}
 
 	log.Info().Str("command", cmd).Int64("user_id", userID).Str("chat_id", chatID).Msg("command received")
-	if err := handler(ctx, chatID, userID, args); err != nil {
-		log.Error().Err(err).Str("command", cmd).Int64("user_id", userID).Msg("handler error")
+	start := time.Now()
+	err := handler(ctx, chatID, userID, args)
+	elapsed := time.Since(start)
+
+	// Log command latency for observability
+	logEvent := log.Info().Str("command", cmd).Int64("user_id", userID).Dur("latency_ms", elapsed)
+	if err != nil {
+		logEvent.Err(err).Msg("command completed with error")
 		_, _ = b.SendHTML(ctx, chatID,
 			fmt.Sprintf("Error processing <code>%s</code>. Please try again later.", html.EscapeString(cmd)))
+	} else {
+		logEvent.Msg("command handled")
+	}
+	if elapsed > slowCommandThreshold {
+		log.Warn().Str("command", cmd).Int64("user_id", userID).Dur("latency_ms", elapsed).Msg("slow command response")
 	}
 }
 
@@ -357,10 +371,16 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 	// Find handler by prefix match
 	for prefix, handler := range b.callbacks {
 		if strings.HasPrefix(cb.Data, prefix) {
+			cbStart := time.Now()
 			if err := handler(ctx, chatID, msgID, userID, cb.Data); err != nil {
-				log.Error().Err(err).Str("data", cb.Data).Msg("callback handler error")
+				log.Error().Err(err).Str("data", cb.Data).Dur("latency_ms", time.Since(cbStart)).Msg("callback handler error")
 				_ = b.AnswerCallback(ctx, cb.ID, "Error processing request")
 				return
+			}
+			cbElapsed := time.Since(cbStart)
+			log.Info().Str("callback", cb.Data).Int64("user_id", userID).Dur("latency_ms", cbElapsed).Msg("callback handled")
+			if cbElapsed > slowCommandThreshold {
+				log.Warn().Str("callback", cb.Data).Int64("user_id", userID).Dur("latency_ms", cbElapsed).Msg("slow callback response")
 			}
 			_ = b.AnswerCallback(ctx, cb.ID, "")
 			return

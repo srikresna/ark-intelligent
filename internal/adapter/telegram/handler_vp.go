@@ -427,20 +427,24 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	cmd.Env = append(os.Environ(), "MPLBACKEND=Agg")
 
 	if err := cmd.Run(); err != nil {
+		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("VP engine failed: %w", err)
 	}
 
 	resultJSON, err := os.ReadFile(outputPath)
 	if err != nil {
+		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("read output: %w", err)
 	}
 
 	var result vpEngineResult
 	if err := json.Unmarshal(resultJSON, &result); err != nil {
+		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("unmarshal output: %w", err)
 	}
 
 	if !result.Success {
+		os.Remove(chartPath) // cleanup chart on failure
 		return &result, fmt.Errorf("%s", result.Error)
 	}
 
