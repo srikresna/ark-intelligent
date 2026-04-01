@@ -131,13 +131,19 @@ Pilih aset:`, h.kb.VPSymbolMenu())
 		return err
 	}
 
-	// Send "computing..." placeholder
-	msgID, _ := h.bot.SendLoading(ctx, chatID,
-		fmt.Sprintf("⏳ Menghitung Volume Profile <b>%s</b> (%s)...",
-			html.EscapeString(mapping.Currency), timeframe))
+	// Multi-step progress indicator
+	sym := html.EscapeString(mapping.Currency)
+	prog := NewProgress(h.bot, chatID, []string{
+		fmt.Sprintf("⏳ Fetching volume data for <b>%s</b> (%s)...", sym, timeframe),
+		fmt.Sprintf("🔄 Computing Volume Profile for <b>%s</b>...", sym),
+		fmt.Sprintf("📊 Building profile levels for <b>%s</b>...", sym),
+	})
+	msgID := prog.Start(ctx)
 
 	state, err := h.computeVPState(ctx, mapping, timeframe)
 	if err != nil {
+		// Stop progress without deleting — reuse message for error display.
+		prog.StopNoDelete()
 		errMsg := userFriendlyError(err, "vp")
 		if msgID > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
@@ -146,6 +152,8 @@ Pilih aset:`, h.kb.VPSymbolMenu())
 		return sendErr
 	}
 
+	// Stop progress without deleting — vpRunMode edits the message with the result.
+	prog.StopNoDelete()
 	h.vpCache.set(chatID, state)
 	return h.vpRunMode(ctx, chatID, msgID, state, "profile")
 }
