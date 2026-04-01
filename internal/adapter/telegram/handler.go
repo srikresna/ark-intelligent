@@ -206,6 +206,7 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
+	bot.RegisterCallback("onboard:", h.cbOnboard)
 	bot.RegisterCallback("macro:", h.cbMacro)
 	bot.RegisterCallback("imp:", h.cbImpact)
 	bot.RegisterCallback("nav:", h.cbNav)
@@ -226,7 +227,103 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 		_ = h.prefsRepo.Set(ctx, userID, prefs)
 	}
 
-	return h.sendHelp(ctx, chatID, userID)
+	// If user already has experience level set, show normal help.
+	if prefs.ExperienceLevel != "" {
+		return h.sendHelp(ctx, chatID, userID)
+	}
+
+	// New user → interactive onboarding with role selector.
+	welcome := `🦅 <b>Selamat datang di ARK Intelligence!</b>
+<i>Institutional Flow &amp; Macro Analytics</i>
+
+Sebelum mulai, pilih level pengalaman trading kamu:
+
+🌱 <b>Pemula</b> — Baru mulai trading, ingin belajar dasar
+📈 <b>Intermediate</b> — Sudah trading aktif, ingin tools analisis
+🏛 <b>Pro</b> — Trader berpengalaman, butuh data institusional`
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, welcome, h.kb.OnboardingRoleMenu())
+	return err
+}
+
+// cbOnboard handles the onboarding flow callbacks (role selection + tutorial).
+func (h *Handler) cbOnboard(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "onboard:")
+
+	// "showhelp" → show full help menu
+	if action == "showhelp" {
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		return h.sendHelp(ctx, chatID, userID)
+	}
+
+	// Role selection: beginner / intermediate / pro
+	level := action
+	if level != "beginner" && level != "intermediate" && level != "pro" {
+		return nil
+	}
+
+	// Persist experience level
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	prefs.ExperienceLevel = level
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+
+	// Delete the role selector message
+	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+
+	// Send tutorial steps based on level
+	var tutorial string
+	switch level {
+	case "beginner":
+		tutorial = `✅ <b>Level: Pemula</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ Cek COT Data</b>
+Ketik <code>/cot EUR</code> — lihat posisi big player di Euro
+
+<b>2️⃣ Cek Kalender</b>
+Ketik <code>/calendar</code> — jadwal rilis data ekonomi
+
+<b>3️⃣ Cek Harga</b>
+Ketik <code>/price EUR</code> — harga terkini + perubahan
+
+Ini menu kamu — klik untuk mulai:`
+
+	case "intermediate":
+		tutorial = `✅ <b>Level: Intermediate</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ CTA Dashboard</b>
+Ketik <code>/cta EUR</code> — analisis teknikal lengkap dengan chart
+
+<b>2️⃣ AI Outlook</b>
+Ketik <code>/outlook</code> — analisis gabungan AI (data + sentiment + web)
+
+<b>3️⃣ Macro Regime</b>
+Ketik <code>/macro</code> — kondisi makro ekonomi global + dampak ke trading
+
+Ini menu kamu — klik untuk mulai:`
+
+	case "pro":
+		tutorial = `✅ <b>Level: Pro / Institutional</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ Alpha Engine</b>
+Ketik <code>/alpha</code> — factor ranking + playbook + risk dashboard
+
+<b>2️⃣ Volume Profile</b>
+Ketik <code>/vp EUR</code> — 10 mode VP termasuk AMT institutional-grade
+
+<b>3️⃣ Quant Analysis</b>
+Ketik <code>/quant EUR</code> — 12 model econometric (GARCH, regime, PCA, dll)
+
+Ini menu kamu — klik untuk mulai:`
+	}
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, tutorial, h.kb.StarterKitMenu(level))
+	return err
 }
 
 func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {

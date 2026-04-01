@@ -69,6 +69,10 @@ type UserPrefs struct {
 	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
 	CalendarView   string     `json:"calendar_view"`   // Last used view: "day", "week", "month"
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default) or "full"
+
+	// ExperienceLevel: user's self-reported trading experience.
+	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).
+	ExperienceLevel string `json:"experience_level,omitempty"`
 }
 
 // DefaultPrefs returns the default user preferences.
