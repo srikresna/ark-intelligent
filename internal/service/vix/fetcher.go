@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -269,6 +270,16 @@ func computeDerivedFields(ts *VIXTermStructure) {
 		ts.SlopePct = (ts.M2 - ts.M1) / ts.M1 * 100
 		// Approximate monthly roll yield: negative for long VIX in contango
 		ts.RollYield = -ts.SlopePct
+	} else if ts.M1 == 0 {
+		// Defensive: M1 zero from malformed CSV → set safe defaults
+		ts.SlopePct = 0
+		ts.RollYield = 0
+	}
+
+	// Guard against NaN/Inf from unexpected calculations
+	if math.IsNaN(ts.SlopePct) || math.IsInf(ts.SlopePct, 0) {
+		ts.SlopePct = 0
+		ts.RollYield = 0
 	}
 
 	if ts.Spot > 0 && ts.M1 > 0 {
