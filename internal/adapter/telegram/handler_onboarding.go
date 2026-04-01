@@ -320,6 +320,7 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /levels — Support/resistance levels · <code>/levels EUR</code>
 /history — COT history comparison · <code>/history EUR</code>
 /ecb — ECB monetary policy dashboard · <code>/ecb</code>
+/leading — OECD leading indicators (G7+ CLI) · <code>/leading</code>
 /intermarket — Cross-asset correlation signals`
 
 	case "research":
