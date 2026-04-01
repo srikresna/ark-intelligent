@@ -1,6 +1,7 @@
 package telegram
 
 // /macro — FRED Macro Regime Dashboard
+// /ecb   — ECB Statistical Data Warehouse Dashboard
 
 import (
 	"context"
@@ -9,6 +10,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 )
 
