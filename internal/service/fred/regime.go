@@ -25,6 +25,8 @@ type MacroRegime struct {
 	Growth       string // growth trajectory label
 	USDStrength  string // USD index label
 	FedBalance   string // Fed balance sheet QT/QE status
+	TGALabel      string // TGA balance status label
+	LiquidityLabel string // Net liquidity regime label
 	RecessionRisk string // "LOW", "ELEVATED", "HIGH — SAHM TRIGGERED"
 	Bias         string // directional bias e.g., "USD BEARISH bias, Gold BULLISH"
 	Description  string // narrative explanation
@@ -437,6 +439,35 @@ func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites)
 		}
 	} else {
 		r.FedBalance = "N/A"
+	}
+
+	// --- 10. Treasury General Account (TGA) ---
+	if data.TGABalance > 0 {
+		tgaDir := data.TGABalanceTrend.Arrow()
+		switch data.TGABalanceTrend.Direction {
+		case "UP":
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Rising (Liquidity Drain) 🔴", data.TGABalance, tgaDir)
+			riskScore += 3
+		case "DOWN":
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Falling (Liquidity Inject) 🟢", data.TGABalance, tgaDir)
+		default:
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Stable", data.TGABalance, tgaDir)
+		}
+	} else {
+		r.TGALabel = "N/A"
+	}
+
+	// --- 11. Net Liquidity Regime ---
+	if data.LiquidityRegime != "" {
+		switch data.LiquidityRegime {
+		case "EASY":
+			r.LiquidityLabel = "💧 EASY — TGA drawdown + declining RRP + expanding Fed BS"
+		case "TIGHT":
+			r.LiquidityLabel = "🏜️ TIGHT — TGA rising + high RRP + QT"
+			riskScore += 5
+		default:
+			r.LiquidityLabel = "⚖️ NEUTRAL — mixed liquidity signals"
+		}
 	}
 
 	// --- Recession Risk Classification ---

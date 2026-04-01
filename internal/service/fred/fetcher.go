@@ -106,6 +106,11 @@ type MacroData struct {
 	FedBalSheet      float64     // WALCL — Fed Total Assets (billions USD)
 	FedBalSheetTrend SeriesTrend // trend: QE (expanding) or QT (contracting)
 
+	// Treasury General Account (TGA)
+	TGABalance      float64     // WDTGAL — TGA balance (billions USD)
+	TGABalanceTrend SeriesTrend // trend: rising (drain) or falling (inject)
+	LiquidityRegime string      // classified: TIGHT, NEUTRAL, EASY (TGA + RRP + Fed BS)
+
 	// USD strength
 	DXY float64 // DTWEXBGS — Nominal Broad U.S. Dollar Index
 
@@ -304,6 +309,7 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		{"A191RL1Q225SBEA", 5}, {"SAHMCURRENT", 5}, {"NAPMNOI", 3}, {"UMCSENT", 3},
 		// Fed balance sheet
 		{"WALCL", 3},
+		{"WDTGAL", 8}, // TGA balance — 8 weeks for trend
 		// USD
 		{"DTWEXBGS", 5},
 		// Housing & Consumer
@@ -528,6 +534,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	// Fed balance sheet
 	data.FedBalSheet, data.FedBalSheetTrend = trend("WALCL", 50)
 
+	// Treasury General Account (TGA) — WDTGAL (weekly, billions)
+	data.TGABalance, data.TGABalanceTrend = trend("WDTGAL", 50) // $50B threshold
+
 	// USD
 	data.DXY = single("DTWEXBGS")
 
@@ -572,6 +581,8 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	// Global - NZ (quarterly CPI — use yoyQ for 4-quarter YoY)
 	data.NZ_CPI, _ = yoyQ("NZLCPIALLQINMEI")
 
+	// --- Liquidity regime classification (TGA + RRP + Fed BS) ---
+	data.LiquidityRegime = classifyLiquidity(data)
 	// --- Derived metrics ---
 	data.YieldSpread = data.Yield10Y - data.Yield2Y
 	// Prefer FRED pre-computed spread (T10Y2Y) when available — more accurate
@@ -618,6 +629,7 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	sanitizeFloat(&data.GDPGrowth)
 	sanitizeFloat(&data.M2Growth)
 	sanitizeFloat(&data.FedBalSheet)
+	sanitizeFloat(&data.TGABalance)
 	sanitizeFloat(&data.DXY)
 	sanitizeFloat(&data.TedSpread)
 	sanitizeFloat(&data.VIX)
@@ -803,5 +815,59 @@ func MergeSentiment(data *MacroData, cnnFearGreed, aaiiBullBear, putCallTotal, p
 	}
 	if putCallIndex > 0 {
 		data.PutCallIndex = putCallIndex
+	}
+}
+
+// classifyLiquidity classifies the aggregate liquidity regime using three pillars:
+//   - TGA Balance (WDTGAL): rising = drain, falling = inject
+//   - Reverse Repo (RRPONTSYD): high = parked liquidity, falling = liquidity entering
+//   - Fed Balance Sheet (WALCL): expanding (QE) = inject, contracting (QT) = drain
+//
+// Returns: "TIGHT", "NEUTRAL", or "EASY".
+func classifyLiquidity(data *MacroData) string {
+	if data.TGABalance == 0 && data.ReverseRepo == 0 && data.FedBalSheet == 0 {
+		return "" // insufficient data
+	}
+
+	score := 0 // positive = easy, negative = tight
+
+	// TGA: rising = drain (tight), falling = inject (easy)
+	switch data.TGABalanceTrend.Direction {
+	case "UP":
+		score-- // TGA rising = Treasury draining liquidity
+	case "DOWN":
+		score++ // TGA falling = Treasury injecting liquidity
+	}
+
+	// TGA absolute level: > $700B = war chest building = potential drain
+	if data.TGABalance > 700 {
+		score--
+	} else if data.TGABalance < 300 && data.TGABalance > 0 {
+		score++ // low TGA = limited drain capacity
+	}
+
+	// Reverse Repo: high = parked liquidity (neutral-to-tight), falling = entering system
+	if data.ReverseRepo > 500 {
+		// Still significant RRP = liquidity buffer exists but parked
+		score-- // not actively in system
+	} else if data.ReverseRepo < 100 && data.ReverseRepo > 0 {
+		score++ // RRP depleted, liquidity has entered system
+	}
+
+	// Fed Balance Sheet: expanding = easy, contracting = tight
+	switch data.FedBalSheetTrend.Direction {
+	case "UP":
+		score++ // QE / expanding = liquidity injection
+	case "DOWN":
+		score-- // QT / contracting = liquidity drain
+	}
+
+	switch {
+	case score >= 2:
+		return "EASY"
+	case score <= -2:
+		return "TIGHT"
+	default:
+		return "NEUTRAL"
 	}
 }

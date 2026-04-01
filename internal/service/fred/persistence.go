@@ -116,6 +116,7 @@ func (ps *PersistenceService) PersistSnapshot(ctx context.Context, data *MacroDa
 	// M2 & Fed balance
 	addObs("M2SL_YOY", data.M2Growth)
 	addObs("WALCL", data.FedBalSheet)
+	addObs("WDTGAL", data.TGABalance)
 
 	// USD
 	addObs("DTWEXBGS", data.DXY)
