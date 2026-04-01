@@ -218,9 +218,13 @@ func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, dateMode, from, to string) 
 		var fetchErr error
 		result, fetchErr = f.doFetchMQL5(ctx, dateMode, from, to)
 		if fetchErr != nil {
-			// Retry once on transient failure
+			// Retry once on transient failure; respect context cancellation during wait
 			log.Warn().Err(fetchErr).Msg("MQL5 fetch failed, retrying in 3s")
-			time.Sleep(3 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(3 * time.Second):
+			}
 			result, fetchErr = f.doFetchMQL5(ctx, dateMode, from, to)
 		}
 		return fetchErr
