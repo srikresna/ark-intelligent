@@ -102,3 +102,69 @@ func (h *Handler) editUserError(ctx context.Context, chatID string, msgID int, e
 		log.Error().Err(editErr).Str("chat_id", chatID).Msg("failed to edit error message")
 	}
 }
+
+// callbackFriendlyError returns a compact (≤200 chars) plain-text error message
+// suitable for display in a Telegram AnswerCallback toast notification.
+// Telegram's AnswerCallbackQuery `text` field is limited to 200 characters and
+// must be plain text (no HTML/Markdown).
+func callbackFriendlyError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded),
+		strings.Contains(lower, "timeout"),
+		strings.Contains(lower, "deadline exceeded"),
+		strings.Contains(lower, "context canceled"):
+		return "⏱ Request timeout — server sedang lambat. Coba lagi dalam beberapa saat."
+
+	case strings.Contains(lower, "not found"),
+		strings.Contains(lower, "no data"),
+		strings.Contains(lower, "key not found"),
+		strings.Contains(lower, "no record"):
+		return "📭 Data belum tersedia. Coba lagi nanti."
+
+	case strings.Contains(lower, "insufficient"),
+		strings.Contains(lower, "not enough"):
+		return "📊 Data historis belum cukup. Coba lagi nanti."
+
+	case strings.Contains(lower, "connection refused"),
+		strings.Contains(lower, "no such host"),
+		strings.Contains(lower, "dial tcp"),
+		strings.Contains(lower, "unreachable"):
+		return "🌐 Koneksi gagal ke server eksternal. Coba lagi dalam 1-2 menit."
+
+	case strings.Contains(lower, "rate limit"),
+		strings.Contains(lower, "too many requests"),
+		strings.Contains(lower, "429"),
+		strings.Contains(lower, "quota"):
+		return "🚦 Batas request tercapai. Tunggu 1-2 menit lalu coba lagi."
+
+	case strings.Contains(lower, "chart"),
+		strings.Contains(lower, "render"),
+		strings.Contains(lower, "script"):
+		return "📈 Gagal membuat chart. Coba lagi."
+
+	case strings.Contains(lower, "gemini"),
+		strings.Contains(lower, "claude"),
+		strings.Contains(lower, "generation failed"),
+		strings.Contains(lower, "openai"),
+		strings.Contains(lower, "llm"):
+		return "🤖 AI sedang tidak tersedia. Analisis template tetap tersedia."
+
+	case strings.Contains(lower, "unauthorized"),
+		strings.Contains(lower, "forbidden"),
+		strings.Contains(lower, "403"),
+		strings.Contains(lower, "401"):
+		return "🔒 Akses ditolak. Hubungi admin."
+
+	case strings.Contains(lower, "badger"):
+		return "💾 Gangguan database internal. Coba lagi dalam beberapa saat."
+	}
+
+	return "⚠️ Terjadi kesalahan. Coba lagi atau hubungi admin."
+}

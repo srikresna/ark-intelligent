@@ -104,3 +104,83 @@ func TestSuggestRetry_WithCommand(t *testing.T) {
 		t.Errorf("expected /price in suggestion, got %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// callbackFriendlyError tests
+// ---------------------------------------------------------------------------
+
+func TestCallbackFriendlyError_Nil(t *testing.T) {
+	if got := callbackFriendlyError(nil); got != "" {
+		t.Errorf("expected empty string for nil error, got %q", got)
+	}
+}
+
+func TestCallbackFriendlyError_Timeout(t *testing.T) {
+	msg := callbackFriendlyError(context.DeadlineExceeded)
+	if !strings.Contains(msg, "timeout") && !strings.Contains(msg, "Timeout") {
+		t.Errorf("expected timeout message, got %q", msg)
+	}
+	if len([]rune(msg)) > 200 {
+		t.Errorf("message exceeds 200 chars: len=%d, msg=%q", len([]rune(msg)), msg)
+	}
+}
+
+func TestCallbackFriendlyError_RateLimit(t *testing.T) {
+	msg := callbackFriendlyError(errors.New("429 too many requests"))
+	if !strings.Contains(msg, "Batas request") {
+		t.Errorf("expected rate limit message, got %q", msg)
+	}
+	if len([]rune(msg)) > 200 {
+		t.Errorf("message exceeds 200 chars")
+	}
+}
+
+func TestCallbackFriendlyError_Network(t *testing.T) {
+	msg := callbackFriendlyError(errors.New("dial tcp: connection refused"))
+	if !strings.Contains(msg, "Koneksi gagal") {
+		t.Errorf("expected connection error message, got %q", msg)
+	}
+}
+
+func TestCallbackFriendlyError_AI(t *testing.T) {
+	msg := callbackFriendlyError(errors.New("gemini generation failed"))
+	if !strings.Contains(msg, "AI") {
+		t.Errorf("expected AI error message, got %q", msg)
+	}
+}
+
+func TestCallbackFriendlyError_Generic(t *testing.T) {
+	msg := callbackFriendlyError(errors.New("completely unknown error"))
+	if !strings.Contains(msg, "kesalahan") {
+		t.Errorf("expected generic error message, got %q", msg)
+	}
+	if len([]rune(msg)) > 200 {
+		t.Errorf("message exceeds 200 chars")
+	}
+}
+
+func TestCallbackFriendlyError_AllUnder200Chars(t *testing.T) {
+	testErrs := []error{
+		context.DeadlineExceeded,
+		errors.New("timeout"),
+		errors.New("not found"),
+		errors.New("key not found"),
+		errors.New("insufficient data"),
+		errors.New("connection refused"),
+		errors.New("dial tcp: no such host"),
+		errors.New("429 rate limit"),
+		errors.New("quota exceeded"),
+		errors.New("chart render failed"),
+		errors.New("gemini generation failed"),
+		errors.New("403 forbidden"),
+		errors.New("401 unauthorized"),
+		errors.New("badger: value log error"),
+		errors.New("some unknown error xyz"),
+	}
+	for _, err := range testErrs {
+		msg := callbackFriendlyError(err)
+		if l := len([]rune(msg)); l > 200 {
+			t.Errorf("callbackFriendlyError(%q) = %d chars (>200): %q", err, l, msg)
+		}
+	}
+}

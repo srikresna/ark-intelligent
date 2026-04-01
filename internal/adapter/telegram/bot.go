@@ -389,7 +389,28 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 			metrics.RecordCallback(cb.Data, userID, cbElapsed, cbErr)
 
 			if cbErr != nil {
-				_ = b.AnswerCallback(ctx, cb.ID, "Error processing request")
+				log.Error().
+					Err(cbErr).
+					Str("callback_data", cb.Data).
+					Int64("user_id", userID).
+					Msg("callback handler error")
+
+				friendly := callbackFriendlyError(cbErr)
+				// Telegram AnswerCallbackQuery text must be ≤200 chars.
+				// callbackFriendlyError guarantees this, but guard defensively.
+				const maxToastLen = 200
+				toast := []rune(friendly)
+				if len(toast) > maxToastLen {
+					toast = toast[:maxToastLen]
+				}
+				_ = b.AnswerCallback(ctx, cb.ID, string(toast))
+
+				// If we have a message to edit, also update it with the full
+				// user-friendly error so the user can read it at their own pace.
+				if chatID != "" && msgID != 0 {
+					fullFriendly := userFriendlyError(cbErr, "")
+					_ = b.EditMessage(ctx, chatID, msgID, fullFriendly)
+				}
 				return
 			}
 			_ = b.AnswerCallback(ctx, cb.ID, "")
