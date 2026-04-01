@@ -8,6 +8,11 @@ import (
 )
 
 // ComputeComposites derives all composite scores from raw MacroData.
+//
+// Returns nil if data is nil.
+// Always returns a fully-populated (non-nil) struct for non-nil input; all
+// score fields default to 0 when the underlying data is missing or zero-valued.
+// This function never panics regardless of the input state.
 func ComputeComposites(data *MacroData) *domain.MacroComposites {
 	if data == nil {
 		return nil
@@ -31,7 +36,8 @@ func ComputeComposites(data *MacroData) *domain.MacroComposites {
 	c.HousingPulse = computeHousingPulse(data)
 	c.FinConditions = computeFinancialConditions(data)
 
-	// Per-country macro scores
+	// Per-country macro scores (-100 to +100).
+	// Each sub-function returns 0 when all input data is missing.
 	c.USScore = computeUSMacroScore(data)
 	ezRate := data.EZ_Rate
 	if data.EZ_10Y != 0 {
@@ -43,6 +49,11 @@ func ComputeComposites(data *MacroData) *domain.MacroComposites {
 	c.AUScore = computeCountryScore(data.AU_CPI, 0, data.AU_Unemployment, 0, 2.5, 0.5, 4.5)
 	c.CAScore = computeCountryScore(data.CA_CPI, 0, data.CA_Unemployment, 0, 2.0, 0.3, 6.0)
 	c.NZScore = computeCountryScore(data.NZ_CPI, 0, 0, 0, 2.0, 0.5, 4.5)
+
+	// Defensive NaN/Inf guard: score functions should never produce non-finite
+	// values, but guard here to prevent downstream scoring math from propagating
+	// NaN/Inf into conviction scores or regime classification.
+	sanitizeCompositeScores(c)
 
 	// Sentiment composite
 	c.SentimentComposite = computeSentimentComposite(data)
@@ -56,6 +67,32 @@ func ComputeComposites(data *MacroData) *domain.MacroComposites {
 	}
 
 	return c
+}
+
+// sanitizeCompositeScores clamps all numeric composite fields to finite values.
+// Any NaN or Inf produced by upstream math is zeroed out to prevent propagation.
+func sanitizeCompositeScores(c *domain.MacroComposites) {
+	c.USScore = sanitizeScore(c.USScore)
+	c.EZScore = sanitizeScore(c.EZScore)
+	c.UKScore = sanitizeScore(c.UKScore)
+	c.JPScore = sanitizeScore(c.JPScore)
+	c.AUScore = sanitizeScore(c.AUScore)
+	c.CAScore = sanitizeScore(c.CAScore)
+	c.NZScore = sanitizeScore(c.NZScore)
+	c.LaborHealth = sanitizeScore(c.LaborHealth)
+	c.CreditStress = sanitizeScore(c.CreditStress)
+	c.InflationMomentum = sanitizeScore(c.InflationMomentum)
+	c.FinConditions = sanitizeScore(c.FinConditions)
+	c.SentimentComposite = sanitizeScore(c.SentimentComposite)
+}
+
+// sanitizeScore returns 0 for any non-finite (NaN, ±Inf) value, otherwise
+// returns the value unchanged. All composite scores should be finite.
+func sanitizeScore(v float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0
+	}
+	return v
 }
 
 // computeLaborHealth returns a 0-100 score for US labor market health.
