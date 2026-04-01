@@ -336,6 +336,12 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 				}
 				b.WriteString("\n")
 			}
+			if sd.MyfxbookAvailable && len(sd.MyfxbookPairs) > 0 {
+				b.WriteString("Retail Positioning (Myfxbook — contrarian indicator):\n")
+				for _, mp := range sd.MyfxbookPairs {
+					b.WriteString(fmt.Sprintf("  %s: Retail %.0f%% Long / %.0f%% Short → %s\n", mp.Symbol, mp.LongPct, mp.ShortPct, mp.Signal))
+				}
+			}
 			b.WriteString("\n")
 		}
 	}

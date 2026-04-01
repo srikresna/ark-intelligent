@@ -3775,6 +3775,42 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data unavailable</code>\n")
 	}
 
+	// --- Myfxbook Retail Positioning ---
+	b.WriteString("\n<b>Retail Positioning (Myfxbook)</b>\n")
+	if data.MyfxbookAvailable && len(data.MyfxbookPairs) > 0 {
+		for _, mp := range data.MyfxbookPairs {
+			var signalEmoji string
+			switch mp.Signal {
+			case "CONTRARIAN_BULLISH":
+				signalEmoji = "🟢"
+			case "LEAN_BULLISH":
+				signalEmoji = "🟢"
+			case "CONTRARIAN_BEARISH":
+				signalEmoji = "🔴"
+			case "LEAN_BEARISH":
+				signalEmoji = "🔴"
+			default:
+				signalEmoji = "⚪"
+			}
+			signalLabel := mp.Signal
+			if signalLabel == "CONTRARIAN_BULLISH" {
+				signalLabel = "Contrarian Bullish"
+			} else if signalLabel == "CONTRARIAN_BEARISH" {
+				signalLabel = "Contrarian Bearish"
+			} else if signalLabel == "LEAN_BULLISH" {
+				signalLabel = "Lean Bullish"
+			} else if signalLabel == "LEAN_BEARISH" {
+				signalLabel = "Lean Bearish"
+			} else {
+				signalLabel = "Neutral"
+			}
+			b.WriteString(fmt.Sprintf("<code>%-8s: %4.1f%% L / %4.1f%% S</code> %s %s\n", mp.Symbol, mp.LongPct, mp.ShortPct, signalEmoji, signalLabel))
+		}
+		b.WriteString("<i>Retail positioning is a contrarian indicator — extreme readings suggest reversal potential.</i>\n")
+	} else {
+		b.WriteString("<code>Data unavailable</code>\n")
+	}
+
 	// --- VIX Term Structure (CBOE) ---
 	b.WriteString("\n<b>VIX Term Structure</b>\n")
 	if data.VIXAvailable {
