@@ -217,6 +217,7 @@ func NewHandler(
 	bot.RegisterCommand("/rank", h.cmdRank)
 	bot.RegisterCommand("/macro", h.cmdMacro)
 	bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
+	bot.RegisterCommand("/leading", h.cmdLeading)    // OECD Composite Leading Indicators
 	bot.RegisterCommand("/eurostat", h.cmdEurostat)  // EU economy dashboard (Eurostat)
 	bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
 	bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
@@ -286,7 +287,10 @@ func NewHandler(
 	bot.RegisterCallback("share:", h.cbShare)
 	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
 
-	log.Info().Int("commands", 48).Int("callbacks", 10).Msg("registered commands and callback prefixes")
+	// Onboarding completion tracking (TASK-204)
+	h.registerOnboardingProgress()
+
+	log.Info().Int("commands", 48).Int("callbacks", 11).Msg("registered commands and callback prefixes")
 	return h
 }
 // ---------------------------------------------------------------------------
