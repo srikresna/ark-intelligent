@@ -127,6 +127,11 @@ type Handler struct {
 	ict      *ICTServices
 	ictCache *ictStateCache
 
+	// smc holds optional SMC analysis engine services.
+	// May be nil — /smc command disabled if not configured.
+	smc      *SMCServices
+	smcCache *smcStateCache
+
 	// gex holds the GEX engine for /gex command.
 	// May be nil — /gex command disabled if not configured.
 	gex *GEXServices
