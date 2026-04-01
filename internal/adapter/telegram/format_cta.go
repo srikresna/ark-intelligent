@@ -256,6 +256,64 @@ func formatCTASummary(state *ctaState) string {
 			mtfNote, state.mtf.WeightedScore, state.mtf.WeightedGrade))
 	}
 
+	// ICT summary — nearest FVG and Order Block from daily
+	if d.ICT != nil {
+		sb.WriteString("\n🔷 <b>ICT Key Levels:</b>\n")
+		// Nearest unfilled FVG
+		nearestFVG := (*ta.FVG)(nil)
+		for i := range d.ICT.FairValueGaps {
+			if !d.ICT.FairValueGaps[i].Filled {
+				nearestFVG = &d.ICT.FairValueGaps[i]
+				break
+			}
+		}
+		if nearestFVG != nil {
+			fvgDir := "🟢 Bullish"
+			if nearestFVG.Type == "BEARISH" {
+				fvgDir = "🔴 Bearish"
+			}
+			fillNote := ""
+			if nearestFVG.FillPct > 0 {
+				fillNote = fmt.Sprintf(" (%.0f%% terisi)", nearestFVG.FillPct)
+			}
+			sb.WriteString(fmt.Sprintf("• FVG %s: <code>%.5f – %.5f</code>%s\n",
+				fvgDir, nearestFVG.Low, nearestFVG.High, fillNote))
+		}
+		// Nearest active Order Block
+		nearestOB := (*ta.OrderBlock)(nil)
+		for i := range d.ICT.OrderBlocks {
+			if !d.ICT.OrderBlocks[i].Broken {
+				nearestOB = &d.ICT.OrderBlocks[i]
+				break
+			}
+		}
+		if nearestOB != nil {
+			obDir := "🟢 Demand"
+			if nearestOB.Type == "BEARISH" {
+				obDir = "🔴 Supply"
+			}
+			mitigatedNote := ""
+			if nearestOB.Mitigated {
+				mitigatedNote = " ⚡mitigated"
+			}
+			sb.WriteString(fmt.Sprintf("• OB %s: <code>%.5f – %.5f</code> (str:%d)%s\n",
+				obDir, nearestOB.Low, nearestOB.High, nearestOB.Strength, mitigatedNote))
+		}
+		if nearestFVG == nil && nearestOB == nil {
+			sb.WriteString("<i>Tidak ada FVG/OB aktif terdeteksi.</i>\n")
+		}
+		// Killzone
+		if d.ICT.Killzone != "" && d.ICT.Killzone != "OFF" {
+			sb.WriteString(fmt.Sprintf("• Killzone: 🕐 <b>%s</b> (sesi aktif)\n", d.ICT.Killzone))
+		}
+		// Premium / Discount zone
+		if d.ICT.PremiumZone {
+			sb.WriteString(fmt.Sprintf("• Zone: 📈 Premium (harga di atas equilibrium %.5f)\n", d.ICT.Equilibrium))
+		} else if d.ICT.DiscountZone {
+			sb.WriteString(fmt.Sprintf("• Zone: 📉 Discount (harga di bawah equilibrium %.5f)\n", d.ICT.Equilibrium))
+		}
+	}
+
 	// Disclaimer
 	sb.WriteString("\n\n<i>⚠️ Ini analisis teknikal otomatis, bukan saran keuangan. Selalu kelola risiko Anda.</i>")
 
