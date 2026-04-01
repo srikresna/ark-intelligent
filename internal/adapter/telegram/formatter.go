@@ -123,7 +123,7 @@ func (f *Formatter) FormatCalendarDay(dateStr string, events []domain.NewsEvent,
 
 		timeDisplay := e.Time
 		if !e.TimeWIB.IsZero() {
-			timeDisplay = e.TimeWIB.Format("15:04 WIB")
+			timeDisplay = fmtutil.UpdatedAtShort(e.TimeWIB)
 		}
 
 		b.WriteString(fmt.Sprintf("%s <b>%s - %s</b>\n", e.FormatImpactColor(), timeDisplay, e.Currency))
@@ -188,7 +188,7 @@ func (f *Formatter) FormatCalendarWeek(weekStart string, events []domain.NewsEve
 
 		timeDisplay := e.Time
 		if !e.TimeWIB.IsZero() {
-			timeDisplay = e.TimeWIB.Format("15:04 WIB")
+			timeDisplay = fmtutil.UpdatedAtShort(e.TimeWIB)
 		}
 
 		line := fmt.Sprintf("%s %s %s: <i>%s</i>", e.FormatImpactColor(), timeDisplay, e.Currency, e.Event)
@@ -234,7 +234,7 @@ func (f *Formatter) FormatCalendarMonth(monthLabel string, events []domain.NewsE
 
 		timeDisplay := e.Time
 		if !e.TimeWIB.IsZero() {
-			timeDisplay = e.TimeWIB.Format("15:04 WIB")
+			timeDisplay = fmtutil.UpdatedAtShort(e.TimeWIB)
 		}
 
 		line := fmt.Sprintf("%s %s %s: <i>%s</i>", e.FormatImpactColor(), timeDisplay, e.Currency, e.Event)
@@ -1130,7 +1130,7 @@ func (f *Formatter) FormatRanking(analyses []domain.COTAnalysis, date time.Time)
 	})
 
 	b.WriteString("🏆 <b>Currency Strength Ranking</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Week of %s | Based on COT Positioning</i>\n\n", date.Format("02 Jan 2006")))
+	b.WriteString(fmt.Sprintf("<i>Week of %s | Based on COT Positioning</i>\n\n", fmtutil.FormatDateWIB(date)))
 
 	medals := []string{"🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"}
 
@@ -1222,7 +1222,7 @@ func (f *Formatter) FormatRankingWithConviction(
 
 	var b strings.Builder
 	b.WriteString("🏆 <b>CURRENCY STRENGTH RANKING</b>\n")
-	b.WriteString(fmt.Sprintf("<i>COT + FRED Conviction — %s</i>\n", date.Format("02 Jan 2006")))
+	b.WriteString(fmt.Sprintf("<i>COT + FRED Conviction — %s</i>\n", fmtutil.FormatDateWIB(date)))
 
 	// Show regime context if available
 	if regime != nil {
@@ -1685,7 +1685,7 @@ func (f *Formatter) FormatMacroRegime(regime fred.MacroRegime, data *fred.MacroD
 	riskBar := buildRiskBar(regime.Score, 15)
 
 	b.WriteString("🏦 <b>MACRO REGIME DASHBOARD</b>\n")
-	b.WriteString(fmt.Sprintf("<i>FRED Data — Updated %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>FRED Data — Updated %s</i>\n\n", fmtutil.FormatDateTimeWIB(data.FetchedAt)))
 	b.WriteString(fmt.Sprintf("<b>REGIME: %s</b>  Risk: %d/100\n", regime.Name, regime.Score))
 	b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", riskBar))
 	b.WriteString(fmt.Sprintf("<code>Recession Risk: %s</code>\n\n", regime.RecessionRisk))
@@ -1870,7 +1870,7 @@ func (f *Formatter) FormatMacroComposites(composites *domain.MacroComposites, da
 
 	var b strings.Builder
 	b.WriteString("<b>📊 MACRO COMPOSITE SCORES</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Computed: %s</i>\n\n", composites.ComputedAt.Format("02 Jan 15:04 WIB")))
+	b.WriteString(fmt.Sprintf("<i>Computed: %s</i>\n\n", fmtutil.FormatDateTimeWIB(composites.ComputedAt)))
 
 	// Labor Health
 	laborIcon := compositeIcon(composites.LaborHealth, 60, 40)
@@ -2098,7 +2098,7 @@ func (f *Formatter) FormatMacroLabor(composites *domain.MacroComposites, data *f
 	var b strings.Builder
 
 	b.WriteString("👷 <b>LABOR MARKET DEEP DIVE</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Updated %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>Updated %s</i>\n\n", fmtutil.FormatDateTimeWIB(data.FetchedAt)))
 
 	// Health Index
 	healthEmoji := "🟢"
@@ -2198,7 +2198,7 @@ func (f *Formatter) FormatMacroInflation(composites *domain.MacroComposites, dat
 	var b strings.Builder
 
 	b.WriteString("🔥 <b>INFLATION DEEP DIVE</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Updated %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>Updated %s</i>\n\n", fmtutil.FormatDateTimeWIB(data.FetchedAt)))
 
 	// Momentum
 	momEmoji := "🟢"
@@ -2307,7 +2307,7 @@ func (f *Formatter) FormatMacroSummary(regime fred.MacroRegime, data *fred.Macro
 	riskBar := buildRiskBar(regime.Score, 15)
 
 	b.WriteString("🏦 <b>MACRO SNAPSHOT</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Data per %s WIB</i>\n\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>Data per %s</i>\n\n", fmtutil.FormatDateTimeWIB(data.FetchedAt)))
 
 	// --- Section 1: Plain-language status ---
 	b.WriteString(macroStatusLine("Ekonomi", macroEconomyLabel(regime, data)))
@@ -2926,10 +2926,10 @@ func (f *Formatter) FormatWalkForward(result *backtestsvc.WalkForwardResult) str
 	for i, w := range result.Windows {
 		b.WriteString(fmt.Sprintf("<code>%d:</code> %s \xe2\x86\x92 %s | %s \xe2\x86\x92 %s\n",
 			i+1,
-			w.TrainStart.Format("02 Jan"),
-			w.TrainEnd.Format("02 Jan"),
-			w.TestStart.Format("02 Jan"),
-			w.TestEnd.Format("02 Jan")))
+			fmtutil.FormatDateShortWIB(w.TrainStart),
+			fmtutil.FormatDateShortWIB(w.TrainEnd),
+			fmtutil.FormatDateShortWIB(w.TestStart),
+			fmtutil.FormatDateShortWIB(w.TestEnd)))
 	}
 
 	b.WriteString("\n")
@@ -3350,8 +3350,8 @@ func (f *Formatter) FormatWeeklyReport(r *domain.WeeklyReport) string {
 
 	b.WriteString("📋 <b>Weekly Performance Report</b>\n")
 	b.WriteString(fmt.Sprintf("<i>%s \xe2\x80\x94 %s</i>\n\n",
-		r.WeekStart.Format("02 Jan"),
-		r.WeekEnd.Format("02 Jan 2006"),
+		fmtutil.FormatDateShortWIB(r.WeekStart),
+		fmtutil.FormatDateWIB(r.WeekEnd),
 	))
 
 	if len(r.Signals) == 0 {
@@ -3628,7 +3628,7 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 	var b strings.Builder
 
 	b.WriteString("🧠 <b>SENTIMENT SURVEY DASHBOARD</b>\n")
-	b.WriteString(fmt.Sprintf("<i>Updated %s WIB</i>\n", data.FetchedAt.Format("02 Jan 15:04")))
+	b.WriteString(fmt.Sprintf("<i>Updated %s</i>\n", fmtutil.FormatDateTimeWIB(data.FetchedAt)))
 
 	// --- CNN Fear & Greed Index ---
 	b.WriteString("\n<b>CNN Fear &amp; Greed Index</b>\n")
