@@ -56,6 +56,8 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 		prefs.COTAlertsEnabled = !prefs.COTAlertsEnabled
 	case "ai_toggle":
 		prefs.AIReportsEnabled = !prefs.AIReportsEnabled
+	case "mobile_toggle":
+		prefs.MobileMode = !prefs.MobileMode
 	case "model_claude":
 		prefs.PreferredModel = "claude"
 	case "model_gemini":

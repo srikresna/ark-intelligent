@@ -478,7 +478,17 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:output_mode_toggle",
 	}})
 
-	// Row 12: View Changelog
+	// Row 12: Mobile sparkline mode toggle
+	mobileLabel := "📱 Mobile Mode: OFF → Turn ON"
+	if prefs.MobileMode {
+		mobileLabel = "📱 Mobile Mode: ON → Turn OFF"
+	}
+	rows = append(rows, []ports.InlineButton{{
+		Text:         mobileLabel,
+		CallbackData: "set:mobile_toggle",
+	}})
+
+	// Row 13: View Changelog
 	rows = append(rows, []ports.InlineButton{{
 		Text:         "📜 View Changelog",
 		CallbackData: "set:changelog_view",

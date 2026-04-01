@@ -102,6 +102,10 @@ type UserPrefs struct {
 	// ExperienceLevel: user's self-reported trading experience.
 	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).
 	ExperienceLevel string `json:"experience_level,omitempty"`
+
+	// MobileMode collapses wide tables into sparkline + one-liner summaries.
+	// Optimised for narrow screens (320px mobile).
+	MobileMode bool `json:"mobile_mode,omitempty"`
 }
 
 // DefaultPrefs returns the default user preferences.
