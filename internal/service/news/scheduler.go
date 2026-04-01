@@ -65,6 +65,10 @@ type Scheduler struct {
 	// impactRecorder captures price impact after event releases.
 	// May be nil — impact recording disabled if price data unavailable.
 	impactRecorder *ImpactRecorder
+
+	// latestFedSpeeches caches the most recent Fed speeches for AI context.
+	latestFedMu      sync.RWMutex
+	latestFedSpeeches []FedSpeech
 }
 
 // NewScheduler creates a new background scheduler.
@@ -126,6 +130,9 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 	// 4. Pre-Event Reminder (Evaluated every minute — sends alerts X mins before event)
 	saferun.Go(ctx, "news-pre-event-reminder", schedLog, func() { s.runPreEventReminderLoop(ctx) })
+
+	// 5. Fed Speeches & FOMC Press RSS Monitor (every 30 minutes)
+	saferun.Go(ctx, "fed-rss-monitor", schedLog, func() { s.runFedRSSLoop(ctx) })
 }
 
 // ---------------------------------------------------------------------------
