@@ -213,6 +213,7 @@ func NewHandler(
 	bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
 	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
+	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
