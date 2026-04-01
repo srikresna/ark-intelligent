@@ -46,6 +46,9 @@ const (
 	btnPrevMonth  = "◀ Bulan Lalu"
 	btnNextMonth  = "Bulan Depan ▶"
 
+	// Calendar
+	btnThisMonth = "Bulan Ini"
+
 	// Actions
 	btnRefresh = "🔄 Refresh"
 	btnClose   = "✖ Tutup"
@@ -164,7 +167,7 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 	// Row 5: Month navigation
 	rows = append(rows, []ports.InlineButton{
 		{Text: btnPrevMonth, CallbackData: "cal:nav:prevmonth:" + dateStr},
-		{Text: "This Month", CallbackData: "cal:nav:thismonth:" + dateStr},
+		{Text: btnThisMonth, CallbackData: "cal:nav:thismonth:" + dateStr},
 		{Text: btnNextMonth, CallbackData: "cal:nav:nextmonth:" + dateStr},
 	})
 
@@ -238,7 +241,8 @@ func (kb *KeyboardBuilder) MacroDrillDownMenu() ports.InlineKeyboard {
 			},
 			{
 				{Text: "🧮 Composites", CallbackData: "macro:composites"},
-				{Text: "<< Ringkasan", CallbackData: "macro:summary"},
+				{Text: btnBack, CallbackData: "macro:summary"},
+				{Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -712,8 +716,9 @@ func (kb *KeyboardBuilder) SeasonalDetailMenu(currency string) ports.InlineKeybo
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Grid Overview", CallbackData: "cmd:seasonal"},
+				{Text: btnBack, CallbackData: "cmd:seasonal"},
 				{Text: "💹 Price", CallbackData: fmt.Sprintf("cmd:price:%s", currency)},
+				{Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1147,7 +1152,7 @@ func (kb *KeyboardBuilder) HelpSubMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "◀ Kembali ke Menu Help", CallbackData: "help:back"},
+				{Text: btnBack, CallbackData: "help:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}

@@ -135,6 +135,7 @@ type IndicatorSnapshot struct {
 	SuperTrend *SuperTrendResult  // nil if insufficient data
 	Fibonacci  *FibResult         // nil if insufficient data
 	Killzone   *KillzoneResult    // current ICT killzone classification (always populated)
+	VWAP       *VWAPSet           // anchored VWAP (daily, weekly, swing anchors) — nil if insufficient volume data
 }
 
 // TASignal represents a normalized signal from one indicator.

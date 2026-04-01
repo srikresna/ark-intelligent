@@ -87,6 +87,11 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	kz := ClassifyKillzone(time.Now())
 	snap.Killzone = &kz
 
+
+	// VWAP: anchored volume-weighted average price (needs volume data)
+	if hasVolume(bars) {
+		snap.VWAP = CalcVWAPSet(bars)
+	}
 	return snap
 }
 

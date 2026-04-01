@@ -3,6 +3,7 @@
 // Currently supported:
 //   - CNN Fear & Greed Index (daily, 0-100 scale)
 //   - AAII Investor Sentiment Survey (weekly, bull/bear/neutral % via Firecrawl)
+//   - VIX Term Structure (CBOE CSV — contango/backwardation regime, daily)
 //
 // CNN uses a public JSON endpoint. AAII is behind Imperva bot protection and
 // requires Firecrawl API to scrape. If FIRECRAWL_API_KEY is not set, AAII is
@@ -24,6 +25,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/internal/service/vix"
 )
 
 var log = logger.Component("sentiment")
@@ -36,6 +38,8 @@ type SentimentFetcher struct {
 	cbAAII     *circuitbreaker.Breaker
 	cbCBOE     *circuitbreaker.Breaker
 	cbCrypto   *circuitbreaker.Breaker
+	cbVIX      *circuitbreaker.Breaker
+	vixCache   *vix.Cache
 }
 
 // NewSentimentFetcher creates a SentimentFetcher with per-source circuit breakers.
@@ -47,6 +51,8 @@ func NewSentimentFetcher() *SentimentFetcher {
 		cbAAII:     circuitbreaker.New("sentiment-aaii", 3, 5*time.Minute),
 		cbCBOE:     circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
 		cbCrypto:   circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
+		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
+		vixCache:   vix.NewCache(),
 	}
 }
 
@@ -106,6 +112,28 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		return nil
 	}); err != nil {
 		log.Debug().Str("source", "crypto-fg").Err(err).Msg("sentiment: crypto F&G circuit breaker rejected or source unavailable")
+	}
+
+	// VIX Term Structure (CBOE CSV — no API key) — wrapped in circuit breaker
+	if err := f.cbVIX.Execute(func() error {
+		ts, vixErr := f.vixCache.Get(ctx)
+		if vixErr != nil {
+			return vixErr
+		}
+		if ts == nil || !ts.Available {
+			return fmt.Errorf("VIX term structure unavailable")
+		}
+		data.VIXSpot = ts.Spot
+		data.VIXM1 = ts.M1
+		data.VIXM2 = ts.M2
+		data.VVIX = ts.VVIX
+		data.VIXContango = ts.Contango
+		data.VIXSlopePct = ts.SlopePct
+		data.VIXRegime = ts.Regime
+		data.VIXAvailable = true
+		return nil
+	}); err != nil {
+		log.Debug().Str("source", "vix").Err(err).Msg("sentiment: VIX circuit breaker rejected or source unavailable")
 	}
 
 	return data, nil

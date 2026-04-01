@@ -12,6 +12,7 @@ import (
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -34,6 +35,7 @@ type UnifiedOutlookData struct {
 	WorldBankData      *worldbank.WorldBankData
 	BISData            *bis.BISData
 	DeFiLlamaTVL       *defillama.TVLSummary
+	IMFData            *imf.IMFWEOData
 	Language           string
 }
 
@@ -403,6 +405,50 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		}
 	}
 
+
+	// -----------------------------------------------------------------------
+	// Section: IMF WEO Forecasts (Forward-Looking)
+	// -----------------------------------------------------------------------
+	if data.IMFData != nil && data.IMFData.Available {
+		available := make([]imf.IMFCountryData, 0, len(data.IMFData.Countries))
+		for _, c := range data.IMFData.Countries {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. IMF WEO FORECASTS (Forward-Looking) ===\n", section))
+			section++
+			yr := available[0].ForecastYear
+			b.WriteString(fmt.Sprintf("%-6s  %6s  %6s  %8s  %8s\n",
+				"CCY", fmt.Sprintf("GDP%d", yr), fmt.Sprintf("GDP%d", yr+1), fmt.Sprintf("CPI%d", yr), fmt.Sprintf("CA%%GDP")))
+			b.WriteString(strings.Repeat("-", 40) + "\n")
+			var highGDP, lowGDP string
+			var highV, lowV float64
+			first := true
+			for _, c := range available {
+				b.WriteString(fmt.Sprintf("%-6s  %+6.2f  %+6.2f  %+8.2f  %+8.2f\n",
+					c.Currency, c.GDPGrowth, c.GDPGrowthNext, c.Inflation, c.CurrentAccount))
+				if first || c.GDPGrowth > highV {
+					highV = c.GDPGrowth
+					highGDP = c.Currency
+				}
+				if first || c.GDPGrowth < lowV {
+					lowV = c.GDPGrowth
+					lowGDP = c.Currency
+				}
+				first = false
+			}
+			b.WriteString(fmt.Sprintf("→ Highest growth: %s (%+.1f%%) | Lowest: %s (%+.1f%%)\n",
+				highGDP, highV, lowGDP, lowV))
+			b.WriteString("\n")
+			b.WriteString("NOTE: IMF forecasts reflect forward expectations, not historical outcomes.\n")
+			b.WriteString("  - Higher GDP forecast → structural tailwind for currency\n")
+			b.WriteString("  - Higher CPI forecast → potential for hawkish central bank policy\n")
+			b.WriteString("  - CA surplus → net capital inflow, currency demand\n")
+			b.WriteString("\n")
+		}
+	}
 	// -----------------------------------------------------------------------
 	// Section 11: Currency Valuation — BIS REER/NEER
 	// -----------------------------------------------------------------------
