@@ -263,10 +263,18 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	}
 
 	html := h.fmt.FormatWeeklyOutlook(result, now)
+	kb := h.kb.RelatedCommandsKeyboard("outlook", "")
 	if editMsgID > 0 {
+		if len(kb.Rows) > 0 {
+			return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
+		}
 		return h.bot.EditMessage(ctx, chatID, editMsgID, html)
 	}
 	_ = h.bot.DeleteMessage(ctx, chatID, placeholderID)
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	if len(kb.Rows) > 0 {
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	} else {
+		_, err = h.bot.SendHTML(ctx, chatID, html)
+	}
 	return err
 }
