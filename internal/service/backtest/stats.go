@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
@@ -149,7 +150,7 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 
 		// Strength breakdown (only count evaluated signals, exclude EXPIRED)
 		if s.Outcome1W != "" && s.Outcome1W != domain.OutcomePending && s.Outcome1W != domain.OutcomeExpired {
-			if s.Strength >= 4 {
+			if s.Strength >= config.SignalStrengthAlert {
 				highTotal++
 				if s.Outcome1W == domain.OutcomeWin {
 					highStrengthWins++

@@ -14,6 +14,7 @@ import (
 
 	"context"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 )
 
@@ -61,7 +62,7 @@ func (b *Bot) SendHTML(ctx context.Context, chatID string, html string) (int, er
 
 	b.rateLimit()
 
-	chunks := splitMessage(html, 4096)
+	chunks := splitMessage(html, config.TelegramMaxMessageLen)
 	var lastMsgID int
 
 	for _, chunk := range chunks {
@@ -115,7 +116,7 @@ func (b *Bot) EditMessage(ctx context.Context, chatID string, msgID int, text st
 		chatID = b.defaultID
 	}
 
-	chunks := splitMessage(text, 4096)
+	chunks := splitMessage(text, config.TelegramMaxMessageLen)
 
 	// Edit the original message with the first chunk.
 	params := map[string]any{
@@ -508,8 +509,8 @@ func (b *Bot) rateLimit() {
 	defer b.sendMu.Unlock()
 
 	sinceLastSend := time.Since(b.lastSend)
-	if sinceLastSend < 35*time.Millisecond {
-		time.Sleep(35*time.Millisecond - sinceLastSend)
+	if sinceLastSend < config.TelegramRateLimitDelay {
+		time.Sleep(config.TelegramRateLimitDelay - sinceLastSend)
 	}
 	b.lastSend = time.Now()
 }

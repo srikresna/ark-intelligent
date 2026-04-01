@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
@@ -172,7 +173,7 @@ func (f *Fetcher) FetchAllHistory(ctx context.Context, contracts []domain.COTCon
 		}
 		allRecords = append(allRecords, history...)
 		// Stagger requests to avoid Socrata rate limits
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(config.COTFetchDelay)
 	}
 	return allRecords, nil
 }

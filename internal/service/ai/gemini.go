@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -41,7 +42,7 @@ func NewGeminiClient(ctx context.Context, apiKey string, modelName string, maxRP
 	model.SetTemperature(0.3) // low creativity, high precision
 	model.SetTopP(0.8)
 	model.SetTopK(40)
-	model.SetMaxOutputTokens(4096)
+	model.SetMaxOutputTokens(int32(config.AIDefaultMaxTokens))
 
 	// Safety settings: allow financial discussion
 	model.SafetySettings = []*genai.SafetySetting{
@@ -115,7 +116,7 @@ func (gc *GeminiClient) GenerateWithSystem(ctx context.Context, systemPrompt, us
 	model.SetTemperature(0.3)
 	model.SetTopP(0.8)
 	model.SetTopK(40)
-	model.SetMaxOutputTokens(4096)
+	model.SetMaxOutputTokens(int32(config.AIDefaultMaxTokens))
 	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
 
 	var lastErr error

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
@@ -238,7 +239,7 @@ func (ca *ClaudeAnalyzer) GenerateUnifiedOutlook(ctx context.Context, data Unifi
 		Messages: []ports.ChatMessage{
 			{Role: "user", Content: prompt + "\n\nIMPORTANT: Analyze ALL the data above thoroughly. Do NOT use web tools yet — focus on the data provided. Provide your full analysis including all 6 sections requested."},
 		},
-		MaxTokens: 4096,
+		MaxTokens: config.AIDefaultMaxTokens,
 	}
 
 	phase1Resp, err := ca.claude.Chat(ctx, phase1Req)
