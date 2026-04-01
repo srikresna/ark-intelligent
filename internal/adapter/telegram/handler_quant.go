@@ -4,6 +4,7 @@ package telegram
 //   /quant [SYMBOL] [TIMEFRAME]  — Quant dashboard with inline keyboard
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,7 +43,7 @@ type quantState struct {
 	createdAt time.Time
 }
 
-const quantStateTTL = 30 * time.Minute
+var quantStateTTL = config.QuantStateTTL
 
 // ---------------------------------------------------------------------------
 // quantStateCache
@@ -149,7 +150,7 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		return err
 	}
 
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
 
 	state, err := h.computeQuantState(ctx, mapping, timeframe)
 	if err != nil {

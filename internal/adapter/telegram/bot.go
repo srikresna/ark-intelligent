@@ -582,6 +582,28 @@ func (b *Bot) DeleteMessage(ctx context.Context, chatID string, msgID int) error
 	return b.apiCallNoResult(ctx, "deleteMessage", params)
 }
 
+// SendTyping sends a "typing" chat action indicator. This shows the user that
+// the bot is processing their request. The indicator automatically expires
+// after ~5 seconds.
+func (b *Bot) SendTyping(ctx context.Context, chatID string) {
+	if chatID == "" {
+		chatID = b.defaultID
+	}
+	params := map[string]interface{}{
+		"action": "typing",
+	}
+	b.setChatID(params, chatID)
+	_ = b.apiCallNoResult(ctx, "sendChatAction", params)
+}
+
+// SendLoading sends a loading message and returns the message ID so it can be
+// edited later with the final result. This provides immediate feedback for
+// commands that take >2 seconds.
+func (b *Bot) SendLoading(ctx context.Context, chatID string, text string) (int, error) {
+	b.SendTyping(ctx, chatID)
+	return b.SendHTML(ctx, chatID, text)
+}
+
 // ---------------------------------------------------------------------------
 // Photo Sending (for chart images)
 // ---------------------------------------------------------------------------

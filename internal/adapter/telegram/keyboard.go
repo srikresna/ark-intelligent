@@ -17,11 +17,46 @@ import (
 //   - "cot:XXX"   -> COT detail for currency/contract
 //   - "set:XXX"   -> Settings toggle action
 //   - "alert:XXX" -> Alert action (mute, dismiss)
+// Standardized button label constants.
+const (
+	btnExpand  = "📖 Detail Lengkap"
+	btnCompact = "📊 Compact"
+)
+
 type KeyboardBuilder struct{}
 
 // NewKeyboardBuilder creates a new KeyboardBuilder.
 func NewKeyboardBuilder() *KeyboardBuilder {
 	return &KeyboardBuilder{}
+}
+
+
+// ---------------------------------------------------------------------------
+// Standardized Button Labels
+// ---------------------------------------------------------------------------
+
+const (
+	// Navigation
+	btnBack       = "◀ Kembali"
+	btnHome       = "🏠 Menu Utama"
+	btnPrevDay    = "◀ Kemarin"
+	btnNextDay    = "Besok ▶"
+	btnPrevWeek   = "◀ Minggu Lalu"
+	btnNextWeek   = "Minggu Depan ▶"
+	btnPrevMonth  = "◀ Bulan Lalu"
+	btnNextMonth  = "Bulan Depan ▶"
+
+	// Actions
+	btnRefresh = "🔄 Refresh"
+	btnClose   = "✖ Tutup"
+)
+
+
+// HomeRow returns a single-row keyboard with the home button.
+func (kb *KeyboardBuilder) HomeRow() []ports.InlineButton {
+	return []ports.InlineButton{
+		{Text: btnHome, CallbackData: "nav:home"},
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -91,15 +126,15 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 	// Row 1: Navigation
 	if isWeek {
 		rows = append(rows, []ports.InlineButton{
-			{Text: "◀ Prev Week", CallbackData: "cal:nav:prevwk:" + dateStr},
+			{Text: btnPrevWeek, CallbackData: "cal:nav:prevwk:" + dateStr},
 			{Text: "Harian", CallbackData: "cal:nav:day:" + dateStr},
-			{Text: "Next Week ▶", CallbackData: "cal:nav:nextwk:" + dateStr},
+			{Text: btnNextWeek, CallbackData: "cal:nav:nextwk:" + dateStr},
 		})
 	} else {
 		rows = append(rows, []ports.InlineButton{
-			{Text: "◀ Kemarin", CallbackData: "cal:nav:prev:" + dateStr},
+			{Text: btnPrevDay, CallbackData: "cal:nav:prev:" + dateStr},
 			{Text: "Seminggu", CallbackData: "cal:nav:week:" + dateStr},
-			{Text: "Besok ▶", CallbackData: "cal:nav:next:" + dateStr},
+			{Text: btnNextDay, CallbackData: "cal:nav:next:" + dateStr},
 		})
 	}
 
@@ -128,9 +163,9 @@ func (kb *KeyboardBuilder) CalendarFilter(activeFilter string, dateStr string, i
 
 	// Row 5: Month navigation
 	rows = append(rows, []ports.InlineButton{
-		{Text: "◀ Prev Month", CallbackData: "cal:nav:prevmonth:" + dateStr},
+		{Text: btnPrevMonth, CallbackData: "cal:nav:prevmonth:" + dateStr},
 		{Text: "This Month", CallbackData: "cal:nav:thismonth:" + dateStr},
-		{Text: "Next Month ▶", CallbackData: "cal:nav:nextmonth:" + dateStr},
+		{Text: btnNextMonth, CallbackData: "cal:nav:nextmonth:" + dateStr},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -187,7 +222,7 @@ func (kb *KeyboardBuilder) MacroDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Kembali ke Ringkasan", CallbackData: "macro:summary"},
+				{Text: btnBack, CallbackData: "macro:summary"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -440,7 +475,7 @@ func (kb *KeyboardBuilder) COTDetailMenu(code string, isRaw bool) ports.InlineKe
 	})
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: "<< Back to Overview", CallbackData: "cot:overview"},
+		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -535,7 +570,7 @@ func (kb *KeyboardBuilder) ImpactEventMenu(category string) ports.InlineKeyboard
 	}
 	// Add back button
 	rows = append(rows, []ports.InlineButton{
-		{Text: "<< Back to Categories", CallbackData: "imp:back"},
+		{Text: btnBack, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -546,7 +581,7 @@ func (kb *KeyboardBuilder) ImpactBackMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Back to Categories", CallbackData: "imp:back"},
+				{Text: btnBack, CallbackData: "imp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -717,7 +752,7 @@ func (kb *KeyboardBuilder) COTDetailMenuWithBias(code string, isRaw bool, signal
 	})
 
 	rows = append(rows, []ports.InlineButton{
-		{Text: "<< Back to Overview", CallbackData: "cot:overview"},
+		{Text: btnBack, CallbackData: "cot:overview"}, {Text: btnHome, CallbackData: "nav:home"},
 	})
 
 	return ports.InlineKeyboard{Rows: rows}
@@ -780,7 +815,7 @@ func (kb *KeyboardBuilder) AlphaDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Kembali ke Ringkasan", CallbackData: "alpha:back"},
+				{Text: btnBack, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -798,7 +833,7 @@ func (kb *KeyboardBuilder) AlphaCryptoDetailMenu() ports.InlineKeyboard {
 				{Text: "🔶 BNB", CallbackData: "alpha:crypto:BNB"},
 			},
 			{
-				{Text: "<< Kembali ke Ringkasan", CallbackData: "alpha:back"},
+				{Text: btnBack, CallbackData: "alpha:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -845,7 +880,7 @@ func (kb *KeyboardBuilder) CTADetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Kembali ke Ringkasan", CallbackData: "cta:back"},
+				{Text: btnBack, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -867,7 +902,7 @@ func (kb *KeyboardBuilder) CTATimeframeMenu() ports.InlineKeyboard {
 				{Text: "📊 Daily", CallbackData: "cta:tf:daily"},
 			},
 			{
-				{Text: "<< Kembali ke Ringkasan", CallbackData: "cta:back"},
+				{Text: btnBack, CallbackData: "cta:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1003,7 +1038,7 @@ func (kb *KeyboardBuilder) QuantDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Kembali ke Dashboard", CallbackData: "quant:back"},
+				{Text: btnBack, CallbackData: "quant:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1054,7 +1089,7 @@ func (kb *KeyboardBuilder) VPDetailMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "<< Kembali ke Dashboard", CallbackData: "vp:back"},
+				{Text: btnBack, CallbackData: "vp:back"}, {Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
@@ -1166,5 +1201,88 @@ func (kb *KeyboardBuilder) buildSymbolMenu(prefix string) ports.InlineKeyboard {
 				{Text: "XAU/GBP", CallbackData: p("XAUGBP")},
 			},
 		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding — Role Selector + Starter Kits
+// ---------------------------------------------------------------------------
+
+// OnboardingRoleMenu builds the experience-level selector for new users.
+func (kb *KeyboardBuilder) OnboardingRoleMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "🌱 Pemula", CallbackData: "onboard:beginner"},
+			},
+			{
+				{Text: "📈 Intermediate", CallbackData: "onboard:intermediate"},
+			},
+			{
+				{Text: "🏛 Pro / Institutional", CallbackData: "onboard:pro"},
+			},
+		},
+	}
+}
+
+// StarterKitMenu returns a role-appropriate starter keyboard.
+func (kb *KeyboardBuilder) StarterKitMenu(level string) ports.InlineKeyboard {
+	switch level {
+	case "beginner":
+		return ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{
+				{
+					{Text: "📊 COT (Posisi Big Player)", CallbackData: "nav:cot"},
+					{Text: "📅 Kalender Ekonomi", CallbackData: "cmd:calendar"},
+				},
+				{
+					{Text: "💹 Cek Harga", CallbackData: "cmd:price"},
+					{Text: "📈 Ranking Mata Uang", CallbackData: "cmd:rank"},
+				},
+				{
+					{Text: "📖 Lihat Semua Command", CallbackData: "onboard:showhelp"},
+				},
+			},
+		}
+	case "intermediate":
+		return ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{
+				{
+					{Text: "📊 COT Analysis", CallbackData: "nav:cot"},
+					{Text: "🦅 AI Outlook", CallbackData: "out:unified"},
+				},
+				{
+					{Text: "📉 CTA Dashboard", CallbackData: "cmd:cta"},
+					{Text: "🔬 Quant Analysis", CallbackData: "cmd:quant"},
+				},
+				{
+					{Text: "🏦 Macro Regime", CallbackData: "cmd:macro"},
+					{Text: "📊 Bias", CallbackData: "cmd:bias"},
+				},
+				{
+					{Text: "📖 Lihat Semua Command", CallbackData: "onboard:showhelp"},
+				},
+			},
+		}
+	default: // pro
+		return ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{
+				{
+					{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
+					{Text: "🦅 AI Outlook", CallbackData: "out:unified"},
+				},
+				{
+					{Text: "📊 Volume Profile", CallbackData: "cmd:vp"},
+					{Text: "🔬 Quant", CallbackData: "cmd:quant"},
+				},
+				{
+					{Text: "📉 CTA + Backtest", CallbackData: "cmd:cta"},
+					{Text: "🏦 Macro", CallbackData: "cmd:macro"},
+				},
+				{
+					{Text: "📖 Lihat Semua Command", CallbackData: "onboard:showhelp"},
+				},
+			},
+		}
 	}
 }

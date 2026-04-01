@@ -10,6 +10,7 @@ package telegram
 //   /cryptoalpha — Bybit microstructure confirmation for top crypto signals
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"fmt"
 	"html"
@@ -60,7 +61,7 @@ type alphaState struct {
 	computedAt time.Time
 }
 
-const alphaStateTTL = 60 * time.Second
+var alphaStateTTL = config.AlphaStateTTL
 
 // alphaStateCache stores per-chat alpha state with TTL.
 type alphaStateCache struct {
@@ -181,10 +182,19 @@ func (h *Handler) cmdAlpha(ctx context.Context, chatID string, _ int64, _ string
 		return err
 	}
 
+	loadID, _ := h.bot.SendLoading(ctx, chatID, "⚡ Menghitung Alpha Engine... ⏳")
+
 	state, err := h.computeAlphaState(ctx)
 	if err != nil {
+		if loadID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadID)
+		}
 		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
+	}
+
+	if loadID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadID)
 	}
 
 	h.alphaCache.set(chatID, state)

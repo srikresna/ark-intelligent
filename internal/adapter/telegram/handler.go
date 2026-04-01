@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"errors"
 	"fmt"
@@ -206,8 +207,10 @@ func NewHandler(
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
+	bot.RegisterCallback("onboard:", h.cbOnboard)
 	bot.RegisterCallback("macro:", h.cbMacro)
 	bot.RegisterCallback("imp:", h.cbImpact)
+	bot.RegisterCallback("nav:", h.cbNav)
 
 	log.Info().Int("commands", 37).Int("callbacks", 9).Msg("registered commands and callback prefixes")
 	return h
@@ -225,7 +228,103 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 		_ = h.prefsRepo.Set(ctx, userID, prefs)
 	}
 
-	return h.sendHelp(ctx, chatID, userID)
+	// If user already has experience level set, show normal help.
+	if prefs.ExperienceLevel != "" {
+		return h.sendHelp(ctx, chatID, userID)
+	}
+
+	// New user → interactive onboarding with role selector.
+	welcome := `🦅 <b>Selamat datang di ARK Intelligence!</b>
+<i>Institutional Flow &amp; Macro Analytics</i>
+
+Sebelum mulai, pilih level pengalaman trading kamu:
+
+🌱 <b>Pemula</b> — Baru mulai trading, ingin belajar dasar
+📈 <b>Intermediate</b> — Sudah trading aktif, ingin tools analisis
+🏛 <b>Pro</b> — Trader berpengalaman, butuh data institusional`
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, welcome, h.kb.OnboardingRoleMenu())
+	return err
+}
+
+// cbOnboard handles the onboarding flow callbacks (role selection + tutorial).
+func (h *Handler) cbOnboard(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "onboard:")
+
+	// "showhelp" → show full help menu
+	if action == "showhelp" {
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		return h.sendHelp(ctx, chatID, userID)
+	}
+
+	// Role selection: beginner / intermediate / pro
+	level := action
+	if level != "beginner" && level != "intermediate" && level != "pro" {
+		return nil
+	}
+
+	// Persist experience level
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	prefs.ExperienceLevel = level
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+
+	// Delete the role selector message
+	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+
+	// Send tutorial steps based on level
+	var tutorial string
+	switch level {
+	case "beginner":
+		tutorial = `✅ <b>Level: Pemula</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ Cek COT Data</b>
+Ketik <code>/cot EUR</code> — lihat posisi big player di Euro
+
+<b>2️⃣ Cek Kalender</b>
+Ketik <code>/calendar</code> — jadwal rilis data ekonomi
+
+<b>3️⃣ Cek Harga</b>
+Ketik <code>/price EUR</code> — harga terkini + perubahan
+
+Ini menu kamu — klik untuk mulai:`
+
+	case "intermediate":
+		tutorial = `✅ <b>Level: Intermediate</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ CTA Dashboard</b>
+Ketik <code>/cta EUR</code> — analisis teknikal lengkap dengan chart
+
+<b>2️⃣ AI Outlook</b>
+Ketik <code>/outlook</code> — analisis gabungan AI (data + sentiment + web)
+
+<b>3️⃣ Macro Regime</b>
+Ketik <code>/macro</code> — kondisi makro ekonomi global + dampak ke trading
+
+Ini menu kamu — klik untuk mulai:`
+
+	case "pro":
+		tutorial = `✅ <b>Level: Pro / Institutional</b>
+
+<b>🎓 3 Langkah Memulai:</b>
+
+<b>1️⃣ Alpha Engine</b>
+Ketik <code>/alpha</code> — factor ranking + playbook + risk dashboard
+
+<b>2️⃣ Volume Profile</b>
+Ketik <code>/vp EUR</code> — 10 mode VP termasuk AMT institutional-grade
+
+<b>3️⃣ Quant Analysis</b>
+Ketik <code>/quant EUR</code> — 12 model econometric (GARCH, regime, PCA, dll)
+
+Ini menu kamu — klik untuk mulai:`
+	}
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, tutorial, h.kb.StarterKitMenu(level))
+	return err
 }
 
 func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {
@@ -646,7 +745,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		_ = h.bot.EditMessage(ctx, chatID, editMsgID, "Generating unified intelligence report... ⏳\n(collecting all data sources + web search)")
 		placeholderID = editMsgID
 	} else {
-		placeholderID, _ = h.bot.SendHTML(ctx, chatID, "Generating unified intelligence report... ⏳\n(collecting all data sources + web search)")
+		placeholderID, _ = h.bot.SendLoading(ctx, chatID, "Generating unified intelligence report... ⏳\n(collecting all data sources + web search)")
 	}
 
 	now := timeutil.NowWIB()
@@ -1048,7 +1147,7 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 // ---------------------------------------------------------------------------
 
 // aiCooldownDuration is the minimum interval between AI-heavy commands per user.
-const aiCooldownDuration = 30 * time.Second
+var aiCooldownDuration = config.AICooldownDefault
 
 // checkAICooldown returns true if the user is allowed to make an AI call,
 // and records the current time. Returns false if the user is still in cooldown.
@@ -1370,6 +1469,126 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 
 // handleMonthNav handles prevmonth / thismonth / nextmonth navigation.
 // dateStr is the reference date from the callback (e.g. "20260301") to compute relative months.
+
+// cbNav handles navigation callbacks (e.g. home button).
+func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "nav:")
+	switch action {
+	case "home":
+		// Delete the current message and show the main menu
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		return h.cmdStart(ctx, chatID, userID, "")
+	default:
+		return nil
+	}
+}
+
+// cbViewToggle handles compact/full view toggle callbacks.
+// Callback data format: "view:<action>:<command>"
+func (h *Handler) cbViewToggle(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	parts := strings.SplitN(strings.TrimPrefix(data, "view:"), ":", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	action, command := parts[0], parts[1]
+
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+
+	switch action {
+	case "full":
+		prefs.OutputMode = domain.OutputFull
+	case "compact":
+		prefs.OutputMode = domain.OutputCompact
+	default:
+		return nil
+	}
+
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+
+	switch command {
+	case "cot":
+		return h.renderCOTOverview(ctx, chatID, userID, msgID)
+	case "macro":
+		return h.renderMacroSummary(ctx, chatID, userID, msgID)
+	default:
+		return nil
+	}
+}
+
+// renderCOTOverview renders COT overview in compact or full mode based on prefs.
+func (h *Handler) renderCOTOverview(ctx context.Context, chatID string, userID int64, editMsgID int) error {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil || len(analyses) == 0 {
+		return nil
+	}
+
+	// Build convictions (best-effort)
+	var convictions []cot.ConvictionScore
+	macroData, fredErr := fred.GetCachedOrFetch(ctx)
+	if fredErr == nil && macroData != nil {
+		composites := fred.ComputeComposites(macroData)
+		regime := fred.ClassifyMacroRegime(macroData, composites)
+		for _, a := range analyses {
+			cs := cot.ComputeConvictionScoreV3(a, regime, 0, "", macroData, nil)
+			convictions = append(convictions, cs)
+		}
+	}
+
+	var htmlOut string
+	var toggleBtn ports.InlineButton
+	if prefs.OutputMode == domain.OutputFull {
+		htmlOut = h.fmt.FormatCOTOverview(analyses, convictions)
+		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:cot"}
+	} else {
+		htmlOut = h.fmt.FormatCOTOverviewCompact(analyses, convictions)
+		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:cot"}
+	}
+
+	kb := h.kb.COTCurrencySelector(analyses)
+	toggleRow := []ports.InlineButton{toggleBtn}
+	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+
+	if editMsgID > 0 {
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
+	}
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, htmlOut, kb)
+	return err
+}
+
+// renderMacroSummary renders macro dashboard in compact or full mode.
+func (h *Handler) renderMacroSummary(ctx context.Context, chatID string, userID int64, editMsgID int) error {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+
+	data, err := fred.GetCachedOrFetch(ctx)
+	if err != nil || data == nil {
+		return nil
+	}
+	composites := fred.ComputeComposites(data)
+	regime := fred.ClassifyMacroRegime(data, composites)
+
+	var htmlOut string
+	var toggleBtn ports.InlineButton
+	if prefs.OutputMode == domain.OutputFull {
+		implications := fred.DeriveTradingImplications(regime, data)
+		htmlOut = h.fmt.FormatMacroSummary(regime, data, implications)
+		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:macro"}
+	} else {
+		htmlOut = h.fmt.FormatMacroSummaryCompact(regime, data)
+		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:macro"}
+	}
+
+	kb := h.kb.MacroMenu(false)
+	toggleRow := []ports.InlineButton{toggleBtn}
+	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+
+	if editMsgID > 0 {
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
+	}
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, htmlOut, kb)
+	return err
+}
+
 func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, navType, dateStr string) error {
 	// Parse the reference date from the callback; fall back to "now" if invalid.
 	// BUG #6 FIX: parse with WIB timezone for consistency with month boundary in WIB.
@@ -1528,7 +1747,7 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 	if !forceRefresh && fred.CacheAge() >= 0 {
 		cacheStatus = "🏦 Loading FRED macro data (from cache)... ⏳"
 	}
-	placeholderID, _ := h.bot.SendHTML(ctx, chatID, cacheStatus)
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, cacheStatus)
 
 	data, err := fred.GetCachedOrFetch(ctx)
 	if err != nil {
@@ -1775,7 +1994,7 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 	if !forceRefresh && sentiment.CacheAge() >= 0 {
 		cacheStatus = "🧠 Loading sentiment data (from cache)... ⏳"
 	}
-	placeholderID, _ := h.bot.SendHTML(ctx, chatID, cacheStatus)
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, cacheStatus)
 
 	data, err := sentiment.GetCachedOrFetch(ctx)
 	if err != nil {

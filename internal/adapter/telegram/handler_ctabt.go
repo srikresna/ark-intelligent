@@ -164,7 +164,7 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 	}
 
 	// Send loading
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf(
 		"⏳ Menjalankan backtest <b>%s</b> (%s, Grade ≥ %s)...\n<i>Ini bisa memakan waktu 10-30 detik.</i>",
 		html.EscapeString(mapping.Currency), timeframe, grade,
 	))

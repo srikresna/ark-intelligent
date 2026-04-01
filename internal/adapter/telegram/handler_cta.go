@@ -4,6 +4,7 @@ package telegram
 //   /cta [SYMBOL] [TIMEFRAME]  — TA dashboard with chart + inline keyboard
 
 import (
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -54,7 +55,7 @@ type ctaState struct {
 	computedAt time.Time
 }
 
-const ctaStateTTL = 120 * time.Second
+var ctaStateTTL = config.CTAStateTTL
 
 // ctaStateCache stores per-chat CTA state with TTL.
 type ctaStateCache struct {
@@ -155,7 +156,7 @@ Pilih aset:`, h.kb.CTASymbolMenu())
 	}
 
 	// Send loading indicator
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("⚡ Computing TA for <b>%s</b>... ⏳", html.EscapeString(mapping.Currency)))
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("⚡ Computing TA for <b>%s</b>... ⏳", html.EscapeString(mapping.Currency)))
 
 	// Compute CTA state
 	state, err := h.computeCTAState(ctx, mapping)

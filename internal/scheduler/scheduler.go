@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
@@ -389,7 +390,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	var strongSignals []cotsvc.Signal
 	for _, sig := range signals {
-		if sig.Strength >= 4 {
+		if sig.Strength >= config.SignalStrengthAlert {
 			strongSignals = append(strongSignals, sig)
 		}
 	}
