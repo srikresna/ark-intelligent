@@ -96,6 +96,9 @@ type UserPrefs struct {
 	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
+	// PinnedCommands stores user-customized pinned command shortcuts.
+	PinnedCommands []string `json:"pinned_commands,omitempty"`
+
 	// ExperienceLevel: user's self-reported trading experience.
 	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).
 	ExperienceLevel string `json:"experience_level,omitempty"`
