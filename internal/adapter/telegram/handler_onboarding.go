@@ -5,6 +5,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -22,8 +23,24 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 		_ = h.prefsRepo.Set(ctx, userID, prefs)
 	}
 
-	// If user already has experience level set, show normal help.
+	// Parse deep link parameters (t.me/botname?start=PARAM)
+	args = strings.TrimSpace(args)
+	if args != "" {
+		h.handleDeepLinkArgs(ctx, chatID, userID, args, &prefs)
+	}
+
+	// If user already has experience level set, show normal help
+	// (or execute cached deep link command intent).
 	if prefs.ExperienceLevel != "" {
+		// Check for pending deep link command intent.
+		if intent := h.deepLinks.Pop(userID); intent != nil {
+			log.Info().
+				Int64("user", userID).
+				Str("cmd", intent.Command).
+				Str("args", intent.Args).
+				Msg("deep link: auto-executing cached command intent")
+			return h.executeDeepLinkCommand(ctx, chatID, userID, intent.Command, intent.Args)
+		}
 		return h.sendHelp(ctx, chatID, userID)
 	}
 
@@ -39,6 +56,120 @@ Sebelum mulai, pilih level pengalaman trading kamu:
 
 	_, err := h.bot.SendWithKeyboard(ctx, chatID, welcome, h.kb.OnboardingRoleMenu())
 	return err
+}
+
+// handleDeepLinkArgs parses and processes deep link start parameters.
+// Supported formats:
+//   - ref_<userID>  → store referrer in user profile
+//   - cmd_<command>_<symbol> → cache intent for post-onboarding execution
+//   - anything else → log and ignore (backward compatible)
+func (h *Handler) handleDeepLinkArgs(ctx context.Context, chatID string, userID int64, args string, prefs *domain.UserPrefs) {
+	log.Info().
+		Int64("user", userID).
+		Str("args", args).
+		Msg("deep link: processing start parameter")
+
+	switch {
+	case strings.HasPrefix(args, "ref_"):
+		// Referral tracking: ref_<referrerUserID>
+		refStr := strings.TrimPrefix(args, "ref_")
+		referrerID, err := strconv.ParseInt(refStr, 10, 64)
+		if err != nil || referrerID <= 0 || referrerID == userID {
+			log.Warn().Str("ref", refStr).Msg("deep link: invalid or self-referral, ignoring")
+			return
+		}
+		// Only record first referral (don't overwrite)
+		if prefs.ReferrerID == 0 {
+			prefs.ReferrerID = referrerID
+			prefs.ReferredAt = timeutil.NowWIB().Format("2006-01-02 15:04")
+			_ = h.prefsRepo.Set(ctx, userID, *prefs)
+			log.Info().
+				Int64("user", userID).
+				Int64("referrer", referrerID).
+				Msg("deep link: referral recorded")
+		}
+
+	case strings.HasPrefix(args, "cmd_"):
+		// Command pre-fill: cmd_<command>[_<symbol>]
+		// Examples: cmd_cot_EUR, cmd_outlook, cmd_cta_XAU
+		parts := strings.SplitN(strings.TrimPrefix(args, "cmd_"), "_", 2)
+		command := parts[0]
+		cmdArgs := ""
+		if len(parts) > 1 {
+			cmdArgs = parts[1]
+		}
+
+		if command == "" {
+			log.Warn().Str("args", args).Msg("deep link: empty command, ignoring")
+			return
+		}
+
+		// Cache the intent — will be executed after onboarding completes
+		h.deepLinks.Set(userID, command, cmdArgs)
+		log.Info().
+			Int64("user", userID).
+			Str("cmd", command).
+			Str("cmdArgs", cmdArgs).
+			Msg("deep link: command intent cached (awaiting onboarding)")
+
+	default:
+		// Unknown format — log for analytics and ignore gracefully
+		log.Info().
+			Int64("user", userID).
+			Str("args", args).
+			Msg("deep link: unrecognized parameter, ignoring")
+	}
+}
+
+// executeDeepLinkCommand routes a deep link command intent to the appropriate handler.
+func (h *Handler) executeDeepLinkCommand(ctx context.Context, chatID string, userID int64, command, args string) error {
+	switch command {
+	case "cot":
+		return h.cmdCOT(ctx, chatID, userID, args)
+	case "outlook":
+		return h.cmdOutlook(ctx, chatID, userID, args)
+	case "cta":
+		return h.cmdCTA(ctx, chatID, userID, args)
+	case "quant":
+		return h.cmdQuant(ctx, chatID, userID, args)
+	case "vp":
+		return h.cmdVP(ctx, chatID, userID, args)
+	case "alpha":
+		return h.cmdAlpha(ctx, chatID, 0, args)
+	case "gex":
+		return h.cmdGEX(ctx, chatID, userID, args)
+	case "macro":
+		return h.cmdMacro(ctx, chatID, userID, args)
+	case "bias":
+		return h.cmdBias(ctx, chatID, userID, args)
+	case "price":
+		return h.cmdPrice(ctx, chatID, userID, args)
+	case "calendar":
+		return h.cmdCalendar(ctx, chatID, userID, args)
+	case "sentiment":
+		return h.cmdSentiment(ctx, chatID, userID, args)
+	case "seasonal":
+		return h.cmdSeasonal(ctx, chatID, userID, args)
+	case "rank":
+		return h.cmdRank(ctx, chatID, userID, args)
+	case "levels":
+		return h.cmdLevels(ctx, chatID, userID, args)
+	case "backtest":
+		return h.cmdBacktest(ctx, chatID, userID, args)
+	case "impact":
+		return h.cmdImpact(ctx, chatID, 0, args)
+	case "intermarket":
+		return h.cmdIntermarket(ctx, chatID, 0, args)
+	case "wyckoff":
+		return h.cmdWyckoff(ctx, chatID, userID, args)
+	case "smc":
+		return h.cmdSMC(ctx, chatID, userID, args)
+	case "elliott":
+		return h.cmdElliott(ctx, chatID, userID, args)
+	default:
+		log.Warn().Str("cmd", command).Msg("deep link: unknown command, showing help")
+		return h.sendHelp(ctx, chatID, userID)
+	}
 }
 
 // cbOnboard handles the onboarding flow callbacks (role selection + tutorial).
@@ -118,7 +249,21 @@ Ini menu kamu — klik untuk mulai:`
 	}
 
 	_, err := h.bot.SendWithKeyboard(ctx, chatID, tutorial, h.kb.StarterKitMenu(level))
-	return err
+	if err != nil {
+		return err
+	}
+
+	// After onboarding completes, check for pending deep link command intent.
+	if intent := h.deepLinks.Pop(userID); intent != nil {
+		log.Info().
+			Int64("user", userID).
+			Str("cmd", intent.Command).
+			Str("args", intent.Args).
+			Msg("deep link: auto-executing post-onboarding command intent")
+		return h.executeDeepLinkCommand(ctx, chatID, userID, intent.Command, intent.Args)
+	}
+
+	return nil
 }
 
 func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args string) error {
