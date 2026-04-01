@@ -125,6 +125,7 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 }
 
 // cbAlertToggle handles quick alert toggle from notification messages.
+// Supports granular per-type disabling via "alert:off:<type>" callbacks.
 func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
 	action := strings.TrimPrefix(data, "alert:")
 
@@ -135,12 +136,35 @@ func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, u
 
 	switch action {
 	case "mute_1h", "disable":
-		// Disable alerts until manually re-enabled via /settings.
+		// Disable ALL alerts until manually re-enabled via /settings.
 		// Note: "mute_1h" is a legacy callback key retained for backward compatibility.
 		prefs.AlertsEnabled = false
+		prefs.COTAlertsEnabled = false
 		_ = h.prefsRepo.Set(ctx, userID, prefs)
 		return h.bot.EditMessage(ctx, chatID, msgID,
-			"Alerts disabled. Use /settings to re-enable.")
+			"\xf0\x9f\x94\x95 Semua alert dimatikan. Gunakan /settings untuk mengaktifkan kembali.")
+
+	case "off:cot":
+		// Disable COT release alerts only.
+		prefs.COTAlertsEnabled = false
+		_ = h.prefsRepo.Set(ctx, userID, prefs)
+		return h.bot.EditMessage(ctx, chatID, msgID,
+			"\xf0\x9f\x94\x95 Alert COT dimatikan.\nGunakan /settings untuk mengaktifkan kembali.")
+
+	case "off:fred":
+		// Disable FRED macro alerts (reuses COTAlertsEnabled flag).
+		prefs.COTAlertsEnabled = false
+		_ = h.prefsRepo.Set(ctx, userID, prefs)
+		return h.bot.EditMessage(ctx, chatID, msgID,
+			"\xf0\x9f\x94\x95 Alert Macro dimatikan.\nGunakan /settings untuk mengaktifkan kembali.")
+
+	case "off:signal":
+		// Disable strong signal alerts (reuses COTAlertsEnabled flag).
+		prefs.COTAlertsEnabled = false
+		_ = h.prefsRepo.Set(ctx, userID, prefs)
+		return h.bot.EditMessage(ctx, chatID, msgID,
+			"\xf0\x9f\x94\x95 Alert Signal dimatikan.\nGunakan /settings untuk mengaktifkan kembali.")
+
 	case "dismiss":
 		return h.bot.DeleteMessage(ctx, chatID, msgID)
 	}
