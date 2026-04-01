@@ -1,12 +1,11 @@
 # Agent Status — last updated: 2026-04-01 11:38 WIB
 
 ## Dev-B
-- **Last run:** 2026-04-01 11:38 WIB
-- **Current:** standby — completed TASK-012 (GEX Engine via Deribit public API), PR #28 opened → agents/main
-- **Files created:** internal/service/marketdata/deribit/{client,types}.go, internal/service/gex/{types,calculator,calculator_test,engine}.go, internal/adapter/telegram/{formatter_gex,handler_gex}.go
-- **Files edited:** internal/adapter/telegram/handler.go (GEXServices field + help text), cmd/bot/main.go (wiring + import)
-- **PRs today:** 19 (PR #1 through #27 + PR #28)
-- **Note:** TASK-012 HIGH priority — Deribit public client, GEX calculation engine with 15-min cache, /gex Telegram command with inline keyboard, 9 unit tests all passing. go build + go vet clean.
+- **Last run:** 2026-04-01 11:48 WIB
+- **Current:** standby — TASK-015 done, branch refactor/split-formatter pushed (gh auth not configured, awaiting Dev-A merge)
+- **Files changed:** deleted formatter.go (4489 LOC), created 20 domain formatter_*.go files (<800 LOC each)
+- **PRs today:** TASK-015 branch refactor/split-formatter ready for PR → agents/main
+- **Note:** TASK-015 HIGH priority — monolithic formatter.go split into 20 domain files. go build + go vet clean. All tests pass.
 
 ## Dev-C
 - **Last run:** 2026-04-01 08:30 WIB
