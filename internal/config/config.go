@@ -192,7 +192,9 @@ func MustLoad() *Config {
 	cfg.EnableStrategyPlaybook = getBool("ENABLE_STRATEGY_PLAYBOOK", true)
 	cfg.EnablePortfolioHeat = getBool("ENABLE_PORTFOLIO_HEAT", true)
 
-	cfg.validate()
+	if err := cfg.validate(); err != nil {
+		log.Fatal().Err(err).Msg("configuration validation failed")
+	}
 	return cfg
 }
 
@@ -232,40 +234,160 @@ func (c *Config) HasMassiveS3() bool {
 	return c.MassiveS3AccessKey != "" && c.MassiveS3SecretKey != ""
 }
 
+// ErrInvalidConfig is returned when configuration validation fails.
+type ErrInvalidConfig string
+
+func (e ErrInvalidConfig) Error() string { return "invalid config: " + string(e) }
+
 // validate performs additional validation beyond required env vars.
-func (c *Config) validate() {
+// Returns an ErrInvalidConfig for any hard-invalid configuration.
+// Advisory issues are logged as warnings but do not cause an error.
+func (c *Config) validate() error {
+	// ---- COT ----------------------------------------------------------------
 	if c.COTHistoryWeeks < 4 {
-		log.Fatal().Msg("COT_HISTORY_WEEKS must be >= 4")
+		return ErrInvalidConfig("COT_HISTORY_WEEKS must be >= 4")
 	}
 	if c.COTFetchInterval < 1*time.Minute {
-		log.Fatal().Msg("COT_FETCH_INTERVAL must be >= 1m")
+		return ErrInvalidConfig("COT_FETCH_INTERVAL must be >= 1m")
 	}
+
+	// ---- Quantitative -------------------------------------------------------
 	if c.ConfluenceCalcInterval < 1*time.Minute {
-		log.Fatal().Msg("CONFLUENCE_CALC_INTERVAL must be >= 1m")
+		return ErrInvalidConfig("CONFLUENCE_CALC_INTERVAL must be >= 1m")
 	}
 
-	// Cross-field: Claude endpoint requires model to be set.
+	// ---- Price ---------------------------------------------------------------
+	if c.PriceFetchInterval <= 0 {
+		return ErrInvalidConfig("PRICE_FETCH_INTERVAL must be > 0")
+	}
+	if c.PriceHistoryWeeks < 1 {
+		return ErrInvalidConfig("PRICE_HISTORY_WEEKS must be >= 1")
+	}
+
+	// ---- Intraday ------------------------------------------------------------
+	if c.IntradayFetchInterval <= 0 {
+		return ErrInvalidConfig("INTRADAY_FETCH_INTERVAL must be > 0")
+	}
+	if c.IntradayRetentionDays < 1 {
+		return ErrInvalidConfig("INTRADAY_RETENTION_DAYS must be >= 1")
+	}
+
+	// ---- AI ------------------------------------------------------------------
+	if c.AICacheTTL <= 0 {
+		return ErrInvalidConfig("AI_CACHE_TTL must be > 0")
+	}
+	if c.AIMaxRPM <= 0 {
+		return ErrInvalidConfig("AI_MAX_RPM must be > 0")
+	}
+	if c.AIMaxDaily <= 0 {
+		return ErrInvalidConfig("AI_MAX_DAILY must be > 0")
+	}
+	if c.AIMaxDaily < c.AIMaxRPM {
+		log.Warn().Int("daily", c.AIMaxDaily).Int("rpm", c.AIMaxRPM).
+			Msg("AI_MAX_DAILY < AI_MAX_RPM — may exhaust daily quota very quickly")
+	}
+
+	// ---- Chat history -------------------------------------------------------
+	if c.ChatHistoryLimit <= 0 {
+		log.Warn().Msg("CHAT_HISTORY_LIMIT <= 0, resetting to default (50)")
+		c.ChatHistoryLimit = 50
+	}
+
+	// ---- Impact bootstrap ---------------------------------------------------
+	if c.ImpactBootstrapMonths < 1 {
+		return ErrInvalidConfig("IMPACT_BOOTSTRAP_MONTHS must be >= 1")
+	}
+
+	// ---- Claude -------------------------------------------------------------
 	if c.ClaudeEndpoint != "" && c.ClaudeModel == "" {
-		log.Fatal().Msg("CLAUDE_MODEL must be set when CLAUDE_ENDPOINT is configured")
+		return ErrInvalidConfig("CLAUDE_MODEL must be set when CLAUDE_ENDPOINT is configured")
+	}
+	if c.ClaudeEndpoint != "" && c.ClaudeMaxTokens <= 0 {
+		return ErrInvalidConfig("CLAUDE_MAX_TOKENS must be > 0 when CLAUDE_ENDPOINT is configured")
+	}
+	if c.ClaudeThinkingBudget < 0 {
+		return ErrInvalidConfig("CLAUDE_THINKING_BUDGET must be >= 0 (0 = disabled)")
 	}
 
-	// Cross-field: Massive S3 credentials must be paired (both or neither).
+	// ---- Massive S3 ---------------------------------------------------------
 	hasS3Key := c.MassiveS3AccessKey != ""
 	hasS3Secret := c.MassiveS3SecretKey != ""
 	if hasS3Key != hasS3Secret {
-		log.Fatal().Msg("MASSIVE_S3_ACCESS_KEY and MASSIVE_S3_SECRET_KEY must both be set or both empty")
+		return ErrInvalidConfig("MASSIVE_S3_ACCESS_KEY and MASSIVE_S3_SECRET_KEY must both be set or both empty")
 	}
 
-	// DATA_DIR writable check — fail fast at startup rather than on first write.
+	// ---- DataDir writable check — fail fast rather than on first write -------
 	testFile := filepath.Join(c.DataDir, ".write_test")
 	if err := os.WriteFile(testFile, []byte("ok"), 0600); err != nil {
-		log.Fatal().Str("dir", c.DataDir).Err(err).Msg("DATA_DIR is not writable")
+		return ErrInvalidConfig("DATA_DIR is not writable: " + c.DataDir + ": " + err.Error())
 	}
 	_ = os.Remove(testFile)
 
-	// Advisory: Gemini API key set but model left at default — warn only.
+	// ---- Advisory warnings --------------------------------------------------
 	if c.GeminiAPIKey != "" && c.GeminiModel == "" {
 		log.Warn().Msg("GEMINI_API_KEY is set but GEMINI_MODEL is empty; using hardcoded default")
+	}
+
+	// ---- Feature availability logging ---------------------------------------
+	c.logFeatureAvailability()
+
+	return nil
+}
+
+// logFeatureAvailability emits startup log lines for every optional integration,
+// indicating whether it is enabled or degraded.
+func (c *Config) logFeatureAvailability() {
+	// Price data providers
+	if len(c.TwelveDataAPIKeys) == 0 {
+		log.Warn().Msg("TWELVE_DATA_API_KEYS not set — price fetcher degraded (Yahoo Finance fallback only)")
+	} else {
+		log.Info().Int("keys", len(c.TwelveDataAPIKeys)).Msg("TwelveData: ENABLED")
+	}
+	if len(c.AlphaVantageAPIKeys) == 0 {
+		log.Info().Msg("ALPHA_VANTAGE_API_KEYS not set — oil/treasury data may be unavailable")
+	} else {
+		log.Info().Int("keys", len(c.AlphaVantageAPIKeys)).Msg("AlphaVantage: ENABLED")
+	}
+	if c.CoinGeckoAPIKey == "" {
+		log.Info().Msg("COINGECKO_API_KEY not set — altcoin market cap (TOTAL3) data unavailable")
+	} else {
+		log.Info().Msg("CoinGecko: ENABLED")
+	}
+
+	// Macro / scraping keys (read direct from env — not in Config struct)
+	if os.Getenv("FRED_API_KEY") == "" {
+		log.Warn().Msg("FRED_API_KEY not set — macro features (yields, inflation, labor) may be rate-limited")
+	} else {
+		log.Info().Msg("FRED: ENABLED")
+	}
+	if os.Getenv("FIRECRAWL_API_KEY") == "" {
+		log.Info().Msg("FIRECRAWL_API_KEY not set — web scraping features disabled")
+	} else {
+		log.Info().Msg("Firecrawl: ENABLED")
+	}
+
+	// AI models
+	if !c.HasGemini() {
+		log.Info().Msg("GEMINI_API_KEY not set — Gemini AI assistant disabled")
+	} else {
+		log.Info().Str("model", c.GeminiModel).Msg("Gemini: ENABLED")
+	}
+	if !c.HasClaude() {
+		log.Info().Msg("CLAUDE_ENDPOINT not set — Claude chatbot disabled")
+	} else {
+		log.Info().Str("model", c.ClaudeModel).Msg("Claude: ENABLED")
+	}
+
+	// Microstructure / research layers
+	if c.EnableBybitMicrostructure {
+		log.Info().Msg("Bybit microstructure: ENABLED")
+	} else {
+		log.Info().Msg("BYBIT_API_KEY not set — crypto microstructure analysis disabled")
+	}
+	if c.EnableMassiveResearch {
+		log.Info().Int("keys", len(c.MassiveAPIKeys)).Msg("Massive research: ENABLED")
+	} else {
+		log.Info().Msg("MASSIVE_API_KEYS not set — historical research layer disabled")
 	}
 }
 

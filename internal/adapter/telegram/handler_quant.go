@@ -41,6 +41,7 @@ type quantState struct {
 	currency  string
 	timeframe string
 	bars      map[string][]ta.OHLCV // tf → bars
+	volCone   *pricesvc.VolCone     // cached vol cone result
 	createdAt time.Time
 }
 
@@ -217,11 +218,15 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 		}
 	}
 
+	// Compute volatility cone (cached in state, TTL via quantStateTTL)
+	volCone := pricesvc.ComputeVolCone(dailyRecords)
+
 	return &quantState{
 		symbol:    mapping.Currency,
 		currency:  mapping.Currency,
 		timeframe: timeframe,
 		bars:      barsByTF,
+		volCone:   volCone,
 		createdAt: time.Now(),
 	}, nil
 }
@@ -231,9 +236,14 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 // ---------------------------------------------------------------------------
 
 func (h *Handler) formatQuantDashboard(state *quantState) string {
+	volConeSection := ""
+	if state.volCone != nil {
+		volConeSection = "\n" + h.fmt.FormatVolCone(state.volCone)
+	}
+
 	return fmt.Sprintf(`📊 <b>QUANT DASHBOARD: %s</b>
 📅 %s — %s
-
+%s
 Pilih model analisis di bawah.
 Setiap model akan menghasilkan chart + analisis detail.
 
@@ -250,6 +260,7 @@ Klik tombol untuk mulai analisis.`,
 		html.EscapeString(state.symbol),
 		time.Now().Format("02 Jan 2006"),
 		state.timeframe,
+		volConeSection,
 	)
 }
 

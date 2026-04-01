@@ -726,3 +726,74 @@ func sortedMapKeys(m map[string]float64) []string {
 	sort.Strings(keys)
 	return keys
 }
+
+// ---------------------------------------------------------------------------
+// FormatVolCone — Volatility Cone Analysis formatter
+// ---------------------------------------------------------------------------
+
+// FormatVolCone formats a VolCone result for Telegram HTML output.
+func (f *Formatter) FormatVolCone(cone *pricesvc.VolCone) string {
+	if cone == nil {
+		return "⚠️ <b>Volatility Cone</b>\n<code>Insufficient history (need ≥150 trading days)</code>\n"
+	}
+
+	var b strings.Builder
+	anomalyIcon := "🟢"
+	if cone.IsAnomaly {
+		anomalyIcon = "🔴"
+	}
+	b.WriteString(fmt.Sprintf("📐 <b>VOLATILITY CONE — %s</b> %s\n", cone.Symbol, anomalyIcon))
+	b.WriteString(fmt.Sprintf("<code>%s</code>\n\n", cone.AsOf.Format("02 Jan 2006")))
+
+	for _, w := range cone.Windows {
+		b.WriteString(volConeWindowBlock(w))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(fmt.Sprintf("<b>💡 %s</b>\n", cone.Summary))
+	return b.String()
+}
+
+// volConeWindowBlock renders a single window as an ASCII band visualization.
+func volConeWindowBlock(w *pricesvc.VolConeWindow) string {
+	var b strings.Builder
+
+	icon := "📊"
+	if w.IsAnomaly && w.AnomalyDir == "HIGH" {
+		icon = "⚠️"
+	} else if w.IsAnomaly && w.AnomalyDir == "LOW" {
+		icon = "🔵"
+	}
+
+	label := fmt.Sprintf("%dd", w.Window)
+	b.WriteString(fmt.Sprintf("%s <b>%s Window</b>  <code>%.1f%%</code>  P%.0f\n",
+		icon, label, w.CurrentVol, w.Percentile))
+
+	// ASCII cone bar: position of current vol in P5..P95 range
+	bar := volConeBar(w.CurrentVol, w.P5, w.P95, 16)
+	b.WriteString(fmt.Sprintf("<code>P5 %s P95</code>\n", bar))
+	b.WriteString(fmt.Sprintf("<code>   P25=%.1f%%  P50=%.1f%%  P75=%.1f%%</code>\n",
+		w.P25, w.P50, w.P75))
+
+	return b.String()
+}
+
+// volConeBar renders an ASCII bar showing where current vol sits in [lo, hi].
+func volConeBar(current, lo, hi float64, width int) string {
+	if hi <= lo || width < 4 {
+		return strings.Repeat("-", width)
+	}
+	pos := int(math.Round((current - lo) / (hi - lo) * float64(width-1)))
+	if pos < 0 {
+		pos = 0
+	}
+	if pos >= width {
+		pos = width - 1
+	}
+	bar := make([]rune, width)
+	for i := range bar {
+		bar[i] = '-'
+	}
+	bar[pos] = '^'
+	return string(bar)
+}
