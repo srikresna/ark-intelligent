@@ -283,6 +283,12 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 	}
 	b.WriteString("</pre>\n")
 
+	// Guard: CurrentMonth may be 0 for new contracts with no history
+	if p.CurrentMonth < 1 || p.CurrentMonth > 12 {
+		b.WriteString("<i>Insufficient history for seasonal analysis.</i>\n")
+		return b.String()
+	}
+
 	curMs := p.Monthly[p.CurrentMonth-1]
 
 	// --- CURRENT MONTH SUMMARY ---
@@ -335,6 +341,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 			driverIcon = "\xe2\x9d\x8c"
 		}
 		b.WriteString(fmt.Sprintf("<code>Outlook : %s %s</code>\n", p.RegimeStats.DriverAlignment, driverIcon))
+	} else {
+		b.WriteString("\n\xF0\x9F\x8F\x9B <b>REGIME CONTEXT</b>\n")
+		b.WriteString("<code>Insufficient history for regime analysis</code>\n")
 	}
 
 	// --- COT ALIGNMENT (Phase 3a) ---
@@ -346,6 +355,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 		}
 		b.WriteString(fmt.Sprintf("<code>Current : COT %s %s</code>\n", p.COTAlignment.CurrentCOTBias, alignIcon))
 		b.WriteString(fmt.Sprintf("<code>Interp  : %s</code>\n", p.COTAlignment.Interpretation))
+	} else {
+		b.WriteString("\n\xF0\x9F\x93\x8A <b>COT ALIGNMENT</b>\n")
+		b.WriteString("<code>Insufficient history for COT analysis</code>\n")
 	}
 
 	// --- EVENT DENSITY (Phase 3b) ---
@@ -362,6 +374,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 		if p.EventDensity.KeyEvents != "" {
 			b.WriteString(fmt.Sprintf("<code>Events  : %s</code>\n", html.EscapeString(p.EventDensity.KeyEvents)))
 		}
+	} else {
+		b.WriteString("\n\xF0\x9F\x93\x86 <b>EVENT DENSITY</b>\n")
+		b.WriteString("<code>Insufficient history for event analysis</code>\n")
 	}
 
 	// --- VOLATILITY CONTEXT (Phase 3c) ---
@@ -376,6 +391,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 		if p.VolContext.Assessment != "" {
 			b.WriteString(fmt.Sprintf("<i>%s</i>\n", p.VolContext.Assessment))
 		}
+	} else if p.VolContext == nil {
+		b.WriteString("\n\xF0\x9F\x93\x89 <b>VOLATILITY</b>\n")
+		b.WriteString("<code>Insufficient history for volatility analysis</code>\n")
 	}
 
 	// --- CROSS-ASSET (Phase 3d) ---
@@ -390,6 +408,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 				cc.Asset, cc.Relation, cc.TheirBias, checkIcon))
 		}
 		b.WriteString(fmt.Sprintf("<code>Assessment: %s</code>\n", p.CrossAsset.Assessment))
+	} else if p.CrossAsset == nil {
+		b.WriteString("\n\xF0\x9F\x94\x97 <b>CROSS-ASSET</b>\n")
+		b.WriteString("<code>Insufficient history for cross-asset analysis</code>\n")
 	}
 
 	// --- EIA ENERGY CONTEXT (Phase 4) ---
@@ -437,6 +458,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 		}
 
 		b.WriteString(fmt.Sprintf("\n<b>Verdict: %s</b>\n", p.Confluence.Verdict))
+	} else {
+		b.WriteString("\n\xF0\x9F\x8E\xAF <b>CONFLUENCE SCORE</b>\n")
+		b.WriteString("<code>Insufficient history for confluence scoring</code>\n")
 	}
 
 	return b.String()

@@ -494,14 +494,17 @@ func TestIntraday_Pass4_ATRCalculation(t *testing.T) {
 
 func TestCorrelation_Pass4_DifferentLengths(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5, 6, 7}
-	y := []float64{2, 4, 6} // Shorter
+	y := []float64{2, 4, 6, 8, 10} // Shorter but >= 5
 
 	r := pearsonCorrelation(x, y)
 
-	// Should use min(len(x), len(y)) = 3 elements
-	// x[:3] = [1,2,3], y[:3] = [2,4,6] -> perfect positive correlation
+	// Should use min(len(x), len(y)) = 5 elements
+	// x[:5] = [1,2,3,4,5], y[:5] = [2,4,6,8,10] -> perfect positive correlation
+	if math.IsNaN(r) {
+		t.Error("Should not return NaN for inputs with >= 5 points")
+	}
 	if math.Abs(r-1.0) > 0.001 {
-		t.Errorf("Correlation of [1,2,3] with [2,4,6] should be 1.0, got %f", r)
+		t.Errorf("Correlation of [1,2,3,4,5] with [2,4,6,8,10] should be 1.0, got %f", r)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/rs/zerolog/log"
 )
 
@@ -40,7 +41,7 @@ type TVLSummary struct {
 var (
 	globalCache *TVLSummary    //nolint:gochecknoglobals
 	cacheMu     sync.RWMutex   //nolint:gochecknoglobals
-	httpClient  = &http.Client{Timeout: httpTimeout} //nolint:gochecknoglobals
+	httpClient  = httpclient.NewClient(httpTimeout) //nolint:gochecknoglobals
 )
 
 // GetCachedOrFetch returns cached TVL data if within TTL, otherwise fetches

@@ -14,6 +14,83 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// Bounded LRU Mutex Map
+// ---------------------------------------------------------------------------
+
+const (
+	lruMutexMaxSize = 10_000
+	lruMutexTTL     = 30 * time.Minute
+	lruEvictEvery   = 5 * time.Minute
+)
+
+// lruMutexEntry holds a per-user mutex and its last-access timestamp.
+type lruMutexEntry struct {
+	mu         sync.Mutex
+	lastAccess time.Time
+}
+
+// lruMutexMap is a bounded map of per-user mutexes with TTL-based eviction.
+// It replaces a bare sync.Map to prevent unbounded memory growth in long-running deployments.
+type lruMutexMap struct {
+	mu      sync.Mutex
+	entries map[int64]*lruMutexEntry
+	maxSize int
+	ttl     time.Duration
+}
+
+func newLRUMutexMap(maxSize int, ttl time.Duration) *lruMutexMap {
+	return &lruMutexMap{
+		entries: make(map[int64]*lruMutexEntry, maxSize),
+		maxSize: maxSize,
+		ttl:     ttl,
+	}
+}
+
+// get returns the per-user mutex, creating one if it does not exist.
+// The entry's lastAccess is refreshed on every call.
+func (l *lruMutexMap) get(userID int64) *sync.Mutex {
+	l.mu.Lock()
+	entry, ok := l.entries[userID]
+	if !ok {
+		entry = &lruMutexEntry{}
+		l.entries[userID] = entry
+	}
+	entry.lastAccess = time.Now()
+	l.mu.Unlock()
+	return &entry.mu
+}
+
+// evict removes entries that have not been accessed for longer than the TTL.
+// An entry is only removed if its inner mutex is not currently held (TryLock succeeds),
+// which avoids the TOCTOU race where two concurrent callers end up with different mutexes.
+func (l *lruMutexMap) evict() {
+	cutoff := time.Now().Add(-l.ttl)
+	evicted := 0
+
+	l.mu.Lock()
+	for uid, entry := range l.entries {
+		if entry.lastAccess.Before(cutoff) && entry.mu.TryLock() {
+			entry.mu.Unlock()
+			delete(l.entries, uid)
+			evicted++
+		}
+	}
+	remaining := len(l.entries)
+	l.mu.Unlock()
+
+	if evicted > 0 {
+		log.Debug().Int("evicted", evicted).Int("remaining", remaining).Msg("lruMutexMap: evicted expired entries")
+	}
+}
+
+func (l *lruMutexMap) size() int {
+	l.mu.Lock()
+	n := len(l.entries)
+	l.mu.Unlock()
+	return n
+}
+
+// ---------------------------------------------------------------------------
 // Authorization Middleware
 // ---------------------------------------------------------------------------
 
@@ -23,8 +100,8 @@ type Middleware struct {
 	ownerID  int64
 
 	// Per-user mutex to prevent TOCTOU race conditions on profile read-modify-write.
-	// Key: userID. Protects concurrent Authorize/CheckAIQuota calls for the same user.
-	userMu sync.Map // map[int64]*sync.Mutex
+	// Bounded LRU map with TTL eviction prevents unbounded memory growth.
+	userMu *lruMutexMap
 
 	// Per-user sliding window for Member/Admin (per-minute rate limiting)
 	windowMu sync.Mutex
@@ -38,6 +115,7 @@ func NewMiddleware(userRepo ports.UserRepository, ownerID int64) *Middleware {
 	m := &Middleware{
 		userRepo: userRepo,
 		ownerID:  ownerID,
+		userMu:   newLRUMutexMap(lruMutexMaxSize, lruMutexTTL),
 		windows:  make(map[int64]*userWindow),
 		stopCh:   make(chan struct{}),
 	}
@@ -52,8 +130,7 @@ func (m *Middleware) Stop() {
 
 // getUserMutex returns a per-user mutex for atomic profile operations.
 func (m *Middleware) getUserMutex(userID int64) *sync.Mutex {
-	v, _ := m.userMu.LoadOrStore(userID, &sync.Mutex{})
-	return v.(*sync.Mutex)
+	return m.userMu.get(userID)
 }
 
 // AuthResult is the outcome of an authorization check.
@@ -418,23 +495,24 @@ func (m *Middleware) allowSlidingWindow(userID int64, maxPerMinute int) bool {
 // cleanupLoop periodically removes stale entries from the sliding window map
 // and per-user mutex map to prevent unbounded memory growth.
 func (m *Middleware) cleanupLoop() {
-	ticker := time.NewTicker(2 * time.Minute)
-	defer ticker.Stop()
+	windowTicker := time.NewTicker(2 * time.Minute)
+	mutexTicker := time.NewTicker(lruEvictEvery)
+	defer windowTicker.Stop()
+	defer mutexTicker.Stop()
 
 	for {
 		select {
 		case <-m.stopCh:
 			return
-		case <-ticker.C:
+		case <-windowTicker.C:
 			m.cleanupWindows()
+		case <-mutexTicker.C:
+			m.userMu.evict()
 		}
 	}
 }
 
 // cleanupWindows removes window entries for users idle > 5 minutes.
-// Note: per-user mutexes (userMu sync.Map) are intentionally NOT evicted here.
-// They are tiny (~64 bytes each) and eviction creates a TOCTOU race where two
-// goroutines could end up with different mutexes for the same user.
 func (m *Middleware) cleanupWindows() {
 	m.windowMu.Lock()
 	defer m.windowMu.Unlock()

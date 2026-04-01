@@ -90,13 +90,15 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 		}
 	}
 	if spot <= 0 {
-		// Fallback: try mark prices from instruments around ATM
-		log.Warn().Str("symbol", sym).Msg("no UnderlyingPrice in book summaries, falling back to MarkPrice")
-		for _, s := range summaries {
-			if s.MarkPrice > 0 {
-				spot = s.MarkPrice * 1000 // rough proxy won't be used further
-				break
-			}
+		// Fallback 1: try to get the Deribit index price directly.
+		// This is the canonical spot source — far more reliable than MarkPrice.
+		log.Warn().Str("symbol", sym).Msg("no UnderlyingPrice in book summaries, fetching index price as fallback")
+		indexSpot, indexErr := e.client.GetIndexPrice(ctx, sym)
+		if indexErr == nil && indexSpot > 0 {
+			spot = indexSpot
+			log.Info().Str("symbol", sym).Float64("spot", spot).Msg("using Deribit index price as spot fallback")
+		} else {
+			log.Warn().Str("symbol", sym).Err(indexErr).Msg("index price fallback failed, will retry from ticker data")
 		}
 	}
 
@@ -132,8 +134,12 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 			continue
 		}
 
-		// Update spot from ticker if better
-		if ticker.UnderlyingPrice > 0 {
+		// Update spot from ticker if better (ticker UnderlyingPrice is the most reliable source)
+		if ticker.UnderlyingPrice > 0 && spot <= 0 {
+			spot = ticker.UnderlyingPrice
+			log.Info().Str("symbol", sym).Float64("spot", spot).Str("instrument", name).Msg("spot price recovered from ticker UnderlyingPrice")
+		} else if ticker.UnderlyingPrice > 0 {
+			// Keep refreshing spot with the latest value for accuracy
 			spot = ticker.UnderlyingPrice
 		}
 

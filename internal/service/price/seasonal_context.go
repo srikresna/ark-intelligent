@@ -36,6 +36,9 @@ func EnrichPattern(ctx context.Context, pattern *SeasonalPattern, deps *Seasonal
 		return
 	}
 	curMonth := pattern.CurrentMonth // 1-12
+	if curMonth < 1 || curMonth > 12 {
+		return // new contract with no data — nothing to enrich
+	}
 	curIdx := curMonth - 1
 	curStats := pattern.Monthly[curIdx]
 	driver := GetAssetDriver(pattern.Currency)

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -51,7 +52,7 @@ func NewClient(apiKey, apiSecret, restBase string) *Client {
 		base = defaultRestBase
 	}
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: httpclient.NewClient(defaultTimeout),
 		apiKey:     apiKey,
 		apiSecret:  apiSecret,
 		restBase:   base,

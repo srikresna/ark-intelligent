@@ -107,7 +107,11 @@ func (ce *CorrelationEngine) BuildMatrix(ctx context.Context, period int) (*doma
 			if a == b {
 				matrix[a][b] = 1.0
 			} else {
-				matrix[a][b] = pearsonCorrelation(returnsMap[a], returnsMap[b])
+				r := pearsonCorrelation(returnsMap[a], returnsMap[b])
+				if math.IsNaN(r) {
+					r = 0 // treat insufficient overlap as uncorrelated
+				}
+				matrix[a][b] = r
 			}
 		}
 	}
@@ -156,6 +160,9 @@ func (ce *CorrelationEngine) BuildWithBreakdowns(ctx context.Context) (*domain.C
 			shortCorr, okS := shortMatrix.Matrix[a][b]
 			longCorr, okL := longMatrix.Matrix[a][b]
 			if !okS || !okL {
+				continue
+			}
+			if math.IsNaN(shortCorr) || math.IsNaN(longCorr) {
 				continue
 			}
 
@@ -243,7 +250,7 @@ func (ce *CorrelationEngine) DetectClusters(matrix *domain.CorrelationMatrix, th
 			if assigned[b] || a == b {
 				continue
 			}
-			if corr, ok := matrix.Matrix[a][b]; ok && corr >= threshold {
+			if corr, ok := matrix.Matrix[a][b]; ok && !math.IsNaN(corr) && corr >= threshold {
 				// Check if b correlates with all existing cluster members
 				fitsCluster := true
 				for _, member := range cluster {
@@ -325,8 +332,8 @@ func pearsonCorrelation(x, y []float64) float64 {
 	if len(y) < n {
 		n = len(y)
 	}
-	if n < 3 {
-		return 0
+	if n < 5 {
+		return math.NaN()
 	}
 
 	// Compute means

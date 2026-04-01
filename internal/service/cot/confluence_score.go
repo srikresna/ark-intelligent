@@ -519,6 +519,9 @@ func ConfluenceScoreWithWeights(
 // getCountryMacroScore returns the macro score for the country associated with
 // a given currency. Used by the per-currency macro differential in V3.
 func getCountryMacroScore(currency string, c *domain.MacroComposites) float64 {
+	if c == nil {
+		return 0
+	}
 	switch currency {
 	case "EUR":
 		return c.EZScore

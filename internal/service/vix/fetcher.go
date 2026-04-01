@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"io"
+	stdlog "log"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -83,10 +86,16 @@ func fetchSingleIndexCSV(ctx context.Context, client *http.Client, url string) (
 
 	var lastClose float64
 	header := true
+	rowNum := 0
 	for {
-		row, err2 := r.Read()
-		if err2 != nil {
+		row, err := r.Read()
+		if err == io.EOF {
 			break
+		}
+		rowNum++
+		if err != nil {
+			stdlog.Printf("vix: fetchSingleIndexCSV: skipping row %d: %v", rowNum, err)
+			continue
 		}
 		if header {
 			header = false
@@ -144,10 +153,16 @@ func fetchVXFutures(ctx context.Context, client *http.Client, ts *VIXTermStructu
 	var rows []rawRow
 
 	header := true
+	rowNum := 0
 	for {
-		row, err2 := r.Read()
-		if err2 != nil {
+		row, err := r.Read()
+		if err == io.EOF {
 			break
+		}
+		rowNum++
+		if err != nil {
+			stdlog.Printf("vix: fetchVXFutures: skipping row %d: %v", rowNum, err)
+			continue
 		}
 		if header {
 			header = false
@@ -269,6 +284,16 @@ func computeDerivedFields(ts *VIXTermStructure) {
 		ts.SlopePct = (ts.M2 - ts.M1) / ts.M1 * 100
 		// Approximate monthly roll yield: negative for long VIX in contango
 		ts.RollYield = -ts.SlopePct
+	} else if ts.M1 == 0 {
+		// Defensive: M1 zero from malformed CSV → set safe defaults
+		ts.SlopePct = 0
+		ts.RollYield = 0
+	}
+
+	// Guard against NaN/Inf from unexpected calculations
+	if math.IsNaN(ts.SlopePct) || math.IsInf(ts.SlopePct, 0) {
+		ts.SlopePct = 0
+		ts.RollYield = 0
 	}
 
 	if ts.Spot > 0 && ts.M1 > 0 {
