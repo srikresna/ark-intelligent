@@ -499,13 +499,13 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		section++ //nolint:ineffassign // used if more sections follow
 		b.WriteString(fmt.Sprintf("=== %d. IMF WEO FORWARD-LOOKING FORECASTS ===\n", section))
 		b.WriteString("Source: IMF World Economic Outlook DataMapper (forward-looking, updated 2×/year)\n")
-		b.WriteString("Columns: Currency | GDP Growth 2026% | GDP Growth 2027% | CPI Inflation 2026% | Current Account (%GDP)\n\n")
+		b.WriteString("Columns: Currency | GDP Growth (forecast)% | GDP Growth (next yr)% | CPI Inflation% | Current Account (%GDP)\n\n")
 		for _, c := range data.IMFData.Countries {
 			if !c.Available {
 				continue
 			}
 			b.WriteString(fmt.Sprintf("  %-3s: GDP=%+.1f%%/%+.1f%% CPI=%.1f%% CA=%+.1f%%GDP\n",
-				c.Currency, c.GDPGrowth2026, c.GDPGrowth2027, c.Inflation2026, c.CurrentAccount))
+				c.Currency, c.GDPGrowth, c.GDPGrowthNext, c.Inflation, c.CurrentAccount))
 		}
 		b.WriteString("\n")
 		if insight := imf.BuildPromptSection(data.IMFData); insight != "" {
