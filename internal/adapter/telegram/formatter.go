@@ -484,7 +484,40 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 	if a.CommExtremeBear {
 		b.WriteString("🔴 <b>Commercial COT Extreme SHORT</b> (contrarian bearish signal)\n")
 	}
-	if a.AssetMgrAlert || a.ThinMarketAlert || a.SmartDumbDivergence || a.CommExtremeBull || a.CommExtremeBear {
+	if a.CategoryDivergence {
+		b.WriteString(fmt.Sprintf("⚡ <b>Category Divergence:</b> %s\n", a.CategoryDivergenceDesc))
+	}
+	if a.AssetMgrAlert || a.ThinMarketAlert || a.SmartDumbDivergence || a.CommExtremeBull || a.CommExtremeBear || a.CategoryDivergence {
+		b.WriteString("\n")
+	}
+
+	// Category Z-Score Breakdown (show if any alert or divergence exists)
+	hasZAlert := a.DealerAlert || a.LevFundAlert || a.ManagedMoneyAlert || a.SwapDealerAlert || a.CategoryDivergence
+	if hasZAlert {
+		b.WriteString("📊 <b>Category Z-Scores (WoW Change vs 52W):</b>\n")
+		zScoreEmoji := func(z float64, alert bool) string {
+			if !alert {
+				return "  "
+			}
+			if z > 0 {
+				return "🟢"
+			}
+			return "🔴"
+		}
+		if rt == "TFF" {
+			b.WriteString(fmt.Sprintf("<code>  Dealer:       %+.2fσ %s</code>\n", a.DealerZScore, zScoreEmoji(a.DealerZScore, a.DealerAlert)))
+			b.WriteString(fmt.Sprintf("<code>  LevFund:      %+.2fσ %s</code>\n", a.LevFundZScore, zScoreEmoji(a.LevFundZScore, a.LevFundAlert)))
+			b.WriteString(fmt.Sprintf("<code>  AssetMgr:     %+.2fσ %s</code>\n", a.AssetMgrZScore, zScoreEmoji(a.AssetMgrZScore, a.AssetMgrAlert)))
+			b.WriteString(fmt.Sprintf("<code>  ManagedMoney: %+.2fσ %s</code>\n", a.ManagedMoneyZScore, zScoreEmoji(a.ManagedMoneyZScore, a.ManagedMoneyAlert)))
+		} else {
+			// DISAGGREGATED: SwapDealer and ManagedMoney are primary
+			b.WriteString(fmt.Sprintf("<code>  ManagedMoney: %+.2fσ %s</code>\n", a.ManagedMoneyZScore, zScoreEmoji(a.ManagedMoneyZScore, a.ManagedMoneyAlert)))
+			b.WriteString(fmt.Sprintf("<code>  SwapDealer:   %+.2fσ %s</code>\n", a.SwapDealerZScore, zScoreEmoji(a.SwapDealerZScore, a.SwapDealerAlert)))
+			b.WriteString(fmt.Sprintf("<code>  LevFund:      %+.2fσ %s</code>\n", a.LevFundZScore, zScoreEmoji(a.LevFundZScore, a.LevFundAlert)))
+		}
+		b.WriteString(fmt.Sprintf("<i>  Alert threshold: |z| ≥ 2.0σ  |  max |z|: %.2f</i>\n",
+			math.Max(math.Max(math.Abs(a.DealerZScore), math.Abs(a.LevFundZScore)),
+				math.Max(math.Abs(a.ManagedMoneyZScore), math.Abs(a.SwapDealerZScore)))))
 		b.WriteString("\n")
 	}
 
