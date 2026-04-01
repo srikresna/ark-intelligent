@@ -313,6 +313,9 @@ func main() {
 	newsSched.SetImpactRecorder(impactRecorder)
 
 	newsSched.Start(ctx)
+
+	// Wire surprise accumulator to main scheduler for ConvictionScoreV3 (fixes BUG-5)
+	sched.SetSurpriseProvider(newsSched)
 	log.Info().Msg("News Background scheduler started")
 
 	// -----------------------------------------------------------------------

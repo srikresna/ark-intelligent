@@ -71,6 +71,12 @@ type Deps struct {
 	// IsBanned checks if a user is banned. May be nil (no ban check).
 	IsBanned func(ctx context.Context, userID int64) bool
 
+	// SurpriseProvider retrieves per-currency economic surprise sigma.
+	// Used for ConvictionScoreV3 in COT broadcast. May be nil (sigma=0).
+	SurpriseProvider interface {
+		GetSurpriseSigma(currency string) float64
+	}
+
 	// OwnerChatID is the owner's chat ID for debug notifications.
 	// If empty, debug notifications are skipped.
 	OwnerChatID string
@@ -108,6 +114,12 @@ func New(deps *Deps) *Scheduler {
 }
 
 // Start launches all background jobs. Non-blocking.
+// SetSurpriseProvider injects the economic surprise accumulator into the scheduler.
+// This is called after the news scheduler is initialized (due to init order dependency).
+func (s *Scheduler) SetSurpriseProvider(sp interface{ GetSurpriseSigma(string) float64 }) {
+	s.deps.SurpriseProvider = sp
+}
+
 func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1040,15 +1052,15 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		}
 
 		// Compute ConvictionScore V3 (5-component: COT + Calendar + Stress + FRED + Price)
-		// BUG-5: newsScheduler (which holds GetSurpriseSigma) is not wired into
-		// the main scheduler's Deps, so we cannot retrieve the live surprise
-		// accumulator here. Pass 0 until Deps is extended with a NewsScheduler
-		// reference (tracked as a follow-up).
+		var surpriseSigma float64
+		if s.deps.SurpriseProvider != nil {
+			surpriseSigma = s.deps.SurpriseProvider.GetSurpriseSigma(analysis.Contract.Currency)
+		}
 		var priceCtx *domain.PriceContext
 		if len(enrich) > 0 && enrich[0].priceCtxs != nil {
 			priceCtx = enrich[0].priceCtxs[sig.ContractCode]
 		}
-		cs := cotsvc.ComputeConvictionScoreV3(*analysis, macroRegime, 0, "", macroData, priceCtx)
+		cs := cotsvc.ComputeConvictionScoreV3(*analysis, macroRegime, surpriseSigma, "", macroData, priceCtx)
 		ps.ConvictionScore = cs.Score
 
 		// --- Quant Model Enrichment ---
