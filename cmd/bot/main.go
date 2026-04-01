@@ -29,6 +29,7 @@ import (
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
+	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
@@ -108,6 +109,11 @@ func main() {
 			log.Warn().Err(err).Msg("FRED snapshot persistence failed (non-fatal)")
 		}
 	})
+
+	// Sentiment cache: inject BadgerDB for persistence across restarts.
+	// Saves Firecrawl API quota by avoiding re-fetches on every restart.
+	sentiment.InitSentimentCache(db.Badger())
+	log.Info().Msg("Sentiment cache persistence initialized (BadgerDB-backed)")
 
 	log.Info().Msg("Storage layer initialized")
 	logStorageSize(db)

@@ -876,6 +876,70 @@ Total: %.0f%%
 		fmtutil.FormatDateTimeUTC(heat.UpdatedAt))
 }
 
+// formatRiskParity renders a risk-parity sizing analysis for Telegram HTML.
+func formatRiskParity(rp *strategy.RiskParityResult) string {
+	if rp == nil {
+		return ""
+	}
+
+	adviceEmoji := "⚖️"
+	switch rp.Recommendation {
+	case strategy.SizingScaleDown:
+		adviceEmoji = "🔻"
+	case strategy.SizingScaleUp:
+		adviceEmoji = "🔺"
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("<b>⚖️ Risk Parity Sizing</b>\n\n"+
+		"%s Rekomendasi: <b>%s</b>\n"+
+		"Heat Total: <b>%.1f%%</b> / %.1f%% maks\n"+
+		"Kelly: %.1f%% (½K: %.1f%%)\n",
+		adviceEmoji, rp.Recommendation,
+		rp.TotalHeatPct, rp.MaxHeatPct,
+		rp.KellyFraction*100, rp.HalfKelly*100))
+
+	if len(rp.HeatBreakdown) > 0 {
+		sb.WriteString("\n<b>Heat per Posisi:</b>\n")
+		for _, h := range rp.HeatBreakdown {
+			bar := heatBar(h.RiskPct, rp.MaxHeatPct/float64(len(rp.HeatBreakdown)))
+			sb.WriteString(fmt.Sprintf("  %s: $%.0f (%.1f%%) %s\n", h.Symbol, h.RiskAmt, h.RiskPct, bar))
+		}
+	}
+
+	if len(rp.AdjustedPositions) > 0 {
+		sb.WriteString("\n<b>Sizing Adjustment:</b>\n")
+		for _, a := range rp.AdjustedPositions {
+			arrow := "→"
+			if a.ScaleFactor < 0.95 {
+				arrow = "↓"
+			} else if a.ScaleFactor > 1.05 {
+				arrow = "↑"
+			}
+			sb.WriteString(fmt.Sprintf("  %s: %.0f %s %.0f (×%.2f)\n",
+				a.Symbol, a.OriginalSize, arrow, a.RecommendedSize, a.ScaleFactor))
+		}
+	}
+
+	return sb.String()
+}
+
+// heatBar renders a small inline bar for heat percentage.
+func heatBar(pct, thresholdPerPos float64) string {
+	if thresholdPerPos <= 0 {
+		return ""
+	}
+	ratio := pct / thresholdPerPos
+	switch {
+	case ratio >= 1.5:
+		return "🔴"
+	case ratio >= 1.0:
+		return "🟡"
+	default:
+		return "🟢"
+	}
+}
+
 func formatRankX(result *factors.RankingResult) string {
 	if result == nil || len(result.Assets) == 0 {
 		return "⚠️ Tidak ada data ranking."

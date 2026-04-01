@@ -106,6 +106,7 @@ type Scheduler struct {
 	lastFREDBroadcast time.Time    // last time FRED alerts were broadcast (dedup guard)
 
 	lastTailRisk     string     // previous VolSuite TailRisk state for SKEW/VIX alert diffing
+	regimeMu         sync.RWMutex // protects regimeEngine access
 		cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
 	lastCOTBroadcast time.Time  // last date successfully broadcast to prevent duplicates
 }
@@ -185,6 +186,7 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 		jobCount++
 	}
 
+	// Proactive regime alert (checks every 4 hours for HMM regime transitions)	if s.deps.DailyPriceRepo != nil && s.deps.PriceFetcher != nil {		s.startJobWithDelay(ctx, "regime-alert", 4*time.Hour, 2*time.Minute, s.jobRegimeAlert)		jobCount++	}
 	// One-time impact bootstrap (backfills historical event impacts on startup)
 	if s.deps.ImpactBootstrapper != nil {
 		s.wg.Add(1)
