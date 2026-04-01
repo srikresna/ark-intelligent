@@ -22,16 +22,18 @@ func TestParseInstrumentExpiry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := parseInstrumentExpiry(tt.input)
+			got, err := parseExpiryFromInstrument(tt.input)
+			ok := err == nil
 			if ok != tt.wantOK {
-				t.Fatalf("parseInstrumentExpiry(%q) ok=%v, want %v", tt.input, ok, tt.wantOK)
+				t.Fatalf("parseExpiryFromInstrument(%q) ok=%v, want %v", tt.input, ok, tt.wantOK)
 			}
 			if !ok {
 				return
 			}
+			_ = err
 			gotDay := got.Format("2006-01-02")
 			if gotDay != tt.wantDay {
-				t.Errorf("parseInstrumentExpiry(%q) = %s, want %s", tt.input, gotDay, tt.wantDay)
+				t.Errorf("parseExpiryFromInstrument(%q) = %s, want %s", tt.input, gotDay, tt.wantDay)
 			}
 			// Verify 08:00 UTC expiry time
 			if got.Hour() != 8 || got.Minute() != 0 {
@@ -53,8 +55,11 @@ func TestGetBookSummary_FiltersExpired(t *testing.T) {
 	futureDate := now.AddDate(0, 0, 30)
 	futureInstr := "BTC-" + futureDate.Format("2Jan06") + "-80000-C"
 
-	pastExpiry, pastOK := parseInstrumentExpiry(pastInstr)
-	futureExpiry, futureOK := parseInstrumentExpiry(futureInstr)
+	pastExpiry, pastErr := parseExpiryFromInstrument(pastInstr)
+	pastOK := pastErr == nil
+	futureExpiry, futureErr := parseExpiryFromInstrument(futureInstr)
+	futureOK := futureErr == nil
+	_, _ = pastErr, futureErr
 
 	if !pastOK {
 		t.Fatalf("failed to parse past instrument: %s", pastInstr)

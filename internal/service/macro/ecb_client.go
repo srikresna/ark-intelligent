@@ -259,6 +259,17 @@ func parseECBDate(s string) time.Time {
 	return time.Time{}
 }
 
+// ---------------------------------------------------------------------------
+// Package-level singleton
+// ---------------------------------------------------------------------------
+
+var defaultECBClient = NewECBClient()
+
+// GetECBData returns the latest ECB data using the package-level client.
+func GetECBData(ctx context.Context) (*ECBData, error) {
+	return defaultECBClient.GetData(ctx)
+}
+
 // FormatECBData formats ECB data for Telegram HTML display.
 func FormatECBData(d *ECBData) string {
 	if d == nil || d.IsZero() {
