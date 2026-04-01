@@ -3,7 +3,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"html"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -20,8 +19,8 @@ func (h *Handler) cmdReport(ctx context.Context, chatID string, userID int64, ar
 	gen := backtestsvc.NewReportGenerator(h.signalRepo)
 	report, err := gen.GenerateWeeklyReport(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error generating report: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	htmlOut := h.fmt.FormatWeeklyReport(report)
@@ -128,8 +127,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 func (h *Handler) backtestMenu(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	summary := "📊 <b>BACKTEST DASHBOARD</b>\n"
@@ -149,8 +148,8 @@ func (h *Handler) backtestMenu(ctx context.Context, chatID string, calc *backtes
 func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if stats.TotalSignals == 0 {
@@ -166,8 +165,8 @@ func (h *Handler) backtestAll(ctx context.Context, chatID string, calc *backtest
 func (h *Handler) backtestBySignalType(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	statsMap, err := calc.ComputeAllBySignalType(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(statsMap) == 0 {
@@ -184,8 +183,8 @@ func (h *Handler) backtestBySignalType(ctx context.Context, chatID string, calc 
 func (h *Handler) backtestOneSignalType(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator, sigType string) error {
 	stats, err := calc.ComputeBySignalType(ctx, sigType)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if stats.TotalSignals == 0 {
@@ -243,8 +242,8 @@ func (h *Handler) backtestByContract(ctx context.Context, chatID string, calc *b
 
 	stats, err := calc.ComputeByContract(ctx, mapping.ContractCode)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if stats.TotalSignals == 0 {
@@ -268,8 +267,8 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 	calc := backtestsvc.NewStatsCalculator(h.signalRepo)
 	stats, err := calc.ComputeAll(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if stats.Evaluated == 0 {
@@ -304,8 +303,8 @@ func (h *Handler) backtestBaseline(ctx context.Context, chatID string) error {
 	gen := backtestsvc.NewBaselineGenerator(h.signalRepo)
 	result, err := gen.ComputeBaseline(ctx, 1000)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	var b strings.Builder
@@ -345,8 +344,8 @@ func (h *Handler) backtestBaseline(ctx context.Context, chatID string) error {
 func (h *Handler) backtestByRegime(ctx context.Context, chatID string, calc *backtestsvc.StatsCalculator) error {
 	statsMap, err := calc.ComputeByRegime(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(statsMap) == 0 {
@@ -363,8 +362,8 @@ func (h *Handler) backtestByRegime(ctx context.Context, chatID string, calc *bac
 func (h *Handler) backtestDedup(ctx context.Context, chatID string) error {
 	signals, err := h.signalRepo.GetAllSignals(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	result := backtestsvc.ComputeDedupStats(signals)
@@ -390,8 +389,8 @@ func (h *Handler) backtestTiming(ctx context.Context, chatID string) error {
 	analyzer := backtestsvc.NewTimingAnalyzer(h.signalRepo)
 	analyses, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(analyses) == 0 {
@@ -409,8 +408,8 @@ func (h *Handler) backtestWalkForward(ctx context.Context, chatID string) error 
 	analyzer := backtestsvc.NewWalkForwardAnalyzer(h.signalRepo)
 	result, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(result.Windows) == 0 {
@@ -428,8 +427,8 @@ func (h *Handler) backtestWeights(ctx context.Context, chatID string) error {
 	optimizer := backtestsvc.NewWeightOptimizer(h.signalRepo)
 	result, err := optimizer.OptimizeWeights(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	htmlOut := h.fmt.FormatWeightOptimization(result)
@@ -447,8 +446,8 @@ func (h *Handler) backtestSmartMoney(ctx context.Context, chatID string) error {
 	analyzer := backtestsvc.NewSmartMoneyAnalyzer(h.cotRepo, h.priceRepo)
 	results, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(results) == 0 {
@@ -471,8 +470,8 @@ func (h *Handler) backtestExcursion(ctx context.Context, chatID string) error {
 	analyzer := backtestsvc.NewExcursionAnalyzer(h.signalRepo, h.dailyPriceRepo)
 	summary, err := analyzer.Analyze(ctx, 10)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if summary.TotalSignals == 0 {
@@ -495,8 +494,8 @@ func (h *Handler) backtestTrendFilter(ctx context.Context, chatID string) error 
 	analyzer := backtestsvc.NewTrendFilterAnalyzer(h.signalRepo)
 	stats, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if stats.TotalSignals == 0 {
@@ -514,8 +513,8 @@ func (h *Handler) backtestMatrix(ctx context.Context, chatID string) error {
 	analyzer := backtestsvc.NewMatrixAnalyzer(h.signalRepo)
 	matrix, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	if len(matrix.Cells) == 0 {
@@ -575,8 +574,8 @@ func (h *Handler) backtestMonteCarlo(ctx context.Context, chatID string) error {
 	sim := backtestsvc.NewMonteCarloSimulator(h.signalRepo)
 	result, err := sim.Simulate(ctx, 1000)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	var b strings.Builder
@@ -604,8 +603,8 @@ func (h *Handler) backtestPortfolio(ctx context.Context, chatID string) error {
 	analyzer := backtestsvc.NewPortfolioAnalyzer(h.signalRepo)
 	result, err := analyzer.Analyze(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	var b strings.Builder
@@ -630,8 +629,8 @@ func (h *Handler) backtestPortfolio(ctx context.Context, chatID string) error {
 func (h *Handler) backtestCost(ctx context.Context, chatID string) error {
 	signals, err := h.signalRepo.GetAllSignals(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	result := backtestsvc.ComputeCostAnalysis(signals, "ALL")
@@ -668,8 +667,8 @@ func truncate(s string, maxLen int) string {
 func (h *Handler) backtestRuin(ctx context.Context, chatID string) error {
 	signals, err := h.signalRepo.GetAllSignals(ctx)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("Error: %s", html.EscapeString(err.Error())))
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
 	}
 
 	result := backtestsvc.ComputeRiskOfRuinFromSignals(signals)

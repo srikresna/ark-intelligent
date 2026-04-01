@@ -149,15 +149,15 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		return err
 	}
 
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
 
 	state, err := h.computeQuantState(ctx, mapping, timeframe)
 	if err != nil {
 		if loadingID > 0 {
 			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 		}
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		h.sendUserError(ctx, chatID, err, "quant")
+		return nil
 	}
 
 	h.quantCache.set(chatID, state)
@@ -315,8 +315,8 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
 	if err != nil {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		h.sendUserError(ctx, chatID, err, "quant")
+		return nil
 	}
 
 	kb := h.kb.QuantDetailMenu()
