@@ -323,6 +323,20 @@ type COTAnalysis struct {
 	AssetMgrZScore float64 `json:"asset_mgr_z_score"`
 	AssetMgrAlert  bool    `json:"asset_mgr_alert"`
 
+	// Category Z-Scores (per category WoW change vs 52W mean/stddev)
+	DealerZScore       float64 `json:"dealer_z_score"`
+	DealerAlert        bool    `json:"dealer_alert"`
+	LevFundZScore      float64 `json:"lev_fund_z_score"`
+	LevFundAlert       bool    `json:"lev_fund_alert"`
+	ManagedMoneyZScore float64 `json:"managed_money_z_score"`
+	ManagedMoneyAlert  bool    `json:"managed_money_alert"`
+	SwapDealerZScore   float64 `json:"swap_dealer_z_score"`
+	SwapDealerAlert    bool    `json:"swap_dealer_alert"`
+
+	// Cross-category divergence signal
+	CategoryDivergence     bool   `json:"category_divergence"`      // true if significant divergence detected
+	CategoryDivergenceDesc string `json:"category_divergence_desc"` // human-readable description
+
 	// --- H. Trader Concentration (NEW: from traders_* API fields) ---
 	// Number of unique traders per category — thin market / crowding detection.
 	DealerShortTraders  int     `json:"dealer_short_traders"`  // Low = highly concentrated (risky)
