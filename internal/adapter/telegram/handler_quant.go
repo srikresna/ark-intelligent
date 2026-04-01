@@ -378,6 +378,13 @@ type quantAssetClose struct {
 // ---------------------------------------------------------------------------
 
 func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineResult, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().
+				Interface("panic", r).
+				Msg("panic in runQuantEngine — subprocess may have failed")
+		}
+	}()
 	tf := state.timeframe
 	bars, ok := state.bars[tf]
 	if !ok || len(bars) == 0 {

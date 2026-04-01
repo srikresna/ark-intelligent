@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -245,7 +246,10 @@ func (b *Bot) getUpdates(ctx context.Context, offset, limit, timeout int) ([]Upd
 func (b *Bot) handleUpdate(ctx context.Context, update Update) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error().Interface("panic", r).Msg("panic in handler")
+			log.Error().
+				Interface("panic", r).
+				Str("stack", string(debug.Stack())).
+				Msg("PANIC recovered in handleUpdate — bot continues running")
 		}
 	}()
 
