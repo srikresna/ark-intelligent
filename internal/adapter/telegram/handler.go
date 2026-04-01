@@ -221,6 +221,7 @@ func NewHandler(
 	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
+	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
