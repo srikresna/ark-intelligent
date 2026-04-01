@@ -41,6 +41,10 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 				e.Volume/1000, // raw ratio placeholder; real would need avgVol
 				sigIcon,
 			))
+			// Educational tooltip for key Wyckoff events
+			if tooltip := wyckoffEventTooltip(e.Name); tooltip != "" {
+				b.WriteString(fmt.Sprintf("     <i>↳ %s</i>\n", tooltip))
+			}
 		}
 		b.WriteString("\n")
 	}
@@ -125,6 +129,31 @@ func phaseForEvent(phases []wyckoff.WyckoffPhase, barIndex int) string {
 		}
 	}
 	return "?"
+}
+
+// wyckoffEventTooltip returns a short Indonesian educational description for key Wyckoff events.
+// Returns empty string for events that don't need a tooltip.
+func wyckoffEventTooltip(name wyckoff.EventName) string {
+	switch name {
+	case wyckoff.EventSpring:
+		return "false breakdown di bawah support — sinyal pembalikan bullish, smart money menyerap jual"
+	case wyckoff.EventSOS:
+		return "SOS (Sign of Strength): breakout di atas resistance dengan volume tinggi — konfirmasi akumulasi"
+	case wyckoff.EventUTAD:
+		return "UTAD (Upthrust After Distribution): false breakout di atas resistance — sinyal pembalikan bearish"
+	case wyckoff.EventSOW:
+		return "SOW (Sign of Weakness): breakdown di bawah support dengan volume — konfirmasi distribusi"
+	case wyckoff.EventSC:
+		return "SC (Selling Climax): titik balik penjualan ekstrem dengan volume sangat tinggi"
+	case wyckoff.EventBC:
+		return "BC (Buying Climax): titik balik pembelian ekstrem — tanda distribusi dimulai"
+	case wyckoff.EventAR, wyckoff.EventARDist:
+		return "AR (Automatic Rally/Reaction): pantulan/tekanan awal setelah climax — mendefinisikan batas range"
+	case wyckoff.EventLPS:
+		return "LPS (Last Point of Support): pullback terakhir volume rendah sebelum markup — entry optimal"
+	default:
+		return ""
+	}
 }
 
 // nextWatchEvent suggests what to monitor next based on current phase.

@@ -27,10 +27,11 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	sb.WriteString(fmt.Sprintf("🌡️ <b>GEX REGIME:</b> %s %s (<code>%s</code>)\n",
 		regimeEmoji, r.Regime, gexFormatGEXValue(r.TotalGEX)))
 	if r.Regime == "POSITIVE_GEX" {
-		sb.WriteString("✅ Dealers net long gamma — range-bound / peredam volatilitas\n\n")
+		sb.WriteString("✅ Dealers net long gamma — range-bound / peredam volatilitas\n")
 	} else {
-		sb.WriteString("⚠️ Dealers net short gamma — volatilitas meningkat / trending\n\n")
+		sb.WriteString("⚠️ Dealers net short gamma — volatilitas meningkat / trending\n")
 	}
+	sb.WriteString("<i>📖 GEX (Gamma Exposure): ukuran sensitivitas harga terhadap posisi options dealer</i>\n\n")
 
 	// Key Levels
 	sb.WriteString("🎯 <b>LEVEL KUNCI:</b>\n")
@@ -44,12 +45,15 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	}
 	if r.MaxPain > 0 {
 		sb.WriteString(fmt.Sprintf("  📌 Max Pain:   <code>%s</code>\n", gexFormatPrice(r.MaxPain)))
+		sb.WriteString("     <i>↳ harga di mana options expiry menyebabkan kerugian terkecil bagi option holders</i>\n")
 	}
 	if r.GammaWall > 0 {
 		sb.WriteString(fmt.Sprintf("  📌 Gamma Wall: <code>%s</code> (resistansi call)\n", gexFormatPrice(r.GammaWall)))
+		sb.WriteString("     <i>↳ strike dengan gamma tertinggi — bertindak sebagai magnet harga / resistansi kuat</i>\n")
 	}
 	if r.PutWall > 0 {
 		sb.WriteString(fmt.Sprintf("  📌 Put Wall:   <code>%s</code> (support put)\n", gexFormatPrice(r.PutWall)))
+		sb.WriteString("     <i>↳ level support terkuat dari konsentrasi posisi put options dealer</i>\n")
 	}
 	sb.WriteString("\n")
 

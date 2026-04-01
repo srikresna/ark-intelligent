@@ -162,13 +162,18 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	// Save last currency for context carry-over
 	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
-	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
+	sym := html.EscapeString(mapping.Currency)
+	prog := NewProgress(h.bot, chatID, []string{
+		fmt.Sprintf("⏳ Fetching market data for <b>%s</b> (%s)...", sym, timeframe),
+		fmt.Sprintf("🔄 Running statistical models for <b>%s</b>...", sym),
+		fmt.Sprintf("📊 Computing quant signals for <b>%s</b>...", sym),
+		fmt.Sprintf("✨ Finalizing analysis for <b>%s</b>...", sym),
+	})
+	prog.Start(ctx)
 
 	state, err := h.computeQuantState(ctx, mapping, timeframe)
 	if err != nil {
-		if loadingID > 0 {
-			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-		}
+		prog.Stop(ctx)
 		h.sendUserError(ctx, chatID, err, "quant")
 		return nil
 	}
@@ -176,9 +181,7 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	h.quantCache.set(chatID, state)
 	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
+	prog.Stop(ctx)
 
 	// Send dashboard
 	dashboard := h.formatQuantDashboard(state)
