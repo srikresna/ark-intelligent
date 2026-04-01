@@ -63,6 +63,11 @@ const (
 
 	// PollRetryDelay is the delay before retrying after a poll error.
 	PollRetryDelay = 5 * time.Second
+
+	// MaxConcurrentHandlers is the default maximum number of concurrent
+	// handleUpdate goroutines. Prevents goroutine explosion under burst/flood.
+	// Overridable via HANDLER_CONCURRENCY env var.
+	MaxConcurrentHandlers = 20
 )
 
 // ---------------------------------------------------------------------------
