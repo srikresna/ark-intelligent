@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ import (
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -230,6 +232,8 @@ func NewHandler(
 	bot.RegisterCommand("/s", h.cmdSentiment)
 	bot.RegisterCommand("/p", h.cmdPrice)
 	bot.RegisterCommand("/l", h.cmdLevels)
+	bot.RegisterCommand("/history", h.cmdHistory)
+	bot.RegisterCommand("/h", h.cmdHistory)
 
 
 	// Register callback handlers
@@ -968,6 +972,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// World Bank cross-country macro fundamentals (graceful degradation on error)
 	wbData, _ := worldbank.GetCachedOrFetch(ctx)
 
+	// BIS REER/NEER currency valuation (graceful degradation on error)
+	bisData, _ := bis.GetCachedOrFetch(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -1008,6 +1015,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		BacktestStats:      backtestStats,
 		CurrencyStrength:   currencyStrength,
 		WorldBankData:      wbData,
+		BISData:            bisData,
 		Language:           prefs.Language,
 	}
 
@@ -1643,6 +1651,115 @@ func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID in
 	}
 }
 
+
+
+// cmdHistory shows COT positioning history for a currency.
+// Usage: /history EUR [4|8|12] — weeks of history (default 4)
+func (h *Handler) cmdHistory(ctx context.Context, chatID string, userID int64, args string) error {
+	h.bot.SendTyping(ctx, chatID)
+
+	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
+	if len(parts) == 0 {
+		// Try last currency
+		lc := h.getLastCurrency(ctx, userID)
+		if lc != "" {
+			parts = []string{lc}
+		} else {
+			_, err := h.bot.SendHTML(ctx, chatID,
+				"📊 <b>COT History</b>\n\nUsage: <code>/history EUR</code> atau <code>/h GBP 8</code>\n\nTampilkan positioning history 4-12 minggu terakhir.")
+			return err
+		}
+	}
+
+	currency := parts[0]
+	weeks := 4
+	if len(parts) > 1 {
+		if w, err := strconv.Atoi(parts[1]); err == nil && w >= 2 && w <= 52 {
+			weeks = w
+		}
+	}
+
+	h.saveLastCurrency(ctx, userID, currency)
+	contractCode := currencyToContractCode(currency)
+
+	records, err := h.cotRepo.GetHistory(ctx, contractCode, weeks)
+	if err != nil || len(records) == 0 {
+		h.sendUserError(ctx, chatID, fmt.Errorf("no history for %s", currency), "history")
+		return nil
+	}
+
+	// Build history view
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("📊 <b>COT History — %s (%d weeks)</b>\n", currency, len(records)))
+	b.WriteString(fmt.Sprintf("<i>%s → %s</i>\n\n", records[len(records)-1].ReportDate.Format("02 Jan"), records[0].ReportDate.Format("02 Jan 2006")))
+
+	// Sparkline of net position
+	netPositions := make([]float64, len(records))
+	for i, r := range records {
+		netPositions[i] = r.GetSmartMoneyNet("TFF")
+	}
+	// Reverse for sparkline (oldest first)
+	for i, j := 0, len(netPositions)-1; i < j; i, j = i+1, j-1 {
+		netPositions[i], netPositions[j] = netPositions[j], netPositions[i]
+	}
+	b.WriteString("📈 Net Position Trend: <code>")
+	b.WriteString(sparkLine(netPositions))
+	b.WriteString("</code>\n\n")
+
+	// Table
+	b.WriteString("<pre>")
+	b.WriteString("Date       | Net Pos   | Chg      | L/S\n")
+	b.WriteString("───────────┼───────────┼──────────┼────\n")
+	for i, r := range records {
+		net := int64(r.GetSmartMoneyNet("TFF"))
+		var chg int64
+		if i+1 < len(records) {
+			prevNet := int64(records[i+1].GetSmartMoneyNet("TFF"))
+			chg = net - prevNet
+		}
+		ratio := 0.0
+		if r.LevFundShort > 0 {
+			ratio = r.LevFundLong / r.LevFundShort
+		}
+		b.WriteString(fmt.Sprintf("%-10s | %+9d | %+8d | %.2f\n",
+			r.ReportDate.Format("02 Jan"), net, chg, ratio))
+	}
+	b.WriteString("</pre>")
+
+	_, err = h.bot.SendHTML(ctx, chatID, b.String())
+	return err
+}
+
+
+// sparkLine generates a Unicode sparkline from a slice of values.
+func sparkLine(values []float64) string {
+	if len(values) == 0 {
+		return ""
+	}
+	blocks := []rune("▁▂▃▄▅▆▇█")
+	min, max := values[0], values[0]
+	for _, v := range values {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	span := max - min
+	if span == 0 {
+		return strings.Repeat("▄", len(values))
+	}
+	var result []rune
+	for _, v := range values {
+		idx := int((v - min) / span * float64(len(blocks)-1))
+		if idx >= len(blocks) {
+			idx = len(blocks) - 1
+		}
+		result = append(result, blocks[idx])
+	}
+	return string(result)
+}
 
 // saveLastCurrency persists the user's last viewed currency for context carry-over.
 func (h *Handler) saveLastCurrency(ctx context.Context, userID int64, currency string) {
