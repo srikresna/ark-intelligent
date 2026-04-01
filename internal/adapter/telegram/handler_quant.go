@@ -141,9 +141,13 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	symbol := parts[0]
-	timeframe := "daily"
+	timeframe := ""
 	if len(parts) > 1 {
 		timeframe = strings.ToLower(parts[1])
+	}
+	if timeframe == "" {
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		timeframe = domain.ResolveDefaultTimeframe(prefs.DefaultTimeframe)
 	}
 
 	mapping := domain.FindPriceMappingByCurrency(symbol)
@@ -170,6 +174,7 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	h.quantCache.set(chatID, state)
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
@@ -485,13 +490,11 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	outData, err := os.ReadFile(outputPath)
 	os.Remove(outputPath)
 	if err != nil {
-		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("read quant output: %w", err)
 	}
 
 	var result quantEngineResult
 	if err := json.Unmarshal(outData, &result); err != nil {
-		os.Remove(chartPath) // cleanup chart on failure
 		return nil, fmt.Errorf("parse quant output: %w", err)
 	}
 

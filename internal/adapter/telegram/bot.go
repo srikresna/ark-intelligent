@@ -338,13 +338,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *Message) {
 			}
 			return
 		}
-	} else if userID != 0 && !b.isOwner(userID) && !b.userLimiter.Allow(userID) {
-		// Fallback to legacy rate limiter if middleware not installed
-		log.Warn().Int64("user_id", userID).Str("command", cmd).Msg("user rate limited")
-		if _, err := b.SendHTML(ctx, chatID, "\u23f3 Rate limited \u2014 please wait a moment before sending more commands."); err != nil {
-			log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send rate-limited message")
+	} else if userID != 0 && !b.isOwner(userID) {
+		if allowed, retryAfter := b.userLimiter.Allow(userID); !allowed {
+			// Fallback to legacy rate limiter if middleware not installed
+			log.Warn().Int64("user_id", userID).Str("command", cmd).Msg("user rate limited")
+			waitSec := int(retryAfter.Seconds())
+			msg := fmt.Sprintf("⏳ Batas request tercapai. Coba lagi dalam ~%d detik.", waitSec)
+			if _, err := b.SendHTML(ctx, chatID, msg); err != nil {
+				log.Error().Err(err).Str("chat_id", chatID).Msg("failed to send rate-limited message")
+			}
+			return
 		}
-		return
 	}
 
 	log.Info().Str("command", cmd).Int64("user_id", userID).Str("chat_id", chatID).Msg("command received")
@@ -395,11 +399,15 @@ func (b *Bot) handleCallback(ctx context.Context, cb *CallbackQuery) {
 			_ = b.AnswerCallback(ctx, cb.ID, result.Reason)
 			return
 		}
-	} else if !b.isOwner(userID) && !b.userLimiter.Allow(userID) {
-		// Fallback to legacy rate limiter if middleware not installed
-		log.Warn().Int64("user_id", userID).Str("data", cb.Data).Msg("user rate limited (callback)")
-		_ = b.AnswerCallback(ctx, cb.ID, "\u23f3 Rate limited \u2014 please wait a moment.")
-		return
+	} else if !b.isOwner(userID) {
+		if allowed, retryAfter := b.userLimiter.Allow(userID); !allowed {
+			// Fallback to legacy rate limiter if middleware not installed
+			log.Warn().Int64("user_id", userID).Str("data", cb.Data).Msg("user rate limited (callback)")
+			waitSec := int(retryAfter.Seconds())
+			msg := fmt.Sprintf("⏳ Batas request tercapai. Coba lagi dalam ~%d detik.", waitSec)
+			_ = b.AnswerCallback(ctx, cb.ID, msg)
+			return
+		}
 	}
 
 	// Find handler by prefix match

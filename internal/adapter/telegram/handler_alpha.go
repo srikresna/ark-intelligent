@@ -23,6 +23,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -703,7 +704,7 @@ func formatFactorRanking(result *factors.RankingResult) string {
 	}
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("<b>📊 Factor Ranking</b> — %d aset\n", result.AssetCount))
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 
 	for _, a := range result.Assets {
 		emoji := alphaSignalEmoji(string(a.Signal))
@@ -750,7 +751,7 @@ func formatPlaybook(result *strategy.PlaybookResult) string {
 		sb.WriteString(fmt.Sprintf("Regime: <b>%s</b> — <i>%s</i>\n",
 			html.EscapeString(result.MacroRegime), regimeDesc))
 	}
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 
 	if result.Transition.IsActive {
 		sb.WriteString(fmt.Sprintf("⚠️ <b>TRANSISI:</b> %s → %s (%.0f%% prob)\n",
@@ -868,7 +869,7 @@ Total: %.0f%%
 		heat.NetExposure,
 		heat.TotalExposure*100,
 		advice,
-		heat.UpdatedAt.UTC().Format("02 Jan 15:04"))
+		fmtutil.FormatDateTimeUTC(heat.UpdatedAt))
 }
 
 func formatRankX(result *factors.RankingResult) string {
@@ -910,7 +911,7 @@ func formatRankX(result *factors.RankingResult) string {
 				i+1, html.EscapeString(a.Currency), a.CompositeScore, alphaSignalEmoji(string(a.Signal))))
 		}
 	}
-	sb.WriteString(fmt.Sprintf("\n<i>%s UTC</i>", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("\n<i>%s</i>", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 	return sb.String()
 }
 
@@ -928,11 +929,11 @@ Status: ✅ <i>Stabil — tidak ada transisi terdeteksi</i>
 
 <i>Artinya: kondisi ekonomi makro tidak menunjukkan perubahan signifikan. Lanjutkan strategi sesuai regime saat ini.</i>
 
-<i>%s UTC</i>`,
+<i>%s</i>`,
 			html.EscapeString(currentRegime),
 			regimeDesc,
 			tw.Probability*100,
-			time.Now().UTC().Format("02 Jan 15:04"))
+			fmtutil.FormatDateTimeUTC(time.Now()))
 	}
 
 	emoji := "⚠️"
@@ -980,7 +981,7 @@ func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []stri
 
 	var sb strings.Builder
 	sb.WriteString("<b>⚡ Crypto Microstructure Alpha</b>\n")
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", time.Now().UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(time.Now())))
 
 	// DeFi TVL context from DeFiLlama (graceful skip if unavailable)
 	if tvl != nil && tvl.Available {

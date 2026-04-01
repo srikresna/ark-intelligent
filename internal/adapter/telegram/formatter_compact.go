@@ -133,6 +133,75 @@ func (f *Formatter) FormatCOTOverviewMinimal(analyses []domain.COTAnalysis, conv
 	return b.String()
 }
 
+// FormatCOTOverviewSparkline renders one compact line per currency in mobile-friendly format.
+// Each line shows: emoji arrow, currency, net position k, WoW change, a COTIndex percentile bar,
+// and conviction signal. Output stays under ~80 chars wide — readable on 320px screens.
+func (f *Formatter) FormatCOTOverviewSparkline(analyses []domain.COTAnalysis, convictions []cot.ConvictionScore) string {
+	var b strings.Builder
+	b.WriteString("📱 <b>COT Mobile View</b>\n")
+	if len(analyses) > 0 {
+		b.WriteString(fmt.Sprintf("<i>%s</i>\n", analyses[0].ReportDate.Format("02 Jan 2006")))
+	}
+	b.WriteString("\n")
+
+	convMap := make(map[string]cot.ConvictionScore, len(convictions))
+	for _, c := range convictions {
+		convMap[c.Currency] = c
+	}
+
+	for _, a := range analyses {
+		code := a.Contract.Currency
+		if code == "" {
+			code = contractCodeToFriendly(a.Contract.Code)
+		}
+
+		// Emoji direction indicator
+		arrow := "➡"
+		if a.NetChange > 0 {
+			arrow = "🟢"
+		} else if a.NetChange < 0 {
+			arrow = "🔴"
+		}
+
+		// Percentile bar from COTIndex (0-100) → 5-block sparkline
+		pctBar := cotIndexBar(a.COTIndex)
+
+		// Conviction label
+		signal := ""
+		if conv, ok := convMap[code]; ok && conv.Direction != "" {
+			signal = fmt.Sprintf(" %s", conv.Direction)
+		}
+
+		b.WriteString(fmt.Sprintf("%s <b>%s</b>: %+.0fk (%+.0fk) <code>%s</code>%s\n",
+			arrow, code, a.NetPosition/1000, a.NetChange/1000, pctBar, signal))
+	}
+
+	b.WriteString("\n💡 <i>Tekan 📖 Detail untuk analisis penuh.</i>")
+	return b.String()
+}
+
+// cotIndexBar converts a COTIndex (0-100) into a 5-block progress bar using Unicode block chars.
+// Example: index=75 → "████░"
+func cotIndexBar(index float64) string {
+	const total = 5
+	if index < 0 {
+		index = 0
+	}
+	if index > 100 {
+		index = 100
+	}
+	filled := int(index / 100 * total)
+	bar := make([]rune, total)
+	for i := 0; i < total; i++ {
+		if i < filled {
+			bar[i] = '█'
+		} else {
+			bar[i] = '░'
+		}
+	}
+	return string(bar)
+}
+
 // FormatMacroSummaryMinimal returns a 2-3 line macro regime summary.
 func (f *Formatter) FormatMacroSummaryMinimal(regime fred.MacroRegime, data *fred.MacroData) string {
 	var b strings.Builder

@@ -126,7 +126,7 @@ func (h *Handler) cmdHelp(ctx context.Context, chatID string, userID int64, args
 	category := strings.ToLower(strings.TrimSpace(args))
 	if category != "" {
 		switch category {
-		case "market", "research", "ai", "signals", "settings", "admin", "changelog":
+		case "market", "research", "ai", "signals", "settings", "admin", "changelog", "shortcuts":
 			return h.sendHelpSubCategory(ctx, chatID, userID, category, 0)
 		}
 	}
@@ -171,7 +171,10 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /bias — Directional bias summary · <code>/bias EUR</code>
 /calendar — Economic calendar · <code>/calendar week</code>
 /price — Daily OHLC price context · <code>/price EUR</code>
-/levels — Support/resistance levels · <code>/levels EUR</code>`
+/levels — Support/resistance levels · <code>/levels EUR</code>
+/history — COT history comparison · <code>/history EUR</code>
+/ecb — ECB monetary policy dashboard · <code>/ecb</code>
+/intermarket — Cross-asset correlation signals`
 
 	case "research":
 		text = `🔬 <b>Research &amp; Alpha Commands</b>
@@ -185,7 +188,10 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /gex — Gamma Exposure (crypto options) · <code>/gex BTC</code> · <code>/gex ETH</code>
 /backtest — Backtest dashboard (17 sub-views)
 /accuracy — Win rate summary
-/report — Weekly signal performance`
+/report — Weekly signal performance
+/wyckoff — Wyckoff phase analysis · <code>/wyckoff EURUSD</code>
+/smc — SMC structure (BOS/CHoCH) · <code>/smc EURUSD</code>
+/elliott — Elliott Wave analysis · <code>/elliott EURUSD</code>`
 
 	case "ai":
 		text = `🧠 <b>AI &amp; Outlook Commands</b>
@@ -223,7 +229,12 @@ Use /settings to configure:
 • Claude Model: Opus / Sonnet / Haiku
 • COT &amp; AI report alerts on/off
 • Currency filter for alerts
-• Alert timing presets`
+• Alert timing presets
+
+<b>⚡ Shortcuts:</b>
+<code>/c</code> cot · <code>/q</code> quant · <code>/b</code> bias · <code>/bt</code> backtest
+<code>/ce</code> cot · <code>/ca</code> cta · <code>/qe</code> quant (with currency arg)
+<code>/bta</code> backtest all · <code>/of</code> outlook fred`
 
 	case "admin":
 		// Only show admin section to admins
@@ -256,6 +267,15 @@ Use /settings to configure:
 			}
 			text = "🆕 <b>What's New</b>\n\n" + cl
 		}
+
+	case "shortcuts":
+		text = "⚡ <b>Quick Shortcuts</b>\n\n" +
+			"<i>Aliases for faster typing on mobile:</i>\n\n" +
+			"<code>/c</code> → /cot · <code>/cal</code> → /calendar · <code>/out</code> → /outlook\n" +
+			"<code>/m</code> → /macro · <code>/b</code> → /bias · <code>/q</code> → /quant\n" +
+			"<code>/bt</code> → /backtest · <code>/r</code> → /rank · <code>/s</code> → /sentiment\n" +
+			"<code>/p</code> → /price · <code>/l</code> → /levels · <code>/h</code> → /history\n\n" +
+			"<i>Tip: All shortcuts accept the same arguments as their full command.</i>"
 
 	default:
 		return h.sendHelp(ctx, chatID, userID)

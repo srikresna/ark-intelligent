@@ -206,8 +206,8 @@ func NewHandler(
 	bot.RegisterCommand("/impact", h.cmdImpact)
 	bot.RegisterCommand("/sentiment", h.cmdSentiment)
 	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
-	bot.RegisterCommand("/price", h.cmdPrice)       // Daily price context
-	bot.RegisterCommand("/levels", h.cmdLevels)     // Support/resistance levels + position sizing
+	bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
+	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 
 	// Membership & upgrade info
@@ -237,6 +237,13 @@ func NewHandler(
 	bot.RegisterCommand("/history", h.cmdHistory)
 	bot.RegisterCommand("/h", h.cmdHistory)
 
+	// Multi-word command+arg aliases for power users (TASK-203)
+	// These combine command + default argument for the most common workflows.
+	bot.RegisterCommand("/ce", h.cmdCOT)            // /ce EUR = /cot EUR
+	bot.RegisterCommand("/ca", h.cmdCTA)             // /ca EUR = /cta EUR
+	bot.RegisterCommand("/qe", h.cmdQuant)           // /qe EUR = /quant EUR
+	bot.RegisterCommand("/bta", h.cmdBacktestAll)    // /bta    = /backtest all
+	bot.RegisterCommand("/of", h.cmdOutlookFRED)     // /of     = /outlook fred
 
 	// Register callback handlers
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
@@ -369,4 +376,20 @@ func (h *Handler) shareCOT(ctx context.Context, chatID string, contractCode stri
 	shareHTML := fmt.Sprintf("<code>%s</code>", html.EscapeString(shareText))
 	_, err = h.bot.SendHTML(ctx, chatID, shareHTML)
 	return err
+}
+
+// cmdBacktestAll is a convenience alias: /bta → /backtest all (TASK-203).
+func (h *Handler) cmdBacktestAll(ctx context.Context, chatID string, userID int64, args string) error {
+	if strings.TrimSpace(args) == "" {
+		args = "all"
+	}
+	return h.cmdBacktest(ctx, chatID, userID, args)
+}
+
+// cmdOutlookFRED is a convenience alias: /of → /outlook fred (TASK-203).
+func (h *Handler) cmdOutlookFRED(ctx context.Context, chatID string, userID int64, args string) error {
+	if strings.TrimSpace(args) == "" {
+		args = "fred"
+	}
+	return h.cmdOutlook(ctx, chatID, userID, args)
 }

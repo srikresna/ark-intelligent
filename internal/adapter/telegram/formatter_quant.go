@@ -9,6 +9,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,9 +28,9 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 	}
 
 	b.WriteString(fmt.Sprintf("⏰ <b>%s — 4H Context</b> %s\n", ic.Currency, arrow))
-	b.WriteString(fmt.Sprintf("<code>Price: %s | As of %s UTC</code>\n\n",
+	b.WriteString(fmt.Sprintf("<code>Price: %s | As of %s</code>\n\n",
 		formatDailyPrice(ic.CurrentPrice, ic.Currency),
-		ic.AsOf.Format("Jan 02 15:04")))
+		fmtutil.FormatDateTimeUTC(ic.AsOf)))
 
 	// Short-term changes
 	b.WriteString("<b>📊 Short-Term Changes</b>\n")
@@ -146,8 +147,8 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 	}
 
 	// --- Cross-Asset vs FX (top 4 FX pairs) ---
-	if len(crossAssets) > 0 && len(fxCurrencies) >= 4 {
-		topFX := fxCurrencies[:4]
+	if len(crossAssets) > 0 && len(fxCurrencies) > 0 {
+		topFX := fxCurrencies[:min(4, len(fxCurrencies))]
 
 		// Group cross-assets by category for readability.
 		type assetGroup struct {
