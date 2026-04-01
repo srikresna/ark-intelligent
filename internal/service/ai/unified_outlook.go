@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
@@ -30,6 +31,7 @@ type UnifiedOutlookData struct {
 	BacktestStats      *domain.BacktestStats
 	CurrencyStrength   []pricesvc.CurrencyStrength
 	WorldBankData      *worldbank.WorldBankData
+	BISData            *bis.BISData
 	Language           string
 }
 
@@ -370,6 +372,38 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString("  - Higher GDP growth differential → currency structural tailwind\n")
 			b.WriteString("  - Current Account surplus → structural currency demand\n")
 			b.WriteString("  - Lower inflation → PPP-based currency strength over time\n")
+			b.WriteString("\n")
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 11: Currency Valuation — BIS REER/NEER
+	// -----------------------------------------------------------------------
+	if data.BISData != nil {
+		available := make([]bis.REERData, 0, len(data.BISData.Currencies))
+		for _, c := range data.BISData.Currencies {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. CURRENCY VALUATION — BIS REER/NEER (Monthly, Broad Basket) ===\n", section))
+			section++ //nolint:ineffassign // section may be used in future extensions
+			b.WriteString("Index base = 2020. LT Avg = 5-year rolling average. Deviation = (REER/LTAvg - 1)%%.\n")
+			b.WriteString(fmt.Sprintf("%-6s  %7s  %7s  %7s  %8s  %12s  %s\n",
+				"CCY", "REER", "NEER", "LTAvg", "Dev%", "Signal", "AsOf"))
+			b.WriteString(strings.Repeat("-", 62) + "\n")
+			for _, c := range available {
+				devStr := fmt.Sprintf("%+.1f%%", c.Deviation)
+				b.WriteString(fmt.Sprintf("%-6s  %7.1f  %7.1f  %7.1f  %8s  %12s  %s\n",
+					c.Currency, c.REER, c.NEER, c.LTAvg, devStr, c.Signal, c.AsOf))
+			}
+			b.WriteString("\n")
+			b.WriteString("NOTE: Use BIS REER for structural FX valuation bias:\n")
+			b.WriteString("  - OVERVALUED REER → structural headwind; risk of mean-reversion lower\n")
+			b.WriteString("  - UNDERVALUED REER → structural tailwind; currency has room to appreciate\n")
+			b.WriteString("  - FAIR (within ±5%) → valuation neutral; momentum/flow dominates\n")
+			b.WriteString("  - Central banks (BIS, IMF) watch REER for FX intervention thresholds\n")
 			b.WriteString("\n")
 		}
 	}
