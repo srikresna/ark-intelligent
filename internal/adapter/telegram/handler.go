@@ -21,6 +21,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
@@ -986,6 +987,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// IMF WEO forecasts — forward-looking GDP, CPI, current account (graceful degradation)
 	imfData, _ := imf.GetCachedOrFetch(ctx)
 
+	// CME FedWatch implied rate probabilities (graceful degradation)
+	fedWatchData := fed.FetchFedWatch(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -1028,6 +1032,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		WorldBankData:      wbData,
 		BISData:            bisData,
 		IMFData:            imfData,
+		FedWatchData:       fedWatchData,
 		Language:           prefs.Language,
 	}
 
