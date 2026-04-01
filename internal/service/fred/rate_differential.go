@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // RateDifferentialEngine computes interest rate differentials and carry trade scores.
@@ -20,7 +22,7 @@ type RateDifferentialEngine struct {
 // NewRateDifferentialEngine creates a new rate differential engine.
 func NewRateDifferentialEngine() *RateDifferentialEngine {
 	return &RateDifferentialEngine{
-		client: &http.Client{Timeout: 15 * time.Second},
+		client: httpclient.New(),
 		apiKey: os.Getenv("FRED_API_KEY"),
 	}
 }

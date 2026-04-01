@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -65,7 +66,7 @@ var (
 	globalCache  *WorldBankData //nolint:gochecknoglobals
 	cacheMu      sync.RWMutex
 	cacheTTL     = 24 * time.Hour //nolint:gochecknoglobals
-	httpClient   = &http.Client{Timeout: 15 * time.Second} //nolint:gochecknoglobals
+	httpClient   = httpclient.New() //nolint:gochecknoglobals
 )
 
 // GetCachedOrFetch returns cached data if within TTL, otherwise fetches fresh

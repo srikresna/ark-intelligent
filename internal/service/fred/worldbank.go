@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // wbLog uses the existing fred package logger.
@@ -176,7 +178,7 @@ func FetchWorldBankMacro(ctx context.Context) (*WorldBankData, error) {
 	wbLog := log.With().Str("source", "worldbank").Logger()
 	wbLog.Info().Msg("Fetching World Bank macro fundamentals")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New()
 	result := &WorldBankData{
 		Countries: make(map[string]*CountryMacro, len(currencyCountry)),
 		FetchedAt: time.Now(),
