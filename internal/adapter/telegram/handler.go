@@ -130,6 +130,10 @@ type Handler struct {
 	// gex holds the GEX engine for /gex command.
 	// May be nil — /gex command disabled if not configured.
 	gex *GEXServices
+
+	// wyckoff holds optional Wyckoff analysis engine services.
+	// May be nil — /wyckoff command disabled if not configured.
+	wyckoff *WyckoffServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
