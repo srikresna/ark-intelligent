@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/news"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
@@ -159,6 +161,9 @@ func (cb *ContextBuilder) BuildSystemPrompt(ctx context.Context, userMessage str
 	// Inject upcoming calendar events
 	cb.injectCalendarContext(ctx, &b)
 
+	// Inject recent Fed speeches
+	cb.injectFedSpeechContext(ctx, &b)
+
 	return b.String()
 }
 
@@ -245,4 +250,68 @@ func (cb *ContextBuilder) injectCalendarContext(ctx context.Context, b *strings.
 		))
 		shown++
 	}
+}
+
+// injectFedSpeechContext adds recent Fed speeches to the AI system prompt.
+// Fetches from both speech and FOMC press feeds, shows last 3 items within 5 days.
+func (cb *ContextBuilder) injectFedSpeechContext(ctx context.Context, b *strings.Builder) {
+	cutoff := timeutil.NowWIB().Add(-5 * 24 * time.Hour).UTC()
+
+	var recent []fedSpeechEntry
+
+	// Fetch speeches (best-effort — failure is non-fatal)
+	speeches, err := news.FetchFedSpeeches(ctx)
+	if err == nil {
+		for _, s := range speeches {
+			if !s.PublishedAt.IsZero() && s.PublishedAt.Before(cutoff) {
+				continue
+			}
+			recent = append(recent, fedSpeechEntry{speech: s})
+		}
+	}
+
+	// Fetch FOMC press releases
+	fomc, err := news.FetchFOMCPress(ctx)
+	if err == nil {
+		for _, s := range fomc {
+			if !s.PublishedAt.IsZero() && s.PublishedAt.Before(cutoff) {
+				continue
+			}
+			recent = append(recent, fedSpeechEntry{speech: s})
+		}
+	}
+
+	if len(recent) == 0 {
+		return
+	}
+
+	// Cap at 3
+	if len(recent) > 3 {
+		recent = recent[:3]
+	}
+
+	b.WriteString("\n--- RECENT FED SPEECHES & FOMC RELEASES ---\n")
+	for _, e := range recent {
+		s := e.speech
+		dateStr := ""
+		if !s.PublishedAt.IsZero() {
+			dateStr = s.PublishedAt.Format("Jan 2")
+		}
+		speakerPart := ""
+		if s.Speaker != "" {
+			speakerPart = s.Speaker + " (" + dateStr + ")"
+		} else {
+			speakerPart = dateStr
+		}
+		title := s.Title
+		if len(title) > 80 {
+			title = title[:77] + "..."
+		}
+		b.WriteString(fmt.Sprintf("- %s: %s\n", speakerPart, title))
+	}
+}
+
+// fedSpeechEntry is a local helper for sorting/capping recent speeches.
+type fedSpeechEntry struct {
+	speech news.FedSpeech
 }

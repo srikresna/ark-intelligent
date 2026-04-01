@@ -34,6 +34,7 @@ type Scheduler struct {
 	messenger  ports.Messenger
 	prefsRepo  ports.PrefsRepository
 	cotRepo    ports.COTRepository // P1.1 — for Confluence Alert cross-check
+	fedRSS     *FedRSSScheduler    // Fed RSS monitor for speeches & FOMC press releases
 
 	// sentReminders prevents duplicate pre-event alerts.
 	// Key: "{eventID}:{minsUntil}", reset at midnight.
@@ -83,6 +84,7 @@ func NewScheduler(
 		cotRepo:       cotRepo,
 		sentReminders: make(map[string]bool),
 		surpriseAccum: make(map[string]float64),
+		fedRSS:        NewFedRSSScheduler(),
 	}
 }
 
@@ -124,6 +126,11 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 	// 4. Pre-Event Reminder (Evaluated every minute — sends alerts X mins before event)
 	go s.runPreEventReminderLoop(ctx)
+
+	// 5. Fed RSS Monitor (polls Fed speech & FOMC press feeds every 30 min)
+	s.fedRSS.SetIsBannedFunc(s.isBanned)
+	s.fedRSS.SetAlertSink(s.broadcastFedRSSAlert)
+	s.fedRSS.Start(ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -1060,6 +1067,36 @@ func (s *Scheduler) runInitialSync(ctx context.Context) {
 	} else {
 		schedLog.Info().Int("events", len(newEvents)).Msg("initial sync successful")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Fed RSS Alert Broadcaster
+// ---------------------------------------------------------------------------
+
+// broadcastFedRSSAlert is registered as the FedRSSScheduler alert sink.
+// It sends the formatted Fed speech/FOMC alert to all active users.
+func (s *Scheduler) broadcastFedRSSAlert(ctx context.Context, html string, level FedAlertLevel) {
+	activeUsers, err := s.prefsRepo.GetAllActive(ctx)
+	if err != nil {
+		schedLog.Error().Err(err).Msg("broadcastFedRSSAlert: get users failed")
+		return
+	}
+
+	for userID, prefs := range activeUsers {
+		if !prefs.AlertsEnabled || prefs.ChatID == "" {
+			continue
+		}
+		if s.isBanned != nil && s.isBanned(ctx, userID) {
+			continue
+		}
+
+		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
+			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("broadcastFedRSSAlert: send failed")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	schedLog.Info().Str("level", string(level)).Int("recipients", len(activeUsers)).Msg("Fed RSS alert broadcast complete")
 }
 
 // ---------------------------------------------------------------------------
