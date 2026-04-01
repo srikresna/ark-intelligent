@@ -12,7 +12,9 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/saferun"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -111,19 +113,19 @@ func (s *Scheduler) Start(ctx context.Context) {
 	schedLog.Info().Msg("starting background monitors")
 
 	// 0. Initial Sync (Run once on startup if empty)
-	go s.runInitialSync(ctx)
+	saferun.Go(ctx, "news-initial-sync", schedLog, func() { s.runInitialSync(ctx) })
 
 	// 1. Weekly Sync Monitor (Runs every Sunday at 23:00 WIB)
-	go s.runWeeklySyncLoop(ctx)
+	saferun.Go(ctx, "news-weekly-sync", schedLog, func() { s.runWeeklySyncLoop(ctx) })
 
 	// 2. Daily Morning Reminder Monitor (Runs every day at 06:00 WIB)
-	go s.runDailyReminderLoop(ctx)
+	saferun.Go(ctx, "news-daily-reminder", schedLog, func() { s.runDailyReminderLoop(ctx) })
 
 	// 3. Micro-Scrape Trigger (Evaluated every minute — picks up actuals after release)
-	go s.runMicroScrapeLoop(ctx)
+	saferun.Go(ctx, "news-micro-scrape", schedLog, func() { s.runMicroScrapeLoop(ctx) })
 
 	// 4. Pre-Event Reminder (Evaluated every minute — sends alerts X mins before event)
-	go s.runPreEventReminderLoop(ctx)
+	saferun.Go(ctx, "news-pre-event-reminder", schedLog, func() { s.runPreEventReminderLoop(ctx) })
 }
 
 // ---------------------------------------------------------------------------
@@ -131,12 +133,6 @@ func (s *Scheduler) Start(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runWeeklySyncLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -168,12 +164,6 @@ func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runDailyReminderLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -287,7 +277,7 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send daily reminder")
 		}
-		time.Sleep(50 * time.Millisecond) // Avoid Telegram flood
+		time.Sleep(config.TelegramFloodDelay) // Avoid Telegram flood
 	}
 }
 
@@ -386,12 +376,6 @@ func buildVolatilePairs(currencySet map[string]bool) []string {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runPreEventReminderLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runPreEventReminderLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -488,7 +472,7 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 			if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 				schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send pre-event alert")
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(config.TelegramFloodDelay)
 		}
 	}
 }
@@ -498,12 +482,6 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runMicroScrapeLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runMicroScrapeLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -675,14 +653,9 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 	// Use context.Background() so a scheduler ctx cancellation (restart/shutdown)
 	// does not prevent past-horizon impact records from being persisted.
 	if s.impactRecorder != nil && hasActual {
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					schedLog.Error().Interface("panic", r).Str("event", ev.Event).Msg("PANIC in RecordImpact goroutine")
-				}
-			}()
+		saferun.Go(ctx, "record-impact-"+ev.Event, schedLog, func() {
 			s.impactRecorder.RecordImpact(context.Background(), ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
-		}()
+		})
 	}
 
 	for userID, prefs := range activeUsers {
@@ -722,7 +695,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send release alert")
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(config.TelegramFloodDelay)
 	}
 
 	// Real-time conviction update — recompute and broadcast when surprise is significant
@@ -764,7 +737,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 						}
 						if len(effCur) == 0 || containsStr(effCur, ev.Currency) {
 							_, _ = s.messenger.SendHTML(ctx, prefs.ChatID, convHTML)
-							time.Sleep(50 * time.Millisecond)
+							time.Sleep(config.TelegramFloodDelay)
 						}
 					}
 				}
@@ -1031,12 +1004,6 @@ func (s *Scheduler) GetSurpriseSigma(currency string) float64 {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runInitialSync(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runInitialSync")
-		}
-	}()
-
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
 
