@@ -39,6 +39,8 @@ func (h *Handler) cmdPrice(ctx context.Context, chatID string, userID int64, arg
 
 // priceOverview shows a categorized snapshot of all major instruments.
 func (h *Handler) priceOverview(ctx context.Context, chatID string) error {
+	h.bot.SendTyping(ctx, chatID)
+
 	builder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
 
 	type section struct {

@@ -37,6 +37,8 @@ func (h *Handler) cmdLevels(ctx context.Context, chatID string, userID int64, ar
 
 // levelsOverview shows key support/resistance summary for major instruments.
 func (h *Handler) levelsOverview(ctx context.Context, chatID string) error {
+	h.bot.SendTyping(ctx, chatID)
+
 	builder := pricesvc.NewLevelsBuilder(h.dailyPriceRepo)
 
 	currencies := []string{"EUR", "GBP", "JPY", "AUD", "XAU", "OIL", "BTC"}

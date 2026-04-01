@@ -37,27 +37,44 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 			return err
 		}
 
+		loadingID, _ := h.bot.SendLoading(ctx, chatID,
+			fmt.Sprintf("📅 Menganalisis seasonal pattern untuk <b>%s</b>... ⏳", html.EscapeString(args)))
+
 		pattern, err := analyzer.AnalyzeContractAdvanced(ctx, mapping.ContractCode, mapping.Currency, deps)
 		if err != nil {
+			if loadingID > 0 {
+				_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+			}
 			h.sendUserError(ctx, chatID, err, "seasonal")
 			return nil
 		}
 
 		htmlOut := h.fmt.FormatSeasonalSingle(*pattern)
 		kb := h.kb.SeasonalDetailMenu(mapping.Currency)
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 		return err
 	}
 
 	// All contracts mode
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📅 Menganalisis seasonal patterns... ⏳")
+
 	patterns, err := analyzer.AnalyzeAllAdvanced(ctx, deps)
 	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		h.sendUserError(ctx, chatID, err, "seasonal")
 		return nil
 	}
 
 	htmlOut := h.fmt.FormatSeasonalPatterns(patterns)
 	kb := h.kb.SeasonalMenu()
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }
