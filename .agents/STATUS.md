@@ -1,13 +1,12 @@
-# Agent Status — last updated: 2026-04-01 12:18 WIB
+# Agent Status — last updated: 2026-04-01 12:28 WIB
 
 ## Dev-B
-- **Last run:** 2026-04-01 12:18 WIB
+- **Last run:** 2026-04-01 12:28 WIB
 - **Current:** standby
 - **Files changed:**
-  - `internal/adapter/telegram/bot.go` — tambah SendChatAction() method
-  - `internal/adapter/telegram/handler.go` — loading indicator di cmdRank + cmdBias
-- **PRs today:** PR #32 feat/TASK-075-loading-indicator-alpha-rank-bias → agents/main (TASK-075)
-- **Note:** Loading indicator (send + delete pattern) untuk /rank dan /bias. SendChatAction ditambah ke bot.go. go build + go vet clean.
+  - `internal/adapter/telegram/handler_quant.go` — hapus dead code block di runQuantEngine
+- **PRs today:** PR #32 (TASK-075), branch task/TASK-021-fix-quant-dead-code-cmd pushed → PR ke agents/main pending gh auth
+- **Note:** TASK-021 done — dead code cmd (exec.CommandContext context.Background tanpa timeout) dihapus dari runQuantEngine. Hanya satu cmd yang dibuat menggunakan cmdCtx 60s timeout. TASK-072 juga di-resolve sebagai duplicate. go build + go vet clean.
 
 ## Dev-C
 - **Last run:** 2026-04-01 08:30 WIB
