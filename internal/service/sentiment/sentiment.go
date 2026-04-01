@@ -39,6 +39,7 @@ type SentimentFetcher struct {
 	cbCBOE     *circuitbreaker.Breaker
 	cbCrypto   *circuitbreaker.Breaker
 	cbVIX      *circuitbreaker.Breaker
+	cbMyfxbook *circuitbreaker.Breaker
 	vixCache   *vix.Cache
 }
 
@@ -52,6 +53,7 @@ func NewSentimentFetcher() *SentimentFetcher {
 		cbCBOE:     circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
 		cbCrypto:   circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
 		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
+		cbMyfxbook: circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
 		vixCache:   vix.NewCache(),
 	}
 }
@@ -136,6 +138,20 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		log.Debug().Str("source", "vix").Err(err).Msg("sentiment: VIX circuit breaker rejected or source unavailable")
 	}
 
+	// Myfxbook Retail Positioning — wrapped in circuit breaker
+	if err := f.cbMyfxbook.Execute(func() error {
+		mfxData := FetchMyfxbook(ctx)
+		IntegrateMyfxbookIntoSentiment(data, mfxData)
+		if !data.MyfxbookAvailable {
+			if os.Getenv("FIRECRAWL_API_KEY") != "" {
+				return fmt.Errorf("Myfxbook retail positioning unavailable")
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Str("source", "myfxbook").Err(err).Msg("sentiment: Myfxbook circuit breaker rejected or source unavailable")
+	}
+
 	return data, nil
 }
 
@@ -179,6 +195,10 @@ type SentimentData struct {
 	VIXSlopePct  float64 // (M2-M1)/M1 * 100
 	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
 	VIXAvailable bool
+
+	// Myfxbook Retail Positioning (Firecrawl)
+	MyfxbookPairs     []MyfxbookPairSentiment
+	MyfxbookAvailable bool
 
 	FetchedAt time.Time
 }
