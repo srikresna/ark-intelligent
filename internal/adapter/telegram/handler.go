@@ -141,6 +141,10 @@ type Handler struct {
 	// wyckoff holds optional Wyckoff analysis engine services.
 	// May be nil — /wyckoff command disabled if not configured.
 	wyckoff *WyckoffServices
+
+	// elliott holds optional Elliott Wave engine services.
+	// May be nil — /elliott command disabled if not configured.
+	elliott *ElliottServices
 }
 
 // NewHandler creates a handler and registers all commands on the bot.
