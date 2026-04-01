@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"sort"
@@ -94,7 +93,7 @@ func fetchSingleIndexCSV(ctx context.Context, client *http.Client, url string) (
 		}
 		rowNum++
 		if err != nil {
-			log.Printf("vix: fetchSingleIndexCSV: skipping row %d: %v", rowNum, err)
+			log.Warn().Int("row", rowNum).Err(err).Msg("fetchSingleIndexCSV: skipping row")
 			continue
 		}
 		if header {
@@ -161,7 +160,7 @@ func fetchVXFutures(ctx context.Context, client *http.Client, ts *VIXTermStructu
 		}
 		rowNum++
 		if err != nil {
-			log.Printf("vix: fetchVXFutures: skipping row %d: %v", rowNum, err)
+			log.Warn().Int("row", rowNum).Err(err).Msg("fetchVXFutures: skipping row")
 			continue
 		}
 		if header {

@@ -134,9 +134,13 @@ func (b *Bot) handleChatMessage(ctx context.Context, msg *Message) {
 			_, _ = b.SendHTML(ctx, chatID, fmt.Sprintf("\u26d4 %s", result.Reason))
 			return
 		}
-	} else if userID != 0 && !b.isOwner(userID) && !b.userLimiter.Allow(userID) {
-		_, _ = b.SendHTML(ctx, chatID, "\u23f3 Rate limited \u2014 please wait a moment.")
-		return
+	} else if userID != 0 && !b.isOwner(userID) {
+		if allowed, retryAfter := b.userLimiter.Allow(userID); !allowed {
+			waitSec := int(retryAfter.Seconds())
+			msg := fmt.Sprintf("⏳ Batas request tercapai. Coba lagi dalam ~%d detik.", waitSec)
+			_, _ = b.SendHTML(ctx, chatID, msg)
+			return
+		}
 	}
 
 	log.Info().Int64("user_id", userID).Str("chat_id", chatID).

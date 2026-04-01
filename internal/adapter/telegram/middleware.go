@@ -237,12 +237,13 @@ func (m *Middleware) Authorize(ctx context.Context, userID int64, username, comm
 			}
 		} else {
 			// Member/Admin: per-minute sliding window
-			if !m.allowSlidingWindow(userID, limits.CommandLimit) {
+			if allowed, retryAfter := m.allowSlidingWindow(userID, limits.CommandLimit); !allowed {
 				_ = m.userRepo.UpsertUser(ctx, profile)
+				waitSec := int(retryAfter.Seconds())
 				return AuthResult{
 					Allowed: false,
 					Profile: profile,
-					Reason:  "Rate limited — please wait a moment before sending more commands.",
+					Reason:  fmt.Sprintf("⏳ Batas request tercapai. Coba lagi dalam ~%d detik.", waitSec),
 				}
 			}
 		}
@@ -303,8 +304,13 @@ func (m *Middleware) AuthorizeCallback(ctx context.Context, userID int64) AuthRe
 	// Sliding window rate limit for callbacks (use same limits as commands)
 	limits := domain.GetTierLimits(profile.Role)
 	if limits.CommandLimit > 0 && !limits.CommandDaily {
-		if !m.allowSlidingWindow(userID, limits.CommandLimit) {
-			return AuthResult{Allowed: false, Profile: profile, Reason: "Rate limited — please wait a moment."}
+		if allowed, retryAfter := m.allowSlidingWindow(userID, limits.CommandLimit); !allowed {
+			waitSec := int(retryAfter.Seconds())
+			return AuthResult{
+				Allowed: false,
+				Profile: profile,
+				Reason:  fmt.Sprintf("⏳ Batas request tercapai. Coba lagi dalam ~%d detik.", waitSec),
+			}
 		}
 	}
 
@@ -467,7 +473,7 @@ func (m *Middleware) ShouldReceiveFREDAlerts(ctx context.Context, userID int64) 
 // Sliding window helper (for Member/Admin per-minute limits)
 // ---------------------------------------------------------------------------
 
-func (m *Middleware) allowSlidingWindow(userID int64, maxPerMinute int) bool {
+func (m *Middleware) allowSlidingWindow(userID int64, maxPerMinute int) (bool, time.Duration) {
 	m.windowMu.Lock()
 	defer m.windowMu.Unlock()
 
@@ -486,10 +492,15 @@ func (m *Middleware) allowSlidingWindow(userID int64, maxPerMinute int) bool {
 	w.timestamps = w.timestamps[start:]
 
 	if len(w.timestamps) >= maxPerMinute {
-		return false
+		// Oldest timestamp in window tells us when a slot opens up.
+		retryAfter := w.timestamps[0].Add(60 * time.Second).Sub(now)
+		if retryAfter < time.Second {
+			retryAfter = time.Second
+		}
+		return false, retryAfter
 	}
 	w.timestamps = append(w.timestamps, now)
-	return true
+	return true, 0
 }
 
 // cleanupLoop periodically removes stale entries from the sliding window map
