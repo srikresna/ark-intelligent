@@ -1095,6 +1095,64 @@ func (kb *KeyboardBuilder) VPDetailMenu() ports.InlineKeyboard {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Help Keyboards — Smart /help with category navigation
+// ---------------------------------------------------------------------------
+
+// HelpCategoryMenu builds the top-level help category selector.
+func (kb *KeyboardBuilder) HelpCategoryMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Market & COT", CallbackData: "help:market"},
+				{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
+			},
+			{
+				{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
+				{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
+			},
+			{
+				{Text: "⚙️ Settings", CallbackData: "help:settings"},
+				{Text: "🆕 What's New", CallbackData: "help:changelog"},
+			},
+		},
+	}
+}
+
+// HelpCategoryMenuWithAdmin builds the top-level help category selector with admin option.
+func (kb *KeyboardBuilder) HelpCategoryMenuWithAdmin() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Market & COT", CallbackData: "help:market"},
+				{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
+			},
+			{
+				{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
+				{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
+			},
+			{
+				{Text: "⚙️ Settings", CallbackData: "help:settings"},
+				{Text: "🔐 Admin", CallbackData: "help:admin"},
+			},
+			{
+				{Text: "🆕 What's New", CallbackData: "help:changelog"},
+			},
+		},
+	}
+}
+
+// HelpSubMenu builds the back button for help sub-category views.
+func (kb *KeyboardBuilder) HelpSubMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "◀ Kembali ke Menu Help", CallbackData: "help:back"},
+			},
+		},
+	}
+}
+
 // VPSymbolMenu builds a symbol selector for /vp (no argument).
 func (kb *KeyboardBuilder) VPSymbolMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
