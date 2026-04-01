@@ -95,7 +95,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 func appendUniqueStructure(events []StructureEvent, e StructureEvent) []StructureEvent {
 	for i := len(events) - 1; i >= 0; i-- {
 		if events[i].Kind == "BOS" && events[i].Direction == e.Direction {
-			if abs64(events[i].Level-e.Level)/e.Level < 0.001 {
+			if e.Level != 0 && abs64(events[i].Level-e.Level)/abs64(e.Level) < 0.001 {
 				return events // duplicate, skip
 			}
 			break
