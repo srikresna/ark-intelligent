@@ -65,8 +65,8 @@ func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 		}
 		returns = append(returns, math.Log(prices[i-1].Close/prices[i].Close))
 	}
-	if len(returns) < 40 {
-		return nil, fmt.Errorf("insufficient valid returns for HMM: %d", len(returns))
+	if len(returns) < 60 {
+		return nil, fmt.Errorf("insufficient valid returns for HMM: need 60, got %d", len(returns))
 	}
 
 	// Discretize returns into emission symbols
@@ -75,19 +75,23 @@ func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 	// Initialize HMM with domain-informed priors
 	model := initHMMPriors()
 
-	// Baum-Welch training
-	maxIter := 50
+	// Baum-Welch training (max 100 iterations, convergence threshold 1e-6)
+	maxIter := 100
 	converged := false
 	var iter int
 	prevLogLik := math.Inf(-1)
 	for iter = 0; iter < maxIter; iter++ {
 		newModel, logLik := baumWelchStep(&model, obs)
 		model = newModel
-		if iter > 0 && math.Abs(logLik-prevLogLik) < 1e-4 {
+		if iter > 0 && math.Abs(logLik-prevLogLik) < 1e-6 {
 			converged = true
 			break
 		}
 		prevLogLik = logLik
+	}
+
+	if !converged {
+		return nil, fmt.Errorf("insufficient data for regime: Baum-Welch did not converge after %d iterations", maxIter)
 	}
 
 	// Forward algorithm for current state probabilities
