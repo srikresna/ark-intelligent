@@ -1385,6 +1385,112 @@ func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID in
 	}
 }
 
+// cbViewToggle handles compact/full view toggle callbacks.
+// Callback data format: "view:<action>:<command>"
+func (h *Handler) cbViewToggle(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	parts := strings.SplitN(strings.TrimPrefix(data, "view:"), ":", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	action, command := parts[0], parts[1]
+
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+
+	switch action {
+	case "full":
+		prefs.OutputMode = domain.OutputFull
+	case "compact":
+		prefs.OutputMode = domain.OutputCompact
+	default:
+		return nil
+	}
+
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+
+	switch command {
+	case "cot":
+		return h.renderCOTOverview(ctx, chatID, userID, msgID)
+	case "macro":
+		return h.renderMacroSummary(ctx, chatID, userID, msgID)
+	default:
+		return nil
+	}
+}
+
+// renderCOTOverview renders COT overview in compact or full mode based on prefs.
+func (h *Handler) renderCOTOverview(ctx context.Context, chatID string, userID int64, editMsgID int) error {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
+	if err != nil || len(analyses) == 0 {
+		return nil
+	}
+
+	// Build convictions (best-effort)
+	var convictions []cot.ConvictionScore
+	macroData, fredErr := fred.GetCachedOrFetch(ctx)
+	if fredErr == nil && macroData != nil {
+		composites := fred.ComputeComposites(macroData)
+		regime := fred.ClassifyMacroRegime(macroData, composites)
+		for _, a := range analyses {
+			cs := cot.ComputeConvictionScoreV3(a, regime, 0, "", macroData, nil)
+			convictions = append(convictions, cs)
+		}
+	}
+
+	var htmlOut string
+	var toggleBtn ports.InlineButton
+	if prefs.OutputMode == domain.OutputFull {
+		htmlOut = h.fmt.FormatCOTOverview(analyses, convictions)
+		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:cot"}
+	} else {
+		htmlOut = h.fmt.FormatCOTOverviewCompact(analyses, convictions)
+		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:cot"}
+	}
+
+	kb := h.kb.COTCurrencySelector(analyses)
+	toggleRow := []ports.InlineButton{toggleBtn}
+	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+
+	if editMsgID > 0 {
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
+	}
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, htmlOut, kb)
+	return err
+}
+
+// renderMacroSummary renders macro dashboard in compact or full mode.
+func (h *Handler) renderMacroSummary(ctx context.Context, chatID string, userID int64, editMsgID int) error {
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+
+	data, err := fred.GetCachedOrFetch(ctx)
+	if err != nil || data == nil {
+		return nil
+	}
+	composites := fred.ComputeComposites(data)
+	regime := fred.ClassifyMacroRegime(data, composites)
+
+	var htmlOut string
+	var toggleBtn ports.InlineButton
+	if prefs.OutputMode == domain.OutputFull {
+		implications := fred.DeriveTradingImplications(regime, data)
+		htmlOut = h.fmt.FormatMacroSummary(regime, data, implications)
+		toggleBtn = ports.InlineButton{Text: btnCompact, CallbackData: "view:compact:macro"}
+	} else {
+		htmlOut = h.fmt.FormatMacroSummaryCompact(regime, data)
+		toggleBtn = ports.InlineButton{Text: btnExpand, CallbackData: "view:full:macro"}
+	}
+
+	kb := h.kb.MacroMenu(false)
+	toggleRow := []ports.InlineButton{toggleBtn}
+	kb.Rows = append([][]ports.InlineButton{toggleRow}, kb.Rows...)
+
+	if editMsgID > 0 {
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, editMsgID, htmlOut, kb)
+	}
+	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, htmlOut, kb)
+	return err
+}
+
 func (h *Handler) handleMonthNav(ctx context.Context, chatID string, msgID int, navType, dateStr string) error {
 	// Parse the reference date from the callback; fall back to "now" if invalid.
 	// BUG #6 FIX: parse with WIB timezone for consistency with month boundary in WIB.

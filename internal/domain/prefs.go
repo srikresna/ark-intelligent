@@ -38,6 +38,15 @@ func IsValidClaudeModel(m ClaudeModelID) bool {
 	return false
 }
 
+
+// OutputMode controls the verbosity of bot output.
+type OutputMode string
+
+const (
+	OutputCompact OutputMode = "compact"
+	OutputFull    OutputMode = "full"
+)
+
 // UserPrefs stores per-user notification preferences.
 type UserPrefs struct {
 	AlertMinutes     []int    `json:"alert_minutes"`      // Minutes before event to alert (e.g., [60, 15, 5])
@@ -58,7 +67,8 @@ type UserPrefs struct {
 	// Broadcast & UI state
 	ChatID         string `json:"chat_id"`         // Telegram chat ID (set on /start, used for push alerts)
 	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
-	CalendarView   string `json:"calendar_view"`   // Last used view: "day", "week", "month"
+	CalendarView   string     `json:"calendar_view"`   // Last used view: "day", "week", "month"
+	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default) or "full"
 }
 
 // DefaultPrefs returns the default user preferences.

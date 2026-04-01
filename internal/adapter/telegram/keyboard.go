@@ -17,6 +17,12 @@ import (
 //   - "cot:XXX"   -> COT detail for currency/contract
 //   - "set:XXX"   -> Settings toggle action
 //   - "alert:XXX" -> Alert action (mute, dismiss)
+// Standardized button label constants.
+const (
+	btnExpand  = "📖 Detail Lengkap"
+	btnCompact = "📊 Compact"
+)
+
 type KeyboardBuilder struct{}
 
 // NewKeyboardBuilder creates a new KeyboardBuilder.
