@@ -12,6 +12,7 @@ import (
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
@@ -164,6 +165,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// BIS REER/NEER currency valuation (graceful degradation on error)
 	bisData, _ := bis.GetCachedOrFetch(ctx)
 
+	// IMF WEO forward-looking forecasts (graceful degradation on error)
+	imfData, _ := imf.GetCachedOrFetch(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -205,6 +209,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		CurrencyStrength:   currencyStrength,
 		WorldBankData:      wbData,
 		BISData:            bisData,
+		IMFData:            imfData,
 		Language:           prefs.Language,
 	}
 
