@@ -13,6 +13,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
@@ -38,6 +39,7 @@ type UnifiedOutlookData struct {
 	DeFiLlamaTVL       *defillama.TVLSummary
 	IMFData            *imf.IMFWEOData
 	FedWatchData       *fed.FedWatchData
+	EurostatData       *macro.EurostatData
 	Language           string
 }
 
@@ -565,6 +567,45 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		b.WriteString("  - Current account surplus → persistent currency demand, structural support\n")
 		b.WriteString("  - These are FORWARD LOOKING (unlike World Bank historical data above)\n")
 		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Eurostat EU Macro Indicators
+	// -----------------------------------------------------------------------
+	if data.EurostatData != nil && !data.EurostatData.IsZero() {
+		section++ //nolint:ineffassign // section may be used in future extensions
+		b.WriteString(fmt.Sprintf("=== %d. EUROSTAT EU ECONOMY ===\n", section))
+		b.WriteString("Source: Eurostat (European Commission) — official EU statistics\n")
+		eu := data.EurostatData
+		if eu.HICPHeadline != 0 {
+			b.WriteString(fmt.Sprintf("EU HICP Inflation (YoY): %.1f%% headline", eu.HICPHeadline))
+			if eu.HICPCore != 0 {
+				b.WriteString(fmt.Sprintf(", %.1f%% core", eu.HICPCore))
+			}
+			if !eu.HICPDate.IsZero() {
+				b.WriteString(fmt.Sprintf(" (%s)", eu.HICPDate.Format("Jan 2006")))
+			}
+			b.WriteString("\n")
+		}
+		if eu.UnempRate != 0 {
+			b.WriteString(fmt.Sprintf("EU Unemployment Rate (SA): %.1f%%", eu.UnempRate))
+			if !eu.UnempDate.IsZero() {
+				b.WriteString(fmt.Sprintf(" (%s)", eu.UnempDate.Format("Jan 2006")))
+			}
+			b.WriteString("\n")
+		}
+		if eu.GDPGrowth != 0 {
+			b.WriteString(fmt.Sprintf("EU GDP Growth (QoQ, SA): %+.1f%%", eu.GDPGrowth))
+			if !eu.GDPDate.IsZero() {
+				q := (eu.GDPDate.Month()-1)/3 + 1
+				b.WriteString(fmt.Sprintf(" (Q%d %d)", q, eu.GDPDate.Year()))
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("NOTE: EU data is critical for EUR pair analysis. Compare with US data (FRED) above for rate differential.\n")
+		b.WriteString("  - EU inflation above 2%% → ECB hawkish = EUR supportive\n")
+		b.WriteString("  - EU unemployment falling → tight labor = ECB less likely to cut\n")
+		b.WriteString("  - EU GDP positive → growth supports EUR vs weaker-growth currencies\n\n")
 	}
 
 	// -----------------------------------------------------------------------

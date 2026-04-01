@@ -13,6 +13,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
@@ -168,6 +169,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// IMF WEO forward-looking forecasts (graceful degradation on error)
 	imfData, _ := imf.GetCachedOrFetch(ctx)
 
+	// Eurostat EU macro data (HICP, unemployment, GDP — graceful degradation on error)
+	eurostatData, _ := macro.GetEurostatData(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -210,6 +214,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		WorldBankData:      wbData,
 		BISData:            bisData,
 		IMFData:            imfData,
+		EurostatData:       eurostatData,
 		Language:           prefs.Language,
 	}
 
