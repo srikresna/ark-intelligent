@@ -437,12 +437,12 @@ func TestPearsonCorrelation_Audit_SymmetryProperty(t *testing.T) {
 }
 
 func TestPearsonCorrelation_Audit_DifferentLengths(t *testing.T) {
-	x := []float64{1, 2, 3, 4, 5}
-	y := []float64{2, 4, 6} // shorter
+	x := []float64{1, 2, 3, 4, 5, 6, 7}
+	y := []float64{2, 4, 6, 8, 10} // shorter but >= 5
 	r := pearsonCorrelation(x, y)
-	// Should use min(len(x), len(y)) = 3
+	// Should use min(len(x), len(y)) = 5
 	if math.IsNaN(r) {
-		t.Error("NaN from different-length inputs")
+		t.Error("NaN from different-length inputs with >= 5 points")
 	}
 }
 

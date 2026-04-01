@@ -44,6 +44,14 @@ type TradingImplication struct {
 // ClassifyMacroRegime derives a macro regime and trading bias from FRED data.
 // Uses a multi-factor scoring system across 9 dimensions.
 func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites) MacroRegime {
+	if data == nil {
+		return MacroRegime{
+			Name:        "UNKNOWN",
+			YieldCurve:  "N/A",
+			Bias:        "NEUTRAL",
+			Description: "Insufficient data for regime classification",
+		}
+	}
 	r := MacroRegime{}
 	riskScore := 0 // accumulates bearish/risk-off pressure
 

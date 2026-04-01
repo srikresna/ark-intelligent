@@ -293,3 +293,50 @@ func fetchIndicator(ctx context.Context, indicator, countryList string) (map[str
 
 	return nil, fmt.Errorf("no values key found for indicator %s", indicator)
 }
+
+// BuildPromptSection returns a compact IMF WEO section string for AI prompts.
+func BuildPromptSection(data *IMFWEOData) string {
+	if data == nil || !data.Available {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("IMF WEO Forecasts:\n")
+
+	parts := make([]string, 0, len(data.Countries))
+	for _, c := range data.Countries {
+		if !c.Available {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s: GDP=%.1f%% CPI=%.1f%% CA=%+.1f%%GDP",
+			c.Currency, c.GDPGrowth, c.Inflation, c.CurrentAccount))
+	}
+	sb.WriteString(strings.Join(parts, " | "))
+	sb.WriteString("\n")
+
+	// Insight: highest vs lowest GDP growth divergence
+	var high, low IMFCountryData
+	first := true
+	for _, c := range data.Countries {
+		if !c.Available {
+			continue
+		}
+		if first {
+			high, low = c, c
+			first = false
+			continue
+		}
+		if c.GDPGrowth > high.GDPGrowth {
+			high = c
+		}
+		if c.GDPGrowth < low.GDPGrowth {
+			low = c
+		}
+	}
+	if !first && high.Currency != low.Currency {
+		sb.WriteString(fmt.Sprintf("→ %s strongest growth (%.1f%%), %s weakest (%.1f%%)\n",
+			high.Currency, high.GDPGrowth, low.Currency, low.GDPGrowth))
+	}
+
+	return sb.String()
+}
