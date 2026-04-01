@@ -90,6 +90,9 @@ func (c *Client) GetInstruments(ctx context.Context, currency string) ([]Instrum
 }
 
 // GetBookSummary returns OI/volume data for all options of a given currency.
+// Expired options are filtered out client-side by parsing the expiry date from
+// the instrument name (e.g. BTC-28MAR25-80000-C). This ensures consistency
+// with GetInstruments which passes expired=false server-side.
 func (c *Client) GetBookSummary(ctx context.Context, currency string) ([]BookSummary, error) {
 	params := url.Values{
 		"currency": {currency},
@@ -99,8 +102,44 @@ func (c *Client) GetBookSummary(ctx context.Context, currency string) ([]BookSum
 	if err := c.get(ctx, "get_book_summary_by_currency", params, &result); err != nil {
 		return nil, err
 	}
-	log.Debug().Str("currency", currency).Int("count", len(result.Result)).Msg("book summary fetched")
-	return result.Result, nil
+
+	// Filter out expired options to match GetInstruments behavior
+	now := time.Now()
+	active := make([]BookSummary, 0, len(result.Result))
+	expired := 0
+	for _, bs := range result.Result {
+		if expiry, ok := parseInstrumentExpiry(bs.InstrumentName); ok {
+			if expiry.Before(now) {
+				expired++
+				continue
+			}
+		}
+		active = append(active, bs)
+	}
+	if expired > 0 {
+		log.Debug().Str("currency", currency).Int("expired_filtered", expired).
+			Int("active", len(active)).Msg("filtered expired options from book summary")
+	}
+	log.Debug().Str("currency", currency).Int("count", len(active)).Msg("book summary fetched")
+	return active, nil
+}
+
+// parseInstrumentExpiry extracts the expiration date from a Deribit instrument name.
+// Format: BTC-28MAR25-80000-C → expiry is 28MAR25 (parsed as 2025-03-28 08:00 UTC).
+// Deribit options expire at 08:00 UTC on expiry day.
+func parseInstrumentExpiry(name string) (time.Time, bool) {
+	parts := strings.SplitN(name, "-", 4)
+	if len(parts) < 3 {
+		return time.Time{}, false
+	}
+	datePart := parts[1] // e.g. 28MAR25
+	t, err := time.Parse("2Jan06", datePart)
+	if err != nil {
+		return time.Time{}, false
+	}
+	// Deribit options expire at 08:00 UTC
+	t = t.Add(8 * time.Hour)
+	return t, true
 }
 
 // GetTicker returns per-instrument Greeks for a single option contract.
