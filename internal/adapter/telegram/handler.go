@@ -244,6 +244,7 @@ func NewHandler(
 	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
 	bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
 	bot.RegisterCommand("/session", h.cmdSession)       // Trading session behavior analysis (London/NY/Tokyo)
+	bot.RegisterCommand("/scenario", h.cmdScenario)    // Monte Carlo price scenario generator
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
