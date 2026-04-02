@@ -58,8 +58,8 @@ var validGEXSymbols = map[string]struct{}{
 // cmdGEX handles the /gex [SYMBOL] command.
 func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ <b>GEX</b> engine tidak tersedia. Hubungi admin.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("GEX engine not available"), "gex")
+		return nil
 	}
 
 	// Parse symbol from args (default: BTC)
@@ -185,8 +185,8 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 // cmdIVSurface handles the /ivol [SYMBOL] command.
 func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ <b>IV Surface</b> engine tidak tersedia. Hubungi admin.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("IV Surface engine not available"), "ivol")
+		return nil
 	}
 
 	sym := "BTC"
@@ -289,8 +289,8 @@ func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID i
 // cmdSkew handles the /skew [SYMBOL] command.
 func (h *Handler) cmdSkew(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ <b>Skew Analysis</b> engine tidak tersedia. Hubungi admin.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("Skew Analysis engine not available"), "skew")
+		return nil
 	}
 
 	sym := "BTC"

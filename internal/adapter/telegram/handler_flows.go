@@ -35,9 +35,8 @@ func (h *Handler) cmdFlows(ctx context.Context, chatID string, _ int64, args str
 		if placeholderID > 0 {
 			_ = h.bot.DeleteMessage(ctx, chatID, placeholderID)
 		}
-		log.Error().Err(err).Msg("flow divergence analysis failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "⚠️ Gagal mengambil data flow divergence. Silakan coba lagi.")
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "flows")
+		return nil
 	}
 
 	text := formatFlowDivergenceResult(result)

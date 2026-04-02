@@ -5,6 +5,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -77,8 +78,8 @@ func (h *Handler) cmdSignalAll(ctx context.Context, chatID string, userID int64)
 	}
 
 	if len(results) == 0 {
-		_, err := h.bot.SendHTML(ctx, chatID, "❌ No unified signal data available.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("no unified signal data available"), "signal")
+		return nil
 	}
 
 	text := h.fmt.FormatUnifiedSignalOverview(results)

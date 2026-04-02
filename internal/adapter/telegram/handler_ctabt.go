@@ -194,8 +194,8 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 			if loadingID > 0 {
 				_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 			}
-			_, err := h.bot.SendHTML(ctx, chatID, "❌ Intraday data repository not configured.")
-			return err
+			h.sendUserError(ctx, chatID, fmt.Errorf("intraday data repository not configured"), "ctabt")
+			return nil
 		}
 		// Determine bar count based on timeframe granularity
 		count := 600
