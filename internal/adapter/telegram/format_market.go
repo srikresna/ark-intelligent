@@ -75,26 +75,26 @@ func (f *Formatter) FormatMarket(data *finviz.CrossAssetData) string {
 	return b.String()
 }
 
-// riskToneEmoji returns an emoji for the risk tone.
+// riskToneEmoji returns an emoji + label for the risk tone.
 func riskToneEmoji(tone string) string {
 	switch tone {
 	case "RISK-ON":
-		return "🟢"
+		return "🟢 Risk-On"
 	case "RISK-OFF":
-		return "🔴"
+		return "🔴 Risk-Off"
 	default:
-		return "🟡"
+		return "🟡 Neutral"
 	}
 }
 
-// changeArrow returns a directional emoji for a % change.
+// changeArrow returns a directional emoji + label for a % change.
 func changeArrow(change float64) string {
 	switch {
 	case change > 0.5:
-		return "🟢"
+		return "🟢 Up"
 	case change < -0.5:
-		return "🔴"
+		return "🔴 Down"
 	default:
-		return "⚪"
+		return "⚪ Flat"
 	}
 }

@@ -98,15 +98,15 @@ func (f *Formatter) FormatUnifiedSignalOverview(sigs []*analysis.UnifiedSignalV2
 	return b.String()
 }
 
-// voteIcon returns an emoji for a VoteDirection.
+// voteIcon returns an emoji + label for a VoteDirection.
 func voteIcon(v analysis.VoteDirection) string {
 	switch v {
 	case analysis.VoteLong:
-		return "🟢"
+		return "🟢 Long"
 	case analysis.VoteShort:
-		return "🔴"
+		return "🔴 Short"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 

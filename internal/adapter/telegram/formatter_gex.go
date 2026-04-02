@@ -243,15 +243,15 @@ func FormatIVSurface(r *gexsvc.IVSurfaceResult) string {
 	return sb.String()
 }
 
-// ivSignalEmoji returns an emoji for the IV market signal.
+// ivSignalEmoji returns an emoji + label for the IV market signal.
 func ivSignalEmoji(signal string) string {
 	switch signal {
 	case "FEAR":
-		return "🔴"
+		return "🔴 Fear"
 	case "GREED":
-		return "🟢"
+		return "🟢 Greed"
 	default:
-		return "🟡"
+		return "🟡 Neutral"
 	}
 }
 
@@ -415,15 +415,15 @@ func skewSmileRow(sk gexsvc.SkewMetrics) string {
 		pcStr, dirEmoji)
 }
 
-// skewSignalEmoji returns a colored emoji for the aggregate skew signal.
+// skewSignalEmoji returns an emoji + label for the aggregate skew signal.
 func skewSignalEmoji(signal string) string {
 	switch signal {
 	case "BEARISH":
-		return "🔴"
+		return "🔴 Bearish"
 	case "BULLISH":
-		return "🟢"
+		return "🟢 Bullish"
 	default:
-		return "🟡"
+		return "🟡 Neutral"
 	}
 }
 

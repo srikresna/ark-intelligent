@@ -56,9 +56,9 @@ func formatVIXDashboard(ts *vixsvc.VIXTermStructure, fetchErr error) string {
 
 	// Term structure
 	if ts.M1 > 0 {
-		termEmoji := "✅"
+		termEmoji := "✅ Contango"
 		if ts.Backwardation {
-			termEmoji = "🔴"
+			termEmoji = "🔴 Backwardation"
 		}
 		b.WriteString("\n<b>Term Structure</b>\n")
 		b.WriteString(fmt.Sprintf("<code>M1  : %.2f  %s</code>\n", ts.M1, ts.M1Symbol))
@@ -226,14 +226,14 @@ func vixRegimeEmoji(regime string) string {
 	}
 }
 
-// vixVolLevelEmoji returns an emoji based on value vs warn/alert thresholds.
+// vixVolLevelEmoji returns an emoji + label based on value vs warn/alert thresholds.
 func vixVolLevelEmoji(val, warnThreshold, alertThreshold float64) string {
 	switch {
 	case val >= alertThreshold:
-		return "🔴"
+		return "🔴 Alert"
 	case val >= warnThreshold:
-		return "⚠️"
+		return "⚠️ Warning"
 	default:
-		return "✅"
+		return "✅ Normal"
 	}
 }

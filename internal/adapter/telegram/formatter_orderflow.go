@@ -44,9 +44,9 @@ func formatOrderFlowResult(r *orderflow.OrderFlowResult) string {
 	sb.WriteString("📊 <b>Delta Bars (last 5):</b>\n")
 	for i := 0; i < displayN; i++ {
 		db := r.DeltaBars[i]
-		dirEmoji := "🔴"
+		dirEmoji := "🔴 Sell"
 		if db.Delta >= 0 {
-			dirEmoji = "🟢"
+			dirEmoji = "🟢 Buy"
 		}
 		direction := "▼"
 		if db.OHLCV.Close >= db.OHLCV.Open {
@@ -116,11 +116,11 @@ func deltaTrendEmoji(trend string) string {
 func ofBiasEmoji(bias string) string {
 	switch bias {
 	case "BULLISH":
-		return "🟢"
+		return "🟢 Bullish"
 	case "BEARISH":
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 

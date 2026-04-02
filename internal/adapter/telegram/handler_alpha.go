@@ -925,7 +925,7 @@ func formatRiskParity(rp *strategy.RiskParityResult) string {
 	return sb.String()
 }
 
-// heatBar renders a small inline bar for heat percentage.
+// heatBar renders a small inline label for heat percentage relative to threshold.
 func heatBar(pct, thresholdPerPos float64) string {
 	if thresholdPerPos <= 0 {
 		return ""
@@ -933,11 +933,11 @@ func heatBar(pct, thresholdPerPos float64) string {
 	ratio := pct / thresholdPerPos
 	switch {
 	case ratio >= 1.5:
-		return "🔴"
+		return "🔴 High"
 	case ratio >= 1.0:
-		return "🟡"
+		return "🟡 Elevated"
 	default:
-		return "🟢"
+		return "🟢 Normal"
 	}
 }
 

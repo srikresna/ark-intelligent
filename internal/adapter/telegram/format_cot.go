@@ -275,9 +275,9 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 				return "  "
 			}
 			if z > 0 {
-				return "🟢"
+				return "🟢 +"
 			}
-			return "🔴"
+			return "🔴 -"
 		}
 		if rt == "TFF" {
 			b.WriteString(fmt.Sprintf("<code>  Dealer:       %+.2fσ %s</code>\n", a.DealerZScore, zScoreEmoji(a.DealerZScore, a.DealerAlert)))

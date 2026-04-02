@@ -120,19 +120,19 @@ func (f *Formatter) FormatMultiStrategy(result *backtestsvc.MultiStrategyResult)
 	return b.String()
 }
 
-// corrEmoji returns a correlation strength indicator emoji.
+// corrEmoji returns a correlation strength indicator emoji + label.
 func corrEmoji(c float64) string {
 	switch {
 	case c >= 0.7:
-		return "🔴" // high positive correlation
+		return "🔴 Correlated" // high positive correlation
 	case c >= 0.3:
-		return "🟡" // moderate positive
+		return "🟡 Moderate" // moderate positive
 	case c <= -0.7:
-		return "🟢" // high negative (diversifying)
+		return "🟢 Diversifying" // high negative (diversifying)
 	case c <= -0.3:
-		return "🟢" // moderate negative
+		return "🟢 Low Corr" // moderate negative
 	default:
-		return "⚪" // low correlation
+		return "⚪ Uncorrelated" // low correlation
 	}
 }
 

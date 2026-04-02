@@ -142,11 +142,11 @@ func formatPairDivergence(pd factors.PairDivergence) string {
 func regimeStabilityEmoji(s float64) string {
 	switch {
 	case s >= 0.8:
-		return "🟢"
+		return "🟢 Stable"
 	case s >= 0.5:
-		return "🟡"
+		return "🟡 Moderate"
 	default:
-		return "🔴"
+		return "🔴 Unstable"
 	}
 }
 
