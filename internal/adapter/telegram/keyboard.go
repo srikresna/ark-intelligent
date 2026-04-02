@@ -1517,6 +1517,7 @@ var relatedCommands = map[string][]struct {
 	"backtest":    {{Label: "📊 Quant", Callback: "quant"}, {Label: "🎯 CTA", Callback: "cta"}, {Label: "📈 Seasonal", Callback: "seasonal"}},
 	"intermarket": {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}, {Label: "📊 Sentiment", Callback: "sentiment"}},
 	"briefing":    {{Label: "📅 Calendar", Callback: "calendar"}, {Label: "🎯 COT Bias", Callback: "bias"}, {Label: "🌐 Macro", Callback: "macro"}},
+	"elliott":     {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Quant", Callback: "quant"}, {Label: "🔑 Levels", Callback: "levels"}},
 }
 
 // RelatedCommandsRow returns a keyboard row with 2–3 related command buttons.
@@ -1658,3 +1659,42 @@ func (kb *KeyboardBuilder) ErrorRetryKeyboard(command, args string) ports.Inline
 	return ports.InlineKeyboard{Rows: [][]ports.InlineButton{retryRow}}
 }
 
+
+// ---------------------------------------------------------------------------
+// Elliott Wave Keyboard
+// ---------------------------------------------------------------------------
+
+// ElliottKeyboard returns the inline keyboard for the /elliott command,
+// showing timeframe toggle buttons for the given symbol.
+func (kb *KeyboardBuilder) ElliottKeyboard(symbol, currentTF string) ports.InlineKeyboard {
+	timeframes := []struct {
+		Label string
+		TF    string
+	}{
+		{"Daily", "daily"},
+		{"4H", "4h"},
+		{"1H", "1h"},
+	}
+
+	var tfRow []ports.InlineButton
+	for _, tf := range timeframes {
+		label := tf.Label
+		if tf.TF == currentTF {
+			label = "✅ " + label
+		}
+		tfRow = append(tfRow, ports.InlineButton{
+			Text:         label,
+			CallbackData: "cmd:elliott:" + symbol + " " + tf.TF,
+		})
+	}
+
+	relatedRow := kb.RelatedCommandsRow("elliott", symbol)
+
+	rows := [][]ports.InlineButton{tfRow}
+	if len(relatedRow) > 0 {
+		rows = append(rows, relatedRow)
+	}
+	rows = append(rows, []ports.InlineButton{{Text: btnHome, CallbackData: "nav:home"}})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
