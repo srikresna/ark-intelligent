@@ -299,7 +299,11 @@ func (h *Handler) cbNav(ctx context.Context, chatID string, msgID int, userID in
 		// Delete the current message and show the main menu
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 		return h.cmdStart(ctx, chatID, userID, "")
+	case "cot":
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		return h.cmdCOT(ctx, chatID, userID, "")
 	default:
+		log.Warn().Str("action", action).Str("chat_id", chatID).Msg("unhandled nav action")
 		return nil
 	}
 }
