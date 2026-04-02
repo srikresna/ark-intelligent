@@ -77,6 +77,9 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 	case "GLOBAL":
 		htmlMsg := h.fmt.FormatMacroGlobal(composites, data)
+		if teData, teErr := macro.GetTECachedOrFetch(ctx); teErr == nil {
+			htmlMsg += "\n" + macro.FormatTEGlobalMacro(teData)
+		}
 		kb := h.kb.MacroDetailMenu()
 		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 	case "LABOR":
@@ -161,6 +164,9 @@ func (h *Handler) cbMacro(ctx context.Context, chatID string, msgID int, userID 
 
 	case "global":
 		htmlMsg := h.fmt.FormatMacroGlobal(composites, macroData)
+		if teData, teErr := macro.GetTECachedOrFetch(ctx); teErr == nil {
+			htmlMsg += "\n" + macro.FormatTEGlobalMacro(teData)
+		}
 		kb := h.kb.MacroDetailMenu()
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlMsg, kb)
 
