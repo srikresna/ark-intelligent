@@ -99,8 +99,8 @@ var wyckoffSymbols = []string{"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", 
 // cmdWyckoff handles /wyckoff [SYMBOL] [TIMEFRAME]
 func (h *Handler) cmdWyckoff(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.wyckoff == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ Wyckoff engine tidak tersedia.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("Wyckoff engine not available"), "wyckoff")
+		return nil
 	}
 
 	parts := strings.Fields(strings.TrimSpace(strings.ToUpper(args)))

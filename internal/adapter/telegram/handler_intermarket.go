@@ -34,9 +34,8 @@ func (h *Handler) cmdIntermarket(ctx context.Context, chatID string, _ int64, ar
 		if placeholderID > 0 {
 			_ = h.bot.DeleteMessage(ctx, chatID, placeholderID)
 		}
-		log.Error().Err(err).Msg("intermarket analysis failed")
-		_, sendErr := h.bot.SendHTML(ctx, chatID, "⚠️ Gagal mengambil data intermarket. Silakan coba lagi.")
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "intermarket")
+		return nil
 	}
 
 	text := formatIntermarketResult(result)

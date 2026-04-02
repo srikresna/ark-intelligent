@@ -91,8 +91,8 @@ func (h *Handler) WithVP(svc VPServices) {
 
 func (h *Handler) cmdVP(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.vp == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "VP engine tidak tersedia.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("VP engine not available"), "vp")
+		return nil
 	}
 
 	parts := strings.Fields(strings.TrimSpace(strings.ToUpper(args)))
@@ -144,12 +144,12 @@ Pilih aset:`, h.kb.VPSymbolMenu())
 	if err != nil {
 		// Stop progress without deleting — reuse message for error display.
 		prog.StopNoDelete()
-		errMsg := userFriendlyError(err, "vp")
 		if msgID > 0 {
-			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
+			h.editUserError(ctx, chatID, msgID, err, "vp")
+		} else {
+			h.sendUserError(ctx, chatID, err, "vp")
 		}
-		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
-		return sendErr
+		return nil
 	}
 
 	// Stop progress without deleting — vpRunMode edits the message with the result.

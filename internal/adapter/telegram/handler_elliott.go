@@ -49,8 +49,8 @@ func (h *Handler) WithElliott(svc ElliottServices) {
 //	/elliott BTCUSD daily
 func (h *Handler) cmdElliott(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.elliott == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚠️ Elliott Wave engine tidak tersedia.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("Elliott Wave engine not available"), "elliott")
+		return nil
 	}
 
 	parts := strings.Fields(strings.TrimSpace(strings.ToUpper(args)))
@@ -98,13 +98,14 @@ Timeframe yang didukung: <code>daily</code>, <code>4h</code>, <code>1h</code>`)
 
 	bars, err := h.fetchElliottBars(ctx, mapping, timeframe)
 	if err != nil || len(bars) == 0 {
-		errMsg := fmt.Sprintf("❌ Gagal mengambil data harga untuk <b>%s</b>: %s",
-			html.EscapeString(mapping.Currency), html.EscapeString(fmt.Sprintf("%v", err)))
 		if msgID > 0 {
 			_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 		}
-		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
-		return sendErr
+		if err == nil {
+			err = fmt.Errorf("no data for %s", mapping.Currency)
+		}
+		h.sendUserError(ctx, chatID, err, "elliott")
+		return nil
 	}
 
 	result := h.elliott.Engine.Analyze(bars, mapping.Currency, strings.ToUpper(timeframe))
