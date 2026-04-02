@@ -94,6 +94,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 		return h.backtestRuin(ctx, chatID)
 	case args == "AUDIT":
 		return h.backtestAudit(ctx, chatID)
+	case args == "MULTI" || args == "MULTISTRATEGY" || args == "COMPOSE":
+		return h.backtestMultiStrategy(ctx, chatID)
 	case knownSignalTypes[args]:
 		// e.g. /backtest SMART_MONEY
 		return h.backtestOneSignalType(ctx, chatID, calc, args)
@@ -126,7 +128,8 @@ func (h *Handler) cmdBacktest(ctx context.Context, chatID string, userID int64, 
 			"<code>/backtest mc</code> \xe2\x80\x94 Monte Carlo simulation\n" +
 			"<code>/backtest portfolio</code> \xe2\x80\x94 portfolio-level\n" +
 			"<code>/backtest ruin</code> \xe2\x80\x94 risk of ruin\n" +
-			"<code>/backtest audit</code> \xe2\x80\x94 bias audit"
+			"<code>/backtest audit</code> \xe2\x80\x94 bias audit\n" +
+			"<code>/backtest multi</code> \xe2\x80\x94 multi-strategy composer"
 		_, err := h.bot.SendHTML(ctx, chatID, helpMsg)
 		return err
 	}
@@ -767,5 +770,32 @@ func (h *Handler) backtestAudit(ctx context.Context, chatID string) error {
 	}
 
 	_, err := h.bot.SendHTML(ctx, chatID, b.String())
+	return err
+}
+
+// backtestMultiStrategy runs per-strategy analysis and shows combined portfolio metrics.
+func (h *Handler) backtestMultiStrategy(ctx context.Context, chatID string) error {
+	if h.signalRepo == nil {
+		_, err := h.bot.SendHTML(ctx, chatID, "Signal data not available yet.")
+		return err
+	}
+
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Running multi-strategy analysis... ⏳")
+
+	composer := backtestsvc.NewStrategyComposer(h.signalRepo)
+	result, err := composer.Compose(ctx)
+	if err != nil {
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
+		h.sendUserError(ctx, chatID, err, "backtest")
+		return nil
+	}
+
+	htmlOut := h.fmt.FormatMultiStrategy(result)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
+	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
 	return err
 }
