@@ -80,6 +80,15 @@ type Deps struct {
 	// OwnerChatID is the owner's chat ID for debug notifications.
 	// If empty, debug notifications are skipped.
 	OwnerChatID string
+
+	// NewsRepo provides access to economic calendar events.
+	// Used by the daily briefing job. May be nil (briefing skipped).
+	NewsRepo ports.NewsRepository
+
+	// DailyBriefing is an optional callback that builds and pushes the
+	// morning briefing HTML to a given chatID. Injected from the Telegram
+	// handler to avoid import cycles. May be nil (auto-push skipped).
+	DailyBriefing func(ctx context.Context, chatID string) bool
 }
 
 // Intervals configures how often each job runs.
@@ -193,7 +202,17 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 		jobCount++
 	}
 
-	// Proactive regime alert (checks every 4 hours for HMM regime transitions)	if s.deps.DailyPriceRepo != nil && s.deps.PriceFetcher != nil {		s.startJobWithDelay(ctx, "regime-alert", 4*time.Hour, 2*time.Minute, s.jobRegimeAlert)		jobCount++	}
+	// Daily briefing push (06:00 WIB — checks every 30 min, fires once per day)
+	if s.deps.DailyBriefing != nil {
+		s.startJobWithDelay(ctx, "daily-briefing", 30*time.Minute, 2*time.Minute, s.jobDailyBriefing)
+		jobCount++
+	}
+
+	// Proactive regime alert (checks every 4 hours for HMM regime transitions)
+	if s.deps.DailyPriceRepo != nil && s.deps.PriceFetcher != nil {
+		s.startJobWithDelay(ctx, "regime-alert", 4*time.Hour, 2*time.Minute, s.jobRegimeAlert)
+		jobCount++
+	}
 	// One-time impact bootstrap (backfills historical event impacts on startup)
 	if s.deps.ImpactBootstrapper != nil {
 		s.wg.Add(1)

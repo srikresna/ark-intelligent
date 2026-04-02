@@ -7,11 +7,11 @@ import "strings"
 func BiasIcon(bias string) string {
 	switch strings.ToUpper(bias) {
 	case "BULLISH":
-		return "🟢"
+		return "🟢 Bullish"
 	case "BEARISH":
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 
@@ -48,10 +48,10 @@ func RegimeEmoji(regime string) string {
 func AccumulationDistributionIcon(schematic string) string {
 	switch strings.ToUpper(schematic) {
 	case "ACCUMULATION":
-		return "🟢"
+		return "🟢 Accumulation"
 	case "DISTRIBUTION":
-		return "🔴"
+		return "🔴 Distribution"
 	default:
-		return "📊"
+		return "📊 Mixed"
 	}
 }

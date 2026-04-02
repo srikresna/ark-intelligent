@@ -79,10 +79,10 @@ func (h *Handler) cmdCompare(ctx context.Context, chatID string, userID int64, a
 // cotBiasLabel returns a human-readable bias label and icon for a net position value.
 func cotBiasLabel(net float64) (string, string) {
 	if net > 5000 {
-		return "BULLISH", "🟢"
+		return "BULLISH", "🟢 Bullish"
 	}
 	if net < -5000 {
-		return "BEARISH", "🔴"
+		return "BEARISH", "🔴 Bearish"
 	}
 	return "NEUTRAL", "🟡"
 }

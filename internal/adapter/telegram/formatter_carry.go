@@ -27,9 +27,9 @@ func (f *Formatter) FormatCarryMonitor(r *domain.CarryMonitorResult) string {
 			medal = "🥉"
 		}
 
-		dirIcon := "🟢"
+		dirIcon := "🟢 Long"
 		if p.Spread < 0 {
-			dirIcon = "🔴"
+			dirIcon = "🔴 Short"
 		}
 
 		bar := spreadBar(p.Spread)
@@ -81,11 +81,11 @@ func spreadBar(spreadBps float64) string {
 func riskEmoji(risk domain.UnwindRisk) string {
 	switch risk {
 	case domain.UnwindAlert:
-		return "🔴"
+		return "🔴 Alert"
 	case domain.UnwindNarrow:
-		return "🟡"
+		return "🟡 Narrow"
 	default:
-		return "🟢"
+		return "🟢 Safe"
 	}
 }
 

@@ -102,6 +102,7 @@ func main() {
 	impactRepo := storage.NewImpactRepo(db)
 	dailyPriceRepo := storage.NewDailyPriceRepo(db)
 	intradayRepo := storage.NewIntradayRepo(db)
+	feedbackRepo := storage.NewFeedbackRepo(db)
 	fredRepo := storage.NewFREDRepo(db)
 	fredPersistence := fred.NewPersistenceService(&fredPersistAdapter{repo: fredRepo})
 	fred.SetPostFetchHook(func(ctx context.Context, data *fred.MacroData) {
@@ -377,6 +378,9 @@ func main() {
 		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
 		intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
 	)
+
+	// Wire feedback repo for 👍/👎 reaction buttons on analysis messages (TASK-051)
+	handler.WithFeedback(feedbackRepo)
 
 	// Wire alpha services (Factor + Strategy + Microstructure engines)
 	if alphaServices != nil {

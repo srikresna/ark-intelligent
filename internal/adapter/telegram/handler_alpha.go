@@ -204,6 +204,7 @@ func (h *Handler) cmdAlpha(ctx context.Context, chatID string, _ int64, _ string
 
 	summary := formatAlphaSummary(state)
 	kb := h.kb.AlphaMenu()
+	kb = AppendFeedbackRow(kb, h.kb, "fb:alpha:summary", h.feedbackEnabled())
 	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
@@ -1147,13 +1148,13 @@ func alphaSignalEmoji(sig string) string {
 	case "STRONG_LONG":
 		return "🟢🟢"
 	case "LONG":
-		return "🟢"
+		return "🟢 Bullish"
 	case "STRONG_SHORT":
 		return "🔴🔴"
 	case "SHORT":
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 
@@ -1201,22 +1202,22 @@ func alphaHeatEmoji(h strategy.HeatLevel) string {
 	case strategy.HeatHot:
 		return "🟠"
 	case strategy.HeatOverheat:
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 
 func alphaMicroEmoji(b microstructure.Bias) string {
 	switch b {
 	case microstructure.BiasBullish:
-		return "🟢"
+		return "🟢 Bullish"
 	case microstructure.BiasBearish:
-		return "🔴"
+		return "🔴 Bearish"
 	case microstructure.BiasConflict:
 		return "🟡"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 

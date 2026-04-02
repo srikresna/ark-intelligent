@@ -369,15 +369,15 @@ func FmtMillions(v float64) string {
 	}
 }
 
-// EmojiForChange returns 🟢/🔴/⚪ based on sign.
+// EmojiForChange returns 🟢/🔴/⚪ with directional text based on sign.
 func EmojiForChange(v float64) string {
 	if v > 0 {
-		return "🟢"
+		return "🟢 Up"
 	}
 	if v < 0 {
-		return "🔴"
+		return "🔴 Down"
 	}
-	return "⚪"
+	return "⚪ Flat"
 }
 
 // EmojiForStrength returns strength emoji (1-5 scale).

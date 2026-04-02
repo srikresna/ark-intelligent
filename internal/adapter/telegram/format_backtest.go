@@ -26,7 +26,7 @@ func (f *Formatter) FormatBacktestStats(stats *domain.BacktestStats) string {
 		if stats.ExpectedValue > 0.3 {
 			evLabel = "Strong Edge"
 		} else if stats.ExpectedValue <= 0 {
-			evIcon = "\xF0\x9F\x94\xB4" // red circle
+			evIcon = "\xF0\x9F\x94\xB4 Weak" // red circle
 			evLabel = "Negative Edge"
 		} else if stats.ExpectedValue < 0.1 {
 			evIcon = "\xE2\x9A\xA0\xEF\xB8\x8F" // warning
@@ -37,7 +37,7 @@ func (f *Formatter) FormatBacktestStats(stats *domain.BacktestStats) string {
 	if stats.ProfitFactor != 0 {
 		pfIcon := "\xE2\x9C\x85"
 		if stats.ProfitFactor < 1.0 {
-			pfIcon = "\xF0\x9F\x94\xB4"
+			pfIcon = "\xF0\x9F\x94\xB4 Low"
 		}
 		b.WriteString(fmt.Sprintf("<code>Profit F :</code> %.2f %s\n", stats.ProfitFactor, pfIcon))
 	}
@@ -103,7 +103,7 @@ func (f *Formatter) FormatBacktestStats(stats *domain.BacktestStats) string {
 	if stats.BrierScore > 0 {
 		brierIcon := "\xE2\x9C\x85" // checkmark — excellent (<0.15)
 		if stats.BrierScore >= 0.25 {
-			brierIcon = "\xF0\x9F\x94\xB4" // red circle — worse than random
+			brierIcon = "\xF0\x9F\x94\xB4 Poor" // red circle — worse than random
 		} else if stats.BrierScore >= 0.15 {
 			brierIcon = "\xE2\x9A\xA0\xEF\xB8\x8F" // warning — decent but not great
 		}
@@ -261,11 +261,11 @@ func (f *Formatter) FormatWalkForward(result *backtestsvc.WalkForwardResult) str
 	var light string
 	switch {
 	case result.OverfitScore < 3:
-		light = "\xF0\x9F\x9F\xA2" // green
+		light = "\xF0\x9F\x9F\xA2 Go" // green
 	case result.OverfitScore <= 10:
 		light = "\xF0\x9F\x9F\xA1" // yellow
 	default:
-		light = "\xF0\x9F\x94\xB4" // red
+		light = "\xF0\x9F\x94\xB4 Stop" // red
 	}
 	b.WriteString(fmt.Sprintf("<code>Overfit Score :</code> %s %.1fpp\n", light, result.OverfitScore))
 

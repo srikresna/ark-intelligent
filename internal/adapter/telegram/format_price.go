@@ -40,25 +40,25 @@ func (f *Formatter) FormatPriceContext(pc *domain.PriceContext) string {
 	b.WriteString(fmt.Sprintf("<code>Harga       : %.5f</code>\n", pc.CurrentPrice))
 
 	// Weekly change with plain explanation
-	wIcon := "🟢"
+	wIcon := "🟢 Up"
 	wDesc := "naik minggu ini"
 	if pc.WeeklyChgPct < 0 {
-		wIcon = "🔴"
+		wIcon = "🔴 Down"
 		wDesc = "turun minggu ini"
 	} else if pc.WeeklyChgPct == 0 {
-		wIcon = "⚪"
+		wIcon = "⚪ Flat"
 		wDesc = "flat minggu ini"
 	}
 	b.WriteString(fmt.Sprintf("<code>Perubahan 1W: </code>%s <b>%+.2f%%</b> <i>(%s)</i>\n", wIcon, pc.WeeklyChgPct, wDesc))
 
 	// Monthly change
-	mIcon := "🟢"
+	mIcon := "🟢 Up"
 	mDesc := "naik sebulan terakhir"
 	if pc.MonthlyChgPct < 0 {
-		mIcon = "🔴"
+		mIcon = "🔴 Down"
 		mDesc = "turun sebulan terakhir"
 	} else if pc.MonthlyChgPct == 0 {
-		mIcon = "⚪"
+		mIcon = "⚪ Flat"
 		mDesc = "flat sebulan terakhir"
 	}
 	b.WriteString(fmt.Sprintf("<code>Perubahan 1M: </code>%s <b>%+.2f%%</b> <i>(%s)</i>\n", mIcon, pc.MonthlyChgPct, mDesc))
@@ -79,22 +79,22 @@ func (f *Formatter) FormatPriceContext(pc *domain.PriceContext) string {
 	b.WriteString("\n<b>Posisi vs Rata-rata Harga:</b>\n")
 
 	ma4wPos := "di BAWAH"
-	ma4wIcon := "🔴"
+	ma4wIcon := "🔴 Below"
 	ma4wMeaning := "bearish jangka pendek"
 	if pc.AboveMA4W {
 		ma4wPos = "di ATAS"
-		ma4wIcon = "🟢"
+		ma4wIcon = "🟢 Above"
 		ma4wMeaning = "bullish jangka pendek"
 	}
 	b.WriteString(fmt.Sprintf("<code>  Rata2 4-minggu : </code>%s %s (%.5f) — <i>%s</i>\n",
 		ma4wIcon, ma4wPos, pc.PriceMA4W, ma4wMeaning))
 
 	ma13wPos := "di BAWAH"
-	ma13wIcon := "🔴"
+	ma13wIcon := "🔴 Below"
 	ma13wMeaning := "tren besar masih turun"
 	if pc.AboveMA13W {
 		ma13wPos = "di ATAS"
-		ma13wIcon = "🟢"
+		ma13wIcon = "🟢 Above"
 		ma13wMeaning = "tren besar masih naik"
 	}
 	b.WriteString(fmt.Sprintf("<code>  Rata2 13-minggu: </code>%s %s (%.5f) — <i>%s</i>\n",
@@ -117,10 +117,10 @@ func (f *Formatter) FormatPriceContext(pc *domain.PriceContext) string {
 		volDesc := "volatilitas normal — pergerakan harga wajar"
 		switch pc.VolatilityRegime {
 		case "EXPANDING":
-			volIcon = "🔴"
+			volIcon = "🔴 High"
 			volDesc = "volatilitas TINGGI — harga sedang bergerak liar, risiko lebih besar"
 		case "CONTRACTING":
-			volIcon = "🟢"
+			volIcon = "🟢 Low"
 			volDesc = "volatilitas RENDAH — harga sedang tenang, breakout mungkin segera terjadi"
 		}
 		b.WriteString(fmt.Sprintf("\n<code>Volatilitas: </code>%s <i>%s</i>\n", volIcon, volDesc))
@@ -225,9 +225,9 @@ func (f *Formatter) FormatSeasonalPatterns(patterns []pricesvc.SeasonalPattern) 
 			limit = len(strong)
 		}
 		for _, t := range strong[:limit] {
-			icon := "\xF0\x9F\x9F\xA2"
+			icon := "\xF0\x9F\x9F\xA2 Up"
 			if t.bias == "BEARISH" {
-				icon = "\xF0\x9F\x94\xB4"
+				icon = "\xF0\x9F\x94\xB4 Down"
 			}
 			confTag := ""
 			if t.confidence == pricesvc.ConfidenceStrong {
@@ -295,9 +295,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 	biasEmoji := "\xe2\x9a\xaa"
 	switch p.CurrentBias {
 	case "BULLISH":
-		biasEmoji = "\xF0\x9F\x9F\xA2"
+		biasEmoji = "\xF0\x9F\x9F\xA2 Bullish"
 	case "BEARISH":
-		biasEmoji = "\xF0\x9F\x94\xB4"
+		biasEmoji = "\xF0\x9F\x94\xB4 Bearish"
 	}
 	b.WriteString(fmt.Sprintf("\n%s <b>%s (%s):</b> %+.2f%% avg, %.0f%% WR",
 		biasEmoji, curMs.Month, p.CurrentBias, curMs.AvgReturn, curMs.WinRate))
@@ -363,9 +363,9 @@ func (f *Formatter) FormatSeasonalSingle(p pricesvc.SeasonalPattern) string {
 	// --- EVENT DENSITY (Phase 3b) ---
 	if p.EventDensity != nil {
 		b.WriteString("\n\xF0\x9F\x93\x86 <b>EVENT DENSITY</b>\n")
-		evIcon := "\xF0\x9F\x9F\xA2"
+		evIcon := "\xF0\x9F\x9F\xA2 Up"
 		if p.EventDensity.Rating == "HIGH" {
-			evIcon = "\xF0\x9F\x94\xB4"
+			evIcon = "\xF0\x9F\x94\xB4 Down"
 		} else if p.EventDensity.Rating == "MEDIUM" {
 			evIcon = "\xF0\x9F\x9F\xA1"
 		}
@@ -522,12 +522,12 @@ func (f *Formatter) FormatDailyPrice(dc *domain.DailyPriceContext) string {
 
 	// MA Trend alignment
 	maTrend := dc.MATrendDaily()
-	trendEmoji := "⚪"
+	trendEmoji := "⚪ Neutral"
 	switch maTrend {
 	case "BULLISH":
-		trendEmoji = "🟢"
+		trendEmoji = "🟢 Bullish"
 	case "BEARISH":
-		trendEmoji = "🔴"
+		trendEmoji = "🔴 Bearish"
 	}
 	b.WriteString(fmt.Sprintf("<code>Alignment: %s</code> %s\n", maTrend, trendEmoji))
 

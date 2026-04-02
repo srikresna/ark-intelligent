@@ -243,6 +243,7 @@ func (h *Handler) sendCOTDetail(ctx context.Context, chatID string, contractCode
 	}
 
 	kb := h.kb.COTDetailMenu(contractCode, false)
+	kb = AppendFeedbackRow(kb, h.kb, "fb:cot:"+contractCode, h.feedbackEnabled())
 	if editMsgID > 0 {
 		return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
 	}

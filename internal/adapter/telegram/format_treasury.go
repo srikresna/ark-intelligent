@@ -25,12 +25,12 @@ func (f *Formatter) FormatTreasury(data *treasury.TreasuryData) string {
 				continue
 			}
 
-			demandEmoji := "⚪"
+			demandEmoji := "⚪ Neutral"
 			switch a.DemandSignal {
 			case "STRONG":
-				demandEmoji = "🟢"
+				demandEmoji = "🟢 Strong"
 			case "WEAK":
-				demandEmoji = "🔴"
+				demandEmoji = "🔴 Weak"
 			}
 
 			b.WriteString(fmt.Sprintf("%s <b>%s</b> (%d auctions)\n",
@@ -76,11 +76,11 @@ func (f *Formatter) FormatTreasury(data *treasury.TreasuryData) string {
 			continue // skip auctions without results yet
 		}
 
-		demandEmoji := "⚪"
+		demandEmoji := "⚪ Neutral"
 		if a.BidToCover >= 2.5 {
-			demandEmoji = "🟢"
+			demandEmoji = "🟢 Strong"
 		} else if a.BidToCover < 2.0 {
-			demandEmoji = "🔴"
+			demandEmoji = "🔴 Weak"
 		}
 
 		b.WriteString(fmt.Sprintf("%s <b>%s</b> — %s\n",

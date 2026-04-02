@@ -30,11 +30,11 @@ func (f *Formatter) FormatCOTOverviewCompact(analyses []domain.COTAnalysis, conv
 			code = contractCodeToFriendly(a.Contract.Code)
 		}
 
-		arrow := "➡"
+		arrow := "➡ Flat"
 		if a.NetChange > 0 {
-			arrow = "🟢"
+			arrow = "🟢 Long"
 		} else if a.NetChange < 0 {
-			arrow = "🔴"
+			arrow = "🔴 Short"
 		}
 
 		signal := ""
@@ -156,11 +156,11 @@ func (f *Formatter) FormatCOTOverviewSparkline(analyses []domain.COTAnalysis, co
 		}
 
 		// Emoji direction indicator
-		arrow := "➡"
+		arrow := "➡ Flat"
 		if a.NetChange > 0 {
-			arrow = "🟢"
+			arrow = "🟢 Long"
 		} else if a.NetChange < 0 {
-			arrow = "🔴"
+			arrow = "🔴 Short"
 		}
 
 		// Percentile bar from COTIndex (0-100) → 5-block sparkline

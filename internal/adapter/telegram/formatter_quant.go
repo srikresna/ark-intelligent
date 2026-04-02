@@ -60,12 +60,12 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 
 	// MA Trend
 	maTrend := ic.IntradayMATrend()
-	trendEmoji := "⚪"
+	trendEmoji := "⚪ Mixed"
 	switch maTrend {
 	case "BULLISH":
-		trendEmoji = "🟢"
+		trendEmoji = "🟢 Bullish"
 	case "BEARISH":
-		trendEmoji = "🔴"
+		trendEmoji = "🔴 Bearish"
 	}
 	b.WriteString(fmt.Sprintf("<code>Alignment: %s</code> %s\n", maTrend, trendEmoji))
 
@@ -228,9 +228,9 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 			limit = len(m.Breakdowns)
 		}
 		for _, bd := range m.Breakdowns[:limit] {
-			sevIcon := "🟡"
+			sevIcon := "🟡 Medium"
 			if bd.Severity == "HIGH" {
-				sevIcon = "🔴"
+				sevIcon = "🔴 High"
 			}
 			b.WriteString(fmt.Sprintf("%s <code>%s/%s: %.2f → %.2f (Δ%+.2f)</code>\n",
 				sevIcon, bd.CurrencyA, bd.CurrencyB, bd.HistoricalCorr, bd.CurrentCorr, bd.Delta))
@@ -273,9 +273,9 @@ func corrIcon(r float64) string {
 	abs := math.Abs(r)
 	switch {
 	case abs >= 0.80:
-		return "🔴" // Strong
+		return "🔴 Strong" // Strong correlation
 	case abs >= 0.50:
-		return "🟠" // Moderate
+		return "🟠 Moderate" // Moderate correlation
 	default:
 		return ""
 	}
@@ -304,9 +304,9 @@ func (f *Formatter) FormatCarryRanking(r *domain.CarryRanking) string {
 		}
 
 		// Direction icon
-		dirIcon := "🟢" // Positive carry (long)
+		dirIcon := "🟢 Long" // Positive carry (long)
 		if p.Differential < 0 {
-			dirIcon = "🔴" // Negative carry (short)
+			dirIcon = "🔴 Short" // Negative carry (short)
 		}
 
 		// Carry bar visualization
@@ -357,14 +357,14 @@ func truncLabel(s string, maxLen int) string {
 func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string {
 	var b strings.Builder
 
-	fcastIcon := "⚪"
+	fcastIcon := "⚪ Stable"
 	fcastLabel := "Stable"
 	switch g.VolForecast {
 	case "INCREASING":
-		fcastIcon = "🔴"
+		fcastIcon = "🔴 Rising"
 		fcastLabel = "Getting wilder"
 	case "DECREASING":
-		fcastIcon = "🟢"
+		fcastIcon = "🟢 Falling"
 		fcastLabel = "Calming down"
 	}
 
@@ -418,14 +418,14 @@ func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string
 func (f *Formatter) FormatHurst(currency string, h *pricesvc.HurstResult, regime *pricesvc.HurstRegimeContext) string {
 	var b strings.Builder
 
-	icon := "⚪"
+	icon := "⚪ Random"
 	label := "Random (no clear pattern)"
 	switch h.Classification {
 	case "TRENDING":
-		icon = "📈"
+		icon = "📈 Trending"
 		label = "Trending — momentum carries forward"
 	case "MEAN_REVERTING":
-		icon = "🔄"
+		icon = "🔄 Reverting"
 		label = "Mean-reverting — extremes snap back"
 	}
 
@@ -486,20 +486,20 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 		return b.String()
 	}
 
-	icon := "⚪"
+	icon := "⚪ Unknown"
 	label := "Unknown"
 	desc := ""
 	switch h.CurrentState {
 	case pricesvc.HMMRiskOn:
-		icon = "🟢"
+		icon = "🟢 Risk-On"
 		label = "Risk-On (Calm)"
 		desc = "Market is in a calm, confident phase. Trends tend to be reliable."
 	case pricesvc.HMMRiskOff:
-		icon = "🟡"
+		icon = "🟡 Risk-Off"
 		label = "Risk-Off (Cautious)"
 		desc = "Market is getting defensive. Expect choppy action, reduce exposure."
 	case pricesvc.HMMCrisis:
-		icon = "🔴"
+		icon = "🔴 Crisis"
 		label = "Crisis (Panic)"
 		desc = "Market is in stress mode. Correlations spike, safe havens outperform."
 	}
@@ -690,11 +690,11 @@ func (f *Formatter) FormatWFOptimization(r *backtestsvc.WFOResult) string {
 
 	// Stability
 	b.WriteString("\n<b>🔒 Stability</b>\n")
-	stabIcon := "🟢"
+	stabIcon := "🟢 Stable"
 	if r.WeightStability < 50 {
-		stabIcon = "🔴"
+		stabIcon = "🔴 Unstable"
 	} else if r.WeightStability < 70 {
-		stabIcon = "🟡"
+		stabIcon = "🟡 Moderate"
 	}
 	b.WriteString(fmt.Sprintf("<code>Weight Stability: %.0f%%</code> %s\n", r.WeightStability, stabIcon))
 
@@ -738,9 +738,9 @@ func (f *Formatter) FormatVolCone(cone *pricesvc.VolCone) string {
 	}
 
 	var b strings.Builder
-	anomalyIcon := "🟢"
+	anomalyIcon := "🟢 Normal"
 	if cone.IsAnomaly {
-		anomalyIcon = "🔴"
+		anomalyIcon = "🔴 Anomaly"
 	}
 	b.WriteString(fmt.Sprintf("📐 <b>VOLATILITY CONE — %s</b> %s\n", cone.Symbol, anomalyIcon))
 	b.WriteString(fmt.Sprintf("<code>%s</code>\n\n", cone.AsOf.Format("02 Jan 2006")))

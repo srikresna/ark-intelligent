@@ -37,12 +37,12 @@ func parseNumeric(s string) *float64 {
 //   2 = higher actual is bearish for the currency (e.g. Unemployment Claims, CPI when above target)
 func directionArrow(actual, forecast string, impactDirection ...int) string {
 	if actual == "" || forecast == "" {
-		return "⚪"
+		return "⚪ Pending"
 	}
 	aVal := parseNumeric(actual)
 	fVal := parseNumeric(forecast)
 	if aVal == nil || fVal == nil {
-		return "⚪"
+		return "⚪ N/A"
 	}
 
 	diff := *aVal - *fVal
@@ -67,11 +67,11 @@ func directionArrow(actual, forecast string, impactDirection ...int) string {
 	}
 
 	if effectiveDiff > 0 {
-		return "🟢"
+		return "🟢 Beat"
 	} else if effectiveDiff < 0 {
-		return "🔴"
+		return "🔴 Miss"
 	}
-	return "⚪"
+	return "⚪ In-line"
 }
 
 // FormatSettings formats the user preferences display.
@@ -216,11 +216,11 @@ func scoreArrow(score float64) string {
 // scoreDot returns a colored dot based on score direction.
 func scoreDot(score float64) string {
 	if score > 15 {
-		return "🟢"
+		return "🟢 Bullish"
 	} else if score < -15 {
-		return "🔴"
+		return "🔴 Bearish"
 	}
-	return "⚪"
+	return "⚪ Neutral"
 }
 
 // trendLabel converts a direction string to a human-readable trend label.
@@ -239,9 +239,9 @@ func trendLabel(direction string) string {
 func shortDirection(d string) string {
 	switch d {
 	case "BULLISH":
-		return "\xF0\x9F\x9F\xA2 BULL"
+		return "\xF0\x9F\x9F\xA2 Bullish BULL"
 	case "BEARISH":
-		return "\xF0\x9F\x94\xB4 BEAR"
+		return "\xF0\x9F\x94\xB4 Bearish BEAR"
 	default:
 		return d
 	}
