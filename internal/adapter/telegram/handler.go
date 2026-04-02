@@ -233,6 +233,7 @@ func NewHandler(
 	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
 	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
 	bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
+	bot.RegisterCommand("/defi", h.cmdDeFi)          // DeFi health dashboard (DefiLlama)
 	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
 
 	// Membership & upgrade info
