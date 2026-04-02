@@ -17,6 +17,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("worldbank") //nolint:gochecknoglobals
@@ -186,50 +187,61 @@ type wbEntity struct {
 // fetchIndicator calls the World Bank API for a single country + series.
 // It returns the most recent non-null value and its year.
 func fetchIndicator(ctx context.Context, countryCode, series string) (float64, int, error) {
-	url := fmt.Sprintf(
+	apiURL := fmt.Sprintf(
 		"https://api.worldbank.org/v2/country/%s/indicator/%s?format=json&mrv=5",
 		countryCode, series,
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return 0, 0, fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("User-Agent", "ark-intelligent/1.0 (market-analysis-bot)")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return 0, 0, fmt.Errorf("http get %s/%s: %w", countryCode, series, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, 0, fmt.Errorf("World Bank API status %d for %s/%s", resp.StatusCode, countryCode, series)
+	type result struct {
+		value float64
+		year  int
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, 0, fmt.Errorf("read body: %w", err)
-	}
-
-	var raw worldBankResponse
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return 0, 0, fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	var points []wbDataPoint
-	if err := json.Unmarshal(raw[1], &points); err != nil {
-		return 0, 0, fmt.Errorf("unmarshal data points: %w", err)
-	}
-
-	// Find most recent non-null value
-	for _, p := range points {
-		if p.Value != nil {
-			year := 0
-			fmt.Sscanf(p.Date, "%d", &year) //nolint:errcheck // parse best-effort
-			return *p.Value, year, nil
+	res, err := retry.Do(ctx, func() (result, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+		if err != nil {
+			return result{}, fmt.Errorf("build request: %w", err)
 		}
-	}
+		req.Header.Set("User-Agent", "ark-intelligent/1.0 (market-analysis-bot)")
 
-	return 0, 0, fmt.Errorf("no non-null data for %s/%s", countryCode, series)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return result{}, fmt.Errorf("http get %s/%s: %w", countryCode, series, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return result{}, fmt.Errorf("World Bank API status %d for %s/%s", resp.StatusCode, countryCode, series)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return result{}, fmt.Errorf("read body: %w", err)
+		}
+
+		var raw worldBankResponse
+		if err := json.Unmarshal(body, &raw); err != nil {
+			return result{}, fmt.Errorf("unmarshal response: %w", err)
+		}
+
+		var points []wbDataPoint
+		if err := json.Unmarshal(raw[1], &points); err != nil {
+			return result{}, fmt.Errorf("unmarshal data points: %w", err)
+		}
+
+		// Find most recent non-null value
+		for _, p := range points {
+			if p.Value != nil {
+				year := 0
+				fmt.Sscanf(p.Date, "%d", &year) //nolint:errcheck // parse best-effort
+				return result{value: *p.Value, year: year}, nil
+			}
+		}
+
+		return result{}, fmt.Errorf("no non-null data for %s/%s", countryCode, series)
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return res.value, res.year, nil
 }

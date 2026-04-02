@@ -17,6 +17,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("price")
@@ -838,29 +839,31 @@ func (f *Fetcher) nextTDKey() string {
 }
 
 func (f *Fetcher) doGet(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 
-	resp, err := f.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+		resp, err := f.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	return body, nil
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read body: %w", err)
+		}
+		return body, nil
+	})
 }
 
 func parseFloat(s string) float64 {
