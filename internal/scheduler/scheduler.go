@@ -312,6 +312,9 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	// 1. Get current latest date before fetch
 	oldLatest, _ := s.deps.COTRepo.GetLatestReportDate(ctx)
 
+	// 1b. Snapshot previous analyses for per-pair alert comparison (TASK-052)
+	prevAnalyses, _ := s.deps.COTRepo.GetAllLatestAnalyses(ctx)
+
 	// 2. Fetch and analyze
 	analyses, err := s.deps.COTAnalyzer.AnalyzeAll(ctx)
 	if err != nil {
@@ -323,6 +326,12 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	if !newLatest.IsZero() && newLatest.After(oldLatest) {
 		log.Info().Str("date", newLatest.Format("2006-01-02")).Msg("new COT data detected")
 		s.broadcastCOTRelease(ctx, newLatest, analyses)
+
+		// 3b. Per-pair alerts (TASK-052) — compare current vs previous analyses
+		activeUsers, aErr := s.deps.PrefsRepo.GetAllActive(ctx)
+		if aErr == nil {
+			s.checkPairAlerts(ctx, analyses, prevAnalyses, activeUsers)
+		}
 	}
 
 	log.Info().Msg("COT data fetched and analyzed")
