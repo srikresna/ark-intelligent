@@ -26,6 +26,12 @@ func (h *Handler) cmdSEC(ctx context.Context, chatID string, _ int64, _ string) 
 
 	htmlMsg := h.fmt.FormatSEC13F(data)
 
+	// Alert on significant new positions (>$1B).
+	alerts := sec.DetectSignificantMoves(data)
+	if len(alerts) > 0 {
+		htmlMsg += h.fmt.FormatSEC13FAlerts(alerts)
+	}
+
 	if placeholderID > 0 {
 		return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 	}

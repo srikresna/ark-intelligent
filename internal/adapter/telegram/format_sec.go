@@ -182,3 +182,19 @@ func formatValueK(valK float64) string {
 	return fmt.Sprintf("%.0fK", valK)
 }
 
+// FormatSEC13FAlerts formats an alert block for significant new positions (>$1B).
+func (f *Formatter) FormatSEC13FAlerts(alerts []sec.SignificantNewPosition) string {
+	if len(alerts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n🚨 <b>SIGNIFICANT MOVES ALERT (&gt;$1B New Position)</b>\n")
+	for _, a := range alerts {
+		b.WriteString(fmt.Sprintf("  🟢 <b>%s</b>: %s — <code>$%s</code>\n",
+			html.EscapeString(a.Institution),
+			html.EscapeString(truncate(a.Issuer, 35)),
+			formatValueK(a.ValueK)))
+	}
+	return b.String()
+}
+

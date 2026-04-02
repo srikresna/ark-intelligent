@@ -3,11 +3,9 @@ package sec
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -217,24 +215,6 @@ func fetchInstitution(ctx context.Context, inst Institution) (*InstitutionReport
 	return report, nil
 }
 
-// informationTable represents the 13F XML holdings structure.
-type informationTable struct {
-	XMLName xml.Name       `xml:"informationTable"`
-	Entries []infoTableRow `xml:"infoTable"`
-}
-
-type infoTableRow struct {
-	Issuer     string `xml:"nameOfIssuer"`
-	TitleClass string `xml:"titleOfClass"`
-	CUSIP      string `xml:"cusip"`
-	Value      string `xml:"value"`
-	ShrOrPrn   struct {
-		Amount  string `xml:"sshPrnamt"`
-		AmtType string `xml:"sshPrnamtType"` // SH or PRN
-	} `xml:"shrsOrPrnAmt"`
-	PutCall string `xml:"putCall"`
-}
-
 // fetch13FHoldings fetches and parses the 13F holdings XML for a filing.
 func fetch13FHoldings(ctx context.Context, cik, accession string) ([]Holding, error) {
 	// Normalize accession: "0001067983-26-000015" → "000106798326000015"
@@ -306,31 +286,6 @@ func fetchHoldingsViaIndex(ctx context.Context, cik, accessionClean string) ([]H
 	}
 
 	return parseHoldingsXML(xmlBody)
-}
-
-// parseHoldingsXML parses the 13F information table XML into Holdings.
-func parseHoldingsXML(data []byte) ([]Holding, error) {
-	var table informationTable
-	if err := xml.Unmarshal(data, &table); err != nil {
-		return nil, fmt.Errorf("13F XML parse: %w", err)
-	}
-
-	holdings := make([]Holding, 0, len(table.Entries))
-	for _, e := range table.Entries {
-		value, _ := strconv.ParseFloat(strings.ReplaceAll(e.Value, ",", ""), 64)
-		shares, _ := strconv.ParseFloat(strings.ReplaceAll(e.ShrOrPrn.Amount, ",", ""), 64)
-
-		holdings = append(holdings, Holding{
-			Issuer:     e.Issuer,
-			CUSIPClass: e.CUSIP,
-			TitleClass: e.TitleClass,
-			Value:      value,
-			Shares:     shares,
-			PutCall:    strings.ToUpper(e.PutCall),
-		})
-	}
-
-	return holdings, nil
 }
 
 // doGet performs an HTTP GET with proper User-Agent header and context.
