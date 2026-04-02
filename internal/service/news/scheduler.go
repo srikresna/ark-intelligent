@@ -28,6 +28,14 @@ type AlertFilterFunc func(ctx context.Context, userID int64, prefsCurrencies, pr
 // FREDAlertCheckFunc checks if a user should receive FRED alerts (Free tier excluded).
 type FREDAlertCheckFunc func(ctx context.Context, userID int64) bool
 
+// AlertGateFunc checks whether an alert should be delivered for the given prefs and alert type.
+// Returns (ok bool, reason string). nil → always deliver.
+type AlertGateFunc func(prefs domain.UserPrefs, alertType string) (bool, string)
+
+// RecordDeliveryFunc increments the daily alert counter after a successful send.
+// nil → no-op.
+type RecordDeliveryFunc func(ctx context.Context, chatID string)
+
 // Scheduler manages background pulling of economic data and dispatching alerts.
 type Scheduler struct {
 	repo       ports.NewsRepository
@@ -61,6 +69,14 @@ type Scheduler struct {
 	// isBanned checks if a user is banned. May be nil (no ban check).
 	// When set, all broadcast loops explicitly skip banned users.
 	isBanned func(ctx context.Context, userID int64) bool
+
+	// alertGate enforces quiet hours, per-alert-type toggles, and daily caps (TASK-202).
+	// May be nil (no gate — all alerts delivered).
+	alertGate AlertGateFunc
+
+	// recordDelivery increments the daily alert counter after a successful send (TASK-202).
+	// May be nil (no counting).
+	recordDelivery RecordDeliveryFunc
 
 	// impactRecorder captures price impact after event releases.
 	// May be nil — impact recording disabled if price data unavailable.
@@ -110,6 +126,17 @@ func (s *Scheduler) SetIsBannedFunc(fn func(ctx context.Context, userID int64) b
 // SetImpactRecorder sets the impact recorder for capturing price impact after releases.
 func (s *Scheduler) SetImpactRecorder(recorder *ImpactRecorder) {
 	s.impactRecorder = recorder
+}
+
+// SetAlertGateFunc sets the alert gate callback (TASK-202).
+// The gate enforces quiet hours, per-alert-type toggles, and daily caps.
+func (s *Scheduler) SetAlertGateFunc(fn AlertGateFunc) {
+	s.alertGate = fn
+}
+
+// SetRecordDeliveryFunc sets the callback to increment daily alert counters (TASK-202).
+func (s *Scheduler) SetRecordDeliveryFunc(fn RecordDeliveryFunc) {
+	s.recordDelivery = fn
 }
 
 // Start begins the background monitoring loop.
@@ -281,8 +308,17 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 			html += "\n\n" + stormWarning
 		}
 
+		// TASK-202: Check quiet hours, alert type, and daily cap before sending.
+		if s.alertGate != nil {
+			if ok, _ := s.alertGate(prefs, domain.AlertTypeNewsHigh); !ok {
+				continue
+			}
+		}
+
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send daily reminder")
+		} else if s.recordDelivery != nil {
+			s.recordDelivery(ctx, prefs.ChatID)
 		}
 		time.Sleep(config.TelegramFloodDelay) // Avoid Telegram flood
 	}
@@ -481,8 +517,17 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 				html += fmt.Sprintf("📊 Forecast: %s | Prev: %s\n", e.Forecast, e.Previous)
 			}
 
+			// TASK-202: Check quiet hours, alert type, and daily cap before sending.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate(prefs, domain.AlertTypeNewsHigh); !ok {
+					continue
+				}
+			}
+
 			if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 				schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send pre-event alert")
+			} else if s.recordDelivery != nil {
+				s.recordDelivery(ctx, prefs.ChatID)
 			}
 			time.Sleep(config.TelegramFloodDelay)
 		}

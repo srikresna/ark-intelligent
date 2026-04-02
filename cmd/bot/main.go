@@ -331,6 +331,10 @@ func main() {
 	impactRecorder := newssvc.NewImpactRecorder(impactRepo, priceRepo, priceFetcher)
 	newsSched.SetImpactRecorder(impactRecorder)
 
+	// TASK-202: Wire alert gate into news scheduler (quiet hours, per-type toggle, daily cap).
+	newsSched.SetAlertGateFunc(sched.ShouldDeliverAlert)
+	newsSched.SetRecordDeliveryFunc(sched.RecordAlertDelivery)
+
 	newsSched.Start(ctx)
 
 	// Wire Fed speech provider into AI context builder for enriched chatbot prompts.
