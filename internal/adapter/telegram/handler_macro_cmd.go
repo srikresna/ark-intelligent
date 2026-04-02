@@ -361,3 +361,23 @@ func (h *Handler) cmdLeading(ctx context.Context, chatID string, _ int64, _ stri
 	htmlMsg := macro.FormatOECDCLIData(data)
 	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
+
+// ---------------------------------------------------------------------------
+// /swaps — DTCC FX Swap Institutional Flows
+// ---------------------------------------------------------------------------
+
+// cmdSwaps handles the /swaps command — fetches and displays DTCC PPD FX swap
+// volume data showing institutional hedging flows and positioning per currency pair.
+func (h *Handler) cmdSwaps(ctx context.Context, chatID string, _ int64, _ string) error {
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "🏛 Fetching DTCC FX swap institutional data... ⏳")
+
+	data, err := macro.GetDTCCData(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("DTCC FX swap data fetch failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID,
+			"❌ Gagal mengambil data DTCC FX swap. Silakan coba lagi nanti.")
+	}
+
+	htmlMsg := macro.FormatDTCCData(data)
+	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+}
