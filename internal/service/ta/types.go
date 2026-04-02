@@ -139,6 +139,7 @@ type IndicatorSnapshot struct {
 	Delta      *DeltaResult       // tick-rule estimated delta (cumulative buy/sell pressure) — nil if insufficient data
 	SMC        *SMCResult         // Smart Money Concepts: BOS, CHOCH, premium/discount — nil if insufficient data
 	Wyckoff    *WyckoffResult     // Wyckoff phase detection — nil if insufficient data (< 20 bars)
+	Elliott    *ElliottResult     // Elliott Wave swing labeler — nil if non-daily/weekly or insufficient data
 }
 
 // TASignal represents a normalized signal from one indicator.

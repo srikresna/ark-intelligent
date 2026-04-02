@@ -915,6 +915,24 @@ func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult)
 		}
 	}
 
+	// Elliott Wave (daily/weekly only)
+	if snap.Elliott != nil {
+		ew := snap.Elliott
+		biasEmoji := "🔵"
+		switch ew.Bias {
+		case "BULLISH":
+			biasEmoji = "🟢"
+		case "BEARISH":
+			biasEmoji = "🔴"
+		}
+		sb.WriteString(fmt.Sprintf("\n〽️ <b>Elliott:</b> Kemungkinan %s (%s bias, confidence %d%%)\n",
+			ew.PossibleWavePosition, biasEmoji+" "+ew.Bias, ew.Confidence))
+		if len(ew.RulesViolated) > 0 {
+			sb.WriteString(fmt.Sprintf("  ⚠️ Violations: %s\n", strings.Join(ew.RulesViolated, "; ")))
+		}
+	}
+
+
 	if len(result.Patterns) > 0 {
 		sb.WriteString("\n🕯 <b>Pola:</b>\n")
 		for _, p := range result.Patterns {

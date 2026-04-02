@@ -435,7 +435,7 @@ func (h *Handler) computeCTAState(ctx context.Context, mapping *domain.PriceSymb
 	// Compute FullResult per timeframe
 	var daily, h4, h1, m15, m30, h6, h12, weekly *ta.FullResult
 
-	daily = engine.ComputeFull(barsByTF["daily"])
+	daily = engine.ComputeFullForTF(barsByTF["daily"], "daily")
 	if b, ok := barsByTF["4h"]; ok {
 		h4 = engine.ComputeFull(b)
 	}

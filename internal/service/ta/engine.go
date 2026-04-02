@@ -109,6 +109,9 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	if len(bars) >= 50 && snap.ATR > 0 {
 		snap.Wyckoff = CalcWyckoff(bars, snap.ATR)
 	}
+
+	// Elliott Wave is computed by ComputeMTF for daily/weekly only.
+	// snap.Elliott remains nil here; ComputeMTF sets it after the call.
 	return snap
 }
 
@@ -146,8 +149,34 @@ func (e *Engine) ComputeFull(bars []OHLCV) *FullResult {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ComputeMTF — multi-timeframe analysis
+// ComputeFullForTF is like ComputeFull but also runs timeframe-specific indicators.
+// Use this instead of ComputeFull when the timeframe is known (e.g. "daily", "weekly").
+func (e *Engine) ComputeFullForTF(bars []OHLCV, tf string) *FullResult {
+	snap := e.ComputeSnapshot(bars)
+	snap.Timeframe = tf
+	if (tf == "daily" || tf == "weekly") && len(bars) >= 30 {
+		snap.Elliott = AnalyzeElliott(bars)
+	}
+	conf := CalcConfluence(snap)
+	zones := CalcZones(snap, conf)
+	patterns := DetectPatterns(bars)
+	var divergences []Divergence
+	rsiSeries := CalcRSISeries(bars, 14)
+	macdLine, _, _ := CalcMACDSeries(bars, 12, 26, 9)
+	if rsiSeries != nil || macdLine != nil {
+		divergences = DetectDivergences(bars, rsiSeries, macdLine)
+	}
+	return &FullResult{
+		Snapshot:    snap,
+		Confluence:  conf,
+		Zones:       zones,
+		Patterns:    patterns,
+		Divergences: divergences,
+		ICT:         CalcICT(bars, snap.ATR),
+		SMC:         snap.SMC,
+		ComputedAt:  time.Now(),
+	}
+}
 // ---------------------------------------------------------------------------
 
 // ComputeMTF calculates multi-timeframe analysis from OHLCV data keyed by
@@ -158,6 +187,10 @@ func (e *Engine) ComputeMTF(barsByTF map[string][]OHLCV) *MTFResult {
 	for tf, bars := range barsByTF {
 		snap := e.ComputeSnapshot(bars)
 		snap.Timeframe = tf
+		// Elliott Wave: only for daily/weekly (skip < 4h for performance)
+		if (tf == "daily" || tf == "weekly") && len(bars) >= 30 {
+			snap.Elliott = AnalyzeElliott(bars)
+		}
 		snapshots[tf] = snap
 	}
 	return CalcMTF(snapshots)

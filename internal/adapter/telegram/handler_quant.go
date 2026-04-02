@@ -49,6 +49,7 @@ type quantState struct {
 	contractCode   string
 	bars           map[string][]ta.OHLCV  // tf → bars
 	volCone        *pricesvc.VolCone      // cached vol cone result
+	wyckoff        *pricesvc.WyckoffResult // cached Wyckoff phase analysis
 	regimeOverlay  RegimeHeaderProvider   // optional regime overlay header
 	createdAt      time.Time
 }
@@ -229,6 +230,9 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 	// Compute volatility cone (cached in state, TTL via quantStateTTL)
 	volCone := pricesvc.ComputeVolCone(dailyRecords)
 
+	// Wyckoff phase analysis (best-effort, non-blocking)
+	wyckoff := pricesvc.AnalyzeWyckoff(dailyRecords)
+
 	state := &quantState{
 		symbol:       mapping.Currency,
 		currency:     mapping.Currency,
@@ -236,6 +240,7 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 		contractCode: code,
 		bars:         barsByTF,
 		volCone:      volCone,
+		wyckoff:      wyckoff,
 		createdAt:    time.Now(),
 	}
 
@@ -264,6 +269,11 @@ func (h *Handler) formatQuantDashboard(state *quantState) string {
 		regimeHeader = state.regimeOverlay.HeaderLine() + "\n"
 	}
 
+	wyckoffSection := ""
+	if state.wyckoff != nil {
+		wyckoffSection = "🌊 <b>Wyckoff:</b> " + html.EscapeString(state.wyckoff.Interpretation)
+	}
+
 	return fmt.Sprintf(`%s📊 <b>QUANT DASHBOARD: %s</b>
 📅 %s — %s
 %s
@@ -279,12 +289,14 @@ Setiap model akan menghasilkan chart + analisis detail.
 <b>🎭 Advanced:</b>
   HMM Regime Detection
 
+%s
 Klik tombol untuk mulai analisis.`,
 		regimeHeader,
 		html.EscapeString(state.symbol),
 		time.Now().Format("02 Jan 2006"),
 		state.timeframe,
 		volConeSection,
+		wyckoffSection,
 	)
 }
 
