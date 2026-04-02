@@ -125,12 +125,12 @@ func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult, opening *ta.AMTO
 
 	// Pattern summary
 	sb.WriteString("─────────────────────\n")
-	biasEmoji := "⚪"
+	biasEmoji := "⚪ Neutral"
 	switch r.Bias {
 	case "BULLISH":
-		biasEmoji = "🟢"
+		biasEmoji = "🟢 Bullish"
 	case "BEARISH":
-		biasEmoji = "🔴"
+		biasEmoji = "🔴 Bearish"
 	}
 	sb.WriteString(fmt.Sprintf("%s <b>Bias:</b> %s\n", biasEmoji, r.Bias))
 
@@ -167,9 +167,9 @@ func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult, opening *ta.AMTO
 		if oc.Confidence != "" {
 			confEmoji := "🟡"
 			if oc.Confidence == "HIGH" {
-				confEmoji = "🟢"
+				confEmoji = "🟢 High"
 			} else if oc.Confidence == "LOW" {
-				confEmoji = "🔴"
+				confEmoji = "🔴 Low"
 			}
 			sb.WriteString(fmt.Sprintf("  %s Confidence: <b>%s</b>\n", confEmoji, oc.Confidence))
 		}
@@ -186,11 +186,11 @@ func formatAuctionResult(symbol string, r *ta.AMTDayTypeResult, opening *ta.AMTO
 func dayTypeEmoji(t ta.DayType) string {
 	switch t {
 	case ta.DayTypeNormal:
-		return "🟢"
+		return "🟢 Up"
 	case ta.DayTypeNormalVariation:
 		return "🟡"
 	case ta.DayTypeTrend:
-		return "🔴"
+		return "🔴 Down"
 	case ta.DayTypeDoubleDistribution:
 		return "🔵"
 	case ta.DayTypePShape:
@@ -198,7 +198,7 @@ func dayTypeEmoji(t ta.DayType) string {
 	case ta.DayTypeBShape:
 		return "📉"
 	default:
-		return "⚪"
+		return "⚪ Flat"
 	}
 }
 

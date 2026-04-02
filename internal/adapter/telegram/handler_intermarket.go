@@ -153,9 +153,9 @@ func directionLabel(d int) string {
 func formatRiskRegime(regime string, divergeCount int) (string, string) {
 	switch regime {
 	case "RISK_ON":
-		return "🟢", "Cross-asset signals aligned for risk appetite — prefer risk-on currencies (AUD, NZD, CAD)"
+		return "🟢 Risk-On", "Cross-asset signals aligned for risk appetite — prefer risk-on currencies (AUD, NZD, CAD)"
 	case "RISK_OFF":
-		return "🔴", "Safe-haven demand confirmed across markets — prefer JPY, CHF, Gold"
+		return "🔴 Risk-Off", "Safe-haven demand confirmed across markets — prefer JPY, CHF, Gold"
 	default: // MIXED
 		if divergeCount >= 3 {
 			return "🟡", fmt.Sprintf("%d divergences aktif — trade individual pairs daripada broad regime bias", divergeCount)

@@ -632,9 +632,9 @@ func formatTradeList(bt *ta.BacktestResult, symbol, timeframe string) string {
 
 	for i := start; i < len(bt.Trades); i++ {
 		t := bt.Trades[i]
-		dirEmoji := "🟢"
+		dirEmoji := "🟢 Long"
 		if t.Direction == "SHORT" {
-			dirEmoji = "🔴"
+			dirEmoji = "🔴 Short"
 		}
 		resultEmoji := "✅"
 		if t.PnLDollar <= 0 {

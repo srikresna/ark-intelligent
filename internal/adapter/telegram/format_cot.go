@@ -86,12 +86,12 @@ func convictionMiniBar(score float64, dir string) string {
 		filled = 5
 	}
 	bar := strings.Repeat("▓", filled) + strings.Repeat("░", 5-filled)
-	icon := "⚪"
+	icon := "⚪ Neutral"
 	switch {
 	case score >= 65 && dir == "LONG":
-		icon = "🟢"
+		icon = "🟢 Bullish"
 	case score >= 65 && dir == "SHORT":
-		icon = "🔴"
+		icon = "🔴 Bearish"
 	case score >= 55:
 		icon = "🟡"
 	}
@@ -152,13 +152,13 @@ func (f *Formatter) FormatCOTOverview(analyses []domain.COTAnalysis, convictions
 
 		for _, a := range grpAnalyses {
 			bias := "NEUTRAL"
-			biasIcon := "⚪"
+			biasIcon := "⚪ Flat"
 			if a.NetPosition > 0 {
 				bias = "LONG"
-				biasIcon = "🟢"
+				biasIcon = "🟢 Long"
 			} else if a.NetPosition < 0 {
 				bias = "SHORT"
-				biasIcon = "🔴"
+				biasIcon = "🔴 Short"
 			}
 
 			idxLbl := cotIdxLabel(a.COTIndex)
@@ -427,10 +427,10 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 		if mmShort > 0 {
 			mmRatio = mmLong / mmShort
 		}
-		mmNetIcon := "🟢"
+		mmNetIcon := "🟢 Long"
 		mmNetDesc := "NET BELI"
 		if mmNet < 0 {
-			mmNetIcon = "🔴"
+			mmNetIcon = "🔴 Short"
 			mmNetDesc = "NET JUAL"
 		}
 
@@ -509,10 +509,10 @@ func (f *Formatter) FormatCOTRaw(r domain.COTRecord) string {
 		lfLong := r.LevFundLong
 		lfShort := r.LevFundShort
 		lfNet := lfLong - lfShort
-		lfNetIcon := "🟢"
+		lfNetIcon := "🟢 Long"
 		lfNetDesc := "NET BELI"
 		if lfNet < 0 {
-			lfNetIcon = "🔴"
+			lfNetIcon = "🔴 Short"
 			lfNetDesc = "NET JUAL"
 		}
 		var lfRatio float64
@@ -881,11 +881,11 @@ func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
 
 	switch {
 	case score >= 75 && cs.Direction == "LONG":
-		icon = "🟢"
+		icon = "🟢 Bullish"
 		verdict = "STRONG BUY SIGNAL"
 		explanation = "Hampir semua indikator sepakat: harga kemungkinan besar naik."
 	case score >= 65 && cs.Direction == "LONG":
-		icon = "🟢"
+		icon = "🟢 Bullish"
 		verdict = "BUY SIGNAL"
 		explanation = "Mayoritas indikator menunjukkan potensi kenaikan harga."
 	case score >= 55 && cs.Direction == "LONG":
@@ -893,11 +893,11 @@ func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
 		verdict = "LEMAH BUY"
 		explanation = "Ada sinyal naik tapi belum cukup kuat. Lebih baik tunggu konfirmasi."
 	case score >= 75 && cs.Direction == "SHORT":
-		icon = "🔴"
+		icon = "🔴 Bearish"
 		verdict = "STRONG SELL SIGNAL"
 		explanation = "Hampir semua indikator sepakat: harga kemungkinan besar turun."
 	case score >= 65 && cs.Direction == "SHORT":
-		icon = "🔴"
+		icon = "🔴 Bearish"
 		verdict = "SELL SIGNAL"
 		explanation = "Mayoritas indikator menunjukkan potensi penurunan harga."
 	case score >= 55 && cs.Direction == "SHORT":
@@ -925,38 +925,38 @@ func (f *Formatter) FormatConvictionBlock(cs cot.ConvictionScore) string {
 	// Component breakdown — plain language
 	b.WriteString("\n<b>Komponen Penilaian:</b>\n")
 
-	cotIcon := "⚪"
+	cotIcon := "⚪ Neutral"
 	cotDesc := "Netral"
 	switch cs.COTBias {
 	case "BULLISH":
-		cotIcon = "🟢"
+		cotIcon = "🟢 Bullish"
 		cotDesc = "Institusi besar sedang beli (bullish)"
 	case "BEARISH":
-		cotIcon = "🔴"
+		cotIcon = "🔴 Bearish"
 		cotDesc = "Institusi besar sedang jual (bearish)"
 	}
 	b.WriteString(fmt.Sprintf("<code>  COT Positioning : </code>%s %s\n", cotIcon, cotDesc))
 
-	fredIcon := "⚪"
+	fredIcon := "⚪ Neutral"
 	fredDesc := "Kondisi makro netral"
 	switch cs.FREDRegime {
 	case "GOLDILOCKS":
-		fredIcon = "🟢"
+		fredIcon = "🟢 Supportive"
 		fredDesc = "Ekonomi AS sehat, risk-on (GOLDILOCKS)"
 	case "DISINFLATIONARY":
-		fredIcon = "🟢"
+		fredIcon = "🟢 Supportive"
 		fredDesc = "Inflasi mereda, kondisi positif (DISINFLATIONARY)"
 	case "INFLATIONARY":
 		fredIcon = "🟡"
 		fredDesc = "Inflasi masih tinggi, hati-hati (INFLATIONARY)"
 	case "STRESS":
-		fredIcon = "🔴"
+		fredIcon = "🔴 Negative"
 		fredDesc = "Pasar dalam tekanan/stres (STRESS)"
 	case "RECESSION":
-		fredIcon = "🔴"
+		fredIcon = "🔴 Negative"
 		fredDesc = "Risiko resesi tinggi (RECESSION)"
 	case "STAGFLATION":
-		fredIcon = "🔴"
+		fredIcon = "🔴 Negative"
 		fredDesc = "Stagflasi: inflasi tinggi + ekonomi lemah"
 	}
 	b.WriteString(fmt.Sprintf("<code>  Kondisi Ekonomi  : </code>%s %s\n", fredIcon, fredDesc))
@@ -1158,9 +1158,9 @@ func (f *Formatter) FormatBiasHTML(signals []cot.Signal, filterCurrency string) 
 			break
 		}
 
-		dirIcon := "\xF0\x9F\x9F\xA2"
+		dirIcon := "\xF0\x9F\x9F\xA2 Long"
 		if s.Direction == "BEARISH" {
-			dirIcon = "\xF0\x9F\x94\xB4"
+			dirIcon = "\xF0\x9F\x94\xB4 Short"
 		}
 
 		strengthBar := strings.Repeat("\xE2\x96\x88", s.Strength) + strings.Repeat("\xE2\x96\x91", 5-s.Strength)
@@ -1194,9 +1194,9 @@ func (f *Formatter) FormatBiasSummary(signals []cot.Signal) string {
 			break
 		}
 
-		dirIcon := "\xF0\x9F\x9F\xA2"
+		dirIcon := "\xF0\x9F\x9F\xA2 Long"
 		if s.Direction == "BEARISH" {
-			dirIcon = "\xF0\x9F\x94\xB4"
+			dirIcon = "\xF0\x9F\x94\xB4 Short"
 		}
 
 		b.WriteString(fmt.Sprintf("%s %s (%d/5, %.0f%%) \xE2\x80\x94 <i>%s</i>\n",
@@ -1354,13 +1354,13 @@ func (f *Formatter) FormatCOTShareText(a domain.COTAnalysis) string {
 		currency = a.Contract.Name
 	}
 
-	biasEmoji := "⚪"
+	biasEmoji := "⚪ Neutral"
 	biasLabel := "NEUTRAL"
 	if a.NetPosition > 0 {
-		biasEmoji = "🟢"
+		biasEmoji = "🟢 Bullish"
 		biasLabel = "BULLISH"
 	} else if a.NetPosition < 0 {
-		biasEmoji = "🔴"
+		biasEmoji = "🔴 Bearish"
 		biasLabel = "BEARISH"
 	}
 

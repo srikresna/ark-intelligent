@@ -14,35 +14,35 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestDirectionArrow_BothEmpty(t *testing.T) {
-	if got := directionArrow("", ""); got != "⚪" {
-		t.Errorf("expected ⚪ for empty inputs, got %q", got)
+	if got := directionArrow("", ""); got != "⚪ Pending" {
+		t.Errorf("expected ⚪ Pending for empty inputs, got %q", got)
 	}
 }
 
 func TestDirectionArrow_ActualEmpty(t *testing.T) {
-	if got := directionArrow("", "1.5%"); got != "⚪" {
-		t.Errorf("expected ⚪ for empty actual, got %q", got)
+	if got := directionArrow("", "1.5%"); got != "⚪ Pending" {
+		t.Errorf("expected ⚪ Pending for empty actual, got %q", got)
 	}
 }
 
 func TestDirectionArrow_BeatsForecast(t *testing.T) {
 	got := directionArrow("3.5%", "3.0%")
-	if got != "🟢" {
-		t.Errorf("expected 🟢 when actual > forecast, got %q", got)
+	if got != "🟢 Beat" {
+		t.Errorf("expected 🟢 Beat when actual > forecast, got %q", got)
 	}
 }
 
 func TestDirectionArrow_MissesForecast(t *testing.T) {
 	got := directionArrow("2.5%", "3.0%")
-	if got != "🔴" {
-		t.Errorf("expected 🔴 when actual < forecast, got %q", got)
+	if got != "🔴 Miss" {
+		t.Errorf("expected 🔴 Miss when actual < forecast, got %q", got)
 	}
 }
 
 func TestDirectionArrow_ExactMatch(t *testing.T) {
 	got := directionArrow("3.0%", "3.0%")
-	if got != "⚪" {
-		t.Errorf("expected ⚪ when actual == forecast, got %q", got)
+	if got != "⚪ In-line" {
+		t.Errorf("expected ⚪ In-line when actual == forecast, got %q", got)
 	}
 }
 
@@ -50,23 +50,23 @@ func TestDirectionArrow_InvertedIndicator(t *testing.T) {
 	// impactDirection=2: higher actual = bearish (e.g. unemployment claims)
 	// actual 250K > forecast 230K → bad for currency → 🔴
 	got := directionArrow("250K", "230K", 2)
-	if got != "🔴" {
-		t.Errorf("expected 🔴 for inverted indicator beating forecast, got %q", got)
+	if got != "🔴 Miss" {
+		t.Errorf("expected 🔴 Miss for inverted indicator beating forecast, got %q", got)
 	}
 }
 
 func TestDirectionArrow_NormalIndicator(t *testing.T) {
 	// impactDirection=1: higher actual = bullish (e.g. NFP)
 	got := directionArrow("250K", "230K", 1)
-	if got != "🟢" {
-		t.Errorf("expected 🟢 for normal indicator beating forecast, got %q", got)
+	if got != "🟢 Beat" {
+		t.Errorf("expected 🟢 Beat for normal indicator beating forecast, got %q", got)
 	}
 }
 
 func TestDirectionArrow_NonNumeric(t *testing.T) {
 	got := directionArrow("N/A", "3.0%")
-	if got != "⚪" {
-		t.Errorf("expected ⚪ for non-numeric actual, got %q", got)
+	if got != "⚪ N/A" {
+		t.Errorf("expected ⚪ N/A for non-numeric actual, got %q", got)
 	}
 }
 
@@ -227,13 +227,13 @@ func TestScoreDot(t *testing.T) {
 		score float64
 		want  string
 	}{
-		{50, "🟢"},
-		{16, "🟢"},
-		{15, "⚪"},
-		{0, "⚪"},
-		{-15, "⚪"},
-		{-16, "🔴"},
-		{-50, "🔴"},
+		{50, "🟢 Bullish"},
+		{16, "🟢 Bullish"},
+		{15, "⚪ Neutral"},
+		{0, "⚪ Neutral"},
+		{-15, "⚪ Neutral"},
+		{-16, "🔴 Bearish"},
+		{-50, "🔴 Bearish"},
 	}
 	for _, tt := range tests {
 		if got := scoreDot(tt.score); got != tt.want {
@@ -342,8 +342,8 @@ func TestShortDirection(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"BULLISH", "🟢 BULL"},
-		{"BEARISH", "🔴 BEAR"},
+		{"BULLISH", "🟢 Bullish BULL"},
+		{"BEARISH", "🔴 Bearish BEAR"},
 		{"NEUTRAL", "NEUTRAL"},
 		{"", ""},
 	}

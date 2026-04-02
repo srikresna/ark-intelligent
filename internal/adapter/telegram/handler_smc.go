@@ -301,9 +301,9 @@ func formatSMCOutput(s *smcState) string {
 		structEmoji := "⬛"
 		switch s.smcResult.Structure {
 		case ta.StructureBullish:
-			structEmoji = "🟢"
+			structEmoji = "🟢 Bullish"
 		case ta.StructureBearish:
-			structEmoji = "🔴"
+			structEmoji = "🔴 Bearish"
 		}
 		sb.WriteString(fmt.Sprintf("Trend: %s <b>%s</b>\n", structEmoji, s.smcResult.Trend))
 
@@ -339,9 +339,9 @@ func formatSMCOutput(s *smcState) string {
 		sb.WriteString("⚡ <b>Fair Value Gaps</b>\n")
 		for i := len(s.ictResult.FVGZones) - 1; i >= 0 && shown < 3; i-- {
 			fvg := s.ictResult.FVGZones[i]
-			icon := "🟢"
+			icon := "🟢 Long"
 			if fvg.Kind == "BEARISH" {
-				icon = "🔴"
+				icon = "🔴 Short"
 			}
 			fillStr := ""
 			if fvg.Filled {
@@ -362,9 +362,9 @@ func formatSMCOutput(s *smcState) string {
 		shown := 0
 		for i := len(s.ictResult.OrderBlocks) - 1; i >= 0 && shown < 3; i-- {
 			ob := s.ictResult.OrderBlocks[i]
-			icon := "🟢"
+			icon := "🟢 Long"
 			if ob.Kind == "BEARISH" {
-				icon = "🔴"
+				icon = "🔴 Short"
 			}
 			status := "unmitigated ✅"
 			if ob.Broken {
@@ -418,9 +418,9 @@ func formatSMCOutput(s *smcState) string {
 		zoneEmoji := "⚖️"
 		switch s.smcResult.CurrentZone {
 		case "PREMIUM":
-			zoneEmoji = "🔴"
+			zoneEmoji = "🔴 Premium"
 		case "DISCOUNT":
-			zoneEmoji = "🟢"
+			zoneEmoji = "🟢 Discount"
 		}
 
 		// Compute zone % position

@@ -19,12 +19,12 @@ func (f *Formatter) FormatAMTDayType(symbol string, r *ta.AMTDayTypeResult) stri
 
 	var b strings.Builder
 
-	biasIcon := "⚖️"
+	biasIcon := "⚖️ Balanced"
 	switch r.Bias {
 	case "BULLISH":
-		biasIcon = "🟢"
+		biasIcon = "🟢 Bullish"
 	case "BEARISH":
-		biasIcon = "🔴"
+		biasIcon = "🔴 Bearish"
 	}
 
 	migIcon := "➡️"
@@ -202,11 +202,11 @@ func openingTypeIcon(ot ta.OpeningType) string {
 func confidenceIcon(c string) string {
 	switch c {
 	case "HIGH":
-		return "🟢"
+		return "🟢 High"
 	case "MEDIUM":
-		return "🟡"
+		return "🟡 Medium"
 	case "LOW":
-		return "🔴"
+		return "🔴 Low"
 	default:
 		return ""
 	}

@@ -241,11 +241,11 @@ func formatElliottResult(r *elliott.WaveCountResult, symbol, timeframe string) s
 func confidenceEmoji(c string) string {
 	switch c {
 	case "HIGH":
-		return "🟢"
+		return "🟢 Impulse"
 	case "MEDIUM":
 		return "🟡"
 	default:
-		return "🔴"
+		return "🔴 Corrective"
 	}
 }
 

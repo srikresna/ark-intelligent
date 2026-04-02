@@ -234,10 +234,12 @@ func NewHandler(
 	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
 	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
 	bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
+	bot.RegisterCommand("/defi", h.cmdDeFi)          // DeFi health dashboard (DefiLlama)
 	bot.RegisterCommand("/bis", h.cmdBIS)            // BIS Statistics: CB policy rates + credit gaps + REER
 	bot.RegisterCommand("/cbrates", h.cmdBIS)        // Central bank policy rates (alias for /bis)
 	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
 	bot.RegisterCommand("/market", h.cmdMarket)     // Cross-asset dashboard (Finviz)
+	bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -266,6 +268,10 @@ func NewHandler(
 	bot.RegisterCommand("/history", h.cmdHistory)
 	bot.RegisterCommand("/h", h.cmdHistory)
 
+	// Daily briefing command (TASK-029)
+	bot.RegisterCommand("/briefing", h.cmdBriefing)
+	bot.RegisterCommand("/br", h.cmdBriefing) // short alias
+
 	// Multi-word command+arg aliases for power users (TASK-203)
 	// These combine command + default argument for the most common workflows.
 	bot.RegisterCommand("/ce", h.cmdCOT)            // /ce EUR = /cot EUR
@@ -289,11 +295,12 @@ func NewHandler(
 	bot.RegisterCallback("help:", h.cbHelp)
 	bot.RegisterCallback("share:", h.cbShare)
 	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
+	bot.RegisterCallback("briefing:", h.cbBriefingRefresh)
 
 	// Onboarding completion tracking (TASK-204)
 	h.registerOnboardingProgress()
 
-	log.Info().Int("commands", 48).Int("callbacks", 11).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 50).Int("callbacks", 11).Msg("registered commands and callback prefixes")
 	return h
 }
 // ---------------------------------------------------------------------------

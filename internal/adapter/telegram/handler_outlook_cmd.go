@@ -269,6 +269,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 
 	html := h.fmt.FormatWeeklyOutlook(result, now)
 	kb := h.kb.RelatedCommandsKeyboard("outlook", "")
+	kb = AppendFeedbackRow(kb, h.kb, "fb:outlook:latest", h.feedbackEnabled())
 	if editMsgID > 0 {
 		if len(kb.Rows) > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
