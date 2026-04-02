@@ -138,6 +138,23 @@ func New(deps *Deps) *Scheduler {
 	return s
 }
 
+// ShouldDeliverAlert delegates to the AlertGate for external callers (e.g. news scheduler).
+// Returns (ok, reason). If no gate is configured, always returns (true, "").
+func (s *Scheduler) ShouldDeliverAlert(prefs domain.UserPrefs, alertType string) (bool, string) {
+	if s.alertGate == nil {
+		return true, ""
+	}
+	return s.alertGate.ShouldDeliver(prefs, alertType)
+}
+
+// RecordAlertDelivery delegates to the AlertGate counter for external callers.
+func (s *Scheduler) RecordAlertDelivery(ctx context.Context, chatID string) {
+	if s.alertGate == nil {
+		return
+	}
+	s.alertGate.RecordDelivery(ctx, chatID)
+}
+
 // Start launches all background jobs. Non-blocking.
 // SetSurpriseProvider injects the economic surprise accumulator into the scheduler.
 // This is called after the news scheduler is initialized (due to init order dependency).
