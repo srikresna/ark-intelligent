@@ -222,6 +222,8 @@ func NewHandler(
 	bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
 	bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
 	bot.RegisterCommand("/swaps", h.cmdSwaps)        // DTCC FX swap institutional flows
+	bot.RegisterCommand("/tedge", h.cmdTEdge)        // TradingEconomics global macro dashboard
+	bot.RegisterCommand("/globalm", h.cmdTEdge)      // alias for /tedge
 	bot.RegisterCommand("/bias", h.cmdBias)
 	bot.RegisterCommand("/backtest", h.cmdBacktest)
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
