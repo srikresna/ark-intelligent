@@ -329,7 +329,7 @@ func formatSMCOutput(s *smcState) string {
 		if ev.Direction == "BEARISH" {
 			icon = "↓"
 		}
-		sb.WriteString(fmt.Sprintf("Last %s %s: <code>%.5f</code>\n", ev.Kind, icon, ev.Level))
+		sb.WriteString(fmt.Sprintf("Last %s %s: <code>%.5f</code>\n", ev.Type, icon, ev.Level))
 	}
 	sb.WriteString("\n")
 
@@ -340,7 +340,7 @@ func formatSMCOutput(s *smcState) string {
 		for i := len(s.ictResult.FVGZones) - 1; i >= 0 && shown < 3; i-- {
 			fvg := s.ictResult.FVGZones[i]
 			icon := "🟢 Long"
-			if fvg.Kind == "BEARISH" {
+			if fvg.Type == "BEARISH" {
 				icon = "🔴 Short"
 			}
 			fillStr := ""
@@ -350,7 +350,7 @@ func formatSMCOutput(s *smcState) string {
 				fillStr = " <i>unfilled</i>"
 			}
 			sb.WriteString(fmt.Sprintf("• %s %s FVG: <code>%.5f – %.5f</code>%s\n",
-				icon, fvg.Kind, fvg.Bottom, fvg.Top, fillStr))
+				icon, fvg.Type, fvg.Low, fvg.High, fillStr))
 			shown++
 		}
 		sb.WriteString("\n")
@@ -363,7 +363,7 @@ func formatSMCOutput(s *smcState) string {
 		for i := len(s.ictResult.OrderBlocks) - 1; i >= 0 && shown < 3; i-- {
 			ob := s.ictResult.OrderBlocks[i]
 			icon := "🟢 Long"
-			if ob.Kind == "BEARISH" {
+			if ob.Type == "BEARISH" {
 				icon = "🔴 Short"
 			}
 			status := "unmitigated ✅"
@@ -372,7 +372,7 @@ func formatSMCOutput(s *smcState) string {
 				status = "breaker ⚡"
 			}
 			sb.WriteString(fmt.Sprintf("• %s %s OB: <code>%.5f – %.5f</code> %s\n",
-				icon, ob.Kind, ob.Bottom, ob.Top, status))
+				icon, ob.Type, ob.Low, ob.High, status))
 			shown++
 		}
 		sb.WriteString("\n")
@@ -401,7 +401,7 @@ func formatSMCOutput(s *smcState) string {
 				break
 			}
 			dir := "↑"
-			if sw.Kind == "SWEEP_LOW" {
+			if sw.Type == "SWEEP_LOW" {
 				dir = "↓"
 			}
 			rev := ""

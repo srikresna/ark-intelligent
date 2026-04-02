@@ -2,19 +2,28 @@
 // analysis engine for forex pairs. It detects Fair Value Gaps, Order Blocks,
 // Breaker Blocks, Change of Character (CHoCH), Break of Structure (BOS),
 // and Liquidity Sweeps from OHLCV data.
+//
+// FVG and Order Block detection is delegated to the canonical ta.CalcICT()
+// implementation in internal/service/ta/ict.go. This package adds structure
+// detection (BOS/CHoCH) and liquidity sweep analysis on top.
+//
+// Type field names are aligned with the ta package for consistency:
+//   - Type (not Kind) for directional classification
+//   - High/Low (not Top/Bottom) for price boundaries
 package ict
 
 import "time"
 
 // ---------------------------------------------------------------------------
-// Core Structs
+// Core Structs — field names aligned with ta.FVG / ta.OrderBlock
 // ---------------------------------------------------------------------------
 
 // FVGZone represents a Fair Value Gap — a 3-candle imbalance zone.
+// Field names (High, Low, Type) match ta.FVG for consistency.
 type FVGZone struct {
-	Kind      string    // "BULLISH" | "BEARISH"
-	Top       float64   // upper bound of the gap
-	Bottom    float64   // lower bound of the gap
+	Type      string    // "BULLISH" | "BEARISH"  (aligned with ta.FVG.Type)
+	High      float64   // upper bound of the gap (aligned with ta.FVG.High)
+	Low       float64   // lower bound of the gap (aligned with ta.FVG.Low)
 	CreatedAt time.Time // timestamp of the middle candle
 	BarIndex  int       // index of the middle candle (in the input slice)
 	Filled    bool      // true if price has entered this zone
@@ -24,10 +33,11 @@ type FVGZone struct {
 // OrderBlock represents an institutional demand/supply zone.
 // A Bearish OB is the last bullish candle before a bearish impulse move.
 // A Bullish OB is the last bearish candle before a bullish impulse move.
+// Field names (High, Low, Type) match ta.OrderBlock for consistency.
 type OrderBlock struct {
-	Kind     string  // "BULLISH" | "BEARISH"
-	Top      float64 // high of the order block candle
-	Bottom   float64 // low of the order block candle
+	Type     string  // "BULLISH" | "BEARISH"  (aligned with ta.OrderBlock.Type)
+	High     float64 // high of the order block candle (aligned with ta.OrderBlock.High)
+	Low      float64 // low of the order block candle  (aligned with ta.OrderBlock.Low)
 	Volume   float64 // volume of the order block candle
 	BarIndex int     // index in the input slice
 	Broken   bool    // true = price has broken through → becomes a Breaker Block
@@ -35,7 +45,7 @@ type OrderBlock struct {
 
 // StructureEvent represents a BOS (Break of Structure) or CHoCH (Change of Character).
 type StructureEvent struct {
-	Kind      string  // "CHOCH" | "BOS"
+	Type      string  // "CHOCH" | "BOS"
 	Direction string  // "BULLISH" | "BEARISH" (direction of the break)
 	Level     float64 // swing high/low that was broken
 	BarIndex  int     // index of the candle that broke the level
@@ -44,7 +54,7 @@ type StructureEvent struct {
 // LiquiditySweep represents a candle that wicks through a prior swing high/low
 // (grabbing stop-loss liquidity) before reversing.
 type LiquiditySweep struct {
-	Kind      string  // "SWEEP_HIGH" | "SWEEP_LOW"
+	Type      string  // "SWEEP_HIGH" | "SWEEP_LOW"
 	Level     float64 // previous swing high/low that was swept
 	SweepHigh float64 // high of the sweeping candle
 	SweepLow  float64 // low of the sweeping candle
@@ -52,7 +62,7 @@ type LiquiditySweep struct {
 	Reversed  bool    // true if confirmed reversal after sweep (close opposite side)
 }
 
-// SwingPoint is an internal struct for swing highs/lows (not exported to callers).
+// swingPoint is an internal struct for swing highs/lows (not exported to callers).
 type swingPoint struct {
 	isHigh   bool
 	level    float64

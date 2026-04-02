@@ -29,8 +29,8 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 	structCount := 0
 	for i := len(r.Structure) - 1; i >= 0 && structCount < 3; i-- {
 		ev := r.Structure[i]
-		icon := structureIcon(ev.Kind, ev.Direction)
-		sb.WriteString(fmt.Sprintf("  %s %s at %.5f\n", icon, ev.Kind, ev.Level))
+		icon := structureIcon(ev.Type, ev.Direction)
+		sb.WriteString(fmt.Sprintf("  %s %s at %.5f\n", icon, ev.Type, ev.Level))
 		structCount++
 	}
 	sb.WriteString("\n")
@@ -41,13 +41,13 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 		for _, ob := range r.OrderBlocks {
 			status := "valid"
 			suffix := ""
-			icon := fmtutil.BiasIcon(ob.Kind)
+			icon := fmtutil.BiasIcon(ob.Type)
 			if ob.Broken {
 				status = "broken → Breaker"
 				suffix = " ⚡"
 			}
 			sb.WriteString(fmt.Sprintf("  %s %s OB: %.5f–%.5f (%s%s)\n",
-				icon, ob.Kind, ob.Bottom, ob.Top, status, suffix))
+				icon, ob.Type, ob.Low, ob.High, status, suffix))
 		}
 		sb.WriteString("\n")
 	}
@@ -63,9 +63,9 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 			if z.Filled {
 				fillStr = "100% filled ✓"
 			}
-			arrow := fmtutil.DirectionIcon(z.Kind)
+			arrow := fmtutil.DirectionIcon(z.Type)
 			fvgLines = append(fvgLines, fmt.Sprintf("  %s %s FVG: %.5f–%.5f (%s)",
-				arrow, z.Kind, z.Bottom, z.Top, fillStr))
+				arrow, z.Type, z.Low, z.High, fillStr))
 			shown++
 		}
 		sb.WriteString(fmt.Sprintf("⬜ <b>FAIR VALUE GAPS (%d)</b>\n", len(r.FVGZones)))
@@ -83,17 +83,17 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 			revStr := ""
 			if s.Reversed {
 				revStr = " → Reversed"
-				if s.Kind == "SWEEP_LOW" {
+				if s.Type == "SWEEP_LOW" {
 					revStr += " 📈 BULLISH"
 				} else {
 					revStr += " 📉 BEARISH"
 				}
 			}
 			icon := "🔺"
-			if s.Kind == "SWEEP_LOW" {
+			if s.Type == "SWEEP_LOW" {
 				icon = "🔻"
 			}
-			sb.WriteString(fmt.Sprintf("  %s %s at %.5f%s\n", icon, s.Kind, s.Level, revStr))
+			sb.WriteString(fmt.Sprintf("  %s %s at %.5f%s\n", icon, s.Type, s.Level, revStr))
 		}
 		sb.WriteString("\n")
 	}
@@ -105,15 +105,15 @@ func FormatICTResult(r *ictsvc.ICTResult) string {
 }
 
 // structureIcon returns a status icon for a structure event.
-func structureIcon(kind, direction string) string {
+func structureIcon(typ, direction string) string {
 	switch {
-	case kind == "CHOCH" && direction == "BULLISH":
+	case typ == "CHOCH" && direction == "BULLISH":
 		return "⚠️ "
-	case kind == "CHOCH" && direction == "BEARISH":
+	case typ == "CHOCH" && direction == "BEARISH":
 		return "⚠️ "
-	case kind == "BOS" && direction == "BULLISH":
+	case typ == "BOS" && direction == "BULLISH":
 		return "✅"
-	case kind == "BOS" && direction == "BEARISH":
+	case typ == "BOS" && direction == "BEARISH":
 		return "❌"
 	default:
 		return "•"

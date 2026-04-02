@@ -33,7 +33,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 				if sp.level > prevHigh.level {
 					// Higher High — BOS in bullish direction (continuation of uptrend).
 					events = appendUniqueStructure(events, StructureEvent{
-						Kind:      "BOS",
+						Type:      "BOS",
 						Direction: "BULLISH",
 						Level:     prevHigh.level,
 						BarIndex:  sp.barIndex,
@@ -43,7 +43,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 					// Only emit if the previous event was not already a bearish CHoCH.
 					if !lastEventIs(events, "CHOCH", "BEARISH") {
 						events = append(events, StructureEvent{
-							Kind:      "CHOCH",
+							Type:      "CHOCH",
 							Direction: "BEARISH",
 							Level:     sp.level,
 							BarIndex:  sp.barIndex,
@@ -63,7 +63,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 				if sp.level < prevLow.level {
 					// Lower Low — BOS in bearish direction.
 					events = appendUniqueStructure(events, StructureEvent{
-						Kind:      "BOS",
+						Type:      "BOS",
 						Direction: "BEARISH",
 						Level:     prevLow.level,
 						BarIndex:  sp.barIndex,
@@ -72,7 +72,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 					// Higher Low after a Higher High — potential CHoCH bullish.
 					if !lastEventIs(events, "CHOCH", "BULLISH") {
 						events = append(events, StructureEvent{
-							Kind:      "CHOCH",
+							Type:      "CHOCH",
 							Direction: "BULLISH",
 							Level:     sp.level,
 							BarIndex:  sp.barIndex,
@@ -94,7 +94,7 @@ func DetectStructure(swings []swingPoint) []StructureEvent {
 // appendUniqueStructure appends a BOS event only if not identical to the previous BOS.
 func appendUniqueStructure(events []StructureEvent, e StructureEvent) []StructureEvent {
 	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].Kind == "BOS" && events[i].Direction == e.Direction {
+		if events[i].Type == "BOS" && events[i].Direction == e.Direction {
 			if e.Level != 0 && abs64(events[i].Level-e.Level)/abs64(e.Level) < 0.001 {
 				return events // duplicate, skip
 			}
@@ -104,10 +104,10 @@ func appendUniqueStructure(events []StructureEvent, e StructureEvent) []Structur
 	return append(events, e)
 }
 
-// lastEventIs checks if the most recent event of a given Kind+Direction already exists.
-func lastEventIs(events []StructureEvent, kind, direction string) bool {
+// lastEventIs checks if the most recent event of a given Type+Direction already exists.
+func lastEventIs(events []StructureEvent, typ, direction string) bool {
 	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].Kind == kind {
+		if events[i].Type == typ {
 			return events[i].Direction == direction
 		}
 	}
