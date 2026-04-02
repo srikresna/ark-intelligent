@@ -9,6 +9,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
@@ -79,6 +80,9 @@ func (h *Handler) cmdMacro(ctx context.Context, chatID string, userID int64, arg
 		htmlMsg := h.fmt.FormatMacroGlobal(composites, data)
 		if teData, teErr := macro.GetTECachedOrFetch(ctx); teErr == nil {
 			htmlMsg += "\n" + macro.FormatTEGlobalMacro(teData)
+		}
+		if bisData, bisErr := bis.GetCachedOrFetch(ctx); bisErr == nil && bisData != nil {
+			htmlMsg += "\n" + h.fmt.FormatMacroREER(bisData)
 		}
 		kb := h.kb.MacroDetailMenu()
 		return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
@@ -166,6 +170,9 @@ func (h *Handler) cbMacro(ctx context.Context, chatID string, msgID int, userID 
 		htmlMsg := h.fmt.FormatMacroGlobal(composites, macroData)
 		if teData, teErr := macro.GetTECachedOrFetch(ctx); teErr == nil {
 			htmlMsg += "\n" + macro.FormatTEGlobalMacro(teData)
+		}
+		if bisData, bisErr := bis.GetCachedOrFetch(ctx); bisErr == nil && bisData != nil {
+			htmlMsg += "\n" + h.fmt.FormatMacroREER(bisData)
 		}
 		kb := h.kb.MacroDetailMenu()
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlMsg, kb)

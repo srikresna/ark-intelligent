@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
@@ -639,6 +640,54 @@ func (f *Formatter) FormatMacroInflation(composites *domain.MacroComposites, dat
 	} else {
 		b.WriteString("<i>Insufficient data for full inflation analysis.</i>\n")
 	}
+
+	return b.String()
+}
+
+// FormatMacroREER formats BIS Real Effective Exchange Rate data for the /macro global view.
+// Shows REER, deviation from 5-year average, and valuation signal per currency.
+func (f *Formatter) FormatMacroREER(data *bis.BISData) string {
+	if data == nil {
+		return ""
+	}
+
+	var available []bis.REERData
+	for _, c := range data.Currencies {
+		if c.Available {
+			available = append(available, c)
+		}
+	}
+	if len(available) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n📊 <b>REAL EFFECTIVE EXCHANGE RATES (BIS)</b>")
+	if len(available) > 0 && available[0].AsOf != "" {
+		b.WriteString(fmt.Sprintf(" <i>(%s)</i>", available[0].AsOf))
+	}
+	b.WriteString("\n")
+
+	b.WriteString("<pre>")
+	b.WriteString(fmt.Sprintf("%-4s %6s %6s %7s  %-14s\n", "CCY", "REER", "NEER", "Dev%", "Signal"))
+	b.WriteString("─────────────────────────────────────\n")
+
+	for _, c := range available {
+		devStr := fmt.Sprintf("%+5.1f%%", c.Deviation)
+		signal := c.Signal
+		icon := "🟡"
+		switch signal {
+		case "OVERVALUED":
+			icon = "🔴"
+		case "UNDERVALUED":
+			icon = "🟢"
+		}
+		b.WriteString(fmt.Sprintf("%s%-3s %6.1f %6.1f %7s  %-14s\n",
+			icon, c.Currency, c.REER, c.NEER, devStr, signal))
+	}
+	b.WriteString("</pre>")
+	b.WriteString("<i>Index base=2020. Dev% = deviation from 5Y avg.\n")
+	b.WriteString("Overvalued → structural headwind | Undervalued → tailwind</i>\n")
 
 	return b.String()
 }
