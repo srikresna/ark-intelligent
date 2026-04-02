@@ -455,6 +455,11 @@ func main() {
 		log.Info().Msg("Elliott Wave commands registered (/elliott)")
 	}
 
+	// Wire regime alert provider for /regime command (TASK-138)
+	// sched implements RegimeAlertProvider via GetRegimeStates + GetRegimeDivergence.
+	handler.WithRegime(sched)
+	log.Info().Msg("Regime alert commands registered (/regime)")
+
 	// Register free-text handler for chatbot mode
 	if chatService != nil {
 		bot.SetFreeTextHandler(handler.HandleFreeText)
