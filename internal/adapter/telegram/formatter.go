@@ -134,7 +134,53 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 		b.WriteString("<code>Alert Currencies   : All Currencies</code>\n")
 	}
 
+	// Quiet hours status (TASK-202)
+	if prefs.QuietHoursEnabled {
+		b.WriteString(fmt.Sprintf("<code>🌙 Quiet Hours  : %02d:00–%02d:00 WIB</code>\n", prefs.QuietHoursStart, prefs.QuietHoursEnd))
+	}
+	if prefs.MaxAlertsPerDay > 0 {
+		b.WriteString(fmt.Sprintf("<code>📋 Daily Cap    : %d alerts/day</code>\n", prefs.MaxAlertsPerDay))
+	}
+
 	b.WriteString("\n<i>Use the buttons below to adjust preferences</i>")
+
+	return b.String()
+}
+
+
+// FormatAlertManagement formats the alert management sub-menu display (TASK-202).
+func (f *Formatter) FormatAlertManagement(prefs domain.UserPrefs) string {
+	var b strings.Builder
+
+	b.WriteString("🔔 <b>Alert Management</b>\n\n")
+
+	// Quiet hours status
+	if prefs.QuietHoursEnabled {
+		b.WriteString(fmt.Sprintf("<code>🌙 Quiet Hours : ON (%02d:00–%02d:00 WIB)</code>\n",
+			prefs.QuietHoursStart, prefs.QuietHoursEnd))
+	} else {
+		b.WriteString("<code>🌙 Quiet Hours : OFF</code>\n")
+	}
+
+	// Alert types status
+	b.WriteString("\n<b>Alert Types:</b>\n")
+	for _, key := range domain.ValidAlertTypes() {
+		status := "✅ ON"
+		if !prefs.IsAlertTypeEnabled(key) {
+			status = "❌ OFF"
+		}
+		b.WriteString(fmt.Sprintf("<code>  %s: %s</code>\n", domain.AlertTypeLabel(key), status))
+	}
+
+	// Daily cap
+	b.WriteString("\n")
+	if prefs.MaxAlertsPerDay > 0 {
+		b.WriteString(fmt.Sprintf("<code>📋 Daily Cap   : %d alerts/day</code>\n", prefs.MaxAlertsPerDay))
+	} else {
+		b.WriteString("<code>📋 Daily Cap   : Unlimited</code>\n")
+	}
+
+	b.WriteString("\n<i>Use the buttons below to adjust alert preferences</i>")
 
 	return b.String()
 }

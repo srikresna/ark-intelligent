@@ -130,6 +130,19 @@ type UserPrefs struct {
 
 	// ReferredAt is when the referral was recorded.
 	ReferredAt string `json:"referred_at,omitempty"`
+
+	// Quiet Hours — DND window (hours in WIB, 0-23).
+	QuietHoursEnabled bool `json:"quiet_hours_enabled,omitempty"`
+	QuietHoursStart   int  `json:"quiet_hours_start,omitempty"` // 0-23 WIB
+	QuietHoursEnd     int  `json:"quiet_hours_end,omitempty"`   // 0-23 WIB
+
+	// AlertTypes is a per-alert-type toggle map.
+	// Known keys: "cot_release", "fred_regime", "signal_strong", "news_high", "concentration".
+	// nil map or missing key → enabled (opt-out model).
+	AlertTypes map[string]bool `json:"alert_types,omitempty"`
+
+	// MaxAlertsPerDay caps daily alert delivery. 0 = unlimited.
+	MaxAlertsPerDay int `json:"max_alerts_per_day,omitempty"`
 }
 
 // DefaultPrefs returns the default user preferences.
@@ -217,3 +230,74 @@ func IsValidAlertCurrency(c string) bool {
 	}
 	return false
 }
+
+// ---------------------------------------------------------------------------
+// Alert Type Keys (TASK-202)
+// ---------------------------------------------------------------------------
+
+// Known alert type keys for per-type granularity.
+const (
+	AlertTypeCOTRelease  = "cot_release"
+	AlertTypeFREDRegime  = "fred_regime"
+	AlertTypeSignalStrong = "signal_strong"
+	AlertTypeNewsHigh    = "news_high"
+	AlertTypeConcentration = "concentration"
+)
+
+// ValidAlertTypes returns all known alert type keys.
+func ValidAlertTypes() []string {
+	return []string{
+		AlertTypeCOTRelease,
+		AlertTypeFREDRegime,
+		AlertTypeSignalStrong,
+		AlertTypeNewsHigh,
+		AlertTypeConcentration,
+	}
+}
+
+// AlertTypeLabel returns a human-friendly label for the alert type key.
+func AlertTypeLabel(key string) string {
+	switch key {
+	case AlertTypeCOTRelease:
+		return "📊 COT Release"
+	case AlertTypeFREDRegime:
+		return "🏛 FRED Macro"
+	case AlertTypeSignalStrong:
+		return "📡 Strong Signal"
+	case AlertTypeNewsHigh:
+		return "📰 High-Impact News"
+	case AlertTypeConcentration:
+		return "🎯 Concentration"
+	default:
+		return key
+	}
+}
+
+// IsAlertTypeEnabled checks if a specific alert type is enabled for the user.
+// nil map or missing key → enabled (opt-out model).
+func (p UserPrefs) IsAlertTypeEnabled(alertType string) bool {
+	if p.AlertTypes == nil {
+		return true
+	}
+	enabled, exists := p.AlertTypes[alertType]
+	if !exists {
+		return true // opt-out: missing key = enabled
+	}
+	return enabled
+}
+
+// IsInQuietHours returns true if the given WIB hour falls within the quiet window.
+// Handles overnight ranges (e.g., 23:00 → 07:00).
+func (p UserPrefs) IsInQuietHours(wibHour int) bool {
+	if !p.QuietHoursEnabled {
+		return false
+	}
+	start, end := p.QuietHoursStart, p.QuietHoursEnd
+	if start <= end {
+		// Same-day range (e.g., 01:00-07:00)
+		return wibHour >= start && wibHour < end
+	}
+	// Overnight range (e.g., 23:00-07:00)
+	return wibHour >= start || wibHour < end
+}
+

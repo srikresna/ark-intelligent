@@ -293,6 +293,7 @@ func NewHandler(
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
+	bot.RegisterCallback("alertmgr:", h.cbAlertMgr)
 	bot.RegisterCallback("cal:filter:", h.cbNewsFilter)
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)

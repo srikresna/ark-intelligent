@@ -122,14 +122,20 @@ type Scheduler struct {
 	carryMu          sync.Mutex               // protects lastCarryResult + lastCarryBroadcast
 	lastCarryResult  *domain.CarryMonitorResult // previous carry snapshot for alert diffing
 	lastCarryBroadcast time.Time               // last time carry alerts were broadcast (dedup guard)
+
+	alertGate *AlertGate // quiet hours + alert type + daily cap (TASK-202)
 }
 
 // New creates a new Scheduler.
 func New(deps *Deps) *Scheduler {
-	return &Scheduler{
+	s := &Scheduler{
 		deps:   deps,
 		stopCh: make(chan struct{}),
 	}
+	if deps.DB != nil {
+		s.alertGate = NewAlertGate(deps.DB.Badger())
+	}
+	return s
 }
 
 // Start launches all background jobs. Non-blocking.
@@ -405,6 +411,13 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 		if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
 			continue
 		}
+
+		// TASK-202: Check quiet hours, alert type, and daily cap.
+		if s.alertGate != nil {
+			if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeCOTRelease); !ok {
+				continue
+			}
+		}
 		// Skip banned users
 		if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 			continue
@@ -631,6 +644,13 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 			if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
 				continue
 			}
+
+			// TASK-202: Check quiet hours, alert type, and daily cap.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeFREDRegime); !ok {
+					continue
+				}
+			}
 			// Ban check (defensive — FREDAlertCheck also excludes banned, but this is explicit)
 			if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 				continue
@@ -726,6 +746,13 @@ func (s *Scheduler) jobCarryAlerts(ctx context.Context) error {
 		for userID, prefs := range activeUsers {
 			if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
 				continue
+			}
+
+			// TASK-202: Check quiet hours, alert type, and daily cap.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeFREDRegime); !ok {
+					continue
+				}
 			}
 			if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 				continue

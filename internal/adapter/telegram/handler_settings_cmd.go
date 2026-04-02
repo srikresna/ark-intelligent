@@ -5,6 +5,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -56,6 +57,11 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 		prefs.COTAlertsEnabled = !prefs.COTAlertsEnabled
 	case "ai_toggle":
 		prefs.AIReportsEnabled = !prefs.AIReportsEnabled
+	case "alert_mgr":
+		// Open the alert management sub-menu
+		html := h.fmt.FormatAlertManagement(prefs)
+		kb := h.kb.AlertManagementMenu(prefs)
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 	case "mobile_toggle":
 		prefs.MobileMode = !prefs.MobileMode
 	case "model_claude":
@@ -170,4 +176,73 @@ func (h *Handler) cbAlertToggle(ctx context.Context, chatID string, msgID int, u
 	}
 
 	return nil
+}
+
+// cbAlertMgr handles alert management sub-menu callbacks (TASK-202).
+func (h *Handler) cbAlertMgr(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "alertmgr:")
+
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case action == "qh_toggle":
+		prefs.QuietHoursEnabled = !prefs.QuietHoursEnabled
+		if prefs.QuietHoursEnabled && prefs.QuietHoursStart == 0 && prefs.QuietHoursEnd == 0 {
+			// Default quiet window: 23:00-07:00 WIB
+			prefs.QuietHoursStart = 23
+			prefs.QuietHoursEnd = 7
+		}
+
+	case strings.HasPrefix(action, "qh_set:"):
+		// Format: qh_set:START:END
+		parts := strings.Split(strings.TrimPrefix(action, "qh_set:"), ":")
+		if len(parts) == 2 {
+			start, e1 := strconv.Atoi(parts[0])
+			end, e2 := strconv.Atoi(parts[1])
+			if e1 == nil && e2 == nil && start >= 0 && start <= 23 && end >= 0 && end <= 23 {
+				prefs.QuietHoursStart = start
+				prefs.QuietHoursEnd = end
+				prefs.QuietHoursEnabled = true
+			}
+		}
+
+	case strings.HasPrefix(action, "type_toggle:"):
+		key := strings.TrimPrefix(action, "type_toggle:")
+		if prefs.AlertTypes == nil {
+			prefs.AlertTypes = make(map[string]bool)
+		}
+		current := prefs.IsAlertTypeEnabled(key)
+		prefs.AlertTypes[key] = !current
+
+	case strings.HasPrefix(action, "cap:"):
+		n, err := strconv.Atoi(strings.TrimPrefix(action, "cap:"))
+		if err == nil && n >= 0 {
+			prefs.MaxAlertsPerDay = n
+		}
+
+	case action == "back":
+		// Return to main settings
+		if err := h.prefsRepo.Set(ctx, userID, prefs); err != nil {
+			return err
+		}
+		html := h.fmt.FormatSettings(prefs)
+		kb := h.kb.SettingsMenu(prefs)
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+
+	default:
+		log.Warn().Str("action", action).Msg("unknown alertmgr action")
+		return nil
+	}
+
+	if err := h.prefsRepo.Set(ctx, userID, prefs); err != nil {
+		return err
+	}
+
+	// Re-render alert management menu
+	html := h.fmt.FormatAlertManagement(prefs)
+	kb := h.kb.AlertManagementMenu(prefs)
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
 }

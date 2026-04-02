@@ -494,10 +494,94 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:mobile_toggle",
 	}})
 
-	// Row 13: View Changelog
+	// Row 13: Alert Management sub-menu (TASK-202)
+	rows = append(rows, []ports.InlineButton{{
+		Text:         "🔔 Manage Alert Types & Quiet Hours",
+		CallbackData: "set:alert_mgr",
+	}})
+
+	// Row 14: View Changelog
 	rows = append(rows, []ports.InlineButton{{
 		Text:         "📜 View Changelog",
 		CallbackData: "set:changelog_view",
+	}})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+
+// AlertManagementMenu builds the alert management sub-menu keyboard (TASK-202).
+// Shows quiet hours, per-alert-type toggles, and daily cap controls.
+func (kb *KeyboardBuilder) AlertManagementMenu(prefs domain.UserPrefs) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	// Row 1: Quiet Hours toggle
+	qhLabel := "🌙 Quiet Hours: OFF → Turn ON"
+	if prefs.QuietHoursEnabled {
+		qhLabel = fmt.Sprintf("🌙 Quiet Hours: ON (%02d:00–%02d:00 WIB) → Turn OFF",
+			prefs.QuietHoursStart, prefs.QuietHoursEnd)
+	}
+	rows = append(rows, []ports.InlineButton{{
+		Text:         qhLabel,
+		CallbackData: "alertmgr:qh_toggle",
+	}})
+
+	// Row 2: Quiet hours presets (only shown when enabled)
+	if prefs.QuietHoursEnabled {
+		qhPreset := func(start, end int, label string) ports.InlineButton {
+			prefix := "  "
+			if prefs.QuietHoursStart == start && prefs.QuietHoursEnd == end {
+				prefix = "✅ "
+			}
+			return ports.InlineButton{
+				Text:         prefix + label,
+				CallbackData: fmt.Sprintf("alertmgr:qh_set:%d:%d", start, end),
+			}
+		}
+		rows = append(rows, []ports.InlineButton{
+			qhPreset(23, 7, "23-07"),
+			qhPreset(22, 8, "22-08"),
+			qhPreset(0, 9, "00-09"),
+		})
+	}
+
+	// Rows 3+: Per-alert-type toggles
+	for _, key := range domain.ValidAlertTypes() {
+		enabled := prefs.IsAlertTypeEnabled(key)
+		label := domain.AlertTypeLabel(key)
+		if enabled {
+			label += ": ON → OFF"
+		} else {
+			label = "❌ " + label + ": OFF → ON"
+		}
+		rows = append(rows, []ports.InlineButton{{
+			Text:         label,
+			CallbackData: "alertmgr:type_toggle:" + key,
+		}})
+	}
+
+	// Row: Daily cap presets
+	capLabel := func(n int, display string) ports.InlineButton {
+		prefix := "  "
+		if prefs.MaxAlertsPerDay == n {
+			prefix = "✅ "
+		}
+		return ports.InlineButton{
+			Text:         prefix + display,
+			CallbackData: fmt.Sprintf("alertmgr:cap:%d", n),
+		}
+	}
+	rows = append(rows, []ports.InlineButton{
+		capLabel(0, "No Limit"),
+		capLabel(10, "10/day"),
+		capLabel(20, "20/day"),
+		capLabel(50, "50/day"),
+	})
+
+	// Back to settings
+	rows = append(rows, []ports.InlineButton{{
+		Text:         "⬅️ Back to Settings",
+		CallbackData: "alertmgr:back",
 	}})
 
 	return ports.InlineKeyboard{Rows: rows}
