@@ -293,11 +293,15 @@ func (h *Handler) sendHelp(ctx context.Context, chatID string, userID int64) err
 
 <i>Pilih kategori untuk melihat commands tersedia:</i>`
 
+	// Fetch user pins for personalized keyboard (TASK-078)
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	pins := prefs.PinnedCommands
+
 	var kb ports.InlineKeyboard
 	if isAdmin {
-		kb = h.kb.HelpCategoryMenuWithAdmin()
+		kb = h.kb.HelpCategoryMenuWithAdmin(pins...)
 	} else {
-		kb = h.kb.HelpCategoryMenu()
+		kb = h.kb.HelpCategoryMenu(pins...)
 	}
 
 	_, err := h.bot.SendWithKeyboard(ctx, chatID, header, kb)
@@ -456,11 +460,15 @@ func (h *Handler) cbHelp(ctx context.Context, chatID string, msgID int, userID i
 
 <i>Pilih kategori untuk melihat commands tersedia:</i>`
 
+		// Fetch user pins for personalized keyboard (TASK-078)
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		pins := prefs.PinnedCommands
+
 		var kb ports.InlineKeyboard
 		if isAdmin {
-			kb = h.kb.HelpCategoryMenuWithAdmin()
+			kb = h.kb.HelpCategoryMenuWithAdmin(pins...)
 		} else {
-			kb = h.kb.HelpCategoryMenu()
+			kb = h.kb.HelpCategoryMenu(pins...)
 		}
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, header, kb)
 	}

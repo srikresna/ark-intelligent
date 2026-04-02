@@ -820,32 +820,53 @@ func (kb *KeyboardBuilder) COTDetailMenuWithBias(code string, isRaw bool, signal
 }
 
 // MainMenu builds a quick-access keyboard for the main bot features.
-func (kb *KeyboardBuilder) MainMenu() ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "📊 COT Analysis", CallbackData: "nav:cot"},
-				{Text: "🦅 Unified Outlook", CallbackData: "out:unified"},
-			},
-			{
-				{Text: "🏦 Macro", CallbackData: "cmd:macro"},
-				{Text: "📅 Calendar", CallbackData: "cmd:calendar"},
-				{Text: "💹 Price", CallbackData: "cmd:price"},
-			},
-			{
-				{Text: "📈 Rank", CallbackData: "cmd:rank"},
-				{Text: "📊 Bias", CallbackData: "cmd:bias"},
-				{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
-			},
-			{
-				{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
-			},
-			{
-				{Text: "🔬 Quant", CallbackData: "cmd:quant"},
-				{Text: "📊 Volume Profile", CallbackData: "cmd:vp"},
-			},
-		},
+// If pins is non-empty, a pinned-commands row is prepended (max 4 buttons).
+func (kb *KeyboardBuilder) MainMenu(pins []string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	// Pinned commands row (TASK-078)
+	if len(pins) > 0 {
+		var pinnedRow []ports.InlineButton
+		for _, pin := range pins {
+			label := "⭐ " + strings.ToUpper(pin)
+			// Truncate long labels to keep buttons readable
+			if len(label) > 20 {
+				label = label[:20]
+			}
+			cb := "cmd:" + strings.ReplaceAll(pin, " ", ":")
+			pinnedRow = append(pinnedRow, ports.InlineButton{
+				Text:         label,
+				CallbackData: cb,
+			})
+		}
+		rows = append(rows, pinnedRow)
 	}
+
+	rows = append(rows,
+		[]ports.InlineButton{
+			{Text: "📊 COT Analysis", CallbackData: "nav:cot"},
+			{Text: "🦅 Unified Outlook", CallbackData: "out:unified"},
+		},
+		[]ports.InlineButton{
+			{Text: "🏦 Macro", CallbackData: "cmd:macro"},
+			{Text: "📅 Calendar", CallbackData: "cmd:calendar"},
+			{Text: "💹 Price", CallbackData: "cmd:price"},
+		},
+		[]ports.InlineButton{
+			{Text: "📈 Rank", CallbackData: "cmd:rank"},
+			{Text: "📊 Bias", CallbackData: "cmd:bias"},
+			{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
+		},
+		[]ports.InlineButton{
+			{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
+		},
+		[]ports.InlineButton{
+			{Text: "🔬 Quant", CallbackData: "cmd:quant"},
+			{Text: "📊 Volume Profile", CallbackData: "cmd:vp"},
+		},
+	)
+
+	return ports.InlineKeyboard{Rows: rows}
 }
 
 // AlphaMenu builds the inline keyboard for the unified /alpha dashboard.
@@ -1161,51 +1182,78 @@ func (kb *KeyboardBuilder) VPDetailMenu() ports.InlineKeyboard {
 // Help Keyboards — Smart /help with category navigation
 // ---------------------------------------------------------------------------
 
-// HelpCategoryMenu builds the top-level help category selector.
-func (kb *KeyboardBuilder) HelpCategoryMenu() ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "📊 Market & COT", CallbackData: "help:market"},
-				{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
-			},
-			{
-				{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
-				{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
-			},
-			{
-				{Text: "⚙️ Settings", CallbackData: "help:settings"},
-				{Text: "⚡ Shortcuts", CallbackData: "help:shortcuts"},
-			},
-			{
-				{Text: "🆕 What's New", CallbackData: "help:changelog"},
-			},
-		},
+// pinnedRow builds an optional row of pinned command buttons (TASK-078).
+// Returns nil if pins is empty.
+func (kb *KeyboardBuilder) pinnedRow(pins []string) [][]ports.InlineButton {
+	if len(pins) == 0 {
+		return nil
 	}
+	var row []ports.InlineButton
+	for _, pin := range pins {
+		label := "⭐ " + strings.ToUpper(pin)
+		// Truncate long labels to keep buttons readable on mobile
+		runes := []rune(label)
+		if len(runes) > 18 {
+			label = string(runes[:18])
+		}
+		cb := "cmd:" + strings.ReplaceAll(pin, " ", ":")
+		row = append(row, ports.InlineButton{
+			Text:         label,
+			CallbackData: cb,
+		})
+	}
+	return [][]ports.InlineButton{row}
+}
+
+// HelpCategoryMenu builds the top-level help category selector.
+// If pins is non-empty, a pinned-commands quick-access row is prepended (TASK-078).
+func (kb *KeyboardBuilder) HelpCategoryMenu(pins ...string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+	rows = append(rows, kb.pinnedRow(pins)...)
+	rows = append(rows,
+		[]ports.InlineButton{
+			{Text: "📊 Market & COT", CallbackData: "help:market"},
+			{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
+		},
+		[]ports.InlineButton{
+			{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
+			{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
+		},
+		[]ports.InlineButton{
+			{Text: "⚙️ Settings", CallbackData: "help:settings"},
+			{Text: "⚡ Shortcuts", CallbackData: "help:shortcuts"},
+		},
+		[]ports.InlineButton{
+			{Text: "🆕 What's New", CallbackData: "help:changelog"},
+		},
+	)
+	return ports.InlineKeyboard{Rows: rows}
 }
 
 // HelpCategoryMenuWithAdmin builds the top-level help category selector with admin option.
-func (kb *KeyboardBuilder) HelpCategoryMenuWithAdmin() ports.InlineKeyboard {
-	return ports.InlineKeyboard{
-		Rows: [][]ports.InlineButton{
-			{
-				{Text: "📊 Market & COT", CallbackData: "help:market"},
-				{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
-			},
-			{
-				{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
-				{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
-			},
-			{
-				{Text: "⚙️ Settings", CallbackData: "help:settings"},
-				{Text: "⚡ Shortcuts", CallbackData: "help:shortcuts"},
-			},
-			{
-				{Text: "🔐 Admin", CallbackData: "help:admin"},
-				{Text: "🆕 What's New", CallbackData: "help:changelog"},
-			},
+// If pins is non-empty, a pinned-commands quick-access row is prepended (TASK-078).
+func (kb *KeyboardBuilder) HelpCategoryMenuWithAdmin(pins ...string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+	rows = append(rows, kb.pinnedRow(pins)...)
+	rows = append(rows,
+		[]ports.InlineButton{
+			{Text: "📊 Market & COT", CallbackData: "help:market"},
+			{Text: "🔬 Research & Alpha", CallbackData: "help:research"},
 		},
-	}
+		[]ports.InlineButton{
+			{Text: "🧠 AI & Outlook", CallbackData: "help:ai"},
+			{Text: "⚡ Signals & Alerts", CallbackData: "help:signals"},
+		},
+		[]ports.InlineButton{
+			{Text: "⚙️ Settings", CallbackData: "help:settings"},
+			{Text: "⚡ Shortcuts", CallbackData: "help:shortcuts"},
+		},
+		[]ports.InlineButton{
+			{Text: "🔐 Admin", CallbackData: "help:admin"},
+			{Text: "🆕 What's New", CallbackData: "help:changelog"},
+		},
+	)
+	return ports.InlineKeyboard{Rows: rows}
 }
 
 // HelpSubMenu builds the back button for help sub-category views.

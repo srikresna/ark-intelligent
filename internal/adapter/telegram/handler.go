@@ -250,6 +250,11 @@ func NewHandler(
 	// Chat history management
 	bot.RegisterCommand("/clear", h.cmdClearChat)
 
+	// Pinned commands (TASK-078)
+	bot.RegisterCommand("/pin", h.cmdPin)
+	bot.RegisterCommand("/unpin", h.cmdUnpin)
+	bot.RegisterCommand("/pins", h.cmdPins)
+
 	// Admin commands (access enforced inside handlers)
 	bot.RegisterCommand("/users", h.cmdUsers)
 	bot.RegisterCommand("/setrole", h.cmdSetRole)
