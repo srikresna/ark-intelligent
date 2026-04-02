@@ -31,9 +31,13 @@ type RegimeResult struct {
 // Safe havens: JPY, CHF, XAU (Gold)
 // Risk FX:     AUD, NZD, CAD, GBP
 //
-// Safe haven BEARISH positioning → specs selling JPY/CHF/Gold → RISK-ON
-// Safe haven BULLISH positioning → specs buying JPY/CHF/Gold → RISK-OFF
-// Risk FX BULLISH positioning → specs buying AUD/NZD/CAD → RISK-ON
+// safehavenScore semantics:
+//   positive → safe havens bullish (risk-off)
+//   negative → safe havens bearish (risk-on)
+//
+// riskFXScore semantics:
+//   positive → risk FX bullish (risk-on)
+//   negative → risk FX bearish (risk-off)
 func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 	safehavenScore := 0.0
 	riskFXScore := 0.0
@@ -42,25 +46,30 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 	for _, a := range analyses {
 		switch a.Contract.Currency {
 		case "JPY", "CHF":
-			// Safe haven: bearish specs = risk-on, bullish specs = risk-off
-			if a.SentimentScore < -20 {
-				safehavenScore -= a.SentimentScore * 0.5 // contributes positively to risk-on
-				factors = append(factors, a.Contract.Currency+" bearish (risk-on signal)")
-			} else if a.SentimentScore > 20 {
-				safehavenScore += a.SentimentScore * 0.5 // contributes to risk-off
-				factors = append(factors, a.Contract.Currency+" bullish (risk-off signal)")
+			// Safe haven sentiment maps directly to safehavenScore:
+			// Bullish (+) → positive safehavenScore → risk-off signal
+			// Bearish (-) → negative safehavenScore → risk-on signal
+			if a.SentimentScore > 10 || a.SentimentScore < -10 {
+				safehavenScore += a.SentimentScore * 0.5
+				if a.SentimentScore > 10 {
+					factors = append(factors, a.Contract.Currency+" bullish (risk-off signal)")
+				} else {
+					factors = append(factors, a.Contract.Currency+" bearish (risk-on signal)")
+				}
 			}
 		case "XAU":
-			if a.SentimentScore > 30 {
+			// Gold bullish → risk-off, Gold bearish → risk-on
+			if a.SentimentScore > 30 || a.SentimentScore < -30 {
 				safehavenScore += a.SentimentScore * 0.3
-				factors = append(factors, "Gold bullish (risk-off signal)")
-			} else if a.SentimentScore < -30 {
-				safehavenScore += a.SentimentScore * 0.3 // negative contribution
-				factors = append(factors, "Gold bearish (risk-on signal)")
+				if a.SentimentScore > 30 {
+					factors = append(factors, "Gold bullish (risk-off signal)")
+				} else {
+					factors = append(factors, "Gold bearish (risk-on signal)")
+				}
 			}
 		case "AUD", "NZD", "CAD":
 			riskFXScore += a.SentimentScore * 0.4
-			if a.SentimentScore > 20 {
+			if a.SentimentScore > 10 {
 				factors = append(factors, a.Contract.Currency+" bullish (risk-on signal)")
 			} else if a.SentimentScore < -20 {
 				factors = append(factors, a.Contract.Currency+" bearish (risk-off signal)")
@@ -68,8 +77,9 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 		}
 	}
 
-	// Classification rules
-	if safehavenScore > 30 && riskFXScore < 0 {
+	// Classification rules:
+	// Risk-off: safehavenScore high (bullish safe havens) AND riskFX weak/sold
+	if safehavenScore >= 30 && riskFXScore < 0 {
 		return RegimeResult{
 			Regime:      RegimeRiskOff,
 			Confidence:  70,
@@ -77,7 +87,8 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 			Description: "Safe havens bid, risk FX sold — defensive positioning",
 		}
 	}
-	if riskFXScore > 30 && safehavenScore < 0 {
+	// Risk-on: riskFX bid AND safe havens bearish (sold)
+	if riskFXScore >= 30 && safehavenScore < 0 {
 		return RegimeResult{
 			Regime:      RegimeRiskOn,
 			Confidence:  70,
@@ -85,6 +96,7 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 			Description: "Risk FX bid, safe havens sold — appetite for risk",
 		}
 	}
+	// Both positive → confused (both safe havens and risk bid)
 	if safehavenScore > 15 && riskFXScore > 15 {
 		return RegimeResult{
 			Regime:      RegimeUncertainty,
@@ -93,7 +105,8 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 			Description: "Both safe havens and risk FX bid — confused market",
 		}
 	}
-	if safehavenScore < -10 && riskFXScore > 10 {
+	// Mild risk-on: safe havens bearish + risk FX somewhat positive
+	if safehavenScore < -5 && riskFXScore > 10 {
 		return RegimeResult{
 			Regime:      RegimeRiskOn,
 			Confidence:  55,
@@ -101,6 +114,7 @@ func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 			Description: "Mild risk-on: risk FX favored over safe havens",
 		}
 	}
+	// Mild risk-off: safe havens somewhat positive + risk FX bearish
 	if safehavenScore > 10 && riskFXScore < -10 {
 		return RegimeResult{
 			Regime:      RegimeRiskOff,

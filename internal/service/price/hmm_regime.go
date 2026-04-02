@@ -90,9 +90,8 @@ func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 		prevLogLik = logLik
 	}
 
-	if !converged {
-		return nil, fmt.Errorf("insufficient data for regime: Baum-Welch did not converge after %d iterations", maxIter)
-	}
+	// Non-convergence is not fatal: proceed with best model so far.
+	// The Converged field in the result tells callers the quality.
 
 	// Forward algorithm for current state probabilities
 	stateProbs := forwardFilter(&model, obs)
