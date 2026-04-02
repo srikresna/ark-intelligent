@@ -138,6 +138,7 @@ type IndicatorSnapshot struct {
 	VWAP       *VWAPSet           // anchored VWAP (daily, weekly, swing anchors) — nil if insufficient volume data
 	Delta      *DeltaResult       // tick-rule estimated delta (cumulative buy/sell pressure) — nil if insufficient data
 	SMC        *SMCResult         // Smart Money Concepts: BOS, CHOCH, premium/discount — nil if insufficient data
+	Wyckoff    *WyckoffResult     // Wyckoff phase detection — nil if insufficient data (< 20 bars)
 }
 
 // TASignal represents a normalized signal from one indicator.

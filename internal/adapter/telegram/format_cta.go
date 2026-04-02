@@ -874,6 +874,45 @@ func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult)
 				sb.WriteString(fmt.Sprintf("  %s BOS %s @ %.4f\n", bosEmoji, bos.Dir, bos.Price))
 			}
 		}
+
+		// Wyckoff Phase (ta-level simplified analysis)
+		if snap.Wyckoff != nil {
+			w := snap.Wyckoff
+			confPct := int(w.PhaseConf * 100)
+			biasEmoji := "🔵"
+			switch w.Bias {
+			case "BULLISH":
+				biasEmoji = "🟢"
+			case "BEARISH":
+				biasEmoji = "🔴"
+			}
+			sb.WriteString(fmt.Sprintf("\n🎯 <b>Wyckoff Phase:</b> %s %s (conf: %d%%)\n",
+				biasEmoji, w.Phase, confPct))
+			if w.TradingRange != nil {
+				tr := w.TradingRange
+				volSign := ""
+				if tr.VolumeDecl {
+					volSign = "✅ declining"
+				} else {
+					volSign = "📈 expanding"
+				}
+				sb.WriteString(fmt.Sprintf("  Range: %.4f – %.4f (%.1f ATR wide, %d bars)\n",
+					tr.Low, tr.High, tr.Width, tr.BarsInRange))
+				sb.WriteString(fmt.Sprintf("  Volume: %s in range\n", volSign))
+			}
+			if len(w.KeyEvents) > 0 {
+				var evNames []string
+				seen := map[string]bool{}
+				for _, ev := range w.KeyEvents {
+					if !seen[ev.Name] {
+						evNames = append(evNames, ev.Name+" ✓")
+						seen[ev.Name] = true
+					}
+				}
+				sb.WriteString(fmt.Sprintf("  Events: %s\n", strings.Join(evNames, " | ")))
+			}
+			sb.WriteString(fmt.Sprintf("  Bias: %s\n", w.Description))
+		}
 	}
 
 	if len(result.Patterns) > 0 {

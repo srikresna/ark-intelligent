@@ -104,6 +104,11 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	if len(bars) >= 20 && snap.ATR > 0 {
 		snap.SMC = CalcSMC(bars, snap.ATR)
 	}
+
+	// Wyckoff phase detection (simplified ta-level analysis)
+	if len(bars) >= 50 && snap.ATR > 0 {
+		snap.Wyckoff = CalcWyckoff(bars, snap.ATR)
+	}
 	return snap
 }
 
