@@ -81,11 +81,11 @@ func spreadBar(spreadBps float64) string {
 func riskEmoji(risk domain.UnwindRisk) string {
 	switch risk {
 	case domain.UnwindAlert:
-		return "🔴 Alert"
+		return "🔴"
 	case domain.UnwindNarrow:
-		return "🟡 Narrow"
+		return "🟡"
 	default:
-		return "🟢 Safe"
+		return "🟢"
 	}
 }
 
