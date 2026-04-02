@@ -38,6 +38,7 @@ import (
 	ta "github.com/arkcode369/ark-intelligent/internal/service/ta"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+	elliottsvc "github.com/arkcode369/ark-intelligent/internal/service/elliott"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -443,6 +444,15 @@ func main() {
 		}
 		handler.WithGEX(gexServices)
 		log.Info().Msg("GEX commands registered (/gex)")
+
+		// Wire Elliott Wave services (automated wave counting and projection)
+		elliottServices := tgbot.ElliottServices{
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+			Engine:         elliottsvc.NewEngine(),
+		}
+		handler.WithElliott(elliottServices)
+		log.Info().Msg("Elliott Wave commands registered (/elliott)")
 	}
 
 	// Register free-text handler for chatbot mode
