@@ -221,6 +221,7 @@ func NewHandler(
 	bot.RegisterCommand("/eurostat", h.cmdEurostat)  // EU economy dashboard (Eurostat)
 	bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
 	bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
+	bot.RegisterCommand("/swaps", h.cmdSwaps)        // DTCC FX swap institutional flows
 	bot.RegisterCommand("/bias", h.cmdBias)
 	bot.RegisterCommand("/backtest", h.cmdBacktest)
 	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
@@ -244,6 +245,7 @@ func NewHandler(
 	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
 	bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
 	bot.RegisterCommand("/session", h.cmdSession)       // Trading session behavior analysis (London/NY/Tokyo)
+	bot.RegisterCommand("/scenario", h.cmdScenario)    // Monte Carlo price scenario generator
 
 	// Membership & upgrade info
 	bot.RegisterCommand("/membership", h.cmdMembership)
@@ -293,6 +295,7 @@ func NewHandler(
 	bot.RegisterCallback("cot:", h.cbCOTDetail)
 	bot.RegisterCallback("alert:", h.cbAlertToggle)
 	bot.RegisterCallback("set:", h.cbSettings)
+	bot.RegisterCallback("alertmgr:", h.cbAlertMgr)
 	bot.RegisterCallback("cal:filter:", h.cbNewsFilter)
 	bot.RegisterCallback("out:", h.cbOutlook)
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
