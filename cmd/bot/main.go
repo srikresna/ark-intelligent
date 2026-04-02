@@ -30,6 +30,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/finviz"
 	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
@@ -114,6 +115,7 @@ func main() {
 	// Sentiment cache: inject BadgerDB for persistence across restarts.
 	// Saves Firecrawl API quota by avoiding re-fetches on every restart.
 	sentiment.InitSentimentCache(db.Badger())
+	finviz.InitCache(db.Badger())
 	log.Info().Msg("Sentiment cache persistence initialized (BadgerDB-backed)")
 
 	log.Info().Msg("Storage layer initialized")

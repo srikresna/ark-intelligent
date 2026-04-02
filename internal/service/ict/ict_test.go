@@ -30,6 +30,17 @@ func reverseChron(bars []ta.OHLCV) []ta.OHLCV {
 	return out
 }
 
+// makePaddingBars generates n bars at a given base price with small moves.
+// Used to pad test datasets to meet the 20-bar minimum for ta.CalcICT.
+func makePaddingBars(n int, basePrice float64, start time.Time, step time.Duration) []ta.OHLCV {
+	bars := make([]ta.OHLCV, n)
+	for i := 0; i < n; i++ {
+		p := basePrice + float64(i%3)*0.001
+		bars[i] = makeBar(p, p+0.002, p-0.002, p+0.001, start.Add(time.Duration(i)*step))
+	}
+	return bars
+}
+
 // ---------------------------------------------------------------------------
 // FVG Detection Tests
 // ---------------------------------------------------------------------------
@@ -37,58 +48,65 @@ func reverseChron(bars []ta.OHLCV) []ta.OHLCV {
 func TestFVG_BullishDetection(t *testing.T) {
 	// Build bars with a clear bullish FVG between bar[0].High and bar[2].Low.
 	// Bullish FVG: right.Low > left.High (right=chron[i+1], left=chron[i-1])
-	// For mid at index 1: left=chron[0] High=1.000, right=chron[2] Low=1.010 → gap 1.000–1.010
+	// Pad to ≥20 bars so ta.CalcICT accepts the input.
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	chron := []ta.OHLCV{
+	step := 4 * time.Hour
+
+	// Leading padding: 15 bars at ~0.990
+	chron := makePaddingBars(15, 0.990, base, step)
+
+	offset := base.Add(time.Duration(15) * step)
+	// The FVG-producing triple:
+	chron = append(chron,
 		// left: High exactly 1.000
-		{Date: base, Open: 0.990, High: 1.000, Low: 0.985, Close: 0.995, Volume: 1000},
+		ta.OHLCV{Date: offset, Open: 0.990, High: 1.000, Low: 0.985, Close: 0.995, Volume: 1000},
 		// mid
-		{Date: base.Add(time.Hour * 4), Open: 1.000, High: 1.005, Low: 0.995, Close: 1.002, Volume: 1000},
+		ta.OHLCV{Date: offset.Add(step), Open: 1.000, High: 1.005, Low: 0.995, Close: 1.002, Volume: 1000},
 		// right: Low exactly 1.010 > left.High 1.000 → bullish FVG top=1.010 bottom=1.000
-		{Date: base.Add(time.Hour * 8), Open: 1.010, High: 1.020, Low: 1.010, Close: 1.015, Volume: 1000},
-		{Date: base.Add(time.Hour * 12), Open: 1.015, High: 1.025, Low: 1.012, Close: 1.020, Volume: 1000},
-		{Date: base.Add(time.Hour * 16), Open: 1.020, High: 1.030, Low: 1.015, Close: 1.025, Volume: 1000},
-	}
+		ta.OHLCV{Date: offset.Add(2 * step), Open: 1.010, High: 1.020, Low: 1.010, Close: 1.015, Volume: 1000},
+		ta.OHLCV{Date: offset.Add(3 * step), Open: 1.015, High: 1.025, Low: 1.012, Close: 1.020, Volume: 1000},
+		ta.OHLCV{Date: offset.Add(4 * step), Open: 1.020, High: 1.030, Low: 1.015, Close: 1.025, Volume: 1000},
+	)
 	bars := reverseChron(chron)
 
 	zones := ict.DetectFVG(bars)
 
-	bullishCount := 0
+	// Look for the specific bullish FVG in the target range 1.000-1.010.
+	// There may be other FVGs from padding bars — we only require the target one.
+	foundTarget := false
 	for _, z := range zones {
-		if z.Kind == "BULLISH" {
-			bullishCount++
-			// The gap should be between left.High=1.000 and right.Low=1.010
-			if z.Bottom < 0.990 || z.Bottom > 1.005 {
-				t.Errorf("unexpected FVG Bottom=%.5f (expected ~1.000)", z.Bottom)
-			}
-			if z.Top < 1.005 || z.Top > 1.015 {
-				t.Errorf("unexpected FVG Top=%.5f (expected ~1.010)", z.Top)
-			}
+		if z.Type == "BULLISH" && z.Low >= 0.990 && z.Low <= 1.005 && z.High >= 1.005 && z.High <= 1.015 {
+			foundTarget = true
 		}
 	}
-	if bullishCount == 0 {
-		t.Error("expected at least 1 BULLISH FVG, got 0")
+	if !foundTarget {
+		t.Errorf("expected a BULLISH FVG in range ~1.000-1.010, got zones: %+v", zones)
 	}
 }
 
 func TestFVG_BearishDetection(t *testing.T) {
 	// Bearish FVG: right.High < left.Low
-	// Bar 0 Low=1.020, Bar 2 High=1.010 → gap 1.010–1.020
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	chron := []ta.OHLCV{
-		makeBar(1.030, 1.035, 1.020, 1.025, base),
-		makeBar(1.020, 1.022, 1.012, 1.015, base.Add(time.Hour*4)),
-		makeBar(1.015, 1.010, 1.000, 1.005, base.Add(time.Hour*8)), // High=1.010 < left Low=1.020
-		makeBar(1.005, 1.008, 0.995, 1.000, base.Add(time.Hour*12)),
-		makeBar(1.000, 1.003, 0.990, 0.995, base.Add(time.Hour*16)),
-	}
+	step := 4 * time.Hour
+
+	// Leading padding at higher price level
+	chron := makePaddingBars(15, 1.030, base, step)
+
+	offset := base.Add(time.Duration(15) * step)
+	chron = append(chron,
+		makeBar(1.030, 1.035, 1.020, 1.025, offset),
+		makeBar(1.020, 1.022, 1.012, 1.015, offset.Add(step)),
+		makeBar(1.015, 1.010, 1.000, 1.005, offset.Add(2*step)), // High=1.010 < left Low=1.020
+		makeBar(1.005, 1.008, 0.995, 1.000, offset.Add(3*step)),
+		makeBar(1.000, 1.003, 0.990, 0.995, offset.Add(4*step)),
+	)
 	bars := reverseChron(chron)
 
 	zones := ict.DetectFVG(bars)
 
 	bearishCount := 0
 	for _, z := range zones {
-		if z.Kind == "BEARISH" {
+		if z.Type == "BEARISH" {
 			bearishCount++
 		}
 	}
@@ -100,18 +118,23 @@ func TestFVG_BearishDetection(t *testing.T) {
 func TestFVG_FillDetection(t *testing.T) {
 	// Create a bullish FVG and then fill it with a subsequent bar.
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	chron := []ta.OHLCV{
-		makeBar(0.990, 1.000, 0.985, 0.995, base),
-		makeBar(1.000, 1.005, 0.995, 1.002, base.Add(time.Hour*4)),
-		makeBar(1.008, 1.020, 1.010, 1.015, base.Add(time.Hour*8)), // FVG: 1.000–1.010
-		makeBar(1.015, 1.020, 1.008, 1.010, base.Add(time.Hour*12)), // fills FVG partially
-		makeBar(1.005, 1.010, 0.995, 0.998, base.Add(time.Hour*16)), // fills completely (Low below Bottom)
-	}
+	step := 4 * time.Hour
+
+	chron := makePaddingBars(15, 0.990, base, step)
+
+	offset := base.Add(time.Duration(15) * step)
+	chron = append(chron,
+		makeBar(0.990, 1.000, 0.985, 0.995, offset),
+		makeBar(1.000, 1.005, 0.995, 1.002, offset.Add(step)),
+		makeBar(1.008, 1.020, 1.010, 1.015, offset.Add(2*step)), // FVG: 1.000–1.010
+		makeBar(1.015, 1.020, 1.008, 1.010, offset.Add(3*step)), // fills FVG partially
+		makeBar(1.005, 1.010, 0.995, 0.998, offset.Add(4*step)), // fills completely
+	)
 	bars := reverseChron(chron)
 
 	zones := ict.DetectFVG(bars)
 	for _, z := range zones {
-		if z.Kind == "BULLISH" && z.FillPct >= 100 {
+		if z.Type == "BULLISH" && z.FillPct >= 100 {
 			if !z.Filled {
 				t.Errorf("expected Filled=true when FillPct=%.1f", z.FillPct)
 			}

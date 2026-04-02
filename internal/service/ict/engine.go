@@ -71,6 +71,7 @@ func (e *Engine) Analyze(bars []ta.OHLCV, symbol, timeframe string) *ICTResult {
 // ---------------------------------------------------------------------------
 
 // convertFVGs converts ta.FVG slices to ict.FVGZone slices.
+// Field mapping is straightforward since names are now aligned.
 func convertFVGs(taFVGs []ta.FVG) []FVGZone {
 	if len(taFVGs) == 0 {
 		return nil
@@ -78,12 +79,12 @@ func convertFVGs(taFVGs []ta.FVG) []FVGZone {
 	zones := make([]FVGZone, len(taFVGs))
 	for i, f := range taFVGs {
 		zones[i] = FVGZone{
-			Kind:    f.Type, // ta uses "BULLISH"/"BEARISH" in Type field
-			Top:     f.High,
-			Bottom:  f.Low,
+			Type:     f.Type,
+			High:     f.High,
+			Low:      f.Low,
 			BarIndex: f.BarIndex,
-			Filled:  f.Filled,
-			FillPct: f.FillPct,
+			Filled:   f.Filled,
+			FillPct:  f.FillPct,
 		}
 	}
 	return zones
@@ -100,18 +101,18 @@ func convertOrderBlocks(taOBs, taBreakers []ta.OrderBlock) []OrderBlock {
 	out := make([]OrderBlock, 0, total)
 	for _, ob := range taOBs {
 		out = append(out, OrderBlock{
-			Kind:     ob.Type,
-			Top:      ob.High,
-			Bottom:   ob.Low,
+			Type:     ob.Type,
+			High:     ob.High,
+			Low:      ob.Low,
 			BarIndex: ob.BarIndex,
 			Broken:   ob.Broken,
 		})
 	}
 	for _, ob := range taBreakers {
 		out = append(out, OrderBlock{
-			Kind:     ob.Type,
-			Top:      ob.High,
-			Bottom:   ob.Low,
+			Type:     ob.Type,
+			High:     ob.High,
+			Low:      ob.Low,
 			BarIndex: ob.BarIndex,
 			Broken:   true, // breakers are always broken by definition
 		})
@@ -161,7 +162,7 @@ func buildSummary(r *ICTResult) string {
 	lastStruct := ""
 	if len(r.Structure) > 0 {
 		ev := r.Structure[len(r.Structure)-1]
-		lastStruct = fmt.Sprintf("%s %s", ev.Kind, ev.Direction)
+		lastStruct = fmt.Sprintf("%s %s", ev.Type, ev.Direction)
 	}
 
 	summary := fmt.Sprintf("Bias: %s.", r.Bias)

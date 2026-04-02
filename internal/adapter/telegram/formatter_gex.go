@@ -311,3 +311,130 @@ func ivSmileEmoji(label string) string {
 		return "➖ FLAT"
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Skew / Smile formatter
+// ---------------------------------------------------------------------------
+
+// FormatSkewResult formats a SkewResult as a Telegram HTML message.
+func FormatSkewResult(r *gexsvc.SkewResult) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmtutil.AnalysisHeader("🔀", "IV SKEW ANALYSIS", r.Symbol, ""))
+	sb.WriteString(fmt.Sprintf("💰 Spot: <code>%s</code>\n", gexFormatPrice(r.SpotPrice)))
+	sb.WriteString(fmt.Sprintf("📅 %s UTC\n\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
+
+	// Aggregate signal
+	signalEmoji := skewSignalEmoji(r.PCRatioSignal)
+	sb.WriteString(fmt.Sprintf("🌡️ <b>SKEW SIGNAL:</b> %s %s\n", signalEmoji, r.PCRatioSignal))
+	sb.WriteString(fmt.Sprintf("  Put/Call IV Ratio: <code>%.3f</code>", r.AggregatePCRatio))
+	if r.PCRatioPercentile > 0 {
+		sb.WriteString(fmt.Sprintf(" (P%.0f)", r.PCRatioPercentile))
+	}
+	sb.WriteString("\n")
+	sb.WriteString("<i>📖 PC Ratio >1 = put IV lebih tinggi (bearish fear); <1 = call demand (bullish)</i>\n\n")
+
+	// Term structure slope
+	termEmoji := "➖"
+	if r.TermSlopeSignal == "CONTANGO" {
+		termEmoji = "📈"
+	} else if r.TermSlopeSignal == "BACKWARDATION" {
+		termEmoji = "📉"
+	}
+	sb.WriteString(fmt.Sprintf("%s <b>TERM STRUCTURE:</b> %s", termEmoji, r.TermSlopeSignal))
+	if r.TermSlopePerDTE != 0 {
+		sb.WriteString(fmt.Sprintf(" (slope: <code>%+.3f%%/day</code>)", r.TermSlopePerDTE))
+	}
+	sb.WriteString("\n")
+	if r.TermSlopeSignal == "BACKWARDATION" {
+		sb.WriteString("⚠️ <i>Near-term IV > far-term — event risk / hedging demand tinggi</i>\n")
+	}
+	sb.WriteString("\n")
+
+	// Alerts (skew flips)
+	if len(r.Alerts) > 0 {
+		sb.WriteString("🚨 <b>SKEW FLIP DETECTED!</b>\n")
+		for _, a := range r.Alerts {
+			sb.WriteString(fmt.Sprintf("  %s → %s (DTE %d, Δ ratio: %.3f)\n",
+				a.OldSkew, a.NewSkew, a.DTE, a.DeltaRatio))
+		}
+		sb.WriteString("<i>📖 Skew flip = reversal sinyal terkuat di options market</i>\n\n")
+	}
+
+	// Per-expiry smile curves (up to 4 expiries)
+	sb.WriteString("📊 <b>IV SMILE PER EXPIRY</b>\n")
+	sb.WriteString("<code>Expiry    DTE  0.80  0.90  ATM  1.10  1.20  PC-R  Dir</code>\n")
+	count := 0
+	for _, sk := range r.ExpirySkews {
+		if count >= 4 {
+			break
+		}
+		if len(sk.SmileCurve) < 3 {
+			continue
+		}
+		sb.WriteString(skewSmileRow(sk))
+		count++
+	}
+	if count == 0 {
+		sb.WriteString("  <i>insufficient data</i>\n")
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("<i>📖 Smile menunjukkan IV di berbagai moneyness. Skew slope negatif = normal (put protection); positif = inverse (call demand).</i>\n")
+
+	return sb.String()
+}
+
+// skewSmileRow formats a single expiry's smile as a table row.
+func skewSmileRow(sk gexsvc.SkewMetrics) string {
+	expiryStr := sk.Expiry.Format("02Jan")
+
+	// Extract smile values, fallback to N/A
+	smileVals := make([]string, 5)
+	for i, sp := range sk.SmileCurve {
+		if i >= 5 {
+			break
+		}
+		if sp.AvgIV > 0 {
+			smileVals[i] = fmt.Sprintf("%3.0f", sp.AvgIV)
+		} else {
+			smileVals[i] = " - "
+		}
+	}
+	// Pad if fewer than 5
+	for i := len(sk.SmileCurve); i < 5; i++ {
+		smileVals[i] = " - "
+	}
+
+	pcStr := fmt.Sprintf("%.2f", sk.PutCallIVRatio)
+	dirEmoji := skewDirEmoji(sk.SkewDirection)
+
+	return fmt.Sprintf("<code>%-8s %3d  %s  %s  %s  %s  %s  %s</code> %s\n",
+		expiryStr, sk.DTE,
+		smileVals[0], smileVals[1], smileVals[2], smileVals[3], smileVals[4],
+		pcStr, dirEmoji)
+}
+
+// skewSignalEmoji returns a colored emoji for the aggregate skew signal.
+func skewSignalEmoji(signal string) string {
+	switch signal {
+	case "BEARISH":
+		return "🔴"
+	case "BULLISH":
+		return "🟢"
+	default:
+		return "🟡"
+	}
+}
+
+// skewDirEmoji returns a short directional emoji for per-expiry skew.
+func skewDirEmoji(dir string) string {
+	switch dir {
+	case "BEARISH":
+		return "📉"
+	case "BULLISH":
+		return "📈"
+	default:
+		return "➖"
+	}
+}

@@ -40,7 +40,7 @@ func DetectLiquiditySweeps(bars []ta.OHLCV, swings []swingPoint) []LiquiditySwee
 						reversed = next.Close < next.Open // bearish follow-through after high sweep
 					}
 					sweeps = append(sweeps, LiquiditySweep{
-						Kind:      "SWEEP_HIGH",
+						Type:      "SWEEP_HIGH",
 						Level:     sp.level,
 						SweepHigh: bar.High,
 						SweepLow:  bar.Low,
@@ -58,7 +58,7 @@ func DetectLiquiditySweeps(bars []ta.OHLCV, swings []swingPoint) []LiquiditySwee
 						reversed = next.Close > next.Open // bullish follow-through after low sweep
 					}
 					sweeps = append(sweeps, LiquiditySweep{
-						Kind:      "SWEEP_LOW",
+						Type:      "SWEEP_LOW",
 						Level:     sp.level,
 						SweepHigh: bar.High,
 						SweepLow:  bar.Low,

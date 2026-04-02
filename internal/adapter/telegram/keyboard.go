@@ -1505,6 +1505,7 @@ var relatedCommands = map[string][]struct {
 	"quant":       {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Backtest", Callback: "backtest"}, {Label: "📈 Price", Callback: "price"}},
 	"calendar":    {{Label: "💥 Impact", Callback: "impact"}, {Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}},
 	"gex":         {{Label: "🔬 Alpha", Callback: "alpha"}, {Label: "📊 Sentiment", Callback: "sentiment"}, {Label: "📈 CryptoAlpha", Callback: "cryptoalpha"}},
+	"skew":        {{Label: "📊 GEX", Callback: "gex"}, {Label: "📈 IV Surface", Callback: "ivol"}, {Label: "🔬 Alpha", Callback: "alpha"}},
 	"sentiment":   {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Bias", Callback: "bias"}, {Label: "📊 Rank", Callback: "rank"}},
 	"price":       {{Label: "🔑 Levels", Callback: "levels"}, {Label: "📊 Quant", Callback: "quant"}, {Label: "🎯 CTA", Callback: "cta"}},
 	"levels":      {{Label: "📈 Price", Callback: "price"}, {Label: "🎯 CTA", Callback: "cta"}, {Label: "📊 Quant", Callback: "quant"}},

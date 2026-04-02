@@ -321,7 +321,9 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /history — COT history comparison · <code>/history EUR</code>
 /ecb — ECB monetary policy dashboard · <code>/ecb</code>
 /leading — OECD leading indicators (G7+ CLI) · <code>/leading</code>
-/intermarket — Cross-asset correlation signals`
+/intermarket — Cross-asset correlation signals
+/defi — DeFi health dashboard (TVL, DEX, stablecoins)
+/onchain — On-chain exchange flows (BTC, ETH)`
 
 	case "research":
 		text = `🔬 <b>Research &amp; Alpha Commands</b>
