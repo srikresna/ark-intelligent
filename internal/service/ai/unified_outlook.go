@@ -13,6 +13,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
@@ -54,6 +55,9 @@ type UnifiedOutlookData struct {
 	// Only includes results with Confidence != "LOW".
 	// Key = symbol (e.g. "EURUSD"), Value = WyckoffResult.
 	WyckoffContexts    map[string]*wyckoffsvc.WyckoffResult
+	// MicrostructureData holds Bybit orderbook/flow microstructure signals for crypto.
+	// Typically BTC and ETH. May be nil if alpha services not configured.
+	MicrostructureData []*microstructure.Signal
 	Language           string
 }
 
@@ -725,6 +729,21 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		}
 		b.WriteString("NOTE: Wyckoff Accumulation Phase C/D (Spring/SOS) → bullish structural setup. " +
 			"Distribution Phase C/D (UTAD/SOW) → bearish structural setup.\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Microstructure (Bybit Orderbook + Flow)
+	// -----------------------------------------------------------------------
+	if len(data.MicrostructureData) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. MICROSTRUCTURE (Bybit Orderbook + Flow) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for _, sig := range data.MicrostructureData {
+			b.WriteString(fmt.Sprintf("%s: Bias=%s Strength=%.0f%% BidAskImbalance=%.2f TakerBuyRatio=%.0f%% OI_Δ%.1f%% Funding=%.4f%%\n",
+				sig.Symbol, sig.Bias, sig.Strength*100,
+				sig.BidAskImbalance, sig.TakerBuyRatio*100,
+				sig.OIChange, sig.FundingRate*100))
+		}
+		b.WriteString("\n")
 	}
 
 	// -----------------------------------------------------------------------

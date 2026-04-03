@@ -16,6 +16,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
+	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
@@ -255,6 +256,18 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		}
 	}
 
+	// Microstructure signals for crypto (Bybit orderbook + flow, graceful degradation)
+	var microSignals []*microstructure.Signal
+	if h.alpha != nil && h.alpha.MicroEngine != nil {
+		if results, mErr := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", []string{"BTCUSDT", "ETHUSDT"}); mErr == nil {
+			for _, sig := range results {
+				if sig != nil {
+					microSignals = append(microSignals, sig)
+				}
+			}
+		}
+	}
+
 	// ---------- Build unified data ----------
 	var macroComposites *domain.MacroComposites
 	if macroData != nil {
@@ -293,6 +306,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		ICTContexts:        ictContexts,
 		GEXResults:         gexResults,
 		WyckoffContexts:    wyckoffContexts,
+		MicrostructureData: microSignals,
 		Language:           prefs.Language,
 	}
 
