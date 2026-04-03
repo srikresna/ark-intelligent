@@ -252,11 +252,3 @@ func BuildServiceConfig(cfg *config.Config) ServiceConfig {
 		},
 	}
 }
-
-// Helper function to format owner chat ID for scheduler
-func ownerChatIDForScheduler(ownerID int64) string {
-	if ownerID <= 0 {
-		return ""
-	}
-	return fmt.Sprintf("%d", ownerID)
-}
