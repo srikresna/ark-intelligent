@@ -1,14 +1,17 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #9)
+# Agent Status — last updated: 2026-04-03 WIB (loop #10)
 
 ## Dev-A
-- **Last run:** 2026-04-03 WIB (loop #9)
-- **Current:** monitoring — PR #286 (TASK-182) pending owner review
-- **PRs merged this loop:**
-  - #314 (TASK-263 GEX context in /outlook) — rebased + merged ✅
-  - #317 (TASK-157 EIA natural gas orphan cleanup) — merged ✅
-  - #318 (6x orphan cleanup: TASK-129,132,134,136,164,207) — merged ✅
-  - #319 (TASK-136 pending duplicate removal) — merged ✅
-- **Pending queue:** Clean — template + TASK-016 (Dev-B) + TASK-182 (owner PR #286)
+- **Status:** PR ready — TASK-094-D (HandlerDeps struct refactor)
+- **Task file:** `.agents/tasks/claimed/TASK-094-D-handler-deps-struct.DEV-A.md`
+- **Paperclip:** PHI-105
+- **Branch:** `feat/TASK-094-D` pushed to origin
+- **Changes:** 
+  - HandlerDeps struct created with all 17 dependencies
+  - NewHandler() refactored to accept HandlerDeps
+  - cmd/bot/main.go call site updated
+  - No behavior changes — pure refactor
+- **Files changed:** `internal/adapter/telegram/handler.go`, `cmd/bot/main.go`
+- **Next:** PR creation pending (needs gh auth) or TechLead review
 
 ## Dev-B
 - **Last run:** 2026-04-03 WIB
