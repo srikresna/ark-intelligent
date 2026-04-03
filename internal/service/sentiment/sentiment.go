@@ -150,9 +150,14 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		data.VIXSpot = ts.Spot
 		data.VIXM1 = ts.M1
 		data.VIXM2 = ts.M2
+		data.VIXM3 = ts.M3
 		data.VVIX = ts.VVIX
 		data.VIXContango = ts.Contango
 		data.VIXSlopePct = ts.SlopePct
+		data.VIXFullSlope = ts.FullSlopePct
+		data.VIXCalM2M3 = ts.CalendarM2M3
+		data.VIXFullContango = ts.FullContango
+		data.VIXFullBackwardation = ts.FullBackwardation
 		data.VIXRegime = ts.Regime
 		data.VIXAvailable = true
 		// MOVE index (bond volatility)
@@ -277,9 +282,14 @@ type SentimentData struct {
 	VIXSpot      float64 // VIX spot index level
 	VIXM1        float64 // Front-month VIX futures settle
 	VIXM2        float64 // Second-month VIX futures settle
+	VIXM3        float64 // Third-month VIX futures settle
 	VVIX         float64 // VIX of VIX
 	VIXContango  bool    // true if M1 > Spot (normal/risk-on)
 	VIXSlopePct  float64 // (M2-M1)/M1 * 100
+	VIXFullSlope float64 // (M3-M1)/M1 * 100 — 2-month slope
+	VIXCalM2M3   float64 // M3 - M2 (forward premium/discount)
+	VIXFullContango      bool // true if M3 > M2 > M1 > Spot
+	VIXFullBackwardation bool // true if M3 < M2 < M1 < Spot
 	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
 	VIXAvailable bool
 

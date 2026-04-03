@@ -284,11 +284,20 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		if data.VIXM2 > 0 {
 			b.WriteString(fmt.Sprintf("<code>M2    : %.2f</code>\n", data.VIXM2))
 		}
+		if data.VIXM3 > 0 {
+			b.WriteString(fmt.Sprintf("<code>M3    : %.2f</code>\n", data.VIXM3))
+		}
 		if data.VVIX > 0 {
 			b.WriteString(fmt.Sprintf("<code>VVIX  : %.1f</code>\n", data.VVIX))
 		}
 		var structLabel, structEmoji string
-		if data.VIXContango {
+		if data.VIXFullContango {
+			structLabel = "FULL CONTANGO"
+			structEmoji = "✅"
+		} else if data.VIXFullBackwardation {
+			structLabel = "FULL BACKWARDATION"
+			structEmoji = "🔴"
+		} else if data.VIXContango {
 			structLabel = "CONTANGO"
 			structEmoji = "✅"
 		} else {
@@ -299,6 +308,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			b.WriteString(fmt.Sprintf("<code>Shape : %s (%+.1f%%) %s</code>\n", structLabel, data.VIXSlopePct, structEmoji))
 		} else {
 			b.WriteString(fmt.Sprintf("<code>Shape : %s %s</code>\n", structLabel, structEmoji))
+		}
+		if data.VIXFullSlope != 0 {
+			b.WriteString(fmt.Sprintf("<code>M1→M3 : %+.1f%%  M2→M3: %+.2f</code>\n", data.VIXFullSlope, data.VIXCalM2M3))
 		}
 		if data.VIXRegime != "" {
 			var regimeEmoji string

@@ -293,7 +293,8 @@ func parseVXSymbolExpiry(symbol string) time.Time {
 // ---------------------------------------------------------------------------
 
 // computeDerivedFields calculates SlopePct, Contango, Backwardation, RollYield,
-// and Regime from the raw M1/M2/Spot values.
+// FullSlopePct, CalendarM2M3, FullContango, FullBackwardation, and Regime
+// from the raw M1/M2/M3/Spot values.
 func computeDerivedFields(ts *VIXTermStructure) {
 	if ts.M1 > 0 && ts.M2 > 0 {
 		ts.SlopePct = (ts.M2 - ts.M1) / ts.M1 * 100
@@ -314,6 +315,21 @@ func computeDerivedFields(ts *VIXTermStructure) {
 	if ts.Spot > 0 && ts.M1 > 0 {
 		ts.Backwardation = ts.M1 < ts.Spot
 		ts.Contango = ts.M1 > ts.Spot && (ts.M2 == 0 || ts.M2 >= ts.M1)
+	}
+
+	// Full term structure metrics (M3 required)
+	if ts.M1 > 0 && ts.M3 > 0 {
+		ts.FullSlopePct = (ts.M3 - ts.M1) / ts.M1 * 100
+		if math.IsNaN(ts.FullSlopePct) || math.IsInf(ts.FullSlopePct, 0) {
+			ts.FullSlopePct = 0
+		}
+	}
+	if ts.M2 > 0 && ts.M3 > 0 {
+		ts.CalendarM2M3 = ts.M3 - ts.M2
+	}
+	if ts.Spot > 0 && ts.M1 > 0 && ts.M2 > 0 && ts.M3 > 0 {
+		ts.FullContango = ts.M3 > ts.M2 && ts.M2 > ts.M1 && ts.M1 > ts.Spot
+		ts.FullBackwardation = ts.M3 < ts.M2 && ts.M2 < ts.M1 && ts.M1 < ts.Spot
 	}
 
 	classifyRegime(ts)
