@@ -322,21 +322,38 @@ func ConfluenceScoreV3(
 	}
 
 	// Weighted combination
+	isLong := analysis.SentimentScore > 0
+	oi4wAdj := 0.0
+	switch analysis.OI4WTrend {
+	case "ACCUMULATING":
+		if isLong {
+			oi4wAdj = 5
+		} else {
+			oi4wAdj = -5
+		}
+	case "DISTRIBUTING":
+		if isLong {
+			oi4wAdj = -5
+		} else {
+			oi4wAdj = 5
+		}
+	}
+
 	if priceContext != nil && macroData != nil {
-		total := cotScore*0.30 + surpriseScore*0.15 + macroScore*0.25 + priceScore*0.30
+		total := cotScore*0.30 + surpriseScore*0.15 + macroScore*0.25 + priceScore*0.30 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	} else if priceContext != nil {
 		// No FRED: COT 40% + Surprise 15% + Price 45%
-		total := cotScore*0.40 + surpriseScore*0.15 + priceScore*0.45
+		total := cotScore*0.40 + surpriseScore*0.15 + priceScore*0.45 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	} else if macroData != nil {
 		// No price: COT 35% + Surprise 20% + Macro 45%
-		total := cotScore*0.35 + surpriseScore*0.20 + macroScore*0.45
+		total := cotScore*0.35 + surpriseScore*0.20 + macroScore*0.45 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	}
 
 	// Neither: COT 60% + Surprise 40%
-	total := cotScore*0.60 + surpriseScore*0.40
+	total := cotScore*0.60 + surpriseScore*0.40 + oi4wAdj
 	return mathutil.Clamp(total, -100, 100)
 }
 
