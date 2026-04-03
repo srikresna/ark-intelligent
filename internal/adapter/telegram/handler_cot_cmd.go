@@ -52,6 +52,7 @@ func (h *Handler) cmdCOT(ctx context.Context, chatID string, userID int64, args 
 	}
 
 	// Overview: all currencies
+	h.bot.SendTyping(ctx, chatID)
 	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 	if err != nil {
 		return fmt.Errorf("get all COT analyses: %w", err)
@@ -308,14 +309,11 @@ func (h *Handler) cbCOTDetail(ctx context.Context, chatID string, msgID int, use
 // ---------------------------------------------------------------------------
 
 func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args string) error {
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, "🎯 Mendeteksi directional bias... ⏳")
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎯 Mendeteksi directional bias... ⏳")
 	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 	if err != nil || len(analyses) == 0 {
-		if loadingID > 0 {
-			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-		}
-		_, err = h.bot.SendHTML(ctx, chatID, "No COT data available for bias detection.")
-		return err
+		h.editUserError(ctx, chatID, loadingID, fmt.Errorf("no COT data available for bias detection"), "bias")
+		return nil
 	}
 
 	// Build history map (8 weeks needed for momentum/divergence detection)
@@ -358,16 +356,11 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 	}
 
 	html := h.fmt.FormatBiasHTML(signals, filterCurrency)
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
 	kb := h.kb.RelatedCommandsKeyboard("bias", filterCurrency)
 	if len(kb.Rows) > 0 {
-		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
-	} else {
-		_, err = h.bot.SendHTML(ctx, chatID, html)
+		return h.bot.EditWithKeyboard(ctx, chatID, loadingID, html, kb)
 	}
-	return err
+	return h.bot.EditMessage(ctx, chatID, loadingID, html)
 }
 
 // cmdHistory shows COT positioning history for a currency.
@@ -601,15 +594,11 @@ func (h *Handler) renderCOTOverview(ctx context.Context, chatID string, userID i
 // cmdRank handles the /rank command — weekly currency strength ranking.
 // Ranks 8 major currencies by COT SentimentScore and shows conviction scores (COT + FRED + Calendar).
 func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args string) error {
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, "📈 Menghitung currency strength ranking... ⏳")
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📈 Menghitung currency strength ranking... ⏳")
 	analyses, err := h.cotRepo.GetAllLatestAnalyses(ctx)
 	if err != nil || len(analyses) == 0 {
-		if loadingID > 0 {
-			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-		}
-		_, err = h.bot.SendHTML(ctx, chatID,
-			"No COT data available for ranking. Data is fetched from CFTC every Friday.")
-		return err
+		h.editUserError(ctx, chatID, loadingID, fmt.Errorf("no COT data available for ranking"), "rank")
+		return nil
 	}
 
 	// Fetch FRED regime for conviction scoring (best-effort, non-fatal)
@@ -670,14 +659,9 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		}
 	}
 
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
 	kb := h.kb.RelatedCommandsKeyboard("rank", "")
 	if len(kb.Rows) > 0 {
-		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
-	} else {
-		_, err = h.bot.SendHTML(ctx, chatID, html)
+		return h.bot.EditWithKeyboard(ctx, chatID, loadingID, html, kb)
 	}
-	return err
+	return h.bot.EditMessage(ctx, chatID, loadingID, html)
 }
