@@ -382,17 +382,17 @@ func (h *Handler) checkAICooldownDynamic(userID int64, cooldown time.Duration) b
 // currencyToContractCode maps 3-letter currency codes to CFTC contract codes.
 func currencyToContractCode(currency string) string {
 	mapping := map[string]string{
-		"EUR":  "099741", // Euro FX
-		"GBP":  "096742", // British Pound
-		"JPY":  "097741", // Japanese Yen
-		"AUD":  "232741", // Australian Dollar
-		"NZD":  "112741", // New Zealand Dollar
-		"CAD":  "090741", // Canadian Dollar
-		"CHF":  "092741", // Swiss Franc
-		"USD":  "098662", // US Dollar Index
-		"GOLD": "088691", // Gold
-		"XAU":  "088691", // Gold alias
-		"OIL":  "067651", // Crude Oil
+		"EUR":  string(domain.ContractEUR),
+		"GBP":  string(domain.ContractGBP),
+		"JPY":  string(domain.ContractJPY),
+		"AUD":  string(domain.ContractAUD),
+		"NZD":  string(domain.ContractNZD),
+		"CAD":  string(domain.ContractCAD),
+		"CHF":  string(domain.ContractCHF),
+		"USD":  string(domain.ContractDXY),
+		"GOLD": string(domain.ContractGold),
+		"XAU":  string(domain.ContractGold),
+		"OIL":  string(domain.ContractOil),
 	}
 
 	if code, ok := mapping[strings.ToUpper(currency)]; ok {
