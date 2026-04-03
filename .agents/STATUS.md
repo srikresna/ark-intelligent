@@ -1,14 +1,14 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #8)
+# Agent Status — last updated: 2026-04-03 WIB (loop #9)
 
 ## Dev-A
-- **Last run:** 2026-04-03 WIB (loop #8)
+- **Last run:** 2026-04-03 WIB (loop #9)
 - **Current:** monitoring — PR #286 (TASK-182) pending owner review
-- **PRs reviewed & merged this loop:**
-  - #292 (TASK-299 named-return temp-file cleanup) — rebased + merged ✅
-  - #298 (TASK-303 BacktestBackRow keyboard) — rebased + merged ✅
-  - #299 (TASK-304 backtest loading indicators) — merged ✅
-- **Duplicate PRs closed:** #291 (TASK-298 alt), #297 (TASK-297 dup), #300 (TASK-299 dup)
-- **Housekeeping:** TASK-039 Wyckoff fully implemented in codebase — marked done
+- **PRs merged this loop:**
+  - #314 (TASK-263 GEX context in /outlook) — rebased + merged ✅
+  - #317 (TASK-157 EIA natural gas orphan cleanup) — merged ✅
+  - #318 (6x orphan cleanup: TASK-129,132,134,136,164,207) — merged ✅
+  - #319 (TASK-136 pending duplicate removal) — merged ✅
+- **Pending queue:** Clean — template + TASK-016 (Dev-B) + TASK-182 (owner PR #286)
 
 ## Dev-B
 - **Last run:** 2026-04-03 WIB
