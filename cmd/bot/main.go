@@ -49,22 +49,15 @@ var changelogContent string
 
 var log = logger.Component("main")
 
-const banner = `
-╔══════════════════════════════════════════════════╗
-║     Institutional Positioning (COT) • Macro Intel ║
-║     Built for institutional-grade macro intel     ║
-╚══════════════════════════════════════════════════╝`
-
 func main() {
-	fmt.Println(banner)
-
-	// -----------------------------------------------------------------------
-	// 1. Configuration
-	// -----------------------------------------------------------------------
+	// Initialize logger first for structured output
 	cfg := config.MustLoad()
 	logger.Init(cfg.LogLevel)
-	// Re-initialize component logger after Init
 	log = logger.Component("main")
+
+	// Print banner using structured logger
+	log.Info().Msg("ARK Community Intelligent - Institutional Positioning (COT) • Macro Intel")
+	log.Info().Msg("Built for institutional-grade macro intel")
 
 	log.Info().
 		Str("version", "v3.0.0").
@@ -137,7 +130,7 @@ func main() {
 	// -----------------------------------------------------------------------
 	// 4. Telegram bot
 	// -----------------------------------------------------------------------
-	bot := tgbot.NewBot(cfg.BotToken, cfg.ChatID)
+	bot := tgbot.NewBot(cfg)
 
 	// Check Python chart rendering dependencies at startup.
 	// Log a warning but do not fail — chart commands gracefully degrade to text.
@@ -367,25 +360,25 @@ func main() {
 	// Handler is wired after newsSched so it can receive the surprise accumulator.
 	// newsSched implements SurpriseProvider via GetSurpriseSigma — enables full
 	// 3-source conviction scoring (COT + FRED + Calendar) in /rank and /cot detail.
-	handler := tgbot.NewHandler(
-		bot,
-		eventRepo,
-		cotRepo,
-		prefsRepo,
-		newsRepo,
-		newsFetcher,
-		aiAnalyzer,     // nil-safe: handler checks IsAvailable()
-		changelogContent,
-		newsSched,       // SurpriseProvider: weekly per-currency surprise accumulator
-		authMiddleware,  // User management middleware
-		priceRepo,       // Price data for backtest/context (nil-safe)
-		signalRepo,      // Signal persistence for backtest (nil-safe)
-		chatService,     // Claude chatbot service (nil-safe)
-		claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
-		impactRepo,      // Event Impact Database (nil-safe)
-		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
-		intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
-	)
+	handler := tgbot.NewHandler(tgbot.HandlerDeps{
+		Bot:            bot,
+		EventRepo:      eventRepo,
+		COTRepo:        cotRepo,
+		PrefsRepo:      prefsRepo,
+		NewsRepo:       newsRepo,
+		NewsFetcher:    newsFetcher,
+		AIAnalyzer:     aiAnalyzer,     // nil-safe: handler checks IsAvailable()
+		Changelog:      changelogContent,
+		NewsScheduler:  newsSched,       // SurpriseProvider: weekly per-currency surprise accumulator
+		Middleware:     authMiddleware,  // User management middleware
+		PriceRepo:      priceRepo,       // Price data for backtest/context (nil-safe)
+		SignalRepo:     signalRepo,      // Signal persistence for backtest (nil-safe)
+		ChatService:    chatService,     // Claude chatbot service (nil-safe)
+		ClaudeAnalyzer: claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
+		ImpactProvider: impactRepo,      // Event Impact Database (nil-safe)
+		DailyPriceRepo: dailyPriceRepo,  // Daily price data for /price command (nil-safe)
+		IntradayRepo:   intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
+	})
 
 	// Wire feedback repo for 👍/👎 reaction buttons on analysis messages (TASK-051)
 	handler.WithFeedback(feedbackRepo)
