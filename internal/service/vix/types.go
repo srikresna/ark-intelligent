@@ -22,6 +22,12 @@ type VIXTermStructure struct {
 	SlopePct      float64 // (M2-M1)/M1 * 100 — % slope of term structure
 	RollYield     float64 // approximate monthly roll cost/benefit (% per month)
 
+	// Full term structure metrics (require M3)
+	FullSlopePct      float64 // (M3-M1)/M1 * 100 — 2-month slope
+	CalendarM2M3      float64 // M3 - M2 (forward premium/discount)
+	FullContango      bool    // true if M3 > M2 > M1 > Spot
+	FullBackwardation bool    // true if M3 < M2 < M1 < Spot (rare, extreme fear)
+
 	// Regime classification
 	Regime string // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
 
