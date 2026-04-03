@@ -11,6 +11,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/fed"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
@@ -41,6 +42,9 @@ type UnifiedOutlookData struct {
 	FedWatchData       *fed.FedWatchData
 	EurostatData       *macro.EurostatData
 	FedSpeeches        *fred.FedSpeechData  // Recent Fed speeches (scraper via Firecrawl)
+	// ICTContexts holds ICT/SMC structure analysis for major symbols (H4 timeframe).
+	// Key = symbol (e.g. "EURUSD"), Value = ICTResult. May be nil if ICT not configured.
+	ICTContexts        map[string]*ictsvc.ICTResult
 	Language           string
 }
 
@@ -644,6 +648,40 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		b.WriteString("  - EU inflation above 2%% → ECB hawkish = EUR supportive\n")
 		b.WriteString("  - EU unemployment falling → tight labor = ECB less likely to cut\n")
 		b.WriteString("  - EU GDP positive → growth supports EUR vs weaker-growth currencies\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: ICT/SMC Market Structure (H4 timeframe)
+	// -----------------------------------------------------------------------
+	if len(data.ICTContexts) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. ICT/SMC MARKET STRUCTURE (H4) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for sym, r := range data.ICTContexts {
+			fvgCount := len(r.FVGZones)
+			obCount := 0
+			for _, ob := range r.OrderBlocks {
+				if !ob.Broken {
+					obCount++
+				}
+			}
+			sweepCount := len(r.Sweeps)
+			b.WriteString(fmt.Sprintf("%s: Bias=%s | UnmitigatedFVG=%d | ActiveOB=%d | Sweeps=%d | Killzone=%s\n",
+				sym, r.Bias, fvgCount, obCount, sweepCount, r.Killzone))
+			// Find last BOS and last CHoCH from structure events.
+			lastBOS, lastCHoCH := "", ""
+			for _, se := range r.Structure {
+				switch se.Type {
+				case "BOS":
+					lastBOS = se.Direction
+				case "CHOCH":
+					lastCHoCH = se.Direction
+				}
+			}
+			if lastBOS != "" || lastCHoCH != "" {
+				b.WriteString(fmt.Sprintf("  Structure: LastBOS=%s LastCHoCH=%s\n", lastBOS, lastCHoCH))
+			}
+		}
+		b.WriteString("NOTE: ICT/SMC data is H4. Use for identifying premium/discount zones and PD Arrays.\n\n")
 	}
 
 	// -----------------------------------------------------------------------

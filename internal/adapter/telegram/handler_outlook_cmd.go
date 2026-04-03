@@ -13,6 +13,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
@@ -184,6 +185,27 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		}
 	}
 
+	// ICT/SMC market structure for major symbols (H4, graceful degradation)
+	var ictContexts map[string]*ictsvc.ICTResult
+	if h.ict != nil {
+		ictContexts = make(map[string]*ictsvc.ICTResult, 4)
+		majors := []string{"EURUSD", "GBPUSD", "XAUUSD", "BTCUSD"}
+		for _, sym := range majors {
+			mapping := domain.FindPriceMappingByCurrency(sym)
+			if mapping == nil {
+				continue
+			}
+			result, ictErr := h.computeICTState(ctx, mapping, "4h")
+			if ictErr != nil {
+				continue
+			}
+			ictContexts[sym] = result
+		}
+		if len(ictContexts) == 0 {
+			ictContexts = nil
+		}
+	}
+
 	// ---------- Build unified data ----------
 	var macroComposites *domain.MacroComposites
 	if macroData != nil {
@@ -219,6 +241,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		IMFData:            imfData,
 		EurostatData:       eurostatData,
 		FedSpeeches:        fedSpeeches,
+		ICTContexts:        ictContexts,
 		Language:           prefs.Language,
 	}
 
