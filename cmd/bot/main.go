@@ -39,6 +39,7 @@ import (
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
 	elliottsvc "github.com/arkcode369/ark-intelligent/internal/service/elliott"
+	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -457,6 +458,15 @@ func main() {
 		}
 		handler.WithElliott(elliottServices)
 		log.Info().Msg("Elliott Wave commands registered (/elliott)")
+
+		// Wire Wyckoff services (Wyckoff Method structure detection)
+		wyckoffServices := tgbot.WyckoffServices{
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+			WyckoffEngine:  wyckoffsvc.NewEngine(),
+		}
+		handler.WithWyckoff(wyckoffServices)
+		log.Info().Msg("Wyckoff commands registered (/wyckoff)")
 	}
 
 	// Wire regime alert provider for /regime command (TASK-138)
