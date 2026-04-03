@@ -29,7 +29,7 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 		h.handleDeepLinkArgs(ctx, chatID, userID, args, &prefs)
 	}
 
-	// If user already has experience level set, show normal help
+	// If user already has experience level set, show welcome back with quick actions
 	// (or execute cached deep link command intent).
 	if prefs.ExperienceLevel != "" {
 		// Check for pending deep link command intent.
@@ -41,7 +41,23 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 				Msg("deep link: auto-executing cached command intent")
 			return h.executeDeepLinkCommand(ctx, chatID, userID, intent.Command, intent.Args)
 		}
-		return h.sendHelp(ctx, chatID, userID)
+
+		// TASK-001-EXT: Welcome back with quick-access keyboard
+		roleConfig := GetRoleConfig(prefs.ExperienceLevel)
+		welcomeBack := fmt.Sprintf(`👋 <b>Selamat datang kembali!</b>
+
+Level: %s
+
+<b>Starter Kit:</b>
+%s
+
+Pilih command atau ketik /help untuk melihat semua command.`,
+			roleConfig.Name,
+			formatStarterKit(roleConfig.StarterKit),
+		)
+
+		_, err := h.bot.SendWithKeyboard(ctx, chatID, welcomeBack, h.kb.StarterKitMenu(prefs.ExperienceLevel))
+		return err
 	}
 
 	// New user → interactive onboarding with role selector.
@@ -49,6 +65,26 @@ func (h *Handler) cmdStart(ctx context.Context, chatID string, userID int64, arg
 <i>Institutional Flow &amp; Macro Analytics</i>
 
 Sebelum mulai, pilih level pengalaman trading kamu:
+
+🌱 <b>Pemula</b> — Baru mulai trading, ingin belajar dasar
+📈 <b>Intermediate</b> — Sudah trading aktif, ingin tools analisis
+🏛 <b>Pro</b> — Trader berpengalaman, butuh data institusional`
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, welcome, h.kb.OnboardingRoleMenu())
+	return err
+}
+
+// cmdOnboarding allows users to restart the onboarding flow voluntarily (TASK-001-EXT).
+func (h *Handler) cmdOnboarding(ctx context.Context, chatID string, userID int64, args string) error {
+	// Reset onboarding state
+	prefs, _ := h.prefsRepo.Get(ctx, userID)
+	prefs.ExperienceLevel = "" // Reset role to trigger re-selection
+	prefs.OnboardingStep = 0
+	_ = h.prefsRepo.Set(ctx, userID, prefs)
+
+	welcome := `🔄 <b>Restart Onboarding</b>
+
+Pilih level pengalaman trading kamu:
 
 🌱 <b>Pemula</b> — Baru mulai trading, ingin belajar dasar
 📈 <b>Intermediate</b> — Sudah trading aktif, ingin tools analisis
@@ -197,7 +233,89 @@ func (h *Handler) cbOnboard(ctx context.Context, chatID string, msgID int, userI
 	// Delete the role selector message
 	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
 
-	// Send tutorial steps based on level
+	// TASK-001-EXT: Show tutorial welcome prompt with starter kit
+	roleConfig := GetRoleConfig(level)
+	welcomeMsg := fmt.Sprintf(`✅ <b>Level: %s</b>
+
+%s
+
+<b>Starter Kit:</b>
+%s
+
+Mau lihat tutorial penggunaan?`,
+		roleConfig.Name,
+		roleConfig.Description,
+		formatStarterKit(roleConfig.StarterKit),
+	)
+
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, welcomeMsg, h.kb.TutorialWelcomeKeyboard(level))
+	return err
+}
+
+// formatStarterKit formats the starter kit commands as a bullet list.
+func formatStarterKit(commands []string) string {
+	var result string
+	for _, cmd := range commands {
+		result += fmt.Sprintf("• <code>%s</code>\n", cmd)
+	}
+	return result
+}
+
+// cbTutorial handles tutorial navigation callbacks (TASK-001-EXT).
+func (h *Handler) cbTutorial(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	action := strings.TrimPrefix(data, "tutorial:")
+	parts := strings.Split(action, ":")
+	if len(parts) < 1 {
+		return nil
+	}
+
+	switch parts[0] {
+	case "start":
+		// Start tutorial from step 0
+		if len(parts) < 2 {
+			return nil
+		}
+		role := parts[1]
+		return h.showTutorialStep(ctx, chatID, msgID, userID, role, 0)
+
+	case "step":
+		// Navigate to specific step
+		if len(parts) < 3 {
+			return nil
+		}
+		role := parts[1]
+		step, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return nil
+		}
+		return h.showTutorialStep(ctx, chatID, msgID, userID, role, step)
+
+	case "skip", "done":
+		// End tutorial, show starter kit
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		return h.showStarterKit(ctx, chatID, userID, prefs.ExperienceLevel)
+	}
+
+	return nil
+}
+
+// showTutorialStep displays a specific tutorial step with navigation.
+func (h *Handler) showTutorialStep(ctx context.Context, chatID string, msgID int, userID int64, role string, step int) error {
+	roleConfig := GetRoleConfig(role)
+	if step < 0 || step >= len(roleConfig.TutorialSteps) {
+		return h.showStarterKit(ctx, chatID, userID, role)
+	}
+
+	tutorialStep := roleConfig.TutorialSteps[step]
+	content := fmt.Sprintf("<b>%s</b>\n\n%s", tutorialStep.Title, tutorialStep.Content)
+
+	kb := h.kb.TutorialStepKeyboard(role, step, len(roleConfig.TutorialSteps))
+	return h.bot.EditWithKeyboard(ctx, chatID, msgID, content, kb)
+}
+
+// showStarterKit displays the starter kit for the user's role.
+func (h *Handler) showStarterKit(ctx context.Context, chatID string, userID int64, level string) error {
 	var tutorial string
 	switch level {
 	case "beginner":
@@ -215,7 +333,6 @@ Ketik <code>/calendar</code> — jadwal rilis data ekonomi
 Ketik <code>/price EUR</code> — harga terkini + perubahan
 
 Ini menu kamu — klik untuk mulai:`
-
 	case "intermediate":
 		tutorial = `✅ <b>Level: Intermediate</b>
 
@@ -231,7 +348,6 @@ Ketik <code>/outlook</code> — analisis gabungan AI (data + sentiment + web)
 Ketik <code>/macro</code> — kondisi makro ekonomi global + dampak ke trading
 
 Ini menu kamu — klik untuk mulai:`
-
 	case "pro":
 		tutorial = `✅ <b>Level: Pro / Institutional</b>
 
@@ -247,6 +363,10 @@ Ketik <code>/vp EUR</code> — 10 mode VP termasuk AMT institutional-grade
 Ketik <code>/quant EUR</code> — 12 model econometric (GARCH, regime, PCA, dll)
 
 Ini menu kamu — klik untuk mulai:`
+	default:
+		tutorial = `✅ <b>Selamat datang!</b>
+
+Pilih command dari menu di bawah:`
 	}
 
 	_, err := h.bot.SendWithKeyboard(ctx, chatID, tutorial, h.kb.StarterKitMenu(level))
