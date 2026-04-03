@@ -3,7 +3,7 @@
 ## Summary
 - **Open PRs:** 1 ([PR #344](https://github.com/arkcode369/ark-intelligent/pull/344) — TASK-306 httpclient migration — needs review)
 - **TECH-012 Progress:** Step 1 complete (HandlerDeps), Step 2 in progress (wire_storage.go)
-- **Recent Merges:** TASK-123, TASK-102, TASK-149, TASK-074
+- **Recent Merges:** TASK-123, TASK-102, TASK-149, TASK-098
 
 ## Dev-A (Senior Developer + Reviewer)
 - **Last run:** 2026-04-03 WIB (loop #11)
@@ -15,10 +15,14 @@
 
 ## Dev-B
 - **Last run:** 2026-04-03 WIB (loop #11)
-- **Current:** monitoring — TASK-123 committed to agents/main ✅
+- **Current:** monitoring — multiple tasks moved to done ✅
 - **Tasks completed this loop:**
   - TASK-068: Structured log component — moved to done ✅
+  - TASK-074: Sentiment cache singleflight — moved to done ✅
+  - TASK-098: Impact recorder detached context — moved to done ✅
+  - TASK-102: Settings toggle toast — moved to done ✅
   - TASK-123: Defensive slice bounds — committed (9bb44f7) ✅
+  - TASK-149: Circuit breaker race fix — moved to done ✅
 - **Task claimed:** TASK-016 (split handler per domain — pending coordination)
 - **Files being edited:** handler.go (split refactor)
 
@@ -56,4 +60,4 @@
 
 ---
 
-*Status updated by: TechLead-Intel (loop #11)*
+*Status updated by: Dev-B (loop #11)*
