@@ -1,12 +1,12 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #97 — state unchanged, still blocked)
+# Agent Status — last updated: 2026-04-03 WIB (loop #98 — PR #350 lint fixed, awaiting CI)
 
 ## Summary
-- **Open PRs:** 5 — 🔴 **Stalled on lint, no fixes applied**
-  - #346 TASK-002 (Dev-A) — No commits since creation
-  - #347 PHI-119 (Dev-C) — No commits since creation  
-  - #348 TASK-001-EXT (Dev-B) — No commits since creation
-  - #349 TASK-094-C3 (Dev-A) — No commits since creation
-  - #350 TASK-094-D (Dev-A) — No commits since creation
+- **Open PRs:** 5 — 🔄 **#350 fixed, others need structural fixes**
+  - #346 TASK-002 (Dev-A) — 🔴 Blocked: keyboard file redeclarations
+  - #347 PHI-119 (Dev-C) — 🔴 Blocked: keyboard file redeclarations  
+  - #348 TASK-001-EXT (Dev-B) — 🔴 Blocked: keyboard file redeclarations
+  - #349 TASK-094-C3 (Dev-A) — 🔴 Blocked: keyboard file redeclarations + type errors
+  - #350 TASK-094-D (Dev-A) — ✅ **FIXED** — Duplicate case removed, := changed to =
 - **Active Assignments:** 2 — 🔴 **No progress**
   - Dev-B: TASK-307 — No commits on origin
   - Dev-C: TASK-006 — No branch created
@@ -241,7 +241,8 @@ git add . && git commit -m "fix: resolve lint errors" && git push
 
 ---
 
-*Status updated by: TechLead-Intel (loop #97)*
+*Status updated by: TechLead-Intel (loop #98)*
+*PR #350 lint fixed, awaiting CI verification*
 *State unchanged, still blocked*
 
 ### Loop #95 Findings
@@ -257,3 +258,13 @@ git add . && git commit -m "fix: resolve lint errors" && git push
 - 🔄 **4 escalations remain active** — no response to any
 - 🔴 **TechLead-Intel continues blocked** — all paths exhausted
 - ⏳ **Sprint stalled indefinitely** — awaiting CTO/user decision
+
+### Loop #98 Findings — BREAKTHROUGH
+- ✅ **Successfully retrieved CI logs** using GitHub API and Python zip extraction
+- ✅ **Fixed PR #350 (TASK-094-D)**:
+  - Removed duplicate `case "reset_onboard":` in handler_settings_cmd.go (lines 72-77)
+  - Changed `levelDisplay :=` to `levelDisplay =` in formatter.go (line 158, variable already declared)
+  - Pushed fixes to feat/TASK-094-D branch, commit 6bed064
+- 🔍 **Analyzed other 4 PRs**: All have same root cause — keyboard_feedback.go redeclares methods already in keyboard.go
+- 🔍 **PR #349 additional issues**: Type mismatches in wire_services.go (int vs time.Duration)
+- 🔄 **Next**: Monitor CI for PR #350, assess fix complexity for remaining 4 PRs
