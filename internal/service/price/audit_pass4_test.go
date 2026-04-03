@@ -187,9 +187,9 @@ func TestHMM_Pass4_TransitionMatrixRowSums(t *testing.T) {
 		t.Fatalf("HMM failed: %v", err)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		rowSum := 0.0
-		for j := 0; j < 3; j++ {
+		for j := 0; j < 4; j++ {
 			rowSum += result.TransitionMatrix[i][j]
 			// Each entry must be non-negative
 			if result.TransitionMatrix[i][j] < 0 {
@@ -213,7 +213,7 @@ func TestHMM_Pass4_StateProbabilitiesSum(t *testing.T) {
 		t.Fatalf("HMM failed: %v", err)
 	}
 
-	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2]
+	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2] + result.StateProbabilities[3]
 	if math.Abs(probSum-1.0) > 0.001 {
 		t.Errorf("State probabilities sum to %f, expected 1.0", probSum)
 	}

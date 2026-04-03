@@ -44,7 +44,7 @@ type RegimeState struct {
 	AlertTier        AlertTier `json:"alert_tier"`          // Current alert tier
 	LastAlertTime    time.Time `json:"last_alert_time"`     // For cooldown
 	LastAlertTier    AlertTier `json:"last_alert_tier"`     // Last tier we alerted on
-	StateProbabilities [3]float64 `json:"state_probabilities"` // [RISK_ON, RISK_OFF, CRISIS]
+	StateProbabilities [4]float64 `json:"state_probabilities"` // [RISK_ON, RISK_OFF, CRISIS, TRENDING]
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 

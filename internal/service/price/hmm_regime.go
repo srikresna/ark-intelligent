@@ -12,34 +12,36 @@ import (
 // Hidden Markov Model (HMM) — Regime-Switching Detection
 // ---------------------------------------------------------------------------
 //
-// 3-state HMM for market regime detection:
-//   State 0: RISK_ON   — low vol, positive drift, trending
-//   State 1: RISK_OFF  — moderate vol, no drift, ranging
-//   State 2: CRISIS    — high vol, negative drift, dislocations
+// 4-state HMM for market regime detection:
+//   State 0: RISK_ON   — moderate positive drift, moderate vol, choppy
+//   State 1: RISK_OFF  — near-zero drift, moderate vol, ranging
+//   State 2: CRISIS    — negative drift, high vol, dislocations
+//   State 3: TRENDING  — strong positive drift, LOW vol, directional
 //
 // Observations: daily log-returns discretized into emission bins.
 // Training: Baum-Welch (EM) for parameter estimation.
 // Inference: Forward algorithm for state probabilities, Viterbi for path.
 
 const (
-	HMMRiskOn  = "RISK_ON"
-	HMMRiskOff = "RISK_OFF"
-	HMMCrisis  = "CRISIS"
+	HMMRiskOn   = "RISK_ON"
+	HMMRiskOff  = "RISK_OFF"
+	HMMCrisis   = "CRISIS"
+	HMMTrending = "TRENDING"
 
-	hmmNumStates   = 3
+	hmmNumStates    = 4
 	hmmNumEmissions = 5 // discretized return bins
 )
 
 // HMMResult holds the output of HMM regime analysis.
 type HMMResult struct {
-	CurrentState      string    `json:"current_state"`       // RISK_ON, RISK_OFF, CRISIS
-	StateProbabilities [3]float64 `json:"state_probabilities"` // P(state) at current time
-	TransitionMatrix  [3][3]float64 `json:"transition_matrix"`  // Estimated transition probs
-	ViterbiPath       []string  `json:"viterbi_path,omitempty"` // Last N states (most likely path)
-	TransitionWarning string    `json:"transition_warning,omitempty"` // Early warning if regime change likely
-	SampleSize        int       `json:"sample_size"`
-	Converged         bool      `json:"converged"`
-	Iterations        int       `json:"iterations"`
+	CurrentState       string        `json:"current_state"`       // RISK_ON, RISK_OFF, CRISIS, TRENDING
+	StateProbabilities [4]float64    `json:"state_probabilities"` // P(state) at current time
+	TransitionMatrix   [4][4]float64 `json:"transition_matrix"`   // Estimated transition probs
+	ViterbiPath        []string      `json:"viterbi_path,omitempty"` // Last N states (most likely path)
+	TransitionWarning  string        `json:"transition_warning,omitempty"` // Early warning if regime change likely
+	SampleSize         int           `json:"sample_size"`
+	Converged          bool          `json:"converged"`
+	Iterations         int           `json:"iterations"`
 }
 
 // HMMModel holds fitted HMM parameters.
@@ -49,7 +51,7 @@ type HMMModel struct {
 	B  [hmmNumStates][hmmNumEmissions]float64      // Emission matrix
 }
 
-// EstimateHMMRegime fits a 3-state HMM to daily returns and infers the current regime.
+// EstimateHMMRegime fits a 4-state HMM to daily returns and infers the current regime.
 // Prices must be newest-first. Requires at least 60 observations.
 func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 	if len(prices) < 60 {
@@ -177,25 +179,26 @@ func sortFloat64s(data []float64) {
 func initHMMPriors() HMMModel {
 	var m HMMModel
 
-	// Initial state: most likely risk-off
-	m.Pi = [3]float64{0.40, 0.45, 0.15}
+	// Initial state distribution
+	m.Pi = [4]float64{0.35, 0.35, 0.15, 0.15}
 
 	// Transition matrix: regimes are sticky (high self-transition)
-	// RISK_ON tends to stay, occasionally shifts to RISK_OFF
-	// CRISIS is rare but sticky when entered
-	m.A = [3][3]float64{
-		{0.90, 0.08, 0.02}, // RISK_ON → mostly stays
-		{0.10, 0.82, 0.08}, // RISK_OFF → can go either way
-		{0.05, 0.20, 0.75}, // CRISIS → sticky but can recover to RISK_OFF
+	m.A = [4][4]float64{
+		{0.70, 0.15, 0.05, 0.10}, // RISK_ON → can shift to TRENDING
+		{0.15, 0.70, 0.10, 0.05}, // RISK_OFF → rarely TRENDING
+		{0.20, 0.40, 0.35, 0.05}, // CRISIS → mostly recovers to RISK_OFF
+		{0.20, 0.05, 0.05, 0.70}, // TRENDING → persistent
 	}
 
 	// Emission matrix: map states to return distribution
-	// RISK_ON: skewed positive (more positive returns)
-	m.B[0] = [5]float64{0.05, 0.10, 0.25, 0.35, 0.25}
+	// RISK_ON: moderate positive drift, moderate vol
+	m.B[0] = [5]float64{0.10, 0.25, 0.30, 0.25, 0.10}
 	// RISK_OFF: symmetric around neutral
-	m.B[1] = [5]float64{0.15, 0.25, 0.30, 0.20, 0.10}
-	// CRISIS: skewed negative (more extreme negative returns)
-	m.B[2] = [5]float64{0.35, 0.25, 0.20, 0.12, 0.08}
+	m.B[1] = [5]float64{0.10, 0.20, 0.40, 0.20, 0.10}
+	// CRISIS: skewed negative, high vol
+	m.B[2] = [5]float64{0.40, 0.25, 0.15, 0.12, 0.08}
+	// TRENDING: strong positive drift, low vol → right-skewed tight distribution
+	m.B[3] = [5]float64{0.05, 0.10, 0.20, 0.35, 0.30}
 
 	return m
 }
@@ -481,15 +484,17 @@ func stateLabel(s int) string {
 		return HMMRiskOff
 	case 2:
 		return HMMCrisis
+	case 3:
+		return HMMTrending
 	default:
 		return "UNKNOWN"
 	}
 }
 
 // detectTransitionWarning checks if a regime change is likely in the next period.
-func detectTransitionWarning(currentState int, probs [3]float64, A [3][3]float64) string {
+func detectTransitionWarning(currentState int, probs [4]float64, A [4][4]float64) string {
 	// One-step-ahead state probabilities
-	var nextProbs [3]float64
+	var nextProbs [4]float64
 	for j := 0; j < hmmNumStates; j++ {
 		for i := 0; i < hmmNumStates; i++ {
 			nextProbs[j] += probs[i] * A[i][j]
@@ -513,6 +518,11 @@ func detectTransitionWarning(currentState int, probs [3]float64, A [3][3]float64
 		return fmt.Sprintf("Elevated CRISIS probability (P=%.0f%%)", nextProbs[2]*100)
 	}
 
+	// TRENDING may shift to RISK_ON/RISK_OFF
+	if currentState == 3 && A[3][0]+A[3][1] > 0.35 {
+		return "TRENDING → may shift to RISK_ON/RISK_OFF"
+	}
+
 	return ""
 }
 
@@ -528,6 +538,8 @@ func HMMConfidenceMultiplier(h *HMMResult) float64 {
 		return 0.90 // Slightly reduce in risk-off
 	case HMMRiskOn:
 		return 1.05 // Slight boost in risk-on
+	case HMMTrending:
+		return 1.10 // Trending = directional signals work better
 	default:
 		return 1.0
 	}
