@@ -155,7 +155,7 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 	}
 
 	// Experience level display
-	levelDisplay := "Belum diset"
+	levelDisplay = "Belum diset"
 	switch prefs.ExperienceLevel {
 	case "beginner":
 		levelDisplay = "🌱 Pemula"
