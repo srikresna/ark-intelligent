@@ -213,6 +213,9 @@ func (e *OverlayEngine) runHMM(records []domain.PriceRecord, overlay *RegimeOver
 	case priceSvc.HMMCrisis:
 		// Crisis: strongly negative
 		score = -(overlay.HMMConfidence * 100)
+	case priceSvc.HMMTrending:
+		// Trending: strong directional move, low vol — moderately bullish
+		score = overlay.HMMConfidence * 70
 	}
 	overlay.HMMScore = clamp(score, -100, 100)
 	return overlay.HMMScore, true
@@ -340,6 +343,9 @@ func scoreToColor(score float64) string {
 func scoreToLabel(score float64, hmmState string) string {
 	if hmmState == priceSvc.HMMCrisis {
 		return "CRISIS"
+	}
+	if hmmState == priceSvc.HMMTrending {
+		return "TRENDING"
 	}
 	switch {
 	case score >= 60:
