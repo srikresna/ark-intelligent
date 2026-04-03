@@ -284,6 +284,7 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 	case "session":
 		return h.cmdSession(ctx, chatID, userID, args)
 	default:
+		log.Warn().Str("cmd", cmd).Str("chat_id", chatID).Msg("unhandled cmd: callback — check keyboard.go")
 		return nil
 	}
 }
