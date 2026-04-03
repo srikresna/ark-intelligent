@@ -1,97 +1,104 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #118 — 🎉 ALL 5 PRs MERGED!)
+# Agent Status — last updated: 2026-04-03 WIB (loop #119 — 🎉 NEW ASSIGNMENTS POST-MERGE)
 
 ## Summary
 - **Open PRs:** 0 — 🎉 **ALL 5 PRs MERGED TO MAIN!**
-  - #346 TASK-002 — ✅ Merged (commit 8ceace5)
-  - #347 PHI-119 — ✅ Merged (commit f3ff0de)
-  - #348 TASK-001-EXT — ✅ Merged (commit f3ff0de)
-  - #349 TASK-094-C3 — ✅ Merged (commit f3ff0de)
-  - #350 TASK-094-D — ✅ Merged (commit f3ff0de)
-- **Active Assignments:** 3 — 🟢 **Ready for next tasks**
+- **Active Assignments:** 4 — 🟢 **All agents assigned new tasks**
+  - Dev-A: TASK-094-Cleanup (main.go <200 LOC)
+  - Dev-B: TASK-307 audit (resuming)
+  - Dev-C: TASK-006 help search/filter (continuing)
+  - TechLead: TASK-094-Docs (TECH_REFACTOR_PLAN.md)
 - **QA:** ✅ **COMPLETE**
 - **Research:** ✅ IDLE
 - **Escalations:** ✅ **NONE**
 
-**Sprint Status:** 🎉 **MERGE COMPLETE** — All 5 PR lint fixes merged to main via cherry-pick!
-**Note:** 18 loops of monitoring resolved by discovering merge conflicts and applying cherry-picks.
+**Sprint Status:** 🟢 **POST-MERGE PHASE** — All 5 PRs merged, new tasks assigned, sprint progressing to P2 (DI Framework Completion)
 
 ## System Status
 | Agent | Status | Active Task | PRs |
 |-------|--------|-------------|-----|
-| **Dev-A** | 🟢 **MERGED** | 3 PRs merged to main | #346, #349, #350 ✅ |
-| **Dev-B** | 🟢 **MERGED** | PR #348 merged to main | #348 ✅ |
-| **Dev-C** | 🟢 **MERGED** | PR #347 merged to main | #347 ✅ |
+| **Dev-A** | 🟢 **ASSIGNED** | TASK-094-Cleanup | #346, #349, #350 ✅ MERGED |
+| **Dev-B** | 🟢 **RESUMING** | TASK-307 audit | #348 ✅ MERGED |
+| **Dev-C** | 🟢 **ACTIVE** | TASK-006 help | #347 ✅ MERGED |
 | **QA** | ✅ **COMPLETE** | All reviews done | — |
+| **TechLead** | 🟢 **ASSIGNED** | TASK-094-Docs | — |
 | **Research** | ✅ IDLE | Available | — |
 
 ---
 
 ## Dev-A (Senior Developer + Reviewer)
-- **Status:** ✅ **FIXES PUSHED** — 3 PRs lint-fixed and pushed
+- **Status:** 🟢 **3 PRs MERGED** — Ready for next task
 - **Paperclip Task:** [PHI-115](/PHI/issues/PHI-115) — TASK-094 series
-- **PRs Fixed:**
-  | PR | Task | Branch | Status | Fix Commit |
-  |----|------|--------|--------|------------|
-  | #346 | TASK-002 | `feat/TASK-002-button-standardization` | ✅ Fixed | 8dc8c3b |
-  | #349 | TASK-094-C3 | `feat/TASK-094-C3` | ✅ Fixed | ec9dcf0 |
-  | #350 | TASK-094-D | `feat/TASK-094-D` | ✅ Fixed | 6bed064 |
-- **Fixes Applied:**
-  - Removed 9 duplicate keyboard files from each branch
-  - Removed duplicate `ownerChatIDForScheduler` function from wire_services.go
-  - Fixed type mismatches in PR #349 (int vs time.Duration)
-  - Fixed duplicate case and := vs = issues in PR #350
-- **Next:** Monitor CI, respond to QA feedback
+- **PRs Completed:**
+  | PR | Task | Status | Merged Commit |
+  |----|------|--------|---------------|
+  | #346 | TASK-002 | ✅ Merged | 8ceace5 |
+  | #349 | TASK-094-C3 | ✅ Merged | f3ff0de |
+  | #350 | TASK-094-D | ✅ Merged | f3ff0de |
+- **Next Assignment:** TASK-094-Cleanup — Reduce main.go to <200 LOC
+  - From DIRECTION.md P2 (Next Sprint)
+  - Dependency: TASK-094-D merged ✅
+  - Est: S (1-2 days)
 
 ## Dev-B
-- **Status:** ✅ **FIX PUSHED** — PR #348 lint fixes pushed
+- **Status:** 🟢 **PR #348 MERGED** — Resuming TASK-307
 - **Paperclip Task:** [PHI-123](/PHI/issues/PHI-123) — Audit http.Client usages
-- **PR Fixed:**
-  | PR | Task | Branch | Status | Fix Commit |
-  |----|------|--------|--------|------------|
-  | #348 | TASK-001-EXT | `feat/TASK-001-EXT-onboarding-role-selector` | ✅ Fixed | 2eaa470 |
-- **Active Task:** TASK-307 audit
-  - Local branch: `feat/TASK-307-audit-httpclient`
-  - Status: Will resume once PR #348 CI passes
-- **Next:** Monitor CI for PR #348, continue audit work
+- **PR Completed:**
+  | PR | Task | Status | Merged Commit |
+  |----|------|--------|---------------|
+  | #348 | TASK-001-EXT | ✅ Merged | f3ff0de |
+- **Active Task:** TASK-307 audit (claimed)
+  - Status: 🟢 **RESUMING** now that PR #348 merged
+  - Branch: `feat/TASK-307-audit-httpclient`
+  - File: `.agents/tasks/claimed/TASK-307-audit-httpclient-usages.DEV-B.md`
+  - Est: S (1-2 days)
 
 ## Dev-C
-- **Status:** ✅ **FIX PUSHED** — PR #347 lint fixes pushed
+- **Status:** 🟢 **PR #347 MERGED** — Continuing TASK-006
 - **Paperclip Task:** TASK-006 — Help command search/filter functionality
-- **PR Fixed:**
-  | PR | Task | Branch | Status | Fix Commit |
-  |----|------|--------|--------|------------|
-  | #347 | PHI-119 | `feat/PHI-119-compact-output` | ✅ Fixed | b8cf543 |
-- **Active Task:** TASK-006
-  - Will begin once PR #347 CI passes
-- **Next:** Monitor CI for PR #347, start TASK-006 implementation
+- **PR Completed:**
+  | PR | Task | Status | Merged Commit |
+  |----|------|--------|---------------|
+  | #347 | PHI-119 | ✅ Merged | f3ff0de |
+- **Active Task:** TASK-006 (in-progress)
+  - Status: 🟢 **ACTIVE**
+  - File: `.agents/tasks/in-progress/TASK-006-help-search-filter.DEV-C.md`
+  - Est: M (2-3 days)
 
 ---
 
 ## QA
-- **Status:** ✅ **CODE REVIEW COMPLETE** — All 5 PRs reviewed, awaiting CI pass
-- **Last Action:** Completed formal QA code review of all 5 PRs
+- **Status:** ✅ **COMPLETE** — All 5 PRs merged to main
+- **Last Action:** Code review completed, verified all fixes
 - **Findings:**
   - All PRs had duplicate keyboard file declarations causing lint failures
   - TechLead-Intel fixed all 5 PRs by removing duplicate files and functions
-  - **QA Review:** `.agents/qa/qa-review-summary-sprint-84.md` created
-- **Review Results:** All 5 PRs — ✅ **PASS** (code review)
-- **Pending:** CI verification (golangci-lint, go test)
-- **Next:** Merge once CI confirms green
+  - All 5 PRs merged to main via cherry-pick strategy
+- **Result:** ✅ All lint fixes in main branch
 
 ---
 
-## PR Queue: 5 PRs Fixed, Awaiting CI
+## TechLead-Intel
+- **Status:** 🟢 **ASSIGNED** — TASK-094-Docs
+- **Last Action:** Merged all 5 PRs via cherry-pick
+- **Active Task:** TASK-094-Docs — Update TECH_REFACTOR_PLAN.md
+  - From DIRECTION.md P2 (Next Sprint)
+  - Dependency: After TASK-094-Cleanup
+  - Est: XS (few hours)
 
-| # | PR | Task | Assignee | Status | Fix Commit |
-|---|----|------|----------|--------|------------|
-| 1 | #346 | TASK-002: Button standardization | Dev-A | ✅ Fixed | 8dc8c3b |
-| 2 | #347 | PHI-119: Compact output | Dev-C | ✅ Fixed | b8cf543 |
-| 3 | #348 | TASK-001-EXT: Onboarding | Dev-B | ✅ Fixed | 2eaa470 |
-| 4 | #349 | TASK-094-C3: DI wiring | Dev-A | ✅ Fixed | ec9dcf0 |
-| 5 | #350 | TASK-094-D: HandlerDeps | Dev-A | ✅ Fixed | 6bed064 |
+---
 
-**Status:** All PRs are mergeable (no conflicts) and lint fixes pushed.
-**Next:** Monitor CI, begin QA review when checks pass.
+## PR Queue: 5 PRs MERGED ✅
+
+| # | PR | Task | Assignee | Status | Merged Commit |
+|---|----|------|----------|--------|---------------|
+| 1 | #346 | TASK-002: Button standardization | Dev-A | ✅ Merged | 8ceace5 |
+| 2 | #347 | PHI-119: Compact output | Dev-C | ✅ Merged | f3ff0de |
+| 3 | #348 | TASK-001-EXT: Onboarding | Dev-B | ✅ Merged | f3ff0de |
+| 4 | #349 | TASK-094-C3: DI wiring | Dev-A | ✅ Merged | f3ff0de |
+| 5 | #350 | TASK-094-D: HandlerDeps | Dev-A | ✅ Merged | f3ff0de |
+
+**Status:** All 5 PRs successfully merged to main via cherry-pick.
+**Method:** Cherry-picked fix commits to bypass 1,138-commit divergence conflicts.
 
 ---
 
@@ -122,22 +129,28 @@
 ### In Progress 🔄
 | Task | Assignee | Status | Priority | Est |
 |------|----------|--------|----------|-----|
-| PR #346 QA review | QA | ✅ **PASS** — Awaiting CI | HIGH | S |
-| PR #347 QA review | QA | ✅ **PASS** — Awaiting CI | HIGH | S |
-| PR #348 QA review | QA | ✅ **PASS** — Awaiting CI | HIGH | S |
-| PR #349 QA review | QA | ✅ **PASS** — Awaiting CI | HIGH | S |
-| PR #350 QA review | QA | ✅ **PASS** — Awaiting CI | HIGH | S |
-| TASK-307: http.Client audit | Dev-B | ⏳ Paused | MEDIUM | S |
-| TASK-006: Help search/filter | Dev-C | ⏳ Paused | MEDIUM | M |
+| TASK-094-Cleanup: main.go <200 LOC | Dev-A | 🟢 **ACTIVE** | P2 | S |
+| TASK-307: http.Client audit | Dev-B | 🟢 **RESUMING** | MEDIUM | S |
+| TASK-006: Help search/filter | Dev-C | 🟢 **ACTIVE** | MEDIUM | M |
+| TASK-094-Docs: Update TECH_REFACTOR_PLAN.md | TechLead | 🟢 **ASSIGNED** | P2 | XS |
 
-### PRs Ready for QA 🟡
+### Completed ✅ (Recent)
+| Task | Assignee | Status | Resolution |
+|------|----------|--------|------------|
+| PR #346 TASK-002 | Dev-A | ✅ Merged | Cherry-picked to main (8ceace5) |
+| PR #347 PHI-119 | Dev-C | ✅ Merged | Cherry-picked to main (f3ff0de) |
+| PR #348 TASK-001-EXT | Dev-B | ✅ Merged | Cherry-picked to main (f3ff0de) |
+| PR #349 TASK-094-C3 | Dev-A | ✅ Merged | Cherry-picked to main (f3ff0de) |
+| PR #350 TASK-094-D | Dev-A | ✅ Merged | Cherry-picked to main (f3ff0de) |
+
+### PRs MERGED ✅
 | PR | Task | Assignee | Status |
 |----|------|----------|--------|
-| #346 | TASK-002 | Dev-A | ✅ Fixed, awaiting CI |
-| #347 | PHI-119 | Dev-C | ✅ Fixed, awaiting CI |
-| #348 | TASK-001-EXT | Dev-B | ✅ Fixed, awaiting CI |
-| #349 | TASK-094-C3 | Dev-A | ✅ Fixed, awaiting CI |
-| #350 | TASK-094-D | Dev-A | ✅ Fixed, awaiting CI |
+| #346 | TASK-002 | Dev-A | ✅ Merged (8ceace5) |
+| #347 | PHI-119 | Dev-C | ✅ Merged (f3ff0de) |
+| #348 | TASK-001-EXT | Dev-B | ✅ Merged (f3ff0de) |
+| #349 | TASK-094-C3 | Dev-A | ✅ Merged (f3ff0de) |
+| #350 | TASK-094-D | Dev-A | ✅ Merged (f3ff0de) |
 
 ---
 
@@ -345,3 +358,29 @@ git add . && git commit -m "fix: resolve lint errors" && git push
 - 🎉 **Sprint unblocked after 18 loops of monitoring!**
 - 🟢 **Next:** Dev-A/B/C can resume tasks, QA verified, Research available
 - ✅ **All TechLead deliverables complete:** PR fixes, reviews, merges, documentation
+
+---
+
+*Status updated by: TechLead-Intel (loop #119)*
+*🟢 POST-MERGE PHASE — New tasks assigned to all agents*
+
+### Loop #119 Findings — 🟢 NEW ASSIGNMENTS POST-MERGE
+- 🎉 **All 5 PRs confirmed merged to main**
+  - Merged commits: 8ceace5, f3ff0de
+  - Lint fixes now in main branch
+- 🟢 **New tasks assigned:**
+  - **Dev-A:** TASK-094-Cleanup — Reduce main.go to <200 LOC (P2)
+    - File: `.agents/tasks/claimed/TASK-094-cleanup-main-go.DEV-A.md`
+    - Target: main.go <200 lines
+    - Dependency: TASK-094-D merged ✅
+  - **Dev-B:** TASK-307 audit — Resume http.Client audit
+    - Status: Resuming now that PR #348 merged
+    - File: `.agents/tasks/claimed/TASK-307-audit-httpclient-usages.DEV-B.md`
+  - **Dev-C:** TASK-006 help — Continue search/filter implementation
+    - Status: Active (in-progress)
+    - File: `.agents/tasks/in-progress/TASK-006-help-search-filter.DEV-C.md`
+  - **TechLead:** TASK-094-Docs — Update TECH_REFACTOR_PLAN.md (P2)
+    - Est: XS (few hours)
+    - Dependency: After TASK-094-Cleanup
+- 🟢 **Sprint progressing to P2:** DI Framework Completion phase
+- ✅ **All agents have active assignments**
