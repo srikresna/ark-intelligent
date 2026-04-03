@@ -1864,3 +1864,15 @@ func (kb *KeyboardBuilder) HistoryNavKeyboard(currency string, currentWeeks int)
 		},
 	}
 }
+
+// BacktestBackRow returns a keyboard with [📊 Backtest Menu] [🏠 Menu Utama] buttons.
+func (kb *KeyboardBuilder) BacktestBackRow() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Backtest Menu", CallbackData: "cmd:backtest"},
+				{Text: btnHome, CallbackData: "nav:home"},
+			},
+		},
+	}
+}

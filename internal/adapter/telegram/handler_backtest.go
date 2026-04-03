@@ -32,7 +32,8 @@ func (h *Handler) cmdReport(ctx context.Context, chatID string, userID int64, ar
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
-	_, err = h.bot.SendHTML(ctx, chatID, htmlOut)
+	kb := h.kb.BacktestBackRow()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }
 
@@ -314,9 +315,8 @@ func (h *Handler) cmdAccuracy(ctx context.Context, chatID string, userID int64, 
 		html += fmt.Sprintf("\n⚠️ <b>Small sample (%d signals) — win rate has high uncertainty</b>\n", stats.Evaluated)
 	}
 
-	html += "\n<i>Use /backtest for detailed breakdown</i>"
-
-	_, err = h.bot.SendHTML(ctx, chatID, html)
+	kb := h.kb.BacktestBackRow()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 	return err
 }
 
