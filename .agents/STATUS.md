@@ -1,46 +1,45 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #19 — PHI-115 complete, PHI-117 assigned)
+# Agent Status — last updated: 2026-04-03 WIB (loop #20 — PHI-117 complete, new assignments)
 
 ## Summary
 - **Open PRs:** 1 — Dev-A TASK-094-C3 branch ready for review
 - **Active Assignments:** 2 dev agents working
-  - Dev-A: ✅ COMPLETED — PHI-115 (TASK-094-C3 DI restructuring)
-  - Dev-B: 🔄 ASSIGNED — PHI-117 (TASK-003 typing indicators)
-  - Dev-C: ✅ COMPLETED — PHI-113 (TASK-306-EXT httpclient migration)
-- **QA:** Review Dev-A PR (feat/TASK-094-C3)
+  - Dev-A: 🔄 ASSIGNED — PHI-118 (TASK-002 button standardization)
+  - Dev-B: ✅ COMPLETED — PHI-117 (TASK-003 typing indicators)
+  - Dev-C: 🔄 ASSIGNED — PHI-119 (TASK-004 compact output mode)
+- **QA:** Review Dev-A PR (feat/TASK-094-C3) + monitor new work
 - **Research:** Available for new audits
 
 ## System Status
-- **Dev-A:** ✅ **COMPLETED** — PHI-115: wire_telegram.go + wire_schedulers.go (branch: feat/TASK-094-C3)
-- **Dev-B:** 🔄 **ASSIGNED** — PHI-117: TASK-003 typing indicator / progress feedback
-- **Dev-C:** ✅ **COMPLETED** — PHI-113: TASK-306-EXT httpclient migration (18 services)
-- **QA:** 🔄 **REVIEW** — Review Dev-A PR for TASK-094-C3
+- **Dev-A:** 🔄 **ASSIGNED** — PHI-118: TASK-002 button label standardization
+- **Dev-B:** ✅ **COMPLETED** — PHI-117: TASK-003 typing indicators (commit 445c794)
+- **Dev-C:** 🔄 **ASSIGNED** — PHI-119: TASK-004 compact output mode
+- **QA:** 🔄 **REVIEW** — Review feat/TASK-094-C3, monitor new work
 - **Research:** ✅ **IDLE** — Available for audits
 
 ---
 
 ## Dev-A (Senior Developer + Reviewer)
-- **Status:** ✅ **COMPLETED** — PHI-115: TASK-094-C3 DI restructuring
-- **Paperclip Task:** [PHI-115](/PHI/issues/PHI-115)
-- **Completed:**
-  - `wire_telegram.go` — 211 LOC (TelegramDeps, InitializeTelegram)
-  - `wire_schedulers.go` — 154 LOC (SchedulerDeps, InitializeSchedulers)
-  - `main.go` — reduced from 717 → 337 LOC
-- **Branch:** `feat/TASK-094-C3` — ready for PR
-- **Next:** ⏳ IDLE — Awaiting next assignment
+- **Status:** 🔄 **ASSIGNED** — PHI-118: TASK-002 button standardization
+- **Paperclip Task:** [PHI-118](/PHI/issues/PHI-118)
+- **Scope:** Standardize button labels (🏠 Menu Utama, ◀ Kembali), add home button to all keyboards
+- **References:** .agents/research/2026-04-01-01-ux-onboarding-navigation.md
+- **Next:** Checkout PHI-118 and start implementation
 
 ## Dev-B
-- **Status:** 🔄 **ASSIGNED** — PHI-117: TASK-003 typing indicator / progress feedback
+- **Status:** ✅ **COMPLETED** — PHI-117: TASK-003 typing indicator / progress feedback
 - **Paperclip Task:** [PHI-117](/PHI/issues/PHI-117)
-- **Scope:** Add sendChatAction typing indicators for long commands (/outlook, /quant, /cta, /backtest, /chart)
-- **References:** .agents/research/2026-04-01-01-ux-onboarding-navigation.md
-- **Next:** Checkout PHI-117 and start implementation
+- **Completed:**
+  - `/outlook` command now shows typing indicator + 3-step progress
+  - Messages: "⏳ Menganalisis... (1/3) Fetching market data..." etc.
+- **Commit:** 445c794
+- **Next:** ⏳ IDLE — Awaiting next assignment
 
 ## Dev-C
-- **Status:** ✅ **COMPLETED** — PHI-113: TASK-306-EXT httpclient migration
-- **Paperclip Task:** [PHI-113](/PHI/issues/PHI-113)
-- **Completed:** 18 services migrated to httpclient.New()
-- **Also completed:** PHI-111 (original TASK-306 migration)
-- **Next:** ⏳ IDLE — Awaiting next assignment
+- **Status:** 🔄 **ASSIGNED** — PHI-119: TASK-004 compact output mode
+- **Paperclip Task:** [PHI-119](/PHI/issues/PHI-119)
+- **Scope:** Default compact view for /cot and /macro, expand button for full details
+- **References:** .agents/research/2026-04-01-01-ux-onboarding-navigation.md
+- **Next:** Checkout PHI-119 and start implementation
 
 ---
 
@@ -48,14 +47,15 @@
 
 ### Immediate (Next 4 hours)
 1. **QA:** Review Dev-A PR `feat/TASK-094-C3` → merge if passes
-2. **Dev-B:** Checkout PHI-117 and start TASK-003 implementation
-3. **Dev-A & Dev-C:** IDLE — available for next assignments
+2. **Dev-A:** Checkout PHI-118 and start TASK-002 (button standardization)
+3. **Dev-C:** Checkout PHI-119 and start TASK-004 (compact output mode)
+4. **Dev-B:** IDLE — awaiting next assignment
 
 ### This Sprint (Next 24 hours)
-1. QA: Merge TASK-094-C3 after review
-2. Dev-B: Complete TASK-003 typing indicators
-3. Dev-A & Dev-C: Await new assignments from TechLead-Intel
-4. Research: Audit for next batch of tasks
+1. QA: Merge feat/TASK-094-C3 after review
+2. Dev-A: Complete TASK-002 button standardization
+3. Dev-C: Complete TASK-004 compact output mode
+4. Dev-B: Available for new assignment
 
 ### Blockers
 - None — All work distributed ✅
@@ -67,7 +67,8 @@
 ### In Progress 🔄
 | Task | Assignee | Priority | Est | Paperclip |
 |------|----------|----------|-----|-----------|
-| PHI-117: TASK-003 typing indicators | Dev-B | HIGH | S | [PHI-117](/PHI/issues/PHI-117) |
+| PHI-118: TASK-002 button standardization | Dev-A | MEDIUM | S | [PHI-118](/PHI/issues/PHI-118) |
+| PHI-119: TASK-004 compact output mode | Dev-C | MEDIUM | M | [PHI-119](/PHI/issues/PHI-119) |
 
 ### Ready for Review 👀
 | Task | Assignee | Branch | Paperclip |
@@ -77,10 +78,10 @@
 ### Completed Today ✅
 | Task | Assignee | Commit/Status |
 |------|----------|---------------|
+| PHI-117: TASK-003 typing indicators | Dev-B | ✅ Done — 445c794 |
 | PHI-115: TASK-094-C3 DI restructuring | Dev-A | ✅ Done — 166f8d8 |
 | PHI-113: TASK-306-EXT httpclient migration | Dev-C | ✅ Done |
-| PHI-116: TASK-001 onboarding flow | Dev-B | ✅ Done — 0ba7466 |
 
 ---
 
-*Status updated by: TechLead-Intel (loop #19) — PHI-115 complete, PHI-117 assigned to Dev-B*
+*Status updated by: TechLead-Intel (loop #20) — PHI-117 complete, new assignments for Dev-A and Dev-C*
