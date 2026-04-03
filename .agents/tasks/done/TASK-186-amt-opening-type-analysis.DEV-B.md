@@ -1,33 +1,40 @@
 # TASK-186: AMT Opening Type Analysis (OD, OTD, ORR, OA)
 
-**Status:** done
 **Priority:** high
-**Completed by:** DEV-B
-**Completed at:** 2026-04-02 09:10 WIB
-**Branch:** agents/dev-b (merged via TASK-189 PR)
+**Type:** feature
+**Estimated:** M
+**Area:** internal/service/ta/
 
-## Files Implemented
+## Deskripsi
 
-- `internal/service/ta/amt_opening.go` — Opening type classifier (280 LOC): ValueArea computation, classifyOpening logic, win rate calculation
-- `internal/service/ta/amt_opening_test.go` — Unit tests: OpenAuction, OpenDrive (up/down), ORR, OTD, nil on single day
-- `internal/adapter/telegram/formatter_amt.go` — FormatAMTOpening with VA levels, win rates, history
+Implementasi Module 2 dari docs/AMT_UPGRADE_PLAN.md — Opening Type Analysis. Classify today's opening berdasarkan posisi relative to yesterday's Value Area.
+
+## Opening Types
+
+1. **Open Drive (OD):** Opens outside VA, aggressively moves AWAY. Follow momentum.
+2. **Open Test Drive (OTD):** Opens outside VA, tests back into VA, then drives away. Follow after test confirms.
+3. **Open Rejection Reverse (ORR):** Opens outside VA, reverses back INTO VA. Fade the move.
+4. **Open Auction (OA):** Opens inside VA, auctions within. Wait for breakout direction.
+
+## Detail Teknis
+
+Requires:
+- Yesterday's Value Area (VAH, VAL, POC) — from Volume Profile engine
+- Today's first 30-60 minutes of price action
+- Classification algorithm: compare open location vs VA, then track first 30m direction
+
+## File Changes
+
+- `internal/service/ta/amt_opening.go` — NEW: Opening type classifier (~180 LOC)
+- `internal/service/ta/amt_models.go` — Add OpeningType, OpeningClassification types
+- `internal/adapter/telegram/formatter_amt.go` — Add opening type section
 
 ## Acceptance Criteria
 
-- [x] Classify today's opening into 4 types (OD, OTD, ORR, OA)
-- [x] Show yesterday's VA levels (VAH, VAL, POC)
-- [x] Show open position relative to VA (ABOVE_VA / BELOW_VA / INSIDE_VA)
-- [x] Trading implication per opening type
-- [x] Historical win rate per opening type (last 20 days)
-- [x] Available 30 minutes after market open (noted in formatter)
-- [x] Unit tests for each opening type
-
-## Verification
-
-- `go build ./...` — clean
-- `go vet ./...` — zero warnings
-- `go test ./internal/service/ta/...` — PASS
-
-## Notes
-
-Implementation was already present in agents/dev-b (merged from TASK-189 branch which implemented all 5 AMT modules). This task is being closed retroactively to keep task state consistent.
+- [ ] Classify today's opening into 4 types
+- [ ] Show yesterday's VA levels (VAH, VAL, POC)
+- [ ] Show open position relative to VA
+- [ ] Trading implication per opening type
+- [ ] Historical win rate per opening type (last 20 days)
+- [ ] Available 30 minutes after market open
+- [ ] Unit tests for each opening type

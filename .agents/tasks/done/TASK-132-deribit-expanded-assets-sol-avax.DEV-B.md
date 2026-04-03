@@ -1,25 +1,36 @@
-# TASK-132: Deribit Expanded Assets — SOL, AVAX, XRP Options (DONE)
+# TASK-132: Deribit Expanded Assets — SOL, AVAX, XRP Options
 
-**Completed by:** Dev-B
-**Date:** 2026-04-02
-**Branch:** feat/TASK-132-deribit-expanded-assets
-**PR:** pending
+**Priority:** medium
+**Type:** feature
+**Estimated:** M
+**Area:** internal/service/gex
+**Created by:** Research Agent
+**Created at:** 2026-04-02 02:00 WIB
+**Siklus:** Data
 
-## Changes
+## Deskripsi
+Expand GEX engine dari BTC/ETH only ke SOL, AVAX, XRP, TRX via Deribit USDC-settled options. Deribit punya 2,296 USDC options yang cover altcoins ini — same public API, different currency parameter.
 
-1. **internal/service/gex/engine.go** — Added `assetConfig` struct and `supportedAssets` map to route BTC/ETH via their own currency and SOL/AVAX/XRP via `currency=USDC` with instrument prefix filtering. Contract size now read from instrument metadata (10 for USDC altcoins vs 1 for BTC/ETH). Index price fallback uses config-driven index names (e.g. `sol_usdc`).
+## Konteks
+- Current GEX: `handler_gex.go:44-47` — hanya support BTC dan ETH
+- Deribit USDC-settled: `get_instruments?currency=USDC` → SOL, AVAX, XRP, TRX
+- Same API, same parsing — hanya tambah currency options
+- Ref: `.agents/research/2026-04-02-02-data-deribit-expanded-tradingeconomics-finviz.md`
 
-2. **internal/service/gex/types.go** — Added `LowLiquidity bool` field to `GEXResult` for thin markets (<20 strikes with data).
+## Acceptance Criteria
+- [ ] go build ./... sukses
+- [ ] go vet ./... sukses
+- [ ] Tambah SOL, AVAX, XRP ke supported symbols di GEX handler
+- [ ] Handle USDC-settled option naming convention (mungkin berbeda dari BTC/ETH)
+- [ ] Update keyboard di GEX untuk include new symbols
+- [ ] Test: `/gex SOL` harus return valid GEX analysis
+- [ ] Graceful: jika USDC options tidak cukup liquid, show warning "Low liquidity, data may be unreliable"
 
-3. **internal/service/marketdata/deribit/client.go** — Added `GetIndexPriceByName()` method for explicit index name lookup (needed for USDC-settled altcoins where index name pattern differs from `{currency}_usd`).
+## File yang Kemungkinan Diubah
+- `internal/service/gex/engine.go` (tambah currency support)
+- `internal/service/gex/deribit_client.go` (USDC currency handling)
+- `internal/adapter/telegram/handler_gex.go` (expand symbol list)
+- `internal/adapter/telegram/keyboard.go` (update GEX keyboard)
 
-4. **internal/adapter/telegram/handler_gex.go** — Expanded `validGEXSymbols` to include SOL, AVAX, XRP. Updated keyboard with all 5 symbols.
-
-5. **internal/adapter/telegram/formatter_gex.go** — Added low-liquidity warning banner when `LowLiquidity` flag is set.
-
-## Verification
-
-- `go build ./...` ✅
-- `go vet ./...` ✅
-- `go test ./internal/service/gex/...` ✅
-- `go test ./internal/service/marketdata/deribit/...` ✅
+## Referensi
+- `.agents/research/2026-04-02-02-data-deribit-expanded-tradingeconomics-finviz.md`
