@@ -5,10 +5,17 @@
 
 ---
 
-## 📊 Code Metrics (Current State)
+## 📊 Code Metrics (Current State — Updated Loop #128)
 
 ```
 Total LOC: ~60,925 lines Go
+
+main.go progression (DI Framework — TASK-094 series):
+  Before TASK-094:     683 LOC
+  After TASK-094-C3:   337 LOC  ✅ COMPLETE
+  After TASK-094-D:    337 LOC  ✅ COMPLETE
+  Target TASK-094-Cleanup: <200 LOC  🔄 IN PROGRESS (Dev-A assigned)
+
 Largest files (god classes — perlu dipecah):
   formatter.go         4,489 LOC  ← CRITICAL
   handler.go           2,381 LOC  ← CRITICAL  
@@ -21,6 +28,28 @@ Largest files (god classes — perlu dipecah):
 ```
 
 Build status: ✅ Clean (go build ./... sukses)
+
+---
+
+## ✅ COMPLETED — DI Framework (TASK-094 Series)
+
+### TASK-094-C3: Extract wire_telegram.go and wire_schedulers.go ✅
+**Status:** MERGED to main (commit f3ff0de)
+**Changes:**
+- Created `wire_telegram.go` (208 LOC) — Telegram bot + handler wiring
+- Created `wire_schedulers.go` (151 LOC) — scheduler + news scheduler wiring
+- Reduced main.go: 683 → 337 LOC (51% reduction)
+
+### TASK-094-D: HandlerDeps Struct ✅
+**Status:** MERGED to main (commit f3ff0de)
+**Changes:**
+- Added HandlerDeps struct (17 params → 1 struct)
+- Clean handler initialization
+
+### TASK-094-Cleanup: main.go <200 LOC 🔄
+**Status:** ASSIGNED to Dev-A
+**Target:** Reduce main.go from 337 → <200 LOC
+**Approach:** Extract remaining initialization to wire_services.go
 
 ---
 
@@ -163,9 +192,18 @@ func Divider() string
 
 ## 🟢 LOW — Nice to Have
 
-### TECH-012: Dependency Injection Framework
-**Problem:** Manual wiring di bot.go sangat verbose dan mudah salah.
-**Solution:** Pertimbangkan `google/wire` atau `uber-go/fx` untuk DI.
+### TECH-012: Dependency Injection Framework ✅ COMPLETE (Manual)
+**Status:** IMPLEMENTED — Manual restructuring (ADR-012 Option C)
+**Decision:** Tidak menggunakan `google/wire` atau `uber-go/fx`
+**Reasoning:** Overhead framework tidak justified untuk codebase ini. Manual wiring lebih predictable.
+
+**Implementation:**
+- `wire_telegram.go` — Telegram-specific wiring
+- `wire_schedulers.go` — Scheduler wiring
+- `wire_services.go` — Service layer DI
+- `HandlerDeps` struct — Handler dependencies
+
+**Result:** main.go reduced 683 → 337 LOC, further cleanup to <200 LOC in progress.
 
 ### TECH-013: Structured Logging Improvement
 **Problem:** Log messages tidak konsistent. Beberapa tidak ada context (currency, user ID).
@@ -189,6 +227,17 @@ log.Info().
 - Error rate per service
 - API call count per provider
 - Cache hit/miss rate
+
+---
+
+## ✅ COMPLETED — DI Framework Phase (TASK-094)
+
+```
+✅ TASK-094-C3: wire_telegram.go + wire_schedulers.go — main.go 683→337 LOC
+✅ TASK-094-D: HandlerDeps struct — handler initialization cleaned
+🔄 TASK-094-Cleanup: main.go <200 LOC — Dev-A assigned
+⏳ TASK-094-Docs: Update TECH_REFACTOR_PLAN.md — TechLead assigned (this doc)
+```
 
 ---
 
@@ -233,3 +282,22 @@ Phase 5 (Enhancement):
 3. **Wajib build clean** sebelum PR: `go build ./... && go vet ./...`
 4. **Wajib test existing** tidak ada yang break: `go test ./...`
 5. **Kalau ragu** — buat task di `pending/` dengan tag `[NEEDS DISCUSSION]` dan notif Dev-A
+
+---
+
+## 📜 Update Log
+
+### Loop #128 — TechLead-Intel Update
+**Date:** 2026-04-03  
+**Updated by:** TechLead-Intel
+
+**Changes:**
+1. ✅ Documented completed DI Framework work (TASK-094-C3, TASK-094-D)
+2. ✅ Updated main.go metrics: 683→337→target <200 LOC
+3. ✅ Marked TECH-012 (DI Framework) as complete — using manual restructuring
+4. ✅ Added completed phase section for TASK-094 series
+5. 🔄 Noted TASK-094-Cleanup in progress (Dev-A assigned)
+
+**Context:**
+All 5 PRs (#346-#350) successfully merged to main via cherry-pick strategy.
+Sprint now in P2 phase (DI Framework Completion).
