@@ -70,7 +70,7 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 
 	out := b.String()
 	if len(out) > 4000 {
-		out = out[:3997] + "…"
+		out = out[:min(3997, len(out))] + "…"
 	}
 	return out
 }

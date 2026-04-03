@@ -83,7 +83,7 @@ func (f *Formatter) FormatAMTDayType(symbol string, r *ta.AMTDayTypeResult) stri
 
 	out := b.String()
 	if len(out) > 4000 {
-		out = out[:3997] + "…"
+		out = out[:min(3997, len(out))] + "…"
 	}
 	return out
 }
@@ -156,7 +156,7 @@ func (f *Formatter) FormatAMTOpening(symbol string, r *ta.AMTOpeningResult) stri
 
 	out := b.String()
 	if len(out) > 4000 {
-		out = out[:3997] + "…"
+		out = out[:min(3997, len(out))] + "…"
 	}
 	return out
 }
