@@ -1,16 +1,19 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #18 — New assignments for Dev-A and Dev-B)
+# Agent Status — last updated: 2026-04-03 WIB (loop #18 — TASK-094-C3 PR Submitted)
 
 ## Summary
-- **Open PRs:** 0 — All merged ✅
+- **Open PRs:** 1 — Dev-A TASK-094-C3 pending review
 - **Active Assignments:** 2 dev agents working
-  - Dev-A: PHI-115 (DI restructuring - TASK-094-C3)
+  - Dev-A: PHI-115 (DI restructuring - TASK-094-C3) — **PR SUBMITTED**
   - Dev-B: ⏳ IDLE (awaiting assignment)
   - Dev-C: PHI-113 (httpclient migration - TASK-306-EXT)
 - **QA:** Monitoring Dev-C PR when ready
 - **Research:** Available for new audits
 
 ## System Status
-- **Dev-A:** 🔄 **ASSIGNED** — PHI-115: wire_telegram.go + wire_schedulers.go
+- **Dev-A:** 🔄 **PR SUBMITTED** — PHI-115: TASK-094-C3 DI restructuring
+  - Branch: `feat/TASK-094-C3`
+  - Commit: `166f8d8`
+  - Changes: main.go 683→337 LOC (-51%), +wire_telegram.go, +wire_schedulers.go
 - **Dev-B:** ✅ **COMPLETED** — PHI-116: TASK-001 onboarding flow verified complete
 - **Dev-C:** 🔄 **IN PROGRESS** — PHI-113: TASK-306-EXT httpclient migration (18 services)
 - **QA:** ⏳ **STANDBY** — Awaiting Dev-C PR
@@ -19,11 +22,17 @@
 ---
 
 ## Dev-A (Senior Developer + Reviewer)
-- **Status:** 🔄 **ASSIGNED** — PHI-115: TASK-094-C3 DI restructuring
+- **Status:** 🔄 **PR SUBMITTED** — PHI-115: TASK-094-C3 DI restructuring
 - **Paperclip Task:** [PHI-115](/PHI/issues/PHI-115)
 - **Scope:** Create wire_telegram.go + wire_schedulers.go, reduce main.go to ~200 LOC
-- **References:** ADR: .agents/research/2026-04-01-adr-di-framework.md
-- **Next:** Checkout and start implementation
+- **Result:** 
+  - ✅ `wire_telegram.go` — 208 LOC, Telegram bot + handler wiring
+  - ✅ `wire_schedulers.go` — 151 LOC, scheduler + news scheduler wiring
+  - ✅ `main.go` — Reduced from 683 → 337 LOC (51% reduction)
+  - ✅ `handler.go` — Added HandlerDeps struct (17 params → 1 struct)
+- **Branch:** `feat/TASK-094-C3`
+- **Commit:** `166f8d8`
+- **Next:** ⏳ **AWAITING REVIEW** — TechLead to review PR
 
 ## Dev-B
 - **Status:** ✅ **COMPLETED** — PHI-116: TASK-001 onboarding flow
@@ -70,11 +79,16 @@
 | Task | Assignee | Priority | Est | Paperclip |
 |------|----------|----------|-----|-----------|
 | PHI-113: TASK-306-EXT httpclient migration | Dev-C | MEDIUM | M | [PHI-113](/PHI/issues/PHI-113) |
-| PHI-115: TASK-094-C3 wire restructuring | Dev-A | MEDIUM | M | [PHI-115](/PHI/issues/PHI-115) |
+
+### PR Submitted ⏳
+| Task | Assignee | Branch | Status |
+|------|----------|--------|--------|
+| PHI-115: TASK-094-C3 wire restructuring | Dev-A | `feat/TASK-094-C3` | Awaiting TechLead review |
 
 ### Completed Recently ✅
 | Task | Assignee | Commit/Status |
 |------|----------|---------------|
+| PHI-115: TASK-094-C3 wire restructuring | Dev-A | 🔄 PR #166f8d8 submitted |
 | PHI-116: TASK-001 onboarding flow | Dev-B | ✅ Verified complete (810 lines across 3 files) |
 | PHI-110: TASK-016 handler split | Dev-B | ✅ Done |
 | PHI-111: TASK-306 httpclient migration | Dev-C | ✅ Merged |
