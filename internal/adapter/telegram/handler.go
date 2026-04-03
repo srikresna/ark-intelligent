@@ -214,6 +214,7 @@ func NewHandler(
 	// Register all commands
 	bot.RegisterCommand("/start", h.cmdStart)
 	bot.RegisterCommand("/help", h.cmdHelp)
+	bot.RegisterCommand("/onboarding", h.cmdOnboarding) // TASK-001-EXT: Restart onboarding
 	bot.RegisterCommand("/settings", h.cmdSettings)
 	bot.RegisterCommand("/status", h.cmdStatus)
 	bot.RegisterCommand("/cot", h.cmdCOT)
@@ -309,6 +310,7 @@ func NewHandler(
 	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
 	bot.RegisterCallback("cmd:", h.cbQuickCommand)
 	bot.RegisterCallback("onboard:", h.cbOnboard)
+	bot.RegisterCallback("tutorial:", h.cbTutorial) // TASK-001-EXT: Tutorial navigation
 	bot.RegisterCallback("macro:", h.cbMacro)
 	bot.RegisterCallback("imp:", h.cbImpact)
 	bot.RegisterCallback("nav:", h.cbNav)
@@ -322,7 +324,7 @@ func NewHandler(
 	// Onboarding completion tracking (TASK-204)
 	h.registerOnboardingProgress()
 
-	log.Info().Int("commands", 51).Int("callbacks", 11).Msg("registered commands and callback prefixes")
+	log.Info().Int("commands", 52).Int("callbacks", 12).Msg("registered commands and callback prefixes")
 	return h
 }
 // ---------------------------------------------------------------------------
