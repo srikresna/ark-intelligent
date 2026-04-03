@@ -206,6 +206,12 @@ func (kb *KeyboardBuilder) SettingsMenu(prefs domain.UserPrefs) ports.InlineKeyb
 		CallbackData: "set:changelog_view",
 	}})
 
+	// Row 17: Home button
+	rows = append(rows, []ports.InlineButton{{
+		Text:         btnHome,
+		CallbackData: "nav:home",
+	}})
+
 	return ports.InlineKeyboard{Rows: rows}
 }
 
