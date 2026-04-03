@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // MyfxbookPairSentiment holds retail positioning for a single forex pair.
@@ -96,7 +98,7 @@ func FetchMyfxbook(ctx context.Context) *MyfxbookData {
 		return result
 	}
 
-	fcClient := &http.Client{Timeout: 45 * time.Second}
+	fcClient := httpclient.New(httpclient.WithTimeout(45 * time.Second))
 	req, err := http.NewRequestWithContext(ctx, "POST", firecrawlScrapeURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		log.Debug().Err(err).Msg("Myfxbook: failed to build Firecrawl request")

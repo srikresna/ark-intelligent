@@ -42,6 +42,21 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
+// WithMaxConnsPerHost overrides the per-host connection limit on a cloned
+// transport. A value of 0 restores the package default (10).
+func WithMaxConnsPerHost(n int) Option {
+	return func(c *http.Client) {
+		limit := n
+		if limit == 0 {
+			limit = defaultMaxConnsPerHost
+		}
+		t := SharedTransport.Clone()
+		t.MaxConnsPerHost = limit
+		t.MaxIdleConnsPerHost = limit
+		c.Transport = t
+	}
+}
+
 // New returns an *http.Client backed by the SharedTransport.
 // Without options it uses a 15 s default timeout.
 func New(opts ...Option) *http.Client {

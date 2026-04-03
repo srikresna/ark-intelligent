@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
 	"github.com/arkcode369/ark-intelligent/internal/service/vix"
@@ -53,7 +54,7 @@ type SentimentFetcher struct {
 // Each breaker opens after 3 consecutive failures and resets after 5 minutes.
 func NewSentimentFetcher() *SentimentFetcher {
 	return &SentimentFetcher{
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		httpClient: httpclient.New(),
 		cbCNN:      circuitbreaker.New("sentiment-cnn", 3, 5*time.Minute),
 		cbAAII:     circuitbreaker.New("sentiment-aaii", 3, 5*time.Minute),
 		cbCBOE:     circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
@@ -512,7 +513,7 @@ func fetchAAIISentiment(ctx context.Context, client *http.Client, data *Sentimen
 	}
 
 	// Use a longer timeout for Firecrawl (it needs to render the page)
-	fcClient := &http.Client{Timeout: 30 * time.Second}
+	fcClient := httpclient.New(httpclient.WithTimeout(30 * time.Second))
 	req, err := http.NewRequestWithContext(ctx, "POST", firecrawlScrapeURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		log.Warn().Str("source", "aaii").Err(err).Msg("AAII: failed to build Firecrawl request")
@@ -594,7 +595,7 @@ func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *Sentim
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ArkIntelligent/1.0)")
 
-	fgClient := &http.Client{Timeout: 10 * time.Second}
+	fgClient := httpclient.New(httpclient.WithTimeout(10 * time.Second))
 	resp, err := fgClient.Do(req)
 	if err != nil {
 		log.Warn().Str("source", "crypto-fg").Err(err).Msg("Crypto F&G: request failed")
