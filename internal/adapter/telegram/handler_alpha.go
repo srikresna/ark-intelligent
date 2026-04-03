@@ -530,7 +530,11 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Menghitung Factor Ranking... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
 		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
@@ -551,7 +555,11 @@ func (h *Handler) cmdPlaybook(ctx context.Context, chatID string, _ int64, _ str
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎯 Menyusun Strategy Playbook... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
 		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
@@ -585,7 +593,11 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🌡️ Menghitung Portfolio Heat... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
 		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
@@ -616,7 +628,11 @@ func (h *Handler) cmdRankX(ctx context.Context, chatID string, _ int64, _ string
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📈 Menyusun RankX Leaderboard... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
 		h.sendUserError(ctx, chatID, err, "alpha")
 		return nil
@@ -690,7 +706,11 @@ func (h *Handler) cmdCryptoAlpha(ctx context.Context, chatID string, _ int64, ar
 		symbols = []string{custom}
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "⚡ Menganalisis Crypto Microstructure... ⏳")
 	results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", symbols)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	tvl := defillama.GetCachedOrFetch(ctx)
 	exVol := cryptocompare.GetCachedOrFetch(ctx)
 	out := formatCryptoAlpha(results, symbols, tvl)
