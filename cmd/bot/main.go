@@ -367,25 +367,25 @@ func main() {
 	// Handler is wired after newsSched so it can receive the surprise accumulator.
 	// newsSched implements SurpriseProvider via GetSurpriseSigma — enables full
 	// 3-source conviction scoring (COT + FRED + Calendar) in /rank and /cot detail.
-	handler := tgbot.NewHandler(
-		bot,
-		eventRepo,
-		cotRepo,
-		prefsRepo,
-		newsRepo,
-		newsFetcher,
-		aiAnalyzer,     // nil-safe: handler checks IsAvailable()
-		changelogContent,
-		newsSched,       // SurpriseProvider: weekly per-currency surprise accumulator
-		authMiddleware,  // User management middleware
-		priceRepo,       // Price data for backtest/context (nil-safe)
-		signalRepo,      // Signal persistence for backtest (nil-safe)
-		chatService,     // Claude chatbot service (nil-safe)
-		claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
-		impactRepo,      // Event Impact Database (nil-safe)
-		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
-		intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
-	)
+	handler := tgbot.NewHandler(tgbot.HandlerDeps{
+		Bot:            bot,
+		EventRepo:      eventRepo,
+		COTRepo:        cotRepo,
+		PrefsRepo:      prefsRepo,
+		NewsRepo:       newsRepo,
+		NewsFetcher:    newsFetcher,
+		AIAnalyzer:     aiAnalyzer,
+		Changelog:      changelogContent,
+		NewsScheduler:  newsSched,
+		Middleware:     authMiddleware,
+		PriceRepo:      priceRepo,
+		SignalRepo:     signalRepo,
+		ChatService:    chatService,
+		ClaudeAnalyzer: claudeAnalyzer,
+		ImpactProvider: impactRepo,
+		DailyPriceRepo: dailyPriceRepo,
+		IntradayRepo:   intradayRepo,
+	})
 
 	// Wire feedback repo for 👍/👎 reaction buttons on analysis messages (TASK-051)
 	handler.WithFeedback(feedbackRepo)
