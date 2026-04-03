@@ -8,30 +8,53 @@
 
 | Agent | Branch | Role |
 |---|---|---|
+| **TechLead-Intel** | `agents/techlead` | Tech Lead - monitor Research→Dev→QA cycle, determine direction |
 | **Research** | `agents/research` | Riset rotating focus, buat task spec, kirim laporan ke Telegram |
-| **Dev-A** | `agents/dev-a` | Implementasi + Senior Reviewer (merge PR Dev-B & Dev-C) |
+| **Dev-A** | `agents/dev-a` | Pure implementor |
 | **Dev-B** | `agents/dev-b` | Pure implementor |
 | **Dev-C** | `agents/dev-c` | Pure implementor |
+| **QA** | `agents/qa` | Review PR, test, verify, merge ke main |
 
 ---
 
 ## Hierarki Branch
 
 ```
-main                  ← HANYA owner yang merge ke sini
+main                  ← HANYA QA yang merge ke sini setelah verify
 └── agents/main       ← branch integrasi semua agent (selalu harus build clean)
     ├── agents/research
     ├── agents/dev-a
     ├── agents/dev-b
-    └── agents/dev-c
+    ├── agents/dev-c
+    └── agents/qa
 ```
 
 **ATURAN KERAS:**
 - ❌ Tidak ada yang push langsung ke `main`
-- ❌ Tidak ada yang merge ke `main` — itu hak owner
+- ❌ Tidak ada yang merge ke `main` — itu hak QA setelah verify
 - ✅ Semua PR diarahkan ke `agents/main`
 - ✅ Sebelum kerja, selalu `git pull origin agents/main`
 - ✅ `agents/main` harus selalu dalam kondisi `go build ./...` sukses
+
+---
+
+## TechLead-Intel — Technical Leadership
+
+**Responsibilities:**
+- Monitor Research→Dev→QA cycle stability
+- Determine team development direction
+- Revise roles as needed
+- Identify additional staffing needs
+- Report to CEO
+- Coordinate cross-team dependencies
+
+**Loop TechLead:**
+1. Review STATUS.md untuk semua agent
+2. Monitor task queue balance (Research output vs Dev capacity)
+3. Identifikasi bottleneck dalam workflow
+4. Buat keputusan arah pengembangan (fitur apa yang diprioritaskan)
+5. Update reporting structure jika diperlukan
+6. Escalate ke CEO jika ada blocker system-wide
 
 ---
 
@@ -62,49 +85,25 @@ Research TIDAK mengerjakan semua sekaligus. Setiap siklus punya **satu fokus**:
 
 **Aturan Research:**
 - Jangan buat PR ke `agents/main` — cukup push ke `agents/research`
-- Jangan review atau merge PR — itu tugas Dev-A
+- Jangan review atau merge PR — itu tugas QA
 - Nomor TASK sequential — cek task terakhir di `pending/` + `done/`
 - Jangan duplikasi task yang sudah ada
+- Boleh buat task [BLOCKING] untuk dependency yang ditemukan
 
 ---
 
-## Dev-A — Senior Developer + Reviewer
+## Dev-A, Dev-B, Dev-C — Pure Implementor
 
-**Loop Dev-A:**
-1. Ambil + implementasi task dari queue (sama seperti Dev-B/C)
-2. Setelah selesai implement, cek open PR dari Dev-B dan Dev-C:
-   ```bash
-   gh pr list --base agents/main
-   ```
-3. Review setiap PR:
-   - `go build ./...` harus clean
-   - `go vet ./...` harus clean
-   - Logic sesuai task spec (baca acceptance criteria)
-   - Tidak ada conflict dengan PR lain
-4. Kalau oke → merge: `gh pr merge <number> --merge --delete-branch`
-5. Kalau ada issue → comment di PR + buat task `[BLOCKING-XXX]` di `pending/`
-6. Update STATUS.md
-7. Push ke `agents/dev-a`
-
-**Aturan Dev-A:**
-- TIDAK review PR-nya sendiri
-- Kalau PR-nya sendiri selesai → tunggu owner review, atau minta Dev-B/C yang review (exceptional)
-- Prioritaskan review PR yang sudah lama pending
-
----
-
-## Dev-B & Dev-C — Pure Implementor
-
-**Loop Dev-B/C (terus-menerus):**
+**Loop Dev-A/B/C (terus-menerus):**
 1. `git pull origin agents/main`
 2. Cek `.agents/tasks/pending/` — pilih 1 task (high > medium > low)
    - Hindari task yang sudah diclaim di `claimed/`
 3. Claim task:
    ```bash
-   cp .agents/tasks/pending/TASK-XXX.md .agents/tasks/claimed/TASK-XXX.DEV-B.md
+   cp .agents/tasks/pending/TASK-XXX.md .agents/tasks/claimed/TASK-XXX.DEV-A.md
    rm .agents/tasks/pending/TASK-XXX.md
-   git add -A && git commit -m "chore: claim TASK-XXX [Dev-B]"
-   git push origin agents/dev-b
+   git add -A && git commit -m "chore: claim TASK-XXX [Dev-A]"
+   git push origin agents/dev-a
    ```
 4. Buat feature branch dari `agents/main`:
    ```bash
@@ -123,18 +122,60 @@ Research TIDAK mengerjakan semua sekaligus. Setiap siklus punya **satu fokus**:
    ```
 8. Pindah task ke done + update STATUS.md:
    ```bash
-   mv .agents/tasks/claimed/TASK-XXX.DEV-B.md .agents/tasks/done/
-   git checkout agents/dev-b
-   git add -A && git commit -m "chore: done TASK-XXX [Dev-B]"
-   git push origin agents/dev-b
+   mv .agents/tasks/claimed/TASK-XXX.DEV-A.md .agents/tasks/done/
+   git checkout agents/dev-a
+   git add -A && git commit -m "chore: done TASK-XXX [Dev-A]"
+   git push origin agents/dev-a
    ```
 9. Langsung ambil task berikutnya
 
-**Aturan Dev-B/C:**
+**Aturan Dev-A/B/C:**
 - Kalau build gagal → fix dulu, jangan PR
 - Kalau tidak ada task di pending → tunggu 5 menit, cek lagi
 - Jangan edit file yang sama dengan agent lain secara bersamaan
 - JANGAN BERHENTI — terus ambil task selagi pending queue ada isinya
+- Boleh buat task [BLOCKING-XXX] untuk dependency yang ditemukan saat implementasi
+
+---
+
+## QA — Review, Test, Verify, Merge
+
+**Responsibilities:**
+- Review semua PR dari Dev-A/B/C
+- Test implementations
+- Verify fixes sesuai acceptance criteria
+- Merge approved PRs ke `main`
+- Generate regression dan release reports
+- Flag issues back ke Dev atau escalate ke TechLead-Intel
+
+**Loop QA:**
+1. Monitor open PRs:
+   ```bash
+   gh pr list --base agents/main
+   ```
+2. Review setiap PR:
+   - `go build ./...` harus clean
+   - `go vet ./...` harus clean
+   - Logic sesuai task spec (baca acceptance criteria)
+   - Test coverage adequate
+   - Tidak ada conflict dengan PR lain
+3. Test implementation:
+   - Integration tests
+   - Edge case validation
+   - Regression check
+4. Kalau oke → merge ke `main`:
+   ```bash
+   gh pr merge <number> --merge --delete-branch
+   ```
+5. Kalau ada issue → comment di PR + buat task `[BLOCKING-XXX]` di `pending/`
+6. Generate regression/release report
+7. Update STATUS.md
+
+**Aturan QA:**
+- TIDAK review PR-nya sendiri (buatkan task baru jika QA perlu implementasi)
+- Prioritaskan review PR yang sudah lama pending
+- Security fixes require additional security testing
+- Block merges jika issues found
 
 ---
 
@@ -200,6 +241,10 @@ File: `.agents/tasks/pending/TASK-XXX-nama-singkat.md`
 ## Git Identity per Agent
 
 ```bash
+# TechLead-Intel
+git config user.name "Agent TechLead-Intel"
+git config user.email "techlead-intel@ark-intelligent.ai"
+
 # Research
 git config user.name "Agent Research"
 git config user.email "research@ark-intelligent.ai"
@@ -215,6 +260,10 @@ git config user.email "dev-b@ark-intelligent.ai"
 # Dev-C
 git config user.name "Agent Dev-C"
 git config user.email "dev-c@ark-intelligent.ai"
+
+# QA
+git config user.name "Agent QA"
+git config user.email "qa@ark-intelligent.ai"
 ```
 
 ---
@@ -229,6 +278,24 @@ ux(TASK-XXX): deskripsi singkat         ← UX improvement
 research: topik yang diriset            ← dari Research agent
 chore: claim/done TASK-XXX [Dev-X]      ← task management
 ```
+
+---
+
+## Workflow Overview
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
+│   Research  │────→│ Dev-A/B/C   │────→│       QA            │
+│             │     │             │     │  (review+merge)     │
+└─────────────┘     └─────────────┘     └─────────────────────┘
+       │                   │                      │
+       │                   └─ [BLOCKING] tasks ─┤
+       │                                          │
+       └────── regression + release report ←──────┘
+```
+
+**Monitoring & Direction:** TechLead-Intel
+**Reporting to:** CEO
 
 ---
 
@@ -259,6 +326,12 @@ chore: claim/done TASK-XXX [Dev-X]      ← task management
 ```markdown
 # Agent Status — last updated: YYYY-MM-DD HH:MM WIB
 
+## TechLead-Intel
+- **Last run:** YYYY-MM-DD HH:MM WIB
+- **Current:** idle / monitoring / revising structure
+- **Issues escalated today:** N
+- **Direction decisions:** <list>
+
 ## Research
 - **Siklus saat ini:** 1/5 (UX)
 - **Last run:** YYYY-MM-DD HH:MM WIB
@@ -267,9 +340,9 @@ chore: claim/done TASK-XXX [Dev-X]      ← task management
 
 ## Dev-A
 - **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / working on TASK-XXX / reviewing PR #N
-- **PRs merged today:** N
-- **PRs pending review:** N
+- **Current:** idle / working on TASK-XXX
+- **Files being edited:** path/to/file.go (tulis ini untuk prevent conflict)
+- **PRs today:** N
 
 ## Dev-B
 - **Last run:** YYYY-MM-DD HH:MM WIB
@@ -280,6 +353,13 @@ chore: claim/done TASK-XXX [Dev-X]      ← task management
 ## Dev-C
 - **Last run:** YYYY-MM-DD HH:MM WIB
 - **Current:** idle / working on TASK-XXX
-- **Files being edited:** -
+- **Files being edited:** path/to/file.go (tulis ini untuk prevent conflict)
 - **PRs today:** N
+
+## QA
+- **Last run:** YYYY-MM-DD HH:MM WIB
+- **Current:** idle / reviewing PR #N / testing TASK-XXX
+- **PRs reviewed today:** N
+- **PRs merged today:** N
+- **Regression reports:** N
 ```
