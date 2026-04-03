@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // eurostatHTTPTimeout for Eurostat API requests.
@@ -172,7 +173,7 @@ type EurostatClient struct {
 // NewEurostatClient creates a new EurostatClient.
 func NewEurostatClient() *EurostatClient {
 	return &EurostatClient{
-		hc: &http.Client{Timeout: eurostatHTTPTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(eurostatHTTPTimeout)),
 	}
 }
 

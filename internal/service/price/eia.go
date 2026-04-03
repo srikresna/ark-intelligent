@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -30,7 +31,7 @@ type EIAClient struct {
 func NewEIAClient(apiKey string) *EIAClient {
 	return &EIAClient{
 		apiKey: apiKey,
-		client: &http.Client{Timeout: 15 * time.Second},
+		client: httpclient.New(httpclient.WithTimeout(15 * time.Second)),
 	}
 }
 

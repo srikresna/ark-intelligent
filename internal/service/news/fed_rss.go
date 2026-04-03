@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/config"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -87,7 +88,7 @@ func fetchFedRSS(ctx context.Context, url, defaultCategory string) ([]FedSpeech,
 	}
 	req.Header.Set("User-Agent", "ark-intelligent/1.0 (forex analytics bot)")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(15 * time.Second))
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fed-rss: fetch %s: %w", url, err)

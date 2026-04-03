@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // ---------------------------------------------------------------------------
@@ -97,7 +98,7 @@ type SNBClient struct {
 // NewSNBClient creates a new SNBClient.
 func NewSNBClient() *SNBClient {
 	return &SNBClient{
-		hc: &http.Client{Timeout: snbHTTPTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(snbHTTPTimeout)),
 	}
 }
 

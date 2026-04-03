@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -73,7 +74,7 @@ var (
 	globalCache *IMFWEOData    //nolint:gochecknoglobals
 	cacheMu     sync.RWMutex   //nolint:gochecknoglobals
 	cacheTTL    = 24 * time.Hour //nolint:gochecknoglobals
-	httpClient  = &http.Client{Timeout: 20 * time.Second} //nolint:gochecknoglobals
+	httpClient  = httpclient.New(httpclient.WithTimeout(20 * time.Second)) //nolint:gochecknoglobals
 )
 
 // GetCachedOrFetch returns cached data if within TTL, otherwise fetches fresh

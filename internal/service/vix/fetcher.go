@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 const (
@@ -27,7 +29,7 @@ const (
 // Never returns a nil pointer.
 func FetchTermStructure(ctx context.Context) (*VIXTermStructure, error) {
 	ts := &VIXTermStructure{AsOf: time.Now().UTC()}
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(15 * time.Second))
 
 	// 1. VIX spot
 	spot, err := fetchSingleIndexCSV(ctx, client, vixEODURL)

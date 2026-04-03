@@ -13,8 +13,9 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
-	"github.com/arkcode369/ark-intelligent/pkg/errs"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -35,7 +36,7 @@ type Fetcher struct {
 // NewFetcher creates a COT fetcher with modern CFTC endpoints.
 func NewFetcher() *Fetcher {
 	return &Fetcher{
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: httpclient.New(httpclient.WithTimeout(60 * time.Second)),
 		endpoints: map[string]string{
 			"TFF":           "https://publicreporting.cftc.gov/resource/yw9f-hn96.json", // TFF Combined
 			"DISAGGREGATED": "https://publicreporting.cftc.gov/resource/kh3c-gbw2.json", // Disaggregated Combined

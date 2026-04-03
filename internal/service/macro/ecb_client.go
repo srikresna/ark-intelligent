@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // ecbHTTPTimeout for ECB SDW API requests.
@@ -57,7 +58,7 @@ type ECBClient struct {
 // NewECBClient creates a new ECBClient.
 func NewECBClient() *ECBClient {
 	return &ECBClient{
-		hc: &http.Client{Timeout: ecbHTTPTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(ecbHTTPTimeout)),
 	}
 }
 

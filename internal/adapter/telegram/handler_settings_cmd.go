@@ -69,12 +69,6 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 		html := h.fmt.FormatAlertManagement(prefs)
 		kb := h.kb.AlertManagementMenu(prefs)
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
-	case "reset_onboard":
-		// Clear experience level so cmdStart re-triggers onboarding (TASK-254)
-		prefs.ExperienceLevel = ""
-		_ = h.prefsRepo.Set(ctx, userID, prefs)
-		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-		return h.cmdStart(ctx, chatID, userID, "")
 	case "mobile_toggle":
 		prefs.MobileMode = !prefs.MobileMode
 	case "token_info_toggle":

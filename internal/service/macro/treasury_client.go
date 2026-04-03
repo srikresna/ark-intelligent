@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -59,7 +60,7 @@ type TreasuryClient struct {
 // NewTreasuryClient creates a new TreasuryClient with a default HTTP client.
 func NewTreasuryClient() *TreasuryClient {
 	return &TreasuryClient{
-		hc: &http.Client{Timeout: httpTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(httpTimeout)),
 	}
 }
 

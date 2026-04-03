@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -111,7 +112,7 @@ func FetchFedWatch(ctx context.Context) *FedWatchData {
 		return result
 	}
 
-	fcClient := &http.Client{Timeout: 45 * time.Second}
+	fcClient := httpclient.New(httpclient.WithTimeout(45 * time.Second))
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.firecrawl.dev/v1/scrape", bytes.NewReader(bodyBytes))
 	if err != nil {
 		log.Debug().Err(err).Msg("fedwatch: failed to build Firecrawl request")

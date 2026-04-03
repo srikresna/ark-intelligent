@@ -154,18 +154,6 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 		b.WriteString(fmt.Sprintf("<code>📋 Daily Cap    : %d alerts/day</code>\n", prefs.MaxAlertsPerDay))
 	}
 
-	// Experience level display
-	levelDisplay := "Belum diset"
-	switch prefs.ExperienceLevel {
-	case "beginner":
-		levelDisplay = "🌱 Pemula"
-	case "intermediate":
-		levelDisplay = "📈 Intermediate"
-	case "pro":
-		levelDisplay = "🏛 Pro / Institutional"
-	}
-	b.WriteString(fmt.Sprintf("<code>Experience Level   : %s</code>\n", levelDisplay))
-
 	b.WriteString("\n<i>Use the buttons below to adjust preferences</i>")
 
 	return b.String()

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // MOVEData holds ICE BofA MOVE Index data — bond market volatility equivalent of VIX.
@@ -50,7 +52,7 @@ type yahooChartResponse struct {
 // vixSpot should be the current VIX level (pass 0 if unavailable).
 func FetchMOVE(ctx context.Context, vixSpot float64) (*MOVEData, error) {
 	md := &MOVEData{AsOf: time.Now().UTC()}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(10 * time.Second))
 
 	url := "https://query2.finance.yahoo.com/v8/finance/chart/%5EMOVE?interval=1d&range=5d"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

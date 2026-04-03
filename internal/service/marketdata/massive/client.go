@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/keyring"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
@@ -43,7 +44,7 @@ func NewClient(keys []string, restBase string) *Client {
 		base = defaultRestBase
 	}
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: httpclient.New(httpclient.WithTimeout(defaultTimeout)),
 		keys:       keyring.New(keys),
 		restBase:   base,
 	}

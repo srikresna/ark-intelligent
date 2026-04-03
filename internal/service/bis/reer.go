@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -81,7 +82,7 @@ type BISData struct {
 var (
 	globalCache *BISData //nolint:gochecknoglobals
 	cacheMu     sync.RWMutex
-	httpClient  = &http.Client{Timeout: httpTimeout} //nolint:gochecknoglobals
+	httpClient  = httpclient.New(httpclient.WithTimeout(httpTimeout)) //nolint:gochecknoglobals
 )
 
 // GetCachedOrFetch returns cached BIS data if within TTL, otherwise fetches

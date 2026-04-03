@@ -15,6 +15,7 @@ import (
 	"math"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // ---------------------------------------------------------------------------
@@ -86,7 +87,7 @@ type OECDClient struct {
 // NewOECDClient creates a new OECDClient.
 func NewOECDClient() *OECDClient {
 	return &OECDClient{
-		hc: &http.Client{Timeout: oecdHTTPTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(oecdHTTPTimeout)),
 	}
 }
 

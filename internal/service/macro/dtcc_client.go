@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // ---------------------------------------------------------------------------
@@ -87,7 +88,7 @@ type DTCCClient struct {
 // NewDTCCClient creates a new DTCCClient.
 func NewDTCCClient() *DTCCClient {
 	return &DTCCClient{
-		hc: &http.Client{Timeout: dtccHTTPTimeout},
+		hc: httpclient.New(httpclient.WithTimeout(dtccHTTPTimeout)),
 	}
 }
 

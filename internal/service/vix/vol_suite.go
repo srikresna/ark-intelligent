@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net/http"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 )
 
 // CBOE EOD CSV URLs for additional volatility indices.
@@ -53,7 +54,7 @@ type VolSuite struct {
 // non-fatal — the suite reports whatever data it can obtain.
 func FetchVolSuite(ctx context.Context, vixSpot float64) *VolSuite {
 	vs := &VolSuite{FetchedAt: time.Now().UTC()}
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(15 * time.Second))
 
 	type indexFetch struct {
 		url    string
