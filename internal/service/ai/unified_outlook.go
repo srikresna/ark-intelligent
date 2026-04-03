@@ -441,6 +441,17 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 					b.WriteString(fmt.Sprintf("  %s: Retail %.0f%% Long / %.0f%% Short → %s\n", mp.Symbol, mp.LongPct, mp.ShortPct, mp.Signal))
 				}
 			}
+			if sd.InsiderClusters != nil && sd.InsiderClusters.Available {
+				ic := sd.InsiderClusters
+				insiderSignal := "NORMAL insider activity"
+				if ic.ClusterBuyCount > 50 {
+					insiderSignal = "ELEVATED insider buying → risk-on signal"
+				} else if ic.ClusterBuyCount < 20 {
+					insiderSignal = "LOW insider buying → caution / risk-off lean"
+				}
+				b.WriteString(fmt.Sprintf("Insider Clusters (OpenInsider): %d cluster buys (total $%.0fM) — %s\n",
+					ic.ClusterBuyCount, ic.TotalValueUSD/1e6, insiderSignal))
+			}
 			b.WriteString("\n")
 		}
 	}
