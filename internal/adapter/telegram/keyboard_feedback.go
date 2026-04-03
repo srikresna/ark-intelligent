@@ -69,10 +69,10 @@ func (kb *KeyboardBuilder) BriefingMenu() ports.InlineKeyboard {
 				{Text: "🔄 Refresh", CallbackData: "briefing:refresh"},
 				{Text: "📅 Calendar", CallbackData: "cmd:calendar"},
 			},
-			{
-				{Text: "📊 COT Detail", CallbackData: "cmd:cot"},
-				{Text: "🏠 Home", CallbackData: "cmd:help"},
-			},
+		{
+			{Text: "📊 COT Detail", CallbackData: "cmd:cot"},
+			{Text: btnHome, CallbackData: "cmd:help"},
+		},
 		},
 	}
 }

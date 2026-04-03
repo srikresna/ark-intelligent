@@ -99,10 +99,10 @@ func (kb *KeyboardBuilder) SessionDetailMenu(currency string) ports.InlineKeyboa
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{
 			{
-				{Text: "◀ Grid", CallbackData: "cmd:session"},
-				{Text: "💹 Price", CallbackData: fmt.Sprintf("cmd:price:%s", currency)},
-				{Text: "📈 Seasonal", CallbackData: fmt.Sprintf("cmd:seasonal:%s", currency)},
-				{Text: btnHome, CallbackData: "nav:home"},
+			{Text: btnBackGrid, CallbackData: "cmd:session"},
+			{Text: "💹 Price", CallbackData: fmt.Sprintf("cmd:price:%s", currency)},
+			{Text: "📈 Seasonal", CallbackData: fmt.Sprintf("cmd:seasonal:%s", currency)},
+			{Text: btnHome, CallbackData: "nav:home"},
 			},
 		},
 	}
