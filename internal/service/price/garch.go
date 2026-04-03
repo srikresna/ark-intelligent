@@ -215,12 +215,13 @@ func estimateGARCHFromReturns(returns []float64) (*GARCHResult, error) {
 	}
 
 	// Convergence check: compare fine-grid LL improvement over coarse-grid.
-	// If the fine grid didn't meaningfully improve, or LL is extremely poor, mark as not converged.
+	// Small improvement (< 0.1) means the fine grid confirmed the coarse result — stable, converged.
+	// Large improvement (>= 0.1) means the coarse grid missed a better region — not converged.
 	converged := true
 	if math.IsInf(fineLL, -1) || math.IsNaN(fineLL) {
 		converged = false
-	} else if fineLL-bestLL < 0.1 {
-		// Fine grid didn't meaningfully improve over coarse grid
+	} else if fineLL-bestLL >= 0.1 {
+		// Fine grid found a significantly better point — coarse grid was unstable
 		converged = false
 	}
 	if alpha+beta > 0.999 {
