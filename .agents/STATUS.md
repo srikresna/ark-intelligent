@@ -11,8 +11,7 @@
 - **Files being edited:** -
 
 ## Dev-B
-- **Last run:** 2026-04-02 10:07 WIB
-- **Current:** standby — no S/M tasks available
-- **Housekeeping:** Marked TASK-158 done (code+tests already merged, PR #242 closed). Removed from pending.
-- **Notes (this run):** All S/M pending tasks have feat branches or are done. Only L-sized tasks remain in pending queue. Resolved merge conflict on TASK-160. All onchain tests pass (13/13).
-- **Files being edited:** -
+- **Last run:** 2026-04-03 WIB
+- **Current:** implementing TASK-102 (settings toggle confirmation toast)
+- **Task claimed:** TASK-102, TASK-153
+- **Files being edited:** internal/adapter/telegram/handler_settings_cmd.go

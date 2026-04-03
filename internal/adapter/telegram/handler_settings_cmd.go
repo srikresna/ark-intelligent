@@ -127,7 +127,79 @@ func (h *Handler) cbSettings(ctx context.Context, chatID string, msgID int, user
 	// Update the message with new settings state
 	html := h.fmt.FormatSettings(prefs)
 	kb := h.kb.SettingsMenu(prefs)
-	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	if err := h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb); err != nil {
+		return err
+	}
+
+	// Show toast feedback so user gets visual/audio confirmation of the change.
+	if toast := settingsActionToast(action, prefs); toast != "" {
+		return callbackToast(toast)
+	}
+	return nil
+}
+
+// settingsActionToast returns a Telegram AnswerCallback toast for a settings action.
+// Returns empty string for navigation actions that don't change persistent state.
+func settingsActionToast(action string, prefs domain.UserPrefs) string {
+	switch action {
+	case "lang_toggle":
+		if prefs.Language == "id" {
+			return "✅ Bahasa: Indonesia"
+		}
+		return "✅ Language: English"
+	case "alerts_toggle":
+		if prefs.AlertsEnabled {
+			return "✅ Alert diaktifkan"
+		}
+		return "🔕 Alert dinonaktifkan"
+	case "cot_toggle":
+		if prefs.COTAlertsEnabled {
+			return "✅ Alert COT aktif"
+		}
+		return "🔕 Alert COT nonaktif"
+	case "ai_toggle":
+		if prefs.AIReportsEnabled {
+			return "✅ AI Reports aktif"
+		}
+		return "🔕 AI Reports nonaktif"
+	case "mobile_toggle":
+		if prefs.MobileMode {
+			return "✅ Mode kompak aktif"
+		}
+		return "✅ Mode normal aktif"
+	case "model_claude":
+		return "✅ Model: Claude"
+	case "model_gemini":
+		return "✅ Model: Gemini"
+	case "impact_high_only":
+		return "✅ Filter impact: High only"
+	case "impact_high_med":
+		return "✅ Filter impact: High + Medium"
+	case "impact_all":
+		return "✅ Filter impact: Semua"
+	case "time_60_15_5":
+		return "✅ Notif: 60/15/5 menit sebelum"
+	case "time_15_5_1":
+		return "✅ Notif: 15/5/1 menit sebelum"
+	case "time_5_1":
+		return "✅ Notif: 5/1 menit sebelum"
+	case "cur_reset":
+		return "✅ Filter mata uang direset"
+	}
+	if strings.HasPrefix(action, "claude_model:") {
+		modelID := strings.TrimPrefix(action, "claude_model:")
+		return fmt.Sprintf("✅ Model: %s", modelID)
+	}
+	if strings.HasPrefix(action, "cur_toggle:") {
+		cur := strings.ToUpper(strings.TrimPrefix(action, "cur_toggle:"))
+		for _, c := range prefs.CurrencyFilter {
+			if strings.ToUpper(c) == cur {
+				return fmt.Sprintf("✅ %s ditambahkan ke filter", cur)
+			}
+		}
+		return fmt.Sprintf("✅ %s dihapus dari filter", cur)
+	}
+	return ""
 }
 
 // cbAlertToggle handles quick alert toggle from notification messages.
