@@ -9,21 +9,23 @@
 ## ✅ Priority: Clear PR Queue (P1)
 
 ### PR Queue Status
-**5 PRs have been submitted and are in review**, all awaiting QA approval.
+**5 PRs have been submitted and are in review**, all need rebase to pick up new CI.
 
-| PR | Task | Assignee | Status | CI |
-|----|------|----------|--------|-----|
-| #346 | TASK-002 | Dev-A | 🔄 In Review | 🔴 Lint fail |
-| #347 | PHI-119 | Dev-C | 🔄 In Review | 🔴 Lint fail |
-| #348 | TASK-001-EXT | Dev-B | 🔄 In Review | 🔴 Lint fail |
-| #349 | TASK-094-C3 | Dev-A | 🔄 In Review | 🔴 Lint fail |
-| #350 | TASK-094-D | Dev-A | 🔄 In Review | 🔴 Lint fail |
+| PR | Task | Assignee | Status | Action |
+|----|------|----------|--------|--------|
+| #346 | TASK-002 | Dev-A | 🔄 Awaiting rebase | Rebase on main |
+| #347 | PHI-119 | Dev-C | 🔄 Awaiting rebase | Rebase on main |
+| #348 | TASK-001-EXT | Dev-B | 🔄 Awaiting rebase | Rebase on main |
+| #349 | TASK-094-C3 | Dev-A | 🔄 Awaiting rebase | Rebase on main |
+| #350 | TASK-094-D | Dev-A | 🔄 Awaiting rebase | Rebase on main |
 
 **Immediate Action Required:**
-1. **Dev-A:** Fix lint on #346, #349, #350
-2. **Dev-B:** Fix lint on #348
-3. **Dev-C:** Fix lint on #347
-4. **QA:** Begin review once CI passes
+1. **Dev-A:** Rebase #346, #349, #350 on main
+2. **Dev-B:** Rebase #348 on main
+3. **Dev-C:** Rebase #347 on main
+4. **QA:** Begin review once CI passes after rebase
+
+**Root Cause:** Main branch now has comprehensive CI/CD with linting (commit 008a86b). PRs created before this update need rebase.
 
 ---
 
