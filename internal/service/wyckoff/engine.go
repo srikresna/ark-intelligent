@@ -42,6 +42,7 @@ func (e *Engine) Analyze(symbol, timeframe string, bars []ta.OHLCV) *WyckoffResu
 	// Reverse to oldest-first for sequential detection.
 	fwd := reverseOHLCV(bars)
 	av := avgVolume(fwd)
+	result.AvgVolume = av
 
 	// ── Accumulation event detection ─────────────────────────────────────────
 	var events []WyckoffEvent

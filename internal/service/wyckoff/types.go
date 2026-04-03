@@ -67,5 +67,6 @@ type WyckoffResult struct {
 	ProjectedMove float64         // estimated breakout magnitude in price units
 	Confidence    string          // "HIGH", "MEDIUM", "LOW"
 	Summary       string          // narrative summary ≤ 300 chars
+	AvgVolume     float64         // mean volume over analyzed bars (for formatter)
 	AnalyzedAt    time.Time
 }

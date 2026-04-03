@@ -38,7 +38,7 @@ func (f *Formatter) FormatWyckoffResult(r *wyckoff.WyckoffResult) string {
 				icon,
 				string(e.Name),
 				e.Price,
-				e.Volume/1000, // raw ratio placeholder; real would need avgVol
+				volumeMult(e.Volume, r.AvgVolume),
 				sigIcon,
 			))
 			// Educational tooltip for key Wyckoff events
@@ -184,4 +184,12 @@ func nextWatchEvent(r *wyckoff.WyckoffResult) string {
 	default:
 		return ""
 	}
+}
+
+// volumeMult returns vol/avg as a ratio for display. Returns 0 if avg <= 0.
+func volumeMult(vol, avg float64) float64 {
+	if avg <= 0 {
+		return 0
+	}
+	return vol / avg
 }
