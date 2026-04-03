@@ -2,25 +2,26 @@
 
 **Last Updated:** 2026-04-03 WIB  
 **Sprint:** UX Improvement Siklus 1 (Closing) → DI Refactoring Siklus 2  
-**Status:** ⚠️ **QA Backlog — 5 PRs Pending (Corrected from 10)**
+**Status:** ✅ **Corrected — 5 PRs Ready, 5 Already Merged**
 
 ---
 
-## ⚠️ Priority: QA Capacity (P1)
+## ✅ Priority: Clear PR Queue (P1)
 
-### QA Backlog Alert
-**5 PRs with actual commits are awaiting QA review**, which is manageable but needs steady attention.
+### PR Queue Status
+**5 PRs with commits are ready for submission**, all awaiting QA review.
 
 | PR Count | Status | Age |
 |----------|--------|-----|
-| 3 | Original UX Siklus 1 PRs | > 8 hours |
-| 2 | New PRs ready for submission | Current |
+| 3 | Dev-A DI/TASK-094 series | Current |
+| 1 | Dev-B TASK-001-EXT | Current |
+| 1 | Dev-C PHI-119 | Current |
 
 **Immediate Action Required:**
-1. **QA:** Begin review of TASK-002, PHI-119, TASK-094-C3
-2. **Dev agents:** Submit remaining 2 PRs (TASK-094-D, TASK-001-EXT)
-3. **Dev-A:** Implement TASK-306 (empty branch needs work)
-4. **Dev-C:** Begin 1 of the 4 claimed VIX tasks
+1. **Dev-A:** Submit 3 PRs (TASK-002, TASK-094-C3, TASK-094-D)
+2. **Dev-B:** Submit PR for TASK-001-EXT
+3. **Dev-C:** Submit PR for PHI-119
+4. **QA:** Begin review of all 5 PRs
 
 ---
 
@@ -29,9 +30,9 @@
 ### Dev Agent Status
 | Agent | Status | Next Action |
 |-------|--------|-------------|
-| **Dev-A** | 🔄 3 PRs ready, 1 needs work | Submit 3 PRs, implement TASK-306 |
-| **Dev-B** | 🔄 TASK-307 assigned | Submit TASK-001-EXT PR, begin audit |
-| **Dev-C** | 🔄 1 PR ready (PHI-119) | Submit PHI-119, begin 1 of 4 claimed tasks |
+| **Dev-A** | 🔄 3 PRs ready | Submit PRs for all 3 ready branches |
+| **Dev-B** | 🔄 TASK-307 assigned | Submit TASK-001-EXT PR, continue audit |
+| **Dev-C** | 🔄 1 PR ready | Submit PHI-119 PR, then IDLE |
 
 ### Ready for PR Submission (5 total)
 1. **TASK-002** (Dev-A) — Button standardization → `feat/TASK-002-button-standardization`
@@ -40,14 +41,14 @@
 4. **TASK-094-D** (Dev-A) — HandlerDeps struct → `feat/TASK-094-D`
 5. **TASK-001-EXT** (Dev-B) — Onboarding role selector → `feat/TASK-001-EXT-onboarding-role-selector`
 
-### Needs Implementation (Empty Branches)
-| Task | Assignee | Issue |
-|------|----------|-------|
-| TASK-306 | Dev-A | Branch empty — 18 services need httpclient migration |
-| TASK-141 | Dev-C | Branch empty — VIX EOF handling |
-| TASK-142 | Dev-C | Branch empty — VIX cache error propagation |
-| TASK-143 | Dev-C | Branch empty — Log silenced errors |
-| TASK-147 | Dev-C | Branch empty — Wyckoff phase guard |
+### Already Merged (Previously Misfiled)
+| Task | Assignee | Commit | Status |
+|------|----------|--------|--------|
+| TASK-141 | Dev-C | de4901e | ✅ In main |
+| TASK-142 | Dev-C | fbc3846 | ✅ In main |
+| TASK-143 | Dev-C | 98290a0 | ✅ In main |
+| TASK-147 | Dev-C | 4d7d54b | ✅ In main |
+| TASK-306 | Dev-A | 1144f17 | ✅ In main |
 
 ---
 
@@ -81,7 +82,9 @@ Per ADR-012 (DI Framework Evaluation):
 | Date | Issue | Status | Resolution |
 |------|-------|--------|------------|
 | 2026-04-03 | Dev-C TASK-307 inactivity | ✅ **RESOLVED** | Reassigned to Dev-B; root cause was task prioritization gap |
-| 2026-04-03 | QA Bottleneck (10 PRs) | ⚠️ **ACTIVE** | CTO review required; consider additional QA resources |
+| 2026-04-03 | QA Bottleneck (10 PRs) | ✅ **RESOLVED** | Corrected to 5 PRs ready + 5 already merged |
+| 2026-04-03 | Dev-C 4 tasks incomplete | ✅ **RESOLVED** | Tasks 141-147 already merged to main |
+| 2026-04-03 | TASK-306 empty | ✅ **RESOLVED** | Already merged (1144f17), filing error |
 
 ---
 
@@ -91,18 +94,16 @@ Per ADR-012 (DI Framework Evaluation):
 |------|----------|---------|
 | 2026-04-02 | DI Framework: Manual restructuring (Option C) | ADR-012 evaluation complete |
 | 2026-04-03 | No new DI framework dependencies | wire/fx overhead not justified |
-| 2026-04-03 | Dev-C workload clarification | 4 active tasks discovered; not inactive |
-| 2026-04-03 | TASK-307 reassigned to Dev-B | Dev-C has sufficient workload |
+| 2026-04-03 | Dev-C workload clarification | 4 tasks already merged; filing error discovered |
+| 2026-04-03 | TASK-307 reassigned to Dev-B | Dev-C work complete |
 
 ---
 
 ## Blockers
 
-| Blocker | Severity | Owner | ETA |
-|---------|----------|-------|-----|
-| ⚠️ QA Bottleneck (10 PRs) | **CRITICAL** | CTO/QA | TBD |
+**No critical blockers.** QA backlog of 5 PRs is manageable.
 
 ---
 
 *Direction maintained by: TechLead-Intel*  
-*⚠️ CRITICAL: QA capacity is blocking sprint progression. Immediate attention required.*
+*✅ All escalations resolved. Sprint progressing normally.*
