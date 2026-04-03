@@ -25,10 +25,15 @@
 - **Next:** Continue TASK-002 implementation
 
 ## Dev-B
-- **Status:** ⏳ **IDLE** — Awaiting checkout of PHI-120
-- **Paperclip Task:** [PHI-120](/PHI/issues/PHI-120) (status: in_progress, assigned)
-- **Completed:** PHI-117 (TASK-003) — typing indicators for all 6 major commands
-- **Next:** **CHECKOUT PHI-120** and start TASK-005 implementation
+- **Status:** ✅ **COMPLETED** — PHI-120 (TASK-005 user-friendly error messages)
+- **Paperclip Task:** [PHI-120](/PHI/issues/PHI-120)
+- **Completed:** 
+  - PHI-117 (TASK-003) — typing indicators for all 6 major commands
+  - PHI-120 (TASK-005) — error handling layer already implemented:
+    - `errors.go` (251 LOC) - user-friendly error mapping
+    - `errors_test.go` (236 LOC) - comprehensive tests
+    - Retry + home buttons on retriable errors
+- **Next:** ⏳ **IDLE** — Awaiting next assignment from TechLead-Intel
 
 ## Dev-C
 - **Status:** 🔄 **RUNNING** — PHI-119: TASK-004 compact output mode
