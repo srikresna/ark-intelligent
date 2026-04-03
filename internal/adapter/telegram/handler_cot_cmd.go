@@ -443,8 +443,24 @@ func (h *Handler) cmdHistory(ctx context.Context, chatID string, userID int64, a
 	}
 	b.WriteString("</pre>")
 
-	_, err = h.bot.SendHTML(ctx, chatID, b.String())
+	kb := h.kb.HistoryNavKeyboard(currency, weeks)
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, b.String(), kb)
 	return err
+}
+
+// cbHistory handles "hist:" callbacks for /history week-switcher navigation.
+func (h *Handler) cbHistory(ctx context.Context, chatID string, _ int, userID int64, data string) error {
+	// data format: "hist:{CURRENCY}:{weeks}"
+	parts := strings.Split(strings.TrimPrefix(data, "hist:"), ":")
+	if len(parts) != 2 {
+		return nil
+	}
+	currency := strings.ToUpper(parts[0])
+	weeks, err := strconv.Atoi(parts[1])
+	if err != nil || weeks < 2 || weeks > 52 {
+		return nil
+	}
+	return h.cmdHistory(ctx, chatID, userID, fmt.Sprintf("%s %d", currency, weeks))
 }
 
 // sparkLine generates a Unicode sparkline from a slice of values.

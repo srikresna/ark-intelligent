@@ -317,6 +317,7 @@ func NewHandler(
 	bot.RegisterCallback("share:", h.cbShare)
 	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
 	bot.RegisterCallback("briefing:", h.cbBriefingRefresh)
+	bot.RegisterCallback("hist:", h.cbHistory)
 
 	// Onboarding completion tracking (TASK-204)
 	h.registerOnboardingProgress()

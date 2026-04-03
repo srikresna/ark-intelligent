@@ -1843,3 +1843,24 @@ func (kb *KeyboardBuilder) ElliottKeyboard(symbol, currentTF string) ports.Inlin
 
 	return ports.InlineKeyboard{Rows: rows}
 }
+
+// HistoryNavKeyboard builds the week-switcher keyboard for /history command.
+// currentWeeks: 4, 8, or 12 — highlights the active selection with a ✓ prefix.
+func (kb *KeyboardBuilder) HistoryNavKeyboard(currency string, currentWeeks int) ports.InlineKeyboard {
+	label := func(w int) string {
+		if w == currentWeeks {
+			return fmt.Sprintf("✓ %dW", w)
+		}
+		return fmt.Sprintf("%dW", w)
+	}
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: label(4), CallbackData: fmt.Sprintf("hist:%s:4", currency)},
+				{Text: label(8), CallbackData: fmt.Sprintf("hist:%s:8", currency)},
+				{Text: label(12), CallbackData: fmt.Sprintf("hist:%s:12", currency)},
+			},
+			kb.HomeRow(),
+		},
+	}
+}
