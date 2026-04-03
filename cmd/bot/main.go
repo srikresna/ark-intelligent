@@ -443,6 +443,16 @@ func main() {
 		handler.WithICT(ictServices)
 		log.Info().Msg("ICT/SMC commands registered (/ict)")
 
+		// Wire SMC services (Smart Money Concepts: BOS/CHOCH + ICT overlay)
+		smcServices := &tgbot.SMCServices{
+			ICTEngine:      ictsvc.NewEngine(),
+			TAEngine:       taEngine,
+			DailyPriceRepo: dailyPriceRepo,
+			IntradayRepo:   intradayRepo,
+		}
+		handler.WithSMC(smcServices)
+		log.Info().Msg("SMC commands registered (/smc)")
+
 		// Wire GEX services (Gamma Exposure engine via Deribit public API)
 		gexServices := &tgbot.GEXServices{
 			Engine: gexsvc.NewEngine(),
