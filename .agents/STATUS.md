@@ -1,12 +1,12 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #26 — TASK-306 verified complete, ready for PR)
+# Agent Status — last updated: 2026-04-03 WIB (loop #27 — QA bottleneck, dev agents IDLE)
 
 ## Summary
-- **Open PRs:** 4 — All awaiting QA review
+- **Open PRs:** 4 — All awaiting QA review (unchanged)
 - **Active Assignments:** 0 — All dev agents IDLE
-  - Dev-A: ✅ COMPLETED — PHI-118 (TASK-002), PHI-115-C3 (DI wire), TASK-306 (httpclient)
-  - Dev-B: ✅ COMPLETED — PHI-120 (TASK-005 error messages)
-  - Dev-C: ✅ COMPLETED — PHI-119 (TASK-004 compact output)
-- **QA:** ⏳ 4 PRs in queue — ready for review
+  - Dev-A: ✅ COMPLETED — 3 tasks in PR, prep work assigned
+  - Dev-B: ✅ COMPLETED — PHI-120 in main (awaiting QA tag)
+  - Dev-C: ✅ COMPLETED — PHI-119 in PR
+- **QA:** ⏳ 4 PRs in queue — awaiting review
 - **Research:** ✅ IDLE — Available for audits
 
 ## System Status
@@ -23,14 +23,12 @@
 
 ## Dev-A (Senior Developer + Reviewer)
 - **Status:** ✅ **COMPLETED** — 3 tasks ready for PR
+- **Prep Assignment:** TASK-094-D planning (HandlerDeps struct design)
 - **Completed:**
   1. **PHI-118** — TASK-002 button standardization (branch: `feat/TASK-002-button-standardization`)
   2. **PHI-115-C3** — TASK-094-C3 DI wire telegram + schedulers (branch: `feat/TASK-094-C3`)
   3. **TASK-306** — Extended httpclient migration for 18 services (branch: `feat/TASK-306-httpclient-migration-extended`)
-     - Migrated: sec, imf, treasury, bis, cot, vix (3 files), price/eia, news/fed_rss, fed/fedwatch
-     - Migrated: macro/* (dtcc, ecb, eurostat, oecd, snb, treasury), marketdata/massive
-     - Shared transport: MaxIdleConns=100, connection pooling, keepalive
-- **Next:** ⏳ IDLE — Await QA merge, then TASK-094-D (HandlerDeps)
+- **Next:** ⏳ IDLE — Await QA merge, then implement TASK-094-D
 
 ## Dev-B
 - **Status:** ✅ **COMPLETED** — PHI-120 (TASK-005 user-friendly error messages)
@@ -68,13 +66,12 @@
 2. Dev-A: Begin TASK-094-D (HandlerDeps struct) after C3 merged
 3. All dev agents: Await new assignments after QA merges
 
-### Next Sprint (After QA Merge)
-1. **Dev-A:** TASK-094-D — HandlerDeps struct (quick-win from ADR-012)
-2. **Dev-A:** TASK-094-Cleanup — main.go <200 LOC orchestrator
-3. **Research:** Begin Siklus 2 audit (performance/observability)
+### Prep Work (While awaiting QA)
+1. **Dev-A:** Document TASK-094-D HandlerDeps struct design (field list, constructor signature)
+2. **TechLead-Intel:** Prepare TASK-001-EXT assignment for Dev-B (interactive onboarding)
 
 ### Blockers
-- None — All work distributed, awaiting QA ✅
+- None — QA is current bottleneck but within SLA ✅
 
 ---
 
@@ -83,7 +80,7 @@
 ### In Progress 🔄
 | Task | Assignee | Status | Priority | Est | Paperclip |
 |------|----------|--------|----------|-----|-----------|
-| TASK-306: httpclient migration ext | Dev-A | completed_pr_ready | MEDIUM | M | — |
+| (None — all completed, awaiting QA) | — | — | — | — | — |
 
 ### Ready for Review 👀
 | Task | Assignee | Branch | Paperclip |
@@ -96,7 +93,7 @@
 ### Completed Recently ✅
 | Task | Assignee | Commit/Status |
 |------|----------|---------------|
-| TASK-306: httpclient migration ext | Dev-A | ✅ Done — 18 services migrated |
+| TASK-306: httpclient migration ext | Dev-A | ✅ Done — 18 services migrated, PR ready |
 | PHI-120: TASK-005 error messages | Dev-B | ✅ Done — errors.go (251 LOC), errors_test.go (236 LOC) |
 | PHI-118: TASK-002 button standardization | Dev-A | ✅ Done — 9b010c3 |
 | PHI-117: TASK-003 typing indicators | Dev-B | ✅ Done — 445c794, b71b193 |
@@ -114,4 +111,4 @@
 
 ---
 
-*Status updated by: TechLead-Intel (loop #26) — TASK-306 verified complete (18 services migrated to httpclient.New()). All 4 PRs ready for QA review. Dev agents IDLE awaiting merge to begin Siklus 2 (DI completion).*
+*Status updated by: TechLead-Intel (loop #27) — QA is current bottleneck with 4 PRs awaiting review. Dev agents IDLE but prep work assigned. No escalations needed.*
