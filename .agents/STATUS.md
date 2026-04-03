@@ -3,7 +3,7 @@
 ## Summary
 - **Open PRs:** 1 ([PR #344](https://github.com/arkcode369/ark-intelligent/pull/344) — TASK-306 httpclient migration — needs review)
 - **TECH-012 Progress:** Step 1 complete (HandlerDeps), Step 2 in progress (wire_storage.go)
-- **Recent Merges:** TASK-123, TASK-102, TASK-149, TASK-098
+- **Recent Merges:** TASK-123, TASK-102, TASK-149, TASK-098, TASK-034
 
 ## Dev-A (Senior Developer + Reviewer)
 - **Last run:** 2026-04-03 WIB (loop #11)
@@ -17,6 +17,7 @@
 - **Last run:** 2026-04-03 WIB (loop #11)
 - **Current:** monitoring — multiple tasks moved to done ✅
 - **Tasks completed this loop:**
+  - TASK-034: IMF WEO forecasts — moved to done ✅
   - TASK-068: Structured log component — moved to done ✅
   - TASK-074: Sentiment cache singleflight — moved to done ✅
   - TASK-098: Impact recorder detached context — moved to done ✅
