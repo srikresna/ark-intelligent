@@ -299,6 +299,10 @@ type COTAnalysis struct {
 	OpenInterestChg   float64 `json:"open_interest_chg"`
 	OIPctChange       float64 `json:"oi_pct_change"`
 	OITrend           string  `json:"oi_trend"`
+	// 4-Week Open Interest Momentum
+	OI4WTrend      string  `json:"oi_4w_trend"`       // "ACCUMULATING", "DISTRIBUTING", "MIXED", "INSUFFICIENT"
+	OI4WMomentum   float64 `json:"oi_4w_momentum"`    // avg weekly OI change over 4 weeks (%)
+	OI4WAccumCount int     `json:"oi_4w_accum_count"` // consecutive weeks of OI rising (positive=accum, negative=distrib)
 	Top4Concentration float64 `json:"top4_concentration"`
 	Top4LongPct       float64 `json:"top4_long_pct"`  // Top-4 long % of OI
 	Top4ShortPct      float64 `json:"top4_short_pct"` // Top-4 short % of OI

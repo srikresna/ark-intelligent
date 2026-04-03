@@ -337,6 +337,16 @@ func (f *Formatter) FormatCOTDetailWithCode(a domain.COTAnalysis, displayCode st
 	// Open Interest
 	b.WriteString("\n<b>Open Interest:</b>\n")
 	b.WriteString(fmt.Sprintf("<code>  OI Change:      %s (%s)</code>\n", fmtutil.FmtNumSigned(a.OpenInterestChg, 0), a.OITrend))
+	if a.OI4WTrend != "" && a.OI4WTrend != "INSUFFICIENT" {
+		icon := "➡️"
+		if a.OI4WTrend == "ACCUMULATING" {
+			icon = "📈"
+		} else if a.OI4WTrend == "DISTRIBUTING" {
+			icon = "📉"
+		}
+		b.WriteString(fmt.Sprintf("<code>  OI 4W Trend:    %s %s (avg %+.1f%%/wk)</code>\n",
+			icon, a.OI4WTrend, a.OI4WMomentum))
+	}
 	if a.SpreadPctOfOI > 0 {
 		b.WriteString(fmt.Sprintf("<code>  Spread Pos:     %.1f%% of OI</code>\n", a.SpreadPctOfOI))
 	}

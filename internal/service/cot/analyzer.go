@@ -306,6 +306,52 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 		analysis.OITrend = "FALLING"
 	}
 
+	// 5c. 4-Week OI Accumulation Momentum
+	if len(history) >= 4 {
+		consecutiveUp := 0
+		consecutiveDown := 0
+		weeklyChanges := make([]float64, 0, 4)
+
+		for i := 0; i < minInt(4, len(history)-1); i++ {
+			currOI := history[i].OpenInterest
+			prevOI := history[i+1].OpenInterest
+			if prevOI <= 0 {
+				continue
+			}
+			chgPct := (currOI - prevOI) / prevOI * 100
+			weeklyChanges = append(weeklyChanges, chgPct)
+			if chgPct > 0.5 {
+				consecutiveUp++
+			} else if chgPct < -0.5 {
+				consecutiveDown++
+			}
+		}
+
+		// Average OI momentum
+		if len(weeklyChanges) > 0 {
+			sum := 0.0
+			for _, c := range weeklyChanges {
+				sum += c
+			}
+			analysis.OI4WMomentum = sum / float64(len(weeklyChanges))
+		}
+
+		switch {
+		case consecutiveUp >= 3:
+			analysis.OI4WTrend = "ACCUMULATING"
+			analysis.OI4WAccumCount = consecutiveUp
+		case consecutiveDown >= 3:
+			analysis.OI4WTrend = "DISTRIBUTING"
+			analysis.OI4WAccumCount = -consecutiveDown
+		case len(weeklyChanges) >= 2:
+			analysis.OI4WTrend = "MIXED"
+		default:
+			analysis.OI4WTrend = "INSUFFICIENT"
+		}
+	} else {
+		analysis.OI4WTrend = "INSUFFICIENT"
+	}
+
 	// === Index Metrics (Larry Williams COT Index) ===
 
 	if len(history) >= 3 {
