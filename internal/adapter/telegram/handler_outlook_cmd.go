@@ -180,6 +180,9 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// Fed speeches — recent FOMC communication (graceful degradation on error)
 	fedSpeeches := fred.FetchRecentSpeeches(ctx)
 
+	// EIA energy inventory data — crude oil, gasoline, distillate (graceful degradation)
+	eiaData, _ := pricesvc.GetCachedOrFetchEIA(ctx)
+
 	// Daily price contexts (for daily technical analysis in outlook)
 	var dailyPriceCtxs map[string]*domain.DailyPriceContext
 	if h.dailyPriceRepo != nil {
@@ -307,6 +310,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		GEXResults:         gexResults,
 		WyckoffContexts:    wyckoffContexts,
 		MicrostructureData: microSignals,
+		EIAData:            eiaData,
 		Language:           prefs.Language,
 	}
 

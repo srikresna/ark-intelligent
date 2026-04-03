@@ -58,7 +58,36 @@ type UnifiedOutlookData struct {
 	// MicrostructureData holds Bybit orderbook/flow microstructure signals for crypto.
 	// Typically BTC and ETH. May be nil if alpha services not configured.
 	MicrostructureData []*microstructure.Signal
+	// EIAData holds EIA weekly energy inventory data (crude, gasoline, distillate).
+	// May be nil if EIA_API_KEY is not configured.
+	EIAData            *pricesvc.EIASeasonalData
 	Language           string
+}
+
+// buildEIASummary returns a one-line EIA crude oil inventory summary with 4-week trend.
+func buildEIASummary(eiaData *pricesvc.EIASeasonalData) string {
+	if eiaData == nil || len(eiaData.CrudeInventory) == 0 {
+		return ""
+	}
+	latest := eiaData.CrudeInventory[0].Value
+	var weeklyChanges []float64
+	for i := 1; i < len(eiaData.CrudeInventory) && i < 5; i++ {
+		weeklyChanges = append(weeklyChanges, eiaData.CrudeInventory[i-1].Value-eiaData.CrudeInventory[i].Value)
+	}
+	avg := 0.0
+	for _, v := range weeklyChanges {
+		avg += v
+	}
+	if len(weeklyChanges) > 0 {
+		avg /= float64(len(weeklyChanges))
+	}
+	trend := "FLAT"
+	if avg > 1.0 {
+		trend = "BUILD"
+	} else if avg < -1.0 {
+		trend = "DRAW"
+	}
+	return fmt.Sprintf("Crude: %.1fMbbl (4wk avg Δ%.1fMbbl/wk → %s)", latest, avg, trend)
 }
 
 // BuildUnifiedOutlookPrompt builds a comprehensive prompt that fuses ALL
@@ -744,6 +773,16 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 				sig.OIChange, sig.FundingRate*100))
 		}
 		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: EIA Energy Data
+	// -----------------------------------------------------------------------
+	if data.EIAData != nil && len(data.EIAData.CrudeInventory) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. EIA ENERGY DATA ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		b.WriteString(buildEIASummary(data.EIAData))
+		b.WriteString("\n(Relevant for USDCAD, AUDUSD, USDNOK analysis)\n\n")
 	}
 
 	// -----------------------------------------------------------------------

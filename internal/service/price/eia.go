@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
@@ -452,4 +454,42 @@ func joinParts(parts []string) string {
 		result += "; " + parts[i]
 	}
 	return result
+}
+
+// ---------------------------------------------------------------------------
+// Package-level EIA cache (TTL: 12h — EIA data updates weekly)
+// ---------------------------------------------------------------------------
+
+const eiaDataCacheTTL = 12 * time.Hour
+
+var (
+	eiaGlobalCacheMu  sync.Mutex
+	eiaGlobalCache    *EIASeasonalData
+	eiaGlobalFetchedAt time.Time
+)
+
+// GetCachedOrFetchEIA returns cached EIASeasonalData if within TTL, else fetches fresh data.
+// Returns nil without error if EIA_API_KEY is not set.
+func GetCachedOrFetchEIA(ctx context.Context) (*EIASeasonalData, error) {
+	eiaGlobalCacheMu.Lock()
+	defer eiaGlobalCacheMu.Unlock()
+
+	if eiaGlobalCache != nil && time.Since(eiaGlobalFetchedAt) < eiaDataCacheTTL {
+		return eiaGlobalCache, nil
+	}
+
+	apiKey := os.Getenv("EIA_API_KEY")
+	if apiKey == "" {
+		return nil, nil // graceful: no key configured
+	}
+
+	client := NewEIAClient(apiKey)
+	data, err := client.FetchSeasonalData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetch EIA data: %w", err)
+	}
+
+	eiaGlobalCache = data
+	eiaGlobalFetchedAt = time.Now()
+	return data, nil
 }
