@@ -1,6 +1,6 @@
 # TASK-305: Fix HMM TRENDING State Score in Overlay Engine
 
-**Status:** claimed
+**Status:** done
 **Priority:** HIGH
 **Effort:** XS
 **Agent:** DEV-A
