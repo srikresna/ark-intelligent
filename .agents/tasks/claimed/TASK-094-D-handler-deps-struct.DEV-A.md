@@ -1,44 +1,44 @@
-# TASK-094-D: Convert Handler to HandlerDeps struct — ✅ COMPLETED
+# TASK-094-D: Convert Handler to HandlerDeps struct — 🔄 IN PROGRESS
 
-**Status:** ✅ DONE (merged to agents/main)  
+**Status:** 🔄 ASSIGNED → Dev-A (PREP WORK)  
 **Priority:** HIGH  
 **Effort:** S (Small — estimasi 1 jam)  
 **Source:** ADR — Dependency Injection Framework Evaluation (TECH-012)  
 **Ref:** `.agents/research/2026-04-01-adr-di-framework.md`  
-**Paperclip:** [PHI-105](/PHI/issues/PHI-105)  
-**Commit:** c2c0b47  
-**Completed:** 2026-04-03
+**Paperclip:** [PHI-115](/PHI/issues/PHI-115)  
+**Blocked by:** C3 PR merge to agents/main  
+**Parent:** TASK-094 (DI Restructuring)
 
 ---
 
 ## Summary
 
-Converted Handler constructor from 17 positional parameters to struct-based dependency injection per ADR TECH-012.
+Convert Handler constructor from 17 positional parameters to struct-based dependency injection per ADR TECH-012. **WAITING for C3 PR merge to agents/main before implementation.**
 
 ---
 
-## Changes Made
+## Changes To Make
 
-### Files Modified
+### Files To Modify
 - `internal/adapter/telegram/handler.go`
-  - Added `HandlerDeps` struct with all 17 dependencies as fields
-  - Refactored `NewHandler(deps HandlerDeps) *Handler` signature
-  - Updated all field assignments to use `deps.FieldName`
+  - Add `HandlerDeps` struct with all 17 dependencies as fields
+  - Refactor `NewHandler(deps HandlerDeps) *Handler` signature
+  - Update all field assignments to use `deps.FieldName`
 
 - `cmd/bot/main.go`
-  - Updated NewHandler call to use `HandlerDeps{...}` struct literal
+  - Update NewHandler call to use `HandlerDeps{...}` struct literal
   - All 17 dependencies now passed as named fields
 
 ---
 
 ## Acceptance Criteria
 
-- [x] Create `HandlerDeps` struct with all 17 dependencies as fields
-- [x] Refactor `NewHandler()` to accept `HandlerDeps` instead of 17 positional params
-- [x] Update all call sites in `cmd/bot/main.go`
-- [x] `go build ./...` clean
-- [x] `go vet ./...` zero warnings
-- [x] No behavior changes — pure refactor
+- [ ] Create `HandlerDeps` struct with all 17 dependencies as fields
+- [ ] Refactor `NewHandler()` to accept `HandlerDeps` instead of 17 positional params
+- [ ] Update all call sites in `cmd/bot/main.go`
+- [ ] `go build ./...` clean
+- [ ] `go vet ./...` zero warnings
+- [ ] No behavior changes — pure refactor
 
 ---
 
