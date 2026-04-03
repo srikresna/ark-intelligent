@@ -445,7 +445,7 @@ type quantAssetClose struct {
 // runQuantEngine — execute Python quant_engine.py
 // ---------------------------------------------------------------------------
 
-func (h *Handler) runQuantEngine(ctx context.Context, state *quantState, mode string) (*quantEngineResult, error) {
+func (h *Handler) runQuantEngine(ctx context.Context, state *quantState, mode string) (result *quantEngineResult, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error().
@@ -511,10 +511,17 @@ func (h *Handler) runQuantEngine(ctx context.Context, state *quantState, mode st
 	outputPath := filepath.Join(tmpDir, fmt.Sprintf("quant_output_%d.json", ts))
 	chartPath := filepath.Join(tmpDir, fmt.Sprintf("quant_chart_%d.png", ts))
 
-	if err := os.WriteFile(inputPath, jsonData, 0644); err != nil {
-		return nil, fmt.Errorf("write quant input: %w", err)
+	if err = os.WriteFile(inputPath, jsonData, 0644); err != nil {
+		err = fmt.Errorf("write quant input: %w", err)
+		return
 	}
 	defer os.Remove(inputPath)
+	defer os.Remove(outputPath)
+	defer func() {
+		if err != nil {
+			os.Remove(chartPath)
+		}
+	}()
 
 	scriptPath := findQuantScript()
 
@@ -525,42 +532,41 @@ func (h *Handler) runQuantEngine(ctx context.Context, state *quantState, mode st
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	if err = cmd.Run(); err != nil {
 		log.Error().Err(err).
 			Str("stderr", stderr.String()).
 			Str("symbol", state.symbol).
 			Str("mode", mode).
 			Msg("quant engine subprocess failed")
-		os.Remove(chartPath) // cleanup chart on failure
-		os.Remove(outputPath)
-		return nil, fmt.Errorf("quant engine failed: %w", err)
+		err = fmt.Errorf("quant engine failed: %w", err)
+		return
 	}
 
 	// Read output
 	outData, err := os.ReadFile(outputPath)
-	os.Remove(outputPath)
 	if err != nil {
-		os.Remove(chartPath) // cleanup chart if output unreadable
-		return nil, fmt.Errorf("read quant output: %w", err)
+		err = fmt.Errorf("read quant output: %w", err)
+		return
 	}
 
-	var result quantEngineResult
-	if err := json.Unmarshal(outData, &result); err != nil {
-		os.Remove(chartPath) // cleanup chart if output unparseable
-		return nil, fmt.Errorf("parse quant output: %w", err)
+	var res quantEngineResult
+	if err = json.Unmarshal(outData, &res); err != nil {
+		err = fmt.Errorf("parse quant output: %w", err)
+		return
 	}
 
 	// Check if chart was actually generated; caller owns cleanup when ChartPath is set.
-	if fi, err := os.Stat(chartPath); err == nil {
+	if fi, statErr := os.Stat(chartPath); statErr == nil {
 		if fi.Size() > 0 {
-			result.ChartPath = chartPath
+			res.ChartPath = chartPath
 		} else {
 			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
 			os.Remove(chartPath)
 		}
 	}
 
-	return &result, nil
+	result = &res
+	return
 }
 
 // ---------------------------------------------------------------------------

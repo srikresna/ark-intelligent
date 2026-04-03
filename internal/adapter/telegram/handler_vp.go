@@ -422,7 +422,7 @@ type vpEngineResult struct {
 	ChartPath  string          `json:"chart_path"`
 }
 
-func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
+func (h *Handler) runVPEngine(input map[string]any) (result *vpEngineResult, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			// This panic is caught by handleUpdate's outer recovery too,
@@ -438,6 +438,12 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	chartPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_chart_%d.png", ts))
 
 	defer os.Remove(inputPath)
+	defer os.Remove(outputPath)
+	defer func() {
+		if err != nil {
+			os.Remove(chartPath)
+		}
+	}()
 
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
@@ -456,43 +462,43 @@ func (h *Handler) runVPEngine(input map[string]any) (*vpEngineResult, error) {
 	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), "MPLBACKEND=Agg")
 
-	if err := cmd.Run(); err != nil {
+	if err = cmd.Run(); err != nil {
 		log.Error().Err(err).
 			Str("stderr", stderr.String()).
 			Msg("VP engine subprocess failed")
-		os.Remove(chartPath) // cleanup chart on failure
-		os.Remove(outputPath)
-		return nil, fmt.Errorf("VP engine failed: %w", err)
+		err = fmt.Errorf("VP engine failed: %w", err)
+		return
 	}
 
 	resultJSON, err := os.ReadFile(outputPath)
-	os.Remove(outputPath)
 	if err != nil {
-		os.Remove(chartPath) // cleanup chart if output unreadable
-		return nil, fmt.Errorf("read output: %w", err)
+		err = fmt.Errorf("read output: %w", err)
+		return
 	}
 
-	var result vpEngineResult
-	if err := json.Unmarshal(resultJSON, &result); err != nil {
-		os.Remove(chartPath) // cleanup chart if output unparseable
-		return nil, fmt.Errorf("unmarshal output: %w", err)
+	var res vpEngineResult
+	if err = json.Unmarshal(resultJSON, &res); err != nil {
+		err = fmt.Errorf("unmarshal output: %w", err)
+		return
 	}
 
-	if !result.Success {
-		os.Remove(chartPath) // cleanup chart on engine-reported failure
-		return &result, fmt.Errorf("%s", result.Error)
+	if !res.Success {
+		err = fmt.Errorf("%s", res.Error)
+		result = &res
+		return
 	}
 
 	if fi, statErr := os.Stat(chartPath); statErr == nil {
 		if fi.Size() > 0 {
-			result.ChartPath = chartPath // caller owns cleanup
+			res.ChartPath = chartPath // caller owns cleanup
 		} else {
 			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
 			os.Remove(chartPath)
 		}
 	}
 
-	return &result, nil
+	result = &res
+	return
 }
 
 // findVPScript locates the vp_engine.py script.
