@@ -213,10 +213,11 @@ func FormatRegimeDashboard(states []*pricesvc.RegimeState, divergence string) st
 		sb.WriteString("\n")
 
 		sb.WriteString(fmt.Sprintf("  State: <code>%s</code> (%dd)\n", s.CurrentState, s.DaysInRegime))
-		sb.WriteString(fmt.Sprintf("  P: RiskOn=%.0f%% RiskOff=%.0f%% Crisis=%.0f%%\n",
+		sb.WriteString(fmt.Sprintf("  P: RiskOn=%.0f%% RiskOff=%.0f%% Crisis=%.0f%% Trending=%.0f%%\n",
 			s.StateProbabilities[0]*100,
 			s.StateProbabilities[1]*100,
-			s.StateProbabilities[2]*100))
+			s.StateProbabilities[2]*100,
+			s.StateProbabilities[3]*100))
 
 		if s.MeanDuration > 0 {
 			sb.WriteString(fmt.Sprintf("  Avg regime duration: %.0fd\n", s.MeanDuration))

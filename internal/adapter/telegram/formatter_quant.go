@@ -502,6 +502,10 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 		icon = "🔴 Crisis"
 		label = "Crisis (Panic)"
 		desc = "Market is in stress mode. Correlations spike, safe havens outperform."
+	case pricesvc.HMMTrending:
+		icon = "🔵 Trending"
+		label = "Trending (Directional)"
+		desc = "Market is in a strong directional move with low vol. Ride the trend."
 	}
 
 	b.WriteString(fmt.Sprintf("🔀 <b>%s — Market Regime</b> %s\n\n", currency, icon))
@@ -515,6 +519,7 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 	b.WriteString(fmt.Sprintf("<code>Calm   : %.0f%%</code>\n", h.StateProbabilities[0]*100))
 	b.WriteString(fmt.Sprintf("<code>Cautious: %.0f%%</code>\n", h.StateProbabilities[1]*100))
 	b.WriteString(fmt.Sprintf("<code>Panic  : %.0f%%</code>\n", h.StateProbabilities[2]*100))
+	b.WriteString(fmt.Sprintf("<code>Trending: %.0f%%</code>\n", h.StateProbabilities[3]*100))
 
 	// Transition warning
 	if h.TransitionWarning != "" {

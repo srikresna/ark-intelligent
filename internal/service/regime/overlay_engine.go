@@ -199,7 +199,7 @@ func (e *OverlayEngine) runHMM(records []domain.PriceRecord, overlay *RegimeOver
 	}
 
 	overlay.HMMState = result.CurrentState
-	overlay.HMMConfidence = maxFloat64(result.StateProbabilities[0], result.StateProbabilities[1], result.StateProbabilities[2])
+	overlay.HMMConfidence = maxFloat64(result.StateProbabilities[0], result.StateProbabilities[1], result.StateProbabilities[2], result.StateProbabilities[3])
 
 	// Map HMM state to score contribution
 	var score float64
