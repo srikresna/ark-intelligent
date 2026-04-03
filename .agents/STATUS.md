@@ -4,14 +4,14 @@
 - **Open PRs:** 4 — Dev-A TASK-002, Dev-C PHI-119, Dev-A TASK-094-C3
 - **Active Assignments:** 1 dev agent working, 2 idle
   - Dev-A: ✅ COMPLETED — PHI-118 (TASK-002 button standardization)
-  - Dev-B: ⏳ IDLE — PHI-120 (TASK-005 error messages) — **needs implementation**
+  - Dev-B: ✅ COMPLETED — PHI-120 (TASK-005 error messages)
   - Dev-C: ✅ PR SUBMITTED — PHI-119 (TASK-004 compact output mode)
 - **QA:** ⏳ IDLE — 4 PRs awaiting review
 - **Research:** ✅ IDLE — Available for new audits
 
 ## System Status
 - **Dev-A:** ✅ **COMPLETED** — PHI-118: TASK-002 button standardization (PR: feat/TASK-002-button-standardization)
-- **Dev-B:** ⏳ **IDLE** — PHI-120: TASK-005 error messages — **needs implementation**
+- **Dev-B:** ✅ **COMPLETED** — PHI-120: TASK-005 error messages (already implemented)
 - **Dev-C:** ✅ **PR SUBMITTED** — PHI-119: TASK-004 compact output mode (branch: feat/PHI-119-compact-output)
 - **QA:** ⏳ **IDLE** — 4 PRs ready for review
 - **Research:** ✅ **IDLE** — Available for audits
@@ -29,13 +29,15 @@
 - **Next:** ⏳ IDLE — Awaiting next assignment
 
 ## Dev-B
-- **Status:** ⏳ **IDLE** — PHI-120 assigned, needs implementation
-- **Paperclip Task:** [PHI-120](/PHI/issues/PHI-120) (status: in_progress)
-- **Completed:** PHI-117 (TASK-003) — typing indicators for all 6 major commands
-- **Scope:** Create error layer to map technical errors → user-friendly messages
-  - Create `internal/adapter/telegram/errors.go` with error mapping
-  - Create `errors_test.go` with comprehensive tests
-- **Next:** **IMPLEMENT PHI-120** — Create errors.go and error handling layer
+- **Status:** ✅ **COMPLETED** — PHI-120 (TASK-005 user-friendly error messages)
+- **Paperclip Task:** [PHI-120](/PHI/issues/PHI-120) (status: done)
+- **Completed:** 
+  - PHI-117 (TASK-003) — typing indicators for all 6 major commands
+  - PHI-120 (TASK-005) — error handling layer:
+    - `errors.go` (251 LOC) - user-friendly error mapping with retry buttons
+    - `errors_test.go` (236 LOC) - comprehensive tests
+    - All error types covered: timeout, data not found, network, AI, auth, BadgerDB
+- **Next:** ⏳ **IDLE** — Awaiting next assignment from TechLead-Intel
 
 ## Dev-C
 - **Status:** ✅ **PR SUBMITTED** — PHI-119: TASK-004 compact output mode
@@ -52,15 +54,14 @@
 ## Action Items
 
 ### Immediate (Next 4 hours)
-1. **Dev-B:** Implement PHI-120 — Create errors.go with user-friendly error mapping
-2. **QA:** Review Dev-A PR `feat/TASK-002-button-standardization` → merge if passes
-3. **QA:** Review Dev-C PR `feat/PHI-119-compact-output` → merge if passes
-4. **QA:** Review Dev-A PR `feat/TASK-094-C3` → merge if passes
+1. **QA:** Review Dev-A PR `feat/TASK-002-button-standardization` → merge if passes
+2. **QA:** Review Dev-C PR `feat/PHI-119-compact-output` → merge if passes
+3. **QA:** Review Dev-A PR `feat/TASK-094-C3` → merge if passes
+4. **TechLead-Intel:** Assign new tasks to Dev-A, Dev-B, Dev-C
 
 ### This Sprint (Next 24 hours)
-1. Dev-B: Complete PHI-120 error messages implementation
-2. QA: Merge all pending PRs after review
-3. Dev-A & Dev-C: Await new assignments after QA merges
+1. QA: Merge all pending PRs after review
+2. All dev agents: Await new assignments after QA merges
 
 ### Blockers
 - None — All work distributed ✅
@@ -72,7 +73,6 @@
 ### In Progress 🔄
 | Task | Assignee | Status | Priority | Est | Paperclip |
 |------|----------|--------|----------|-----|-----------|
-| PHI-120: TASK-005 error messages | Dev-B | **idle** | HIGH | S | [PHI-120](/PHI/issues/PHI-120) |
 | PHI-119: TASK-004 compact output | Dev-C | pr_submitted | MEDIUM | M | [PHI-119](/PHI/issues/PHI-119) |
 
 ### Ready for Review 👀
@@ -85,6 +85,7 @@
 ### Completed Recently ✅
 | Task | Assignee | Commit/Status |
 |------|----------|---------------|
+| PHI-120: TASK-005 error messages | Dev-B | ✅ Done — errors.go (251 LOC), errors_test.go (236 LOC) |
 | PHI-118: TASK-002 button standardization | Dev-A | ✅ Done — 9b010c3 |
 | PHI-117: TASK-003 typing indicators | Dev-B | ✅ Done — 445c794, b71b193 |
 | PHI-115: TASK-094-C3 DI restructuring | Dev-A | ✅ Done — 166f8d8 |
