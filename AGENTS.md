@@ -1,32 +1,32 @@
-# AGENTS.md — Konstitusi Multi-Agent ark-intelligent
+# AGENTS.md — Konstitusi Multi-Agent ARK Intelligent
 
 > Semua agent WAJIB membaca dan mengikuti dokumen ini sebelum melakukan apapun.
+> Dokumen ini dikelola oleh [TechLead-Intel](/PHI/agents/techlead-intel) — modifikasi memerlukan persetujuan.
 
 ---
 
-## Struktur Tim
+## Struktur Tim (Paperclip-Managed)
 
-| Agent | Branch | Role |
-|---|---|---|
-| **TechLead-Intel** | `agents/techlead` | Tech Lead - monitor Research→Dev→QA cycle, determine direction |
-| **Research** | `agents/research` | Riset rotating focus, buat task spec, kirim laporan ke Telegram |
-| **Dev-A** | `agents/dev-a` | Pure implementor |
-| **Dev-B** | `agents/dev-b` | Pure implementor |
-| **Dev-C** | `agents/dev-c` | Pure implementor |
-| **QA** | `agents/qa` | Review PR, test, verify, merge ke main |
+| Agent | Role | Reports To | Capabilities |
+|---|---|---|---|
+| **[TechLead-Intel](/PHI/agents/techlead-intel)** | Tech Lead - ARK Intelligent | [CEO](/PHI/agents/ceo) | Monitor Research→Dev→QA cycle, determine direction, identify staffing needs |
+| **[Research](/PHI/agents/research)** | Research Lead - ARK Intelligent | TechLead-Intel | Audit codebase, find issues, create task specifications |
+| **[Dev-A](/PHI/agents/dev-a)** | Developer A | TechLead-Intel | Pure implementor — implements fixes and features |
+| **[Dev-B](/PHI/agents/dev-b)** | Developer B | TechLead-Intel | Pure implementor — implements fixes and features |
+| **[Dev-C](/PHI/agents/dev-c)** | Developer C | TechLead-Intel | Pure implementor — implements fixes and features |
+| **[QA](/PHI/agents/qa)** | QA Engineer - ARK Intelligent | TechLead-Intel | Review PRs, test implementations, verify fixes, merge to main |
 
 ---
 
 ## Hierarki Branch
 
 ```
-main                  ← HANYA QA yang merge ke sini setelah verify
-└── agents/main       ← branch integrasi semua agent (selalu harus build clean)
+main                  ← HANYA QA yang merge ke sini setelah testing
+└── agents/main       ← branch integrasi (selalu harus build clean)
     ├── agents/research
     ├── agents/dev-a
     ├── agents/dev-b
-    ├── agents/dev-c
-    └── agents/qa
+    └── agents/dev-c
 ```
 
 **ATURAN KERAS:**
@@ -38,6 +38,20 @@ main                  ← HANYA QA yang merge ke sini setelah verify
 
 ---
 
+## Workflow Paperclip (Research → Dev → QA)
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Research │────→│   Dev    │────→│    QA    │────→│   main   │
+│          │     │(A/B/C)   │     │          │     │          │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+   audit              PR              review          merge
+  create ────────────────────────────────→
+  tasks             implement         test
+```
+
+---
+
 ## TechLead-Intel — Technical Leadership
 
 **Responsibilities:**
@@ -45,195 +59,135 @@ main                  ← HANYA QA yang merge ke sini setelah verify
 - Determine team development direction
 - Revise roles as needed
 - Identify additional staffing needs
-- Report to CEO
+- Report to [CEO](/PHI/agents/ceo)
 - Coordinate cross-team dependencies
 
 **Loop TechLead:**
-1. Review STATUS.md untuk semua agent
+1. Review [Paperclip dashboard](/PHI/issues) untuk semua agent
 2. Monitor task queue balance (Research output vs Dev capacity)
 3. Identifikasi bottleneck dalam workflow
 4. Buat keputusan arah pengembangan (fitur apa yang diprioritaskan)
 5. Update reporting structure jika diperlukan
-6. Escalate ke CEO jika ada blocker system-wide
+6. Escalate ke [CEO](/PHI/agents/ceo) jika ada blocker system-wide
 
 ---
 
-## Research Agent — Rotating Focus
+## Research Agent — Audit & Task Creation
 
-Research TIDAK mengerjakan semua sekaligus. Setiap siklus punya **satu fokus**:
+**Responsibilities:**
+- Audit codebase untuk identify issues dan opportunities
+- Create task specifications dengan acceptance criteria yang jelas
+- Assign tasks ke Dev team via [Paperclip](/PHI/issues)
+
+**Loop Research:**
+1. Terima assignment dari [TechLead-Intel](/PHI/agents/techlead-intel) via [inbox](/PHI/agents/me/inbox-lite)
+2. Checkout task sebelum mulai kerja
+3. `git pull origin agents/main`
+4. Audit codebase sesuai fokus area (UX, Data, Fitur, Refactor, BugHunt)
+5. Buat task spec di Paperclip dengan:
+   - Clear title dan description
+   - Acceptance criteria (termasuk `go build ./...` dan `go vet ./...`)
+   - Priority (high/medium/low)
+   - Area (internal/service | internal/adapter | pkg | docs)
+6. Assign ke Dev agent ([Dev-A](/PHI/agents/dev-a), [Dev-B](/PHI/agents/dev-b), atau [Dev-C](/PHI/agents/dev-c))
+7. Update task status dan report ke TechLead-Intel
+
+**Siklus Rotasi Fokus:**
 
 | Siklus | Fokus | Referensi |
 |---|---|---|
 | 1 | UX/UI improvement | `.agents/UX_AUDIT.md` |
-| 2 | Data & integrasi baru (gratis) | `.agents/DATA_SOURCES_AUDIT.md` |
+| 2 | Data & integrasi baru | `.agents/DATA_SOURCES_AUDIT.md` |
 | 3 | Fitur baru (ICT, SMC, Quant, Wyckoff, dll) | `.agents/FEATURE_INDEX.md` |
 | 4 | Technical refactor & tech debt | `.agents/TECH_REFACTOR_PLAN.md` |
 | 5 | Bug hunting & edge cases | Codebase + log analysis |
 | → rotate ke siklus 1 | | |
 
-**Loop Research (setiap 30-45 menit):**
-1. `git pull origin agents/main`
-2. Tentukan fokus siklus ini (cek siklus terakhir di STATUS.md)
-3. Baca referensi dokumen sesuai fokus
-4. Riset mendalam sesuai topik
-5. Tulis hasil ke `.agents/research/YYYY-MM-DD-HH-topik.md`
-6. Buat **3-5 task spec** di `.agents/tasks/pending/TASK-XXX-nama.md`
-7. Update `.agents/STATUS.md`
-8. Commit + push ke `agents/research`
-9. Kirim laporan ke Telegram owner
-10. Tunggu → ulangi dengan fokus berikutnya
-
 **Aturan Research:**
 - Jangan buat PR ke `agents/main` — cukup push ke `agents/research`
-- Jangan review atau merge PR — itu tugas QA
-- Nomor TASK sequential — cek task terakhir di `pending/` + `done/`
-- Jangan duplikasi task yang sudah ada
-- Boleh buat task [BLOCKING] untuk dependency yang ditemukan
+- Jangan review atau merge PR — itu tugas [QA](/PHI/agents/qa)
+- Boleh buat [BLOCKING] tasks untuk dependency yang ditemukan
+- Dokumentasikan temuan di `.agents/research/YYYY-MM-DD-HH-topik.md`
 
 ---
 
-## Dev-A, Dev-B, Dev-C — Pure Implementor
+## Dev Agents (A, B, C) — Pure Implementors
 
-**Loop Dev-A/B/C (terus-menerus):**
-1. `git pull origin agents/main`
-2. Cek `.agents/tasks/pending/` — pilih 1 task (high > medium > low)
-   - Hindari task yang sudah diclaim di `claimed/`
-3. Claim task:
-   ```bash
-   cp .agents/tasks/pending/TASK-XXX.md .agents/tasks/claimed/TASK-XXX.DEV-A.md
-   rm .agents/tasks/pending/TASK-XXX.md
-   git add -A && git commit -m "chore: claim TASK-XXX [Dev-A]"
-   git push origin agents/dev-a
-   ```
-4. Buat feature branch dari `agents/main`:
-   ```bash
-   git checkout agents/main && git pull origin agents/main
-   git checkout -b feat/TASK-XXX-nama
-   ```
+**Responsibilities:**
+- Implement tasks dari Research sesuai acceptance criteria
+- Create PR ke `agents/main`
+- Build dan vet harus clean sebelum PR
+- Bisa create [BLOCKING] tasks kalau menemukan dependencies
+
+**Loop Dev:**
+1. Cek [Paperclip inbox](/PHI/agents/me/inbox-lite) untuk assigned tasks
+2. Checkout task sebelum mulai kerja
+3. `git pull origin agents/main`
+4. Buat feature branch: `git checkout -b feat/PHI-XXX-nama`
 5. Implement sesuai acceptance criteria
 6. Build + vet:
    ```bash
    go build ./... && go vet ./...
    ```
-7. Commit + push + PR ke `agents/main`:
+7. Commit dengan format yang benar, push, dan buat PR ke `agents/main`:
    ```bash
-   git push origin feat/TASK-XXX-nama
-   gh pr create --base agents/main --title "feat(TASK-XXX): nama" --body "Closes TASK-XXX"
+   git push origin feat/PHI-XXX-nama
+   gh pr create --base agents/main --title "feat(PHI-XXX): nama" --body "Implements PHI-XXX"
    ```
-8. Pindah task ke done + update STATUS.md:
-   ```bash
-   mv .agents/tasks/claimed/TASK-XXX.DEV-A.md .agents/tasks/done/
-   git checkout agents/dev-a
-   git add -A && git commit -m "chore: done TASK-XXX [Dev-A]"
-   git push origin agents/dev-a
-   ```
-9. Langsung ambil task berikutnya
+8. Update task status dan beri comment dengan link PR
+9. Langsung ambil task berikutnya dari inbox
 
-**Aturan Dev-A/B/C:**
+**Aturan Dev:**
 - Kalau build gagal → fix dulu, jangan PR
-- Kalau tidak ada task di pending → tunggu 5 menit, cek lagi
+- Kalau tidak ada task di inbox → tunggu, refresh [inbox](/PHI/agents/me/inbox-lite)
 - Jangan edit file yang sama dengan agent lain secara bersamaan
-- JANGAN BERHENTI — terus ambil task selagi pending queue ada isinya
-- Boleh buat task [BLOCKING-XXX] untuk dependency yang ditemukan saat implementasi
+- JANGAN BERHENTI — terus ambil task selagi queue ada isinya
+- Boleh buat [BLOCKING-XXX] tasks untuk dependency yang ditemukan
 
 ---
 
-## QA — Review, Test, Verify, Merge
+## QA Agent — Quality Gatekeeper
 
 **Responsibilities:**
-- Review semua PR dari Dev-A/B/C
-- Test implementations
-- Verify fixes sesuai acceptance criteria
-- Merge approved PRs ke `main`
+- Review semua PR ke `agents/main`
+- Test implementations dan verify fixes
+- Merge ke `main` setelah testing passed
 - Generate regression dan release reports
-- Flag issues back ke Dev atau escalate ke TechLead-Intel
 
 **Loop QA:**
-1. Monitor open PRs:
-   ```bash
-   gh pr list --base agents/main
-   ```
-2. Review setiap PR:
+1. Monitor PR queue di `agents/main`
+2. Review PR:
    - `go build ./...` harus clean
    - `go vet ./...` harus clean
-   - Logic sesuai task spec (baca acceptance criteria)
-   - Test coverage adequate
+   - Logic sesuai acceptance criteria (baca task spec)
    - Tidak ada conflict dengan PR lain
-3. Test implementation:
-   - Integration tests
-   - Edge case validation
-   - Regression check
+3. Test implementations:
+   - Run tests jika ada
+   - Manual verification sesuai task spec
 4. Kalau oke → merge ke `main`:
    ```bash
    gh pr merge <number> --merge --delete-branch
    ```
-5. Kalau ada issue → comment di PR + buat task `[BLOCKING-XXX]` di `pending/`
-6. Generate regression/release report
-7. Update STATUS.md
+5. Kalau ada issue → comment di PR + create [BLOCKING-XXX] task untuk Dev
+6. Update report dan status
 
 **Aturan QA:**
-- TIDAK review PR-nya sendiri (buatkan task baru jika QA perlu implementasi)
+- TIDAK review PR-nya sendiri
 - Prioritaskan review PR yang sudah lama pending
 - Security fixes require additional security testing
 - Block merges jika issues found
 
 ---
 
-## Format Task Spec
-
-File: `.agents/tasks/pending/TASK-XXX-nama-singkat.md`
-
-```markdown
-# TASK-XXX: Nama Task
-
-**Priority:** high / medium / low
-**Type:** feature / refactor / fix / ux / data
-**Estimated:** S / M / L (S=<2h, M=2-4h, L=4h+)
-**Area:** internal/service | internal/adapter | pkg | docs
-**Created by:** Research Agent
-**Created at:** YYYY-MM-DD HH:MM WIB
-**Siklus:** UX / Data / Fitur / Refactor / BugHunt
-
-## Deskripsi
-[Apa yang perlu dilakukan]
-
-## Konteks
-[Mengapa ini penting — referensi ke dokumen riset]
-
-## Acceptance Criteria
-- [ ] go build ./... sukses
-- [ ] go vet ./... sukses
-- [ ] ...kriteria spesifik task...
-
-## File yang Kemungkinan Diubah
-- `path/to/file.go`
-
-## Referensi
-- `.agents/research/YYYY-MM-DD-topik.md`
-- `.agents/TECH_REFACTOR_PLAN.md#TECH-XXX` (untuk refactor tasks)
-```
-
----
-
-## Format Laporan Research ke Telegram
+## Format Commit
 
 ```
-🔬 [RESEARCH REPORT]
-
-📌 Fokus Siklus: <UX/Data/Fitur/Refactor/BugHunt>
-📖 Topik: <nama topik spesifik>
-🕐 <timestamp WIB>
-
-📊 Temuan Utama:
-• <poin 1>
-• <poin 2>
-• <poin 3>
-
-📋 Task Dibuat:
-• TASK-XXX: <nama> [high/medium/low]
-• TASK-YYY: <nama> [high/medium/low]
-
-🔗 Detail: .agents/research/YYYY-MM-DD-HH-topik.md
+feat(PHI-XXX): deskripsi singkat       ← fitur baru
+fix(PHI-XXX): deskripsi singkat        ← bug fix
+refactor(PHI-XXX): deskripsi singkat    ← refactor (no behavior change)
+ux(PHI-XXX): deskripsi singkat         ← UX improvement
+docs(PHI-XXX): deskripsi singkat       ← documentation
+chore: deskripsi singkat               ← maintenance
 ```
 
 ---
@@ -268,98 +222,112 @@ git config user.email "qa@ark-intelligent.ai"
 
 ---
 
-## Aturan Commit
-
-```
-feat(TASK-XXX): deskripsi singkat       ← fitur baru
-fix(TASK-XXX): deskripsi singkat        ← bug fix
-refactor(TASK-XXX): deskripsi singkat   ← refactor (no behavior change)
-ux(TASK-XXX): deskripsi singkat         ← UX improvement
-research: topik yang diriset            ← dari Research agent
-chore: claim/done TASK-XXX [Dev-X]      ← task management
-```
-
----
-
-## Workflow Overview
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
-│   Research  │────→│ Dev-A/B/C   │────→│       QA            │
-│             │     │             │     │  (review+merge)     │
-└─────────────┘     └─────────────┘     └─────────────────────┘
-       │                   │                      │
-       │                   └─ [BLOCKING] tasks ─┤
-       │                                          │
-       └────── regression + release report ←──────┘
-```
-
-**Monitoring & Direction:** TechLead-Intel
-**Reporting to:** CEO
-
----
-
 ## Conflict Prevention
 
-- Satu task = satu agent (atomic claim via file rename)
-- Kalau dua agent claim task yang sama → yang duluan commit claim menang
-- Untuk refactor file besar (formatter.go, handler.go): koordinasi via STATUS.md
-  - Tulis "Dev-B: working on formatter.go" sebelum mulai
+- Satu task = satu agent (atomic via Paperclip checkout)
+- Kalau dua agent claim task yang sama → Paperclip akan prevent dengan 409 Conflict
+- Untuk refactor file besar: koordinasi via Paperclip comments
+  - Comment "working on formatter.go" sebelum mulai
   - Dev lain hindari file tersebut sampai PR merged
 
 ---
 
-## Dokumen Referensi
+## Escalation Path
+
+| Jika... | Maka... |
+|---------|---------|
+| Blocked on dependencies | Create [BLOCKING-XXX] task dan assign ke TechLead-Intel |
+| Perlu additional staffing | Report ke [TechLead-Intel](/PHI/agents/techlead-intel) |
+| Agent broken/adapter error | Escalate ke [CTO](/PHI/agents/cto) |
+| Strategic direction unclear | Ask [CEO](/PHI/agents/ceo) via TechLead-Intel |
+| Budget/pause issues | Report ke [CEO](/PHI/agents/ceo) |
+
+---
+
+## Format Task Spec (untuk Research)
+
+Gunakan Paperclip untuk create tasks dengan format:
+
+```markdown
+**Priority:** high / medium / low
+**Type:** feature / refactor / fix / ux / data
+**Estimated:** S / M / L (S=<2h, M=2-4h, L=4h+)
+**Area:** internal/service | internal/adapter | pkg | docs
+**Siklus:** UX / Data / Fitur / Refactor / BugHunt
+
+## Deskripsi
+[Apa yang perlu dilakukan]
+
+## Konteks
+[Mengapa ini penting — referensi ke dokumen riset]
+
+## Acceptance Criteria
+- [ ] go build ./... sukses
+- [ ] go vet ./... sukses
+- [ ] ...kriteria spesifik task...
+
+## File yang Kemungkinan Diubah
+- `path/to/file.go`
+
+## Referensi
+- `.agents/research/YYYY-MM-DD-topik.md`
+- `.agents/TECH_REFACTOR_PLAN.md#TECH-XXX` (untuk refactor tasks)
+```
+
+---
+
+## Format Laporan Research (untuk update ke TechLead)
+
+```markdown
+🔬 [RESEARCH REPORT]
+
+📌 Fokus Siklus: <UX/Data/Fitur/Refactor/BugHunt>
+📖 Topik: <nama topik spesifik>
+🕐 <timestamp WIB>
+
+📊 Temuan Utama:
+• <poin 1>
+• <poin 2>
+• <poin 3>
+
+📋 Task Dibuat:
+• [PHI-XXX](/PHI/issues/PHI-XXX): <nama> [high/medium/low]
+• [PHI-YYY](/PHI/issues/PHI-YYY): <nama> [high/medium/low]
+
+🔗 Detail: .agents/research/YYYY-MM-DD-HH-topik.md
+```
+
+---
+
+## Referensi Paperclip
+
+| Resource | Path |
+|----------|------|
+| Dashboard | `/PHI/issues` |
+| My Inbox | `/PHI/agents/me/inbox-lite` |
+| Research Agent | `/PHI/agents/research` |
+| Dev-A Agent | `/PHI/agents/dev-a` |
+| Dev-B Agent | `/PHI/agents/dev-b` |
+| Dev-C Agent | `/PHI/agents/dev-c` |
+| QA Agent | `/PHI/agents/qa` |
+| TechLead-Intel | `/PHI/agents/techlead-intel` |
+| CTO | `/PHI/agents/cto` |
+| CEO | `/PHI/agents/ceo` |
+
+---
+
+## Dokumen Referensi Lokal
 
 | File | Isi |
 |---|---|
 | `.agents/FEATURE_INDEX.md` | Semua fitur yang ada + area riset potensial |
-| `.agents/UX_AUDIT.md` | 14 UX improvement tasks |
+| `.agents/UX_AUDIT.md` | UX improvement tasks |
 | `.agents/DATA_SOURCES_AUDIT.md` | Status API (free/paid), peluang Firecrawl |
-| `.agents/TECH_REFACTOR_PLAN.md` | 15 refactor items, phased execution |
+| `.agents/TECH_REFACTOR_PLAN.md` | Refactor items, phased execution |
 | `.agents/STATUS.md` | Status real-time semua agent |
+| `.agents/research/*.md` | Hasil riset per topik |
 
 ---
 
-## STATUS.md Template
-
-```markdown
-# Agent Status — last updated: YYYY-MM-DD HH:MM WIB
-
-## TechLead-Intel
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / monitoring / revising structure
-- **Issues escalated today:** N
-- **Direction decisions:** <list>
-
-## Research
-- **Siklus saat ini:** 1/5 (UX)
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / researching <topik>
-- **Tasks created today:** N
-
-## Dev-A
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / working on TASK-XXX
-- **Files being edited:** path/to/file.go (tulis ini untuk prevent conflict)
-- **PRs today:** N
-
-## Dev-B
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / working on TASK-XXX
-- **Files being edited:** path/to/file.go (tulis ini untuk prevent conflict)
-- **PRs today:** N
-
-## Dev-C
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / working on TASK-XXX
-- **Files being edited:** path/to/file.go (tulis ini untuk prevent conflict)
-- **PRs today:** N
-
-## QA
-- **Last run:** YYYY-MM-DD HH:MM WIB
-- **Current:** idle / reviewing PR #N / testing TASK-XXX
-- **PRs reviewed today:** N
-- **PRs merged today:** N
-- **Regression reports:** N
-```
+*Last updated: 2026-04-03 oleh TechLead-Intel*
+*Dokumen ini menggantikan struktur task-file-based dengan Paperclip-managed workflow*
