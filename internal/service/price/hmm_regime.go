@@ -83,7 +83,7 @@ func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 	for iter = 0; iter < maxIter; iter++ {
 		newModel, logLik := baumWelchStep(&model, obs)
 		model = newModel
-		if iter > 0 && math.Abs(logLik-prevLogLik) < 1e-6 {
+		if math.Abs(logLik-prevLogLik) < 1e-4 {
 			converged = true
 			break
 		}
