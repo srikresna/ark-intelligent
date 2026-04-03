@@ -9,23 +9,24 @@
 ## ✅ Priority: Clear PR Queue (P1)
 
 ### PR Queue Status
-**5 PRs have been submitted and are in review**, all need rebase to pick up new CI.
+**5 PRs have been submitted and are in review**, all have code lint errors needing fixes.
 
 | PR | Task | Assignee | Status | Action |
 |----|------|----------|--------|--------|
-| #346 | TASK-002 | Dev-A | 🔄 Awaiting rebase | Rebase on main |
-| #347 | PHI-119 | Dev-C | 🔄 Awaiting rebase | Rebase on main |
-| #348 | TASK-001-EXT | Dev-B | 🔄 Awaiting rebase | Rebase on main |
-| #349 | TASK-094-C3 | Dev-A | 🔄 Awaiting rebase | Rebase on main |
-| #350 | TASK-094-D | Dev-A | 🔄 Awaiting rebase | Rebase on main |
+| #346 | TASK-002 | Dev-A | 🔴 Lint fail | Fix code lint issues |
+| #347 | PHI-119 | Dev-C | 🔴 Lint fail | Fix code lint issues |
+| #348 | TASK-001-EXT | Dev-B | 🔴 Lint fail | Fix code lint issues |
+| #349 | TASK-094-C3 | Dev-A | 🔴 Lint fail | Fix code lint issues |
+| #350 | TASK-094-D | Dev-A | 🔴 Lint fail | Fix code lint issues |
 
 **Immediate Action Required:**
-1. **Dev-A:** Rebase #346, #349, #350 on main
-2. **Dev-B:** Rebase #348 on main
-3. **Dev-C:** Rebase #347 on main
-4. **QA:** Begin review once CI passes after rebase
+1. **Dev-A:** Fix lint on #346, #349, #350 → Run `golangci-lint run ./...`
+2. **Dev-B:** Fix lint on #348
+3. **Dev-C:** Fix lint on #347
+4. **All:** Commit fixes and push to trigger CI
+5. **QA:** Begin review once CI passes
 
-**Root Cause:** Main branch now has comprehensive CI/CD with linting (commit 008a86b). PRs created before this update need rebase.
+**Root Cause:** PR branches have actual lint errors (unused imports, unchecked errors, etc.) that need code fixes, not just CI configuration.
 
 ---
 
