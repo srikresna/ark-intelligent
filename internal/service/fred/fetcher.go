@@ -250,6 +250,11 @@ type MacroData struct {
 	PutCallEquity float64 // CBOE Equity Put/Call Ratio
 	PutCallIndex  float64 // CBOE Index Put/Call Ratio
 
+	// --- NYSE Market Breadth ---
+	AdvancingIssues float64 // ADVN — NYSE Advancing Issues (daily)
+	DecliningIssues float64 // DECN — NYSE Declining Issues (daily)
+	NetNewHighs     float64 // NHNL — NYSE Net New Highs (weekly)
+
 	FetchedAt time.Time
 }
 
@@ -343,6 +348,10 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		{"CANCPIALLMINMEI", 14}, {"LRHUTTTTCAM156S", 5},
 		// Global - NZ (quarterly CPI — need 14 obs for yoy)
 		{"NZLCPIALLQINMEI", 14},
+		// NYSE Market Breadth
+		{"ADVN", 5},  // NYSE Advancing Issues (daily)
+		{"DECN", 5},  // NYSE Declining Issues (daily)
+		{"NHNL", 5},  // NYSE Net New Highs (weekly)
 	}
 
 	// Parallel fetch with semaphore
@@ -596,6 +605,11 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 
 	// Global - NZ (quarterly CPI — use yoyQ for 4-quarter YoY)
 	data.NZ_CPI, _ = yoyQ("NZLCPIALLQINMEI")
+
+	// NYSE Market Breadth
+	data.AdvancingIssues = single("ADVN")
+	data.DecliningIssues = single("DECN")
+	data.NetNewHighs = single("NHNL")
 
 	// --- Liquidity regime classification (TGA + RRP + Fed BS) ---
 	data.LiquidityRegime = classifyLiquidity(data)

@@ -35,6 +35,10 @@ type MacroComposites struct {
 	VIXTermRatio  float64 // VIX / VIX3M (>1 = backwardation)
 	VIXTermRegime string  // BACKWARDATION, FLAT, CONTANGO
 
+	// NYSE Market Breadth
+	AdvDecRatio float64 // NYSE Adv/Dec ratio (>1 = net positive breadth)
+	NetNewHighs float64 // NYSE net new highs (NHs - NLs)
+
 	ComputedAt time.Time
 }
 

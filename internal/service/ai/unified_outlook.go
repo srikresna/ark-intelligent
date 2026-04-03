@@ -386,6 +386,10 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		if comp.VIXTermRegime != "" && comp.VIXTermRegime != "N/A" {
 			b.WriteString(fmt.Sprintf("VIX Term Structure: %s (ratio: %.3f)\n", comp.VIXTermRegime, comp.VIXTermRatio))
 		}
+		if comp.AdvDecRatio > 0 || comp.NetNewHighs != 0 {
+			b.WriteString(fmt.Sprintf("NYSE Breadth: Adv/Dec=%.2f (%s) | Net New Highs=%.0f\n",
+				comp.AdvDecRatio, breadthLabel(comp.AdvDecRatio), comp.NetNewHighs))
+		}
 		b.WriteString(fmt.Sprintf("Country Scores: US=%+.0f EZ=%+.0f UK=%+.0f JP=%+.0f AU=%+.0f CA=%+.0f NZ=%+.0f\n",
 			comp.USScore, comp.EZScore, comp.UKScore, comp.JPScore, comp.AUScore, comp.CAScore, comp.NZScore))
 		b.WriteString("Use these composite scores as the PRIMARY basis for macro assessment — they synthesize 80+ underlying FRED series.\n")
@@ -888,4 +892,18 @@ func writeDailyPriceContextLine(b *strings.Builder, label string, dc *domain.Dai
 	}
 	line += fmt.Sprintf(" | Mom5D: %+.2f%%", dc.Momentum5D)
 	b.WriteString(line + "\n")
+}
+
+// breadthLabel returns a human-readable NYSE breadth label based on Adv/Dec ratio.
+func breadthLabel(ratio float64) string {
+	switch {
+	case ratio >= 1.5:
+		return "STRONG_BREADTH"
+	case ratio >= 1.0:
+		return "POSITIVE"
+	case ratio >= 0.7:
+		return "MIXED"
+	default:
+		return "NEGATIVE_BREADTH"
+	}
 }

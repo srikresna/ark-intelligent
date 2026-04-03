@@ -66,6 +66,12 @@ func ComputeComposites(data *MacroData) *domain.MacroComposites {
 		c.VIXTermRegime = "N/A"
 	}
 
+	// NYSE Market Breadth
+	if data.AdvancingIssues > 0 && data.DecliningIssues > 0 {
+		c.AdvDecRatio = data.AdvancingIssues / data.DecliningIssues
+	}
+	c.NetNewHighs = data.NetNewHighs
+
 	return c
 }
 
