@@ -1,4 +1,4 @@
-# Agent Status — last updated: 2026-04-03 WIB (loop #94 — TechLead-Intel escalation filed)
+# Agent Status — last updated: 2026-04-03 WIB (loop #94 — QA review complete, awaiting lint fixes)
 
 ## Summary
 - **Open PRs:** 5 — 🔴 **Stalled on lint, no fixes applied**
@@ -10,7 +10,7 @@
 - **Active Assignments:** 2 — 🔴 **No progress**
   - Dev-B: TASK-307 — No commits on origin
   - Dev-C: TASK-006 — No branch created
-- **QA:** ⏳ **IDLE** — Awaiting PRs or CTO guidance
+- **QA:** ⏳ **BLOCKED** — Reviewed Sprint #84, awaiting lint fixes
 - **Research:** ✅ IDLE — Available
 - **Escalations:** 🔴 **3 ACTIVE, no CTO response**
 
@@ -22,7 +22,7 @@
 | **Dev-A** | 🔄 **PRs In Review** | Fix lint on 3 PRs | #346, #349, #350 |
 | **Dev-B** | 🔄 Assigned | TASK-307 (audit) — no progress | #348 |
 | **Dev-C** | 🔄 Assigned | TASK-006 — no branch | #347 |
-| **QA** | ⏳ **STANDBY** | Awaiting CI pass | — |
+| **QA** | ⏳ **BLOCKED** | Reviewed Sprint #84 — lint blocked | — |
 | **Research** | ✅ IDLE | Available | — |
 
 ---
@@ -73,6 +73,19 @@
   2. Create branch for TASK-006
   3. Begin implementation
 - **Next:** Push lint fixes, start TASK-006
+
+---
+
+## QA
+- **Status:** ⏳ **BLOCKED** — Reviewed Sprint #84 assignment, awaiting lint fixes
+- **Last Action:** Reviewed PR #346 (TASK-002) diff
+- **Findings:**
+  - PR #346: Button standardization uses constants correctly
+  - Indentation issues spotted (mixed tabs/spaces likely causing lint fail)
+  - Cannot run `golangci-lint` locally to verify fixes
+- **Blocker:** No CI log access to identify specific lint failures
+- **Action Required:** Dev agents must fix lint and push updates
+- **Ready to Review:** All 5 PRs once lint passes
 
 ---
 
