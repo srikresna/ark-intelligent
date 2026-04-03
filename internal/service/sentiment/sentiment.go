@@ -45,6 +45,7 @@ type SentimentFetcher struct {
 	cbVIX      *circuitbreaker.Breaker
 	cbMyfxbook *circuitbreaker.Breaker
 	cbCryptoGlobal *circuitbreaker.Breaker
+	cbInsider   *circuitbreaker.Breaker
 	vixCache    *vix.Cache
 	dvolFetcher *dvol.Fetcher
 	cbDVOL      *circuitbreaker.Breaker
@@ -62,6 +63,7 @@ func NewSentimentFetcher() *SentimentFetcher {
 		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
 		cbMyfxbook: circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
 		cbCryptoGlobal: circuitbreaker.New("sentiment-crypto-global", 3, 5*time.Minute),
+		cbInsider:  circuitbreaker.New("sentiment-insider", 3, 10*time.Minute),
 		vixCache:    vix.NewCache(),
 		dvolFetcher: dvol.NewFetcher(),
 		cbDVOL:      circuitbreaker.New("sentiment-dvol", 3, 10*time.Minute),
@@ -228,10 +230,21 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		log.Debug().Str("source", "dvol").Err(err).Msg("sentiment: DVOL circuit breaker rejected or source unavailable")
 	}
 
+	// OpenInsider Cluster Buys — wrapped in circuit breaker
+	if err := f.cbInsider.Execute(func() error {
+		fetchInsiderClusterBuys(ctx, f.httpClient, data)
+		if data.InsiderClusters == nil || !data.InsiderClusters.Available {
+			if os.Getenv("FIRECRAWL_API_KEY") != "" {
+				return fmt.Errorf("OpenInsider cluster buys unavailable")
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Debug().Str("source", "openinsider").Err(err).Msg("sentiment: OpenInsider circuit breaker rejected or source unavailable")
+	}
+
 	return data, nil
 }
-
-// SentimentData holds the latest readings from all sentiment sources.
 type SentimentData struct {
 	// AAII Investor Sentiment Survey
 	AAIIBullish   float64 // % bullish
@@ -344,6 +357,9 @@ type SentimentData struct {
 	// Myfxbook Retail Positioning (Firecrawl)
 	MyfxbookPairs     []MyfxbookPairSentiment
 	MyfxbookAvailable bool
+
+	// OpenInsider Cluster Buys (Firecrawl) — smart money risk-on signal
+	InsiderClusters *InsiderClusterData
 
 	FetchedAt time.Time
 }
