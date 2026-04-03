@@ -102,10 +102,16 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 	// ---------- Collect ALL data sources (best-effort, non-fatal) ----------
 
 	// COT
-	cotAnalyses, _ := h.cotRepo.GetAllLatestAnalyses(ctx)
+	var cotAnalyses []domain.COTAnalysis
+	if h.cotRepo != nil {
+		cotAnalyses, _ = h.cotRepo.GetAllLatestAnalyses(ctx)
+	}
 
 	// News
-	weekEvts, _ := h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
+	var weekEvts []domain.NewsEvent
+	if h.newsRepo != nil {
+		weekEvts, _ = h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
+	}
 
 	// FRED Macro
 	macroData, _ := fred.GetCachedOrFetch(ctx)
