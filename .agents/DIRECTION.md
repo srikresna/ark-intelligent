@@ -29,15 +29,17 @@ The 4 open PRs from UX Siklus 1 need QA review and merge:
 
 ---
 
-## ⚠️ Active Escalation
+## ⚠️ Escalation Update (Loop #32)
 
-**Dev-C Inactivity on TASK-307**
-- **Issue:** Task assigned in loop #28 (~4h ago), no progress
-- **Impact:** Sprint velocity, uneven workload
-- **Status:** Escalation filed, awaiting Dev-C response
-- **File:** `.agents/escalations/2026-04-03-DEV-C-inactivity-TASK-307.md`
+**Dev-C Inactivity on TASK-307 — RESOLVED by Reassignment**
+- **Original Issue:** Dev-C assigned TASK-307 in loop #28, no progress after 5+ hours
+- **Resolution:** ✅ **REASSIGNED to Dev-B** (available after completing TASK-001-EXT)
+- **Status:** CTO notified for Dev-C follow-up
+- **Files:** 
+  - `.agents/escalations/2026-04-03-DEV-C-inactivity-TASK-307.md` (updated)
+  - `.agents/tasks/claimed/TASK-307-audit-httpclient-usages.DEV-B.md` (reassigned)
 
-**Next Action:** Dev-C must acknowledge and begin task within 2 hours, or escalate to CTO.
+**For CTO:** Review Dev-C availability and workload.
 
 ---
 

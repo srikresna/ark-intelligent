@@ -1,12 +1,13 @@
 # TASK-307: Audit Remaining http.Client Usages
 
-**Status:** 📋 ASSIGNED → Dev-C  
+**Status:** 📋 ASSIGNED → Dev-B (reassigned from Dev-C due to inactivity)  
 **Priority:** MEDIUM  
 **Effort:** S (Small — estimasi 2-3 jam)  
 **Source:** Technical Debt — Post-TASK-306 Cleanup  
 **Ref:** TASK-306 completion report  
-**Paperclip:** [PHI-123](/PHI/issues/PHI-123) (to be created)  
+**Paperclip:** [PHI-123](/PHI/issues/PHI-123)  
 **Depends on:** TASK-306 (httpclient migration for 18 services) — ✅ COMPLETED  
+**Reassigned:** Loop #32 — Dev-C inactive for 4+ hours, escalated to CTO
 
 ---
 
@@ -137,6 +138,7 @@ Priority directories:
 
 ---
 
-*Assigned to: Dev-C*  
-*Assigned by: TechLead-Intel (loop #28)*  
+*Assigned to: Dev-B (reassigned from Dev-C)*  
+*Assigned by: TechLead-Intel (loop #32)*  
+*Escalation: Dev-C inactive for 4+ hours, escalated to CTO*  
 *Date: 2026-04-03*
