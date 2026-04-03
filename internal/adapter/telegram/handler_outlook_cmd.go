@@ -12,6 +12,7 @@ import (
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
@@ -206,6 +207,22 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		}
 	}
 
+	// GEX (Gamma Exposure) for BTC and ETH via Deribit (graceful degradation)
+	var gexResults map[string]*gexsvc.GEXResult
+	if h.gex != nil {
+		gexResults = make(map[string]*gexsvc.GEXResult, 2)
+		for _, sym := range []string{"BTC", "ETH"} {
+			r, gexErr := h.gex.Engine.Analyze(ctx, sym)
+			if gexErr != nil {
+				continue
+			}
+			gexResults[sym] = r
+		}
+		if len(gexResults) == 0 {
+			gexResults = nil
+		}
+	}
+
 	// ---------- Build unified data ----------
 	var macroComposites *domain.MacroComposites
 	if macroData != nil {
@@ -242,6 +259,7 @@ func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int
 		EurostatData:       eurostatData,
 		FedSpeeches:        fedSpeeches,
 		ICTContexts:        ictContexts,
+		GEXResults:         gexResults,
 		Language:           prefs.Language,
 	}
 

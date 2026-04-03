@@ -7,6 +7,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
 	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
@@ -45,6 +46,9 @@ type UnifiedOutlookData struct {
 	// ICTContexts holds ICT/SMC structure analysis for major symbols (H4 timeframe).
 	// Key = symbol (e.g. "EURUSD"), Value = ICTResult. May be nil if ICT not configured.
 	ICTContexts        map[string]*ictsvc.ICTResult
+	// GEXResults holds Gamma Exposure analysis for crypto assets (Deribit options data).
+	// Key = symbol (e.g. "BTC", "ETH"), Value = GEXResult. May be nil if GEX not configured.
+	GEXResults         map[string]*gexsvc.GEXResult
 	Language           string
 }
 
@@ -682,6 +686,23 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			}
 		}
 		b.WriteString("NOTE: ICT/SMC data is H4. Use for identifying premium/discount zones and PD Arrays.\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Gamma Exposure — Options Flow (Deribit)
+	// -----------------------------------------------------------------------
+	if len(data.GEXResults) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. GAMMA EXPOSURE — OPTIONS FLOW (Deribit) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for sym, r := range data.GEXResults {
+			b.WriteString(fmt.Sprintf("%s @ $%.0f: Regime=%s | TotalGEX=%.2fM | Flip=$%.0f | GWall=$%.0f | PWall=$%.0f | MaxPain=$%.0f\n",
+				sym, r.SpotPrice, r.Regime,
+				r.TotalGEX/1e6, r.GEXFlipLevel,
+				r.GammaWall, r.PutWall, r.MaxPain))
+		}
+		b.WriteString("NOTE: POSITIVE_GEX = dealer hedging dampens moves (mean-reversion). " +
+			"NEGATIVE_GEX = dealer hedging amplifies moves (trending). " +
+			"GEX Flip Level = key price where regime switches.\n\n")
 	}
 
 	// -----------------------------------------------------------------------
