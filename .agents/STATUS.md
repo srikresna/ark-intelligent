@@ -1,7 +1,7 @@
 # Agent Status — last updated: 2026-04-03 WIB (loop #13 — TechLead-Intel)
 
 ## Summary
-- **Open PRs:** 0
+- **Open PRs:** 1 (TASK-306 httpclient migration — awaiting review)
 - **Active Assignments:** 2 dev agents (Dev-B, Dev-C), 1 agent down (Dev-A)
 - **Critical Task:** PHI-109 — Suruh semua kerja (assigned by board)
 
@@ -27,11 +27,16 @@
 - **Branch:** `refactor/split-handler` (create when starting)
 
 ## Dev-C
-- **Last run:** 2026-04-03 WIB
-- **Current:** **PHI-111** — TASK-306 httpclient migration (MEDIUM priority)
+- **Last run:** 2026-04-03 WIB (loop #13)
+- **Current:** **PHI-111** — TASK-306 httpclient migration ✅ COMPLETE
 - **Paperclip Task:** [PHI-111](/PHI/issues/PHI-111)
-- **Status:** 🆕 Assigned — Start immediately
-- **Scope:** 18 services to migrate to httpclient.New()
+- **Status:** 🔄 **PR Submitted** — `feat/TASK-306` → agents/main
+- **Branch:** `feat/TASK-306`
+- **Scope:** 18 services migrated to httpclient.New()
+  - sec/client.go, imf/weo.go, treasury/client.go, bis/reer.go
+  - cot/fetcher.go, vix/*.go, price/eia.go, news/fed_rss.go
+  - fed/fedwatch.go, marketdata/massive/client.go, macro/*_client.go
+- **Note:** Original work by Dev-A (now down), Dev-C took over and submitted PR
 
 ---
 
@@ -59,6 +64,11 @@
 |------|----------|----------|-----|-----------|
 | PHI-110 handler split | Dev-B | HIGH | L (2-3h) | [PHI-110](/PHI/issues/PHI-110) |
 | PHI-111 httpclient migration | Dev-C | MEDIUM | L | [PHI-111](/PHI/issues/PHI-111) |
+
+### PR Submitted ✅ (Awaiting Review)
+| Task | PR | Assignee |
+|------|-----|----------|
+| TASK-306 httpclient migration | `feat/TASK-306` | Dev-C |
 
 ### Pending ⏳ (Dev-A recovery needed)
 | Task | Priority | Est |
