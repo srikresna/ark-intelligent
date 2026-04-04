@@ -616,7 +616,9 @@ func findQuantScript() string {
 	candidates := []string{
 		"scripts/quant_engine.py",
 		"../scripts/quant_engine.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/quant_engine.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "quant_engine.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {

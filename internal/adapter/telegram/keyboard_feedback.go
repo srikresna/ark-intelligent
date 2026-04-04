@@ -1,8 +1,6 @@
 package telegram
 
 import (
-	"fmt"
-
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 )
 
@@ -11,7 +9,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // ShareRow returns a single-button row with a share/forward button.
-// callbackBase should be e.g. "share:cot:EUR", "share:outlook:latest".
+// callbackBase should be e.g. "share:cot:EUR".
 func (kb *KeyboardBuilder) ShareRow(callbackBase string) []ports.InlineButton {
 	return []ports.InlineButton{
 		{Text: "📤 Share", CallbackData: callbackBase},

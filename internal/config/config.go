@@ -88,8 +88,6 @@ type Config struct {
 	EnableBybitMicrostructure bool // Enable Bybit crypto microstructure module (default: true if BybitAPIKey set)
 	EnableMassiveResearch     bool // Enable Massive historical research layer (default: true if MassiveAPIKeys set)
 	EnableFactorEngine        bool // Enable cross-sectional factor ranking engine (default: true)
-	EnableStrategyPlaybook    bool // Enable regime playbook + conviction engine (default: true)
-	EnablePortfolioHeat       bool // Enable portfolio exposure heat engine (default: true)
 }
 
 // MustLoad loads configuration from environment variables.
@@ -189,8 +187,6 @@ func MustLoad() *Config {
 	cfg.EnableBybitMicrostructure = cfg.BybitAPIKey != "" || getEnv("ENABLE_BYBIT_MICROSTRUCTURE", "") == "true"
 	cfg.EnableMassiveResearch = len(cfg.MassiveAPIKeys) > 0 || getEnv("ENABLE_MASSIVE_RESEARCH", "") == "true"
 	cfg.EnableFactorEngine = getBool("ENABLE_FACTOR_ENGINE", true)
-	cfg.EnableStrategyPlaybook = getBool("ENABLE_STRATEGY_PLAYBOOK", true)
-	cfg.EnablePortfolioHeat = getBool("ENABLE_PORTFOLIO_HEAT", true)
 
 	if err := cfg.validate(); err != nil {
 		log.Fatal().Err(err).Msg("configuration validation failed")

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	tgbot "github.com/arkcode369/ark-intelligent/internal/adapter/telegram"
+	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/health"
@@ -28,6 +29,7 @@ import (
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
+	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
@@ -673,7 +675,7 @@ func ownerChatIDForScheduler(ownerID int64) string {
 func newImpactBootstrapper(
 	fetcher *newssvc.MQL5Fetcher,
 	priceRepo ports.PriceRepository,
-	impactRepo ports.ImpactRepository,
+	impactRepo *storage.ImpactRepo,
 	priceFetcher ports.PriceFetcher,
 	months int,
 ) *newssvc.ImpactBootstrapper {

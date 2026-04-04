@@ -399,7 +399,9 @@ func findCTAScript() string {
 	candidates := []string{
 		"scripts/cta_chart.py",
 		"../scripts/cta_chart.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/cta_chart.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "cta_chart.py")}, candidates...)
 	}
 
 	// Check relative to current working dir

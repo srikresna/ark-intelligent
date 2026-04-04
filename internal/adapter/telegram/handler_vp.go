@@ -506,7 +506,9 @@ func findVPScript() string {
 	candidates := []string{
 		"scripts/vp_engine.py",
 		"../scripts/vp_engine.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/vp_engine.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "vp_engine.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {

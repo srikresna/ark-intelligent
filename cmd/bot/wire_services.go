@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	tgbot "github.com/arkcode369/ark-intelligent/internal/adapter/telegram"
 	"github.com/arkcode369/ark-intelligent/internal/config"
@@ -49,7 +49,7 @@ type AIServiceConfig struct {
 	AIMaxRPM             int
 	AIMaxDaily           int
 	ClaudeEndpoint       string
-	ClaudeTimeout        int
+	ClaudeTimeout        time.Duration
 	ClaudeModel          string
 	ClaudeMaxTokens      int
 	ClaudeThinkingBudget int
@@ -251,12 +251,4 @@ func BuildServiceConfig(cfg *config.Config) ServiceConfig {
 			BybitRestBase:             cfg.BybitRestBase,
 		},
 	}
-}
-
-// Helper function to format owner chat ID for scheduler
-func ownerChatIDForScheduler(ownerID int64) string {
-	if ownerID <= 0 {
-		return ""
-	}
-	return fmt.Sprintf("%d", ownerID)
 }

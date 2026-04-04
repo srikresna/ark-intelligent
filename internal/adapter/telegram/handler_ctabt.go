@@ -499,7 +499,9 @@ func findBacktestScript() string {
 	candidates := []string{
 		"scripts/backtest_chart.py",
 		"../scripts/backtest_chart.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/backtest_chart.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "backtest_chart.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {

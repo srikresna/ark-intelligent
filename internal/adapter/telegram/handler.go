@@ -164,162 +164,166 @@ type Handler struct {
 	regimeProvider RegimeAlertProvider
 }
 
+// HandlerDeps holds all dependencies needed by the Handler.
+type HandlerDeps struct {
+	Bot            *Bot
+	EventRepo      ports.EventRepository
+	COTRepo        ports.COTRepository
+	PrefsRepo      ports.PrefsRepository
+	NewsRepo       ports.NewsRepository
+	NewsFetcher    ports.NewsFetcher
+	AIAnalyzer     ports.AIAnalyzer
+	Changelog      string
+	NewsScheduler  SurpriseProvider
+	Middleware     *Middleware
+	PriceRepo      ports.PriceRepository
+	SignalRepo     ports.SignalRepository
+	ChatService    *aisvc.ChatService
+	ClaudeAnalyzer *aisvc.ClaudeAnalyzer
+	ImpactProvider ImpactProvider
+	DailyPriceRepo pricesvc.DailyPriceStore
+	IntradayRepo   pricesvc.IntradayStore
+}
+
 // NewHandler creates a handler and registers all commands on the bot.
 // newsScheduler, chatService, and claudeAnalyzer may be nil; all callers guard with nil checks before use.
-func NewHandler(
-	bot *Bot,
-	eventRepo ports.EventRepository,
-	cotRepo ports.COTRepository,
-	prefsRepo ports.PrefsRepository,
-	newsRepo ports.NewsRepository,
-	newsFetcher ports.NewsFetcher,
-	aiAnalyzer ports.AIAnalyzer,
-	changelog string,
-	newsScheduler SurpriseProvider,
-	middleware *Middleware,
-	priceRepo ports.PriceRepository,
-	signalRepo ports.SignalRepository,
-	chatService *aisvc.ChatService,
-	claudeAnalyzer *aisvc.ClaudeAnalyzer,
-	impactProvider ImpactProvider,
-	dailyPriceRepo pricesvc.DailyPriceStore,
-	intradayRepo pricesvc.IntradayStore,
-) *Handler {
+func NewHandler(d HandlerDeps) *Handler {
 	h := &Handler{
-		bot:            bot,
+		bot:            d.Bot,
 		fmt:            NewFormatter(),
 		kb:             NewKeyboardBuilder(),
-		eventRepo:      eventRepo,
-		cotRepo:        cotRepo,
-		prefsRepo:      prefsRepo,
-		newsRepo:       newsRepo,
-		newsFetcher:    newsFetcher,
-		aiAnalyzer:     aiAnalyzer,
-		changelog:      changelog,
-		newsScheduler:  newsScheduler,
+		eventRepo:      d.EventRepo,
+		cotRepo:        d.COTRepo,
+		prefsRepo:      d.PrefsRepo,
+		newsRepo:       d.NewsRepo,
+		newsFetcher:    d.NewsFetcher,
+		aiAnalyzer:     d.AIAnalyzer,
+		changelog:      d.Changelog,
+		newsScheduler:  d.NewsScheduler,
 		aiCooldown:     make(map[int64]time.Time),
 		chatCooldown:   make(map[int64]time.Time),
 		deepLinks:      newDeepLinkCache(),
-		middleware:     middleware,
-		priceRepo:      priceRepo,
-		signalRepo:     signalRepo,
-		chatService:    chatService,
-		claudeAnalyzer: claudeAnalyzer,
-		impactProvider: impactProvider,
-		dailyPriceRepo: dailyPriceRepo,
-		intradayRepo:   intradayRepo,
+		middleware:     d.Middleware,
+		priceRepo:      d.PriceRepo,
+		signalRepo:     d.SignalRepo,
+		chatService:    d.ChatService,
+		claudeAnalyzer: d.ClaudeAnalyzer,
+		impactProvider: d.ImpactProvider,
+		dailyPriceRepo: d.DailyPriceRepo,
+		intradayRepo:   d.IntradayRepo,
 		adminConfirm:   newAdminConfirmStore(),
 	}
 
 	// Register all commands
-	bot.RegisterCommand("/start", h.cmdStart)
-	bot.RegisterCommand("/help", h.cmdHelp)
-	bot.RegisterCommand("/onboarding", h.cmdOnboarding) // TASK-001-EXT: Restart onboarding
-	bot.RegisterCommand("/settings", h.cmdSettings)
-	bot.RegisterCommand("/status", h.cmdStatus)
-	bot.RegisterCommand("/cot", h.cmdCOT)
-	bot.RegisterCommand("/outlook", h.cmdOutlook)
-	bot.RegisterCommand("/calendar", h.cmdCalendar)
-	bot.RegisterCommand("/rank", h.cmdRank)
-	bot.RegisterCommand("/macro", h.cmdMacro)
-	bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
-	bot.RegisterCommand("/leading", h.cmdLeading)    // OECD Composite Leading Indicators
-	bot.RegisterCommand("/eurostat", h.cmdEurostat)  // EU economy dashboard (Eurostat)
-	bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
-	bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
-	bot.RegisterCommand("/swaps", h.cmdSwaps)        // DTCC FX swap institutional flows
-	bot.RegisterCommand("/tedge", h.cmdTEdge)        // TradingEconomics global macro dashboard
-	bot.RegisterCommand("/globalm", h.cmdTEdge)      // alias for /tedge
-	bot.RegisterCommand("/bias", h.cmdBias)
-	bot.RegisterCommand("/backtest", h.cmdBacktest)
-	bot.RegisterCommand("/accuracy", h.cmdAccuracy)
-	bot.RegisterCommand("/report", h.cmdReport)
-	bot.RegisterCommand("/impact", h.cmdImpact)
-	bot.RegisterCommand("/sentiment", h.cmdSentiment)
-	bot.RegisterCommand("/vix", h.cmdVix)                // CBOE volatility index dashboard (VIX + vol suite)
-	bot.RegisterCommand("/seasonal", h.cmdSeasonal)
-	bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
-	bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
-	bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
-	bot.RegisterCommand("/flows", h.cmdFlows)             // Cross-asset flow divergence detection
-	bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
-	bot.RegisterCommand("/13f", h.cmdSEC)             // SEC EDGAR 13F institutional holdings
-	bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
-	bot.RegisterCommand("/setalert", h.cmdSetAlert)  // Per-pair COT alert management
-	bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
-	bot.RegisterCommand("/defi", h.cmdDeFi)          // DeFi health dashboard (DefiLlama)
-	bot.RegisterCommand("/carry", h.cmdCarry)         // Carry trade monitor & unwind detector
-	bot.RegisterCommand("/bis", h.cmdBIS)            // BIS Statistics: CB policy rates + credit gaps + REER
-	bot.RegisterCommand("/cbrates", h.cmdBIS)        // Central bank policy rates (alias for /bis)
-	bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
-	bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
-	bot.RegisterCommand("/session", h.cmdSession)       // Trading session behavior analysis (London/NY/Tokyo)
-	bot.RegisterCommand("/scenario", h.cmdScenario)    // Monte Carlo price scenario generator
+	d.Bot.RegisterCommand("/start", h.cmdStart)
+	d.Bot.RegisterCommand("/help", h.cmdHelp)
+	d.Bot.RegisterCommand("/onboarding", h.cmdOnboarding) // TASK-001-EXT: Restart onboarding
+	d.Bot.RegisterCommand("/settings", h.cmdSettings)
+	d.Bot.RegisterCommand("/status", h.cmdStatus)
+	d.Bot.RegisterCommand("/cot", h.cmdCOT)
+	d.Bot.RegisterCommand("/outlook", h.cmdOutlook)
+	d.Bot.RegisterCommand("/calendar", h.cmdCalendar)
+	d.Bot.RegisterCommand("/rank", h.cmdRank)
+	d.Bot.RegisterCommand("/macro", h.cmdMacro)
+	d.Bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
+	d.Bot.RegisterCommand("/leading", h.cmdLeading)    // OECD Composite Leading Indicators
+	d.Bot.RegisterCommand("/eurostat", h.cmdEurostat)  // EU economy dashboard (Eurostat)
+	d.Bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
+	d.Bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
+	d.Bot.RegisterCommand("/swaps", h.cmdSwaps)        // DTCC FX swap institutional flows
+	d.Bot.RegisterCommand("/tedge", h.cmdTEdge)        // TradingEconomics global macro dashboard
+	d.Bot.RegisterCommand("/globalm", h.cmdTEdge)      // alias for /tedge
+	d.Bot.RegisterCommand("/bias", h.cmdBias)
+	d.Bot.RegisterCommand("/backtest", h.cmdBacktest)
+	d.Bot.RegisterCommand("/accuracy", h.cmdAccuracy)
+	d.Bot.RegisterCommand("/report", h.cmdReport)
+	d.Bot.RegisterCommand("/impact", h.cmdImpact)
+	d.Bot.RegisterCommand("/sentiment", h.cmdSentiment)
+	d.Bot.RegisterCommand("/vix", h.cmdVix)                // CBOE volatility index dashboard (VIX + vol suite)
+	d.Bot.RegisterCommand("/seasonal", h.cmdSeasonal)
+	d.Bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
+	d.Bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
+	d.Bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
+	d.Bot.RegisterCommand("/flows", h.cmdFlows)             // Cross-asset flow divergence detection
+	d.Bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
+	d.Bot.RegisterCommand("/13f", h.cmdSEC)             // SEC EDGAR 13F institutional holdings
+	d.Bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
+	d.Bot.RegisterCommand("/setalert", h.cmdSetAlert)  // Per-pair COT alert management
+	d.Bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
+	d.Bot.RegisterCommand("/defi", h.cmdDeFi)          // DeFi health dashboard (DefiLlama)
+	d.Bot.RegisterCommand("/carry", h.cmdCarry)         // Carry trade monitor & unwind detector
+	d.Bot.RegisterCommand("/bis", h.cmdBIS)            // BIS Statistics: CB policy rates + credit gaps + REER
+	d.Bot.RegisterCommand("/cbrates", h.cmdBIS)        // Central bank policy rates (alias for /bis)
+	d.Bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
+	d.Bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
+	d.Bot.RegisterCommand("/session", h.cmdSession)       // Trading session behavior analysis (London/NY/Tokyo)
+	d.Bot.RegisterCommand("/scenario", h.cmdScenario)    // Monte Carlo price scenario generator
+	d.Bot.RegisterCommand("/regime", h.cmdRegime)        // Multi-asset regime dashboard (HMM states)
 
 	// Membership & upgrade info
-	bot.RegisterCommand("/membership", h.cmdMembership)
+	d.Bot.RegisterCommand("/membership", h.cmdMembership)
 
 	// Chat history management
-	bot.RegisterCommand("/clear", h.cmdClearChat)
+	d.Bot.RegisterCommand("/clear", h.cmdClearChat)
 
 	// Pinned commands (TASK-078)
-	bot.RegisterCommand("/pin", h.cmdPin)
-	bot.RegisterCommand("/unpin", h.cmdUnpin)
-	bot.RegisterCommand("/pins", h.cmdPins)
+	d.Bot.RegisterCommand("/pin", h.cmdPin)
+	d.Bot.RegisterCommand("/unpin", h.cmdUnpin)
+	d.Bot.RegisterCommand("/pins", h.cmdPins)
 
 	// Admin commands (access enforced inside handlers)
-	bot.RegisterCommand("/users", h.cmdUsers)
-	bot.RegisterCommand("/setrole", h.cmdSetRole)
-	bot.RegisterCommand("/ban", h.cmdBan)
-	bot.RegisterCommand("/unban", h.cmdUnban)
+	d.Bot.RegisterCommand("/users", h.cmdUsers)
+	d.Bot.RegisterCommand("/setrole", h.cmdSetRole)
+	d.Bot.RegisterCommand("/ban", h.cmdBan)
+	d.Bot.RegisterCommand("/unban", h.cmdUnban)
 
 	// Short aliases for power users (mobile-friendly)
-	bot.RegisterCommand("/c", h.cmdCOT)
-	bot.RegisterCommand("/cal", h.cmdCalendar)
-	bot.RegisterCommand("/out", h.cmdOutlook)
-	bot.RegisterCommand("/m", h.cmdMacro)
-	bot.RegisterCommand("/b", h.cmdBias)
-	bot.RegisterCommand("/q", h.cmdQuant)
-	bot.RegisterCommand("/bt", h.cmdBacktest)
-	bot.RegisterCommand("/r", h.cmdRank)
-	bot.RegisterCommand("/s", h.cmdSentiment)
-	bot.RegisterCommand("/p", h.cmdPrice)
-	bot.RegisterCommand("/l", h.cmdLevels)
-	bot.RegisterCommand("/history", h.cmdHistory)
-	bot.RegisterCommand("/h", h.cmdHistory)
+	d.Bot.RegisterCommand("/c", h.cmdCOT)
+	d.Bot.RegisterCommand("/cal", h.cmdCalendar)
+	d.Bot.RegisterCommand("/out", h.cmdOutlook)
+	d.Bot.RegisterCommand("/m", h.cmdMacro)
+	d.Bot.RegisterCommand("/b", h.cmdBias)
+	d.Bot.RegisterCommand("/q", h.cmdQuant)
+	d.Bot.RegisterCommand("/bt", h.cmdBacktest)
+	d.Bot.RegisterCommand("/r", h.cmdRank)
+	d.Bot.RegisterCommand("/s", h.cmdSentiment)
+	d.Bot.RegisterCommand("/p", h.cmdPrice)
+	d.Bot.RegisterCommand("/l", h.cmdLevels)
+	d.Bot.RegisterCommand("/history", h.cmdHistory)
+	d.Bot.RegisterCommand("/h", h.cmdHistory)
 
 	// Daily briefing command (TASK-029)
-	bot.RegisterCommand("/briefing", h.cmdBriefing)
-	bot.RegisterCommand("/br", h.cmdBriefing) // short alias
+	d.Bot.RegisterCommand("/briefing", h.cmdBriefing)
+	d.Bot.RegisterCommand("/br", h.cmdBriefing) // short alias
 
 	// Multi-word command+arg aliases for power users (TASK-203)
 	// These combine command + default argument for the most common workflows.
-	bot.RegisterCommand("/ce", h.cmdCOT)            // /ce EUR = /cot EUR
-	bot.RegisterCommand("/ca", h.cmdCTA)             // /ca EUR = /cta EUR
-	bot.RegisterCommand("/qe", h.cmdQuant)           // /qe EUR = /quant EUR
-	bot.RegisterCommand("/bta", h.cmdBacktestAll)    // /bta    = /backtest all
-	bot.RegisterCommand("/of", h.cmdOutlookFRED)     // /of     = /outlook fred
+	d.Bot.RegisterCommand("/ce", h.cmdCOT)            // /ce EUR = /cot EUR
+	d.Bot.RegisterCommand("/ca", h.cmdCTA)             // /ca EUR = /cta EUR
+	d.Bot.RegisterCommand("/qe", h.cmdQuant)           // /qe EUR = /quant EUR
+	d.Bot.RegisterCommand("/bta", h.cmdBacktestAll)    // /bta    = /backtest all
+	d.Bot.RegisterCommand("/of", h.cmdOutlookFRED)     // /of     = /outlook fred
 
 	// Register callback handlers
-	bot.RegisterCallback("cot:", h.cbCOTDetail)
-	bot.RegisterCallback("alert:", h.cbAlertToggle)
-	bot.RegisterCallback("set:", h.cbSettings)
-	bot.RegisterCallback("alertmgr:", h.cbAlertMgr)
-	bot.RegisterCallback("cal:filter:", h.cbNewsFilter)
-	bot.RegisterCallback("out:", h.cbOutlook)
-	bot.RegisterCallback("cal:nav:", h.cbNewsNav)
-	bot.RegisterCallback("cmd:", h.cbQuickCommand)
-	bot.RegisterCallback("onboard:", h.cbOnboard)
-	bot.RegisterCallback("tutorial:", h.cbTutorial) // TASK-001-EXT: Tutorial navigation
-	bot.RegisterCallback("macro:", h.cbMacro)
-	bot.RegisterCallback("imp:", h.cbImpact)
-	bot.RegisterCallback("nav:", h.cbNav)
-	bot.RegisterCallback("help:", h.cbHelp)
-	bot.RegisterCallback("setalert:", h.cbSetAlert) // Per-pair alert management keyboard
-	bot.RegisterCallback("share:", h.cbShare)
-	bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
-	bot.RegisterCallback("briefing:", h.cbBriefingRefresh)
-	bot.RegisterCallback("hist:", h.cbHistory)
+	d.Bot.RegisterCallback("cot:", h.cbCOTDetail)
+	d.Bot.RegisterCallback("alert:", h.cbAlertToggle)
+	d.Bot.RegisterCallback("set:", h.cbSettings)
+	d.Bot.RegisterCallback("alertmgr:", h.cbAlertMgr)
+	d.Bot.RegisterCallback("cal:filter:", h.cbNewsFilter)
+	d.Bot.RegisterCallback("out:", h.cbOutlook)
+	d.Bot.RegisterCallback("cal:nav:", h.cbNewsNav)
+	d.Bot.RegisterCallback("cmd:", h.cbQuickCommand)
+	d.Bot.RegisterCallback("onboard:", h.cbOnboard)
+	d.Bot.RegisterCallback("tutorial:", h.cbTutorial) // TASK-001-EXT: Tutorial navigation
+	d.Bot.RegisterCallback("macro:", h.cbMacro)
+	d.Bot.RegisterCallback("imp:", h.cbImpact)
+	d.Bot.RegisterCallback("nav:", h.cbNav)
+	d.Bot.RegisterCallback("help:", h.cbHelp)
+	d.Bot.RegisterCallback("setalert:", h.cbSetAlert) // Per-pair alert management keyboard
+	d.Bot.RegisterCallback("share:", h.cbShare)
+	d.Bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
+	d.Bot.RegisterCallback("briefing:", h.cbBriefingRefresh)
+	d.Bot.RegisterCallback("hist:", h.cbHistory)
 
 	// Onboarding completion tracking (TASK-204)
 	h.registerOnboardingProgress()
@@ -417,10 +421,6 @@ func (h *Handler) cbShare(ctx context.Context, chatID string, msgID int, userID 
 	switch shareType {
 	case "cot":
 		return h.shareCOT(ctx, chatID, key)
-	case "outlook":
-		// Outlook share — placeholder for future implementation
-		_, err := h.bot.SendHTML(ctx, chatID, "<i>Outlook share coming soon.</i>")
-		return err
 	default:
 		return nil
 	}
