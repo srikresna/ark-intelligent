@@ -153,13 +153,14 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 	// data: "gex:sym:BTC" | "gex:refresh:BTC"
 	parts := strings.SplitN(data, ":", 3)
 	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed GEX callback data")
 		return nil
 	}
 	action := parts[1]
 	sym := strings.ToUpper(parts[2])
 
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return nil
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for GEX analysis.", sym))
 	}
 
 	switch action {
@@ -264,11 +265,12 @@ func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID i
 	}
 	parts := strings.SplitN(data, ":", 3)
 	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed IVol callback data")
 		return nil
 	}
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return nil
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for IV Surface.", sym))
 	}
 	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
 	if err != nil {
@@ -367,11 +369,12 @@ func (h *Handler) handleSkewCallback(ctx context.Context, chatID string, msgID i
 	}
 	parts := strings.SplitN(data, ":", 3)
 	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed Skew callback data")
 		return nil
 	}
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return nil
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for Skew analysis.", sym))
 	}
 	result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
 	if err != nil {

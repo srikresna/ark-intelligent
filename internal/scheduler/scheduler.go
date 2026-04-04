@@ -692,7 +692,11 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 	// --- SKEW/VIX tail risk alert (TASK-208) ---
 	// Fetch VIX term structure (includes VolSuite with SKEW data) and check
 	// for tail risk state transitions. Runs in goroutine to not block FRED job.
-	go s.checkSKEWVIXAlert(ctx)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.checkSKEWVIXAlert(ctx)
+	}()
 
 	return nil
 }

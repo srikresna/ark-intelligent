@@ -131,7 +131,9 @@ func CheckPythonDeps() {
 		importStmt += "import " + d
 	}
 
-	cmd := exec.CommandContext(context.Background(), "python3", "-c", importStmt)
+	checkCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(checkCtx, "python3", "-c", importStmt)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		log.Error().
 			Err(err).

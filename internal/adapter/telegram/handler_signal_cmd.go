@@ -38,16 +38,15 @@ func (h *Handler) cmdSignal(ctx context.Context, chatID string, userID int64, ar
 
 // sendSignalForCurrency computes and sends the unified signal for one currency.
 func (h *Handler) sendSignalForCurrency(ctx context.Context, chatID, currency string) error {
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, "🎯 Computing unified signal for <b>"+currency+"</b>... ⏳")
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎯 Computing unified signal for <b>"+currency+"</b>... ⏳")
 
 	sig, err := h.computeUnifiedSignal(ctx, currency)
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID,
-			"❌ <b>Signal error</b>\n\n<code>"+err.Error()+"</code>")
-		return sendErr
+		h.sendUserError(ctx, chatID, err, "signal")
+		return nil
 	}
 
 	text := h.fmt.FormatUnifiedSignal(sig)
@@ -62,7 +61,7 @@ func (h *Handler) sendSignalForCurrency(ctx context.Context, chatID, currency st
 
 // cmdSignalAll computes the unified signal for all tracked currencies.
 func (h *Handler) cmdSignalAll(ctx context.Context, chatID string, userID int64) error {
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, "🎯 Computing unified signals for all currencies... ⏳")
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎯 Computing unified signals for all currencies... ⏳")
 
 	currencies := []string{"EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"}
 	var results []*analysis.UnifiedSignalV2

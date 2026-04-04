@@ -197,6 +197,10 @@ func (h *Handler) cbNewsNav(ctx context.Context, chatID string, msgID int, userI
 		}
 	}
 
+	if len(events) == 0 {
+		return h.bot.EditMessage(ctx, chatID, msgID, "📅 No calendar events found for this period.\n\n<i>MQL5 calendar may be temporarily unavailable.</i>")
+	}
+
 	// Load saved filter preference (instead of resetting to "all" on nav)
 	prefs, _ := h.prefsRepo.Get(ctx, userID)
 	activeFilter := prefs.CalendarFilter
