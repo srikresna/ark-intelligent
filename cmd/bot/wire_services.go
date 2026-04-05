@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	tgbot "github.com/arkcode369/ark-intelligent/internal/adapter/telegram"
 	"github.com/arkcode369/ark-intelligent/internal/config"
@@ -49,7 +50,7 @@ type AIServiceConfig struct {
 	AIMaxRPM             int
 	AIMaxDaily           int
 	ClaudeEndpoint       string
-	ClaudeTimeout        int
+	ClaudeTimeout        time.Duration
 	ClaudeModel          string
 	ClaudeMaxTokens      int
 	ClaudeThinkingBudget int

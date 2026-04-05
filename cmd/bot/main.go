@@ -28,8 +28,10 @@ import (
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
 	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
+	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	storagepkg "github.com/arkcode369/ark-intelligent/internal/adapter/storage"
 	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	ta "github.com/arkcode369/ark-intelligent/internal/service/ta"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
@@ -659,21 +661,12 @@ func claudeStatus(cs *aisvc.ChatService) string {
 	return "Offline"
 }
 
-// ownerChatIDForScheduler converts an owner user ID to a chat ID string.
-// Returns "" if the owner ID is not set (disabling owner notifications).
-func ownerChatIDForScheduler(ownerID int64) string {
-	if ownerID <= 0 {
-		return ""
-	}
-	return fmt.Sprintf("%d", ownerID)
-}
-
 // newImpactBootstrapper creates a configured ImpactBootstrapper with the
 // specified number of months to backfill.
 func newImpactBootstrapper(
 	fetcher *newssvc.MQL5Fetcher,
 	priceRepo ports.PriceRepository,
-	impactRepo ports.ImpactRepository,
+	impactRepo *storagepkg.ImpactRepo,
 	priceFetcher ports.PriceFetcher,
 	months int,
 ) *newssvc.ImpactBootstrapper {

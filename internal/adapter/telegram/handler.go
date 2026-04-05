@@ -164,50 +164,55 @@ type Handler struct {
 	regimeProvider RegimeAlertProvider
 }
 
+// HandlerDeps holds all dependencies for the Handler constructor.
+// Use this struct to pass dependencies to NewHandler (TASK-094-D).
+type HandlerDeps struct {
+	Bot            *Bot
+	EventRepo      ports.EventRepository
+	COTRepo        ports.COTRepository
+	PrefsRepo      ports.PrefsRepository
+	NewsRepo       ports.NewsRepository
+	NewsFetcher    ports.NewsFetcher
+	AIAnalyzer     ports.AIAnalyzer
+	Changelog      string
+	NewsScheduler  SurpriseProvider
+	Middleware     *Middleware
+	PriceRepo      ports.PriceRepository
+	SignalRepo     ports.SignalRepository
+	ChatService    *aisvc.ChatService
+	ClaudeAnalyzer *aisvc.ClaudeAnalyzer
+	ImpactProvider ImpactProvider
+	DailyPriceRepo pricesvc.DailyPriceStore
+	IntradayRepo   pricesvc.IntradayStore
+}
+
 // NewHandler creates a handler and registers all commands on the bot.
 // newsScheduler, chatService, and claudeAnalyzer may be nil; all callers guard with nil checks before use.
-func NewHandler(
-	bot *Bot,
-	eventRepo ports.EventRepository,
-	cotRepo ports.COTRepository,
-	prefsRepo ports.PrefsRepository,
-	newsRepo ports.NewsRepository,
-	newsFetcher ports.NewsFetcher,
-	aiAnalyzer ports.AIAnalyzer,
-	changelog string,
-	newsScheduler SurpriseProvider,
-	middleware *Middleware,
-	priceRepo ports.PriceRepository,
-	signalRepo ports.SignalRepository,
-	chatService *aisvc.ChatService,
-	claudeAnalyzer *aisvc.ClaudeAnalyzer,
-	impactProvider ImpactProvider,
-	dailyPriceRepo pricesvc.DailyPriceStore,
-	intradayRepo pricesvc.IntradayStore,
-) *Handler {
+func NewHandler(deps HandlerDeps) *Handler {
+	bot := deps.Bot
 	h := &Handler{
-		bot:            bot,
+		bot:            deps.Bot,
 		fmt:            NewFormatter(),
 		kb:             NewKeyboardBuilder(),
-		eventRepo:      eventRepo,
-		cotRepo:        cotRepo,
-		prefsRepo:      prefsRepo,
-		newsRepo:       newsRepo,
-		newsFetcher:    newsFetcher,
-		aiAnalyzer:     aiAnalyzer,
-		changelog:      changelog,
-		newsScheduler:  newsScheduler,
+		eventRepo:      deps.EventRepo,
+		cotRepo:        deps.COTRepo,
+		prefsRepo:      deps.PrefsRepo,
+		newsRepo:       deps.NewsRepo,
+		newsFetcher:    deps.NewsFetcher,
+		aiAnalyzer:     deps.AIAnalyzer,
+		changelog:      deps.Changelog,
+		newsScheduler:  deps.NewsScheduler,
 		aiCooldown:     make(map[int64]time.Time),
 		chatCooldown:   make(map[int64]time.Time),
 		deepLinks:      newDeepLinkCache(),
-		middleware:     middleware,
-		priceRepo:      priceRepo,
-		signalRepo:     signalRepo,
-		chatService:    chatService,
-		claudeAnalyzer: claudeAnalyzer,
-		impactProvider: impactProvider,
-		dailyPriceRepo: dailyPriceRepo,
-		intradayRepo:   intradayRepo,
+		middleware:     deps.Middleware,
+		priceRepo:      deps.PriceRepo,
+		signalRepo:     deps.SignalRepo,
+		chatService:    deps.ChatService,
+		claudeAnalyzer: deps.ClaudeAnalyzer,
+		impactProvider: deps.ImpactProvider,
+		dailyPriceRepo: deps.DailyPriceRepo,
+		intradayRepo:   deps.IntradayRepo,
 		adminConfirm:   newAdminConfirmStore(),
 	}
 

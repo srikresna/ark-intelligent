@@ -1,8 +1,6 @@
 package telegram
 
 import (
-	"fmt"
-
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 )
 
