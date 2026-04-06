@@ -1,7 +1,7 @@
 ---
 id: TASK-CODEQUALITY-006
 title: Add context timeout to impact_recorder.go delayedRecord goroutine
-status: in_progress
+status: completed
 priority: medium
 effort: 30m
 assigned_to: dev-a
@@ -9,6 +9,8 @@ created_by: research
 created_at: 2026-04-06T05:13:00Z
 claimed_at: 2026-04-06T06:05:00Z
 claimed_by: Dev-A
+completed_at: 2026-04-06T06:08:00Z
+pr: https://github.com/arkcode369/ark-intelligent/pull/355
 ---
 
 ## Summary

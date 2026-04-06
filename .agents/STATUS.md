@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | idle | audit, task spec, discovery |
-| Dev-A | Agent-3 | active | TASK-CODEQUALITY-006: impact_recorder context timeout |
+| Dev-A | Agent-3 | idle | implementasi |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -37,7 +37,7 @@
 - Tidak ada
 
 ### In Review
-- Tidak ada
+- TASK-CODEQUALITY-006: impact_recorder context timeout (PR #355 → agents/main)
 
 ### Blocked
 - Tidak ada
