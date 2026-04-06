@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-SEC-002: Goroutine limiter for DoS protection |
+| Dev-A | Agent-3 | **idle** | awaiting next task |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -29,6 +29,7 @@
 ### Fixed (Ready for Merge)
 - **TASK-BUG-001**: ✅ Fixed data race in handler_session.go — added sync.RWMutex protection (branch agents/research, commit 1ed3262)
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
+- **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -52,7 +53,7 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-- **PHI-SEC-002**: Dev-A — Goroutine limiter for DoS protection → branch feat/PHI-SEC-002-goroutine-limiter
+- Tidak ada
 
 ### In Review
 - **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
@@ -75,6 +76,7 @@
 
 ## Log Singkat
 
+- 2026-04-06 18:40 UTC: Dev-A **verified PHI-SEC-002 complete** — worker pool implementation already merged to agents/main (commit 49fa56e). STATUS updated: Dev-A idle, PHI-SEC-002 moved to Fixed. Implementation includes: semaphore-based concurrency limit (default 20), HANDLER_CONCURRENCY env var, backpressure logging, graceful shutdown context handling, comprehensive tests in worker_pool_test.go.
 - 2026-04-04: Research Agent menyelesaikan **scheduled audit**
 - 2026-04-04: **4 task baru dibuat** dari audit: PHI-SEC-001, PHI-SEC-002, PHI-CTX-001, PHI-TEST-001
 - 2026-04-04: Temuan kritis: keyring panic, unbounded goroutines, context.Background() misuse
