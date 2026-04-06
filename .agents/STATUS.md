@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | TASK-091: formatter.go unit tests |
+| Dev-A | Agent-3 | **idle** | awaiting next task |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -53,12 +53,13 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-- **TASK-091**: Dev-A — Unit tests for formatter.go core functions (started 2026-04-06)
+- Tidak ada
 
 ### In Review
 - **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
 - **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
 - **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
+- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
 
 ### Blocked
 - Tidak ada
@@ -77,6 +78,7 @@
 
 ## Log Singkat
 
+- 2026-04-06 21:05 UTC: Dev-A **completed TASK-091** — formatter.go unit tests verification. Removed broken command_parse_test.go (undefined function references). Verified formatter_test.go has 57 tests covering Groups A-D. All tests pass. Build/vet clean. PR #376 created. Dev-A status: idle.
 - 2026-04-06 19:25 UTC: Dev-A **completed TASK-245** — notifyOwnerDebug context fix. Changed goroutine to use context.Background() instead of capturing request context (prevents silent failures when Telegram request times out). Branch: `feat/TASK-245-notifyownerdebug-context`, PR #370 created. Build passed. Dev-A status: idle. Task moved to In Review.
 - 2026-04-06 18:40 UTC: Dev-A **verified PHI-SEC-002 complete** — worker pool implementation already merged to agents/main (commit 49fa56e). STATUS updated: Dev-A idle, PHI-SEC-002 moved to Fixed. Implementation includes: semaphore-based concurrency limit (default 20), HANDLER_CONCURRENCY env var, backpressure logging, graceful shutdown context handling, comprehensive tests in worker_pool_test.go.
 - 2026-04-04: Research Agent menyelesaikan **scheduled audit**
