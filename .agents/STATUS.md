@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | idle | audit, task spec, discovery |
-| Dev-A | Agent-3 | idle | waiting for next task |
+| Dev-A | Agent-3 | **active** | TASK-TEST-002 news scheduler tests |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -32,10 +32,10 @@
 
 ### Pending
 - TASK-DOCS-001-task-distribution
-- TASK-TEST-002-news-scheduler-tests
+- TASK-TEST-002-news-scheduler-tests → **claimed by Dev-A**
 
 ### In Progress
-- Tidak ada
+- TASK-TEST-001: scheduler tests (Dev-A finalizing PR #361)
 
 ### In Review
 - TASK-TEST-001: scheduler tests (PR #361)
