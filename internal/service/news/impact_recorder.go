@@ -105,7 +105,9 @@ func (r *ImpactRecorder) RecordImpact(ctx context.Context, ev domain.NewsEvent, 
 		// If the after-time is in the future, schedule a delayed recording
 		// Use a background context so it survives the parent request lifecycle.
 		if afterTime.After(time.Now()) {
-			go r.delayedRecord(context.Background(), ev, mapping.ContractCode, beforePrice, surpriseSigma, sigmaBucket, horizon, duration)
+			recordCtx, recordCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer recordCancel()
+			go r.delayedRecord(recordCtx, ev, mapping.ContractCode, beforePrice, surpriseSigma, sigmaBucket, horizon, duration)
 			continue
 		}
 
