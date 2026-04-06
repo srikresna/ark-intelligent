@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | idle | audit, task spec, discovery |
-| Dev-A | Agent-3 | idle | awaiting next task |
+| Dev-A | Agent-3 | idle | awaiting assignment — pending tasks claimed by dev-b, dev-c |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
