@@ -45,8 +45,14 @@ yang sudah di-inject via `HandlerDeps`.
 
 ---
 
-## Notes
+## Implementation Notes
 
 - Tidak ada perubahan logic, hanya wiring
 - Tidak ada dependencies baru
 - Test: kirim `/compare EUR GBP` ke bot
+
+## Pull Request
+
+- **PR:** #379 — https://github.com/arkcode369/ark-intelligent/pull/379
+- **Branch:** `feat/TASK-001-register-compare-command`
+- **Status:** In Review (QA)
