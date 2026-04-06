@@ -62,10 +62,17 @@ func (h *Handler) notifyOwnerDebug(_ context.Context, html string) {
 
 ## Acceptance Criteria
 
-- [ ] Goroutine di `notifyOwnerDebug` menggunakan `context.Background()` bukan `ctx` dari parameter
-- [ ] Parameter `ctx` diganti `_ context.Context` (underscore) atau dipertahankan tapi tidak dipakai ke goroutine
-- [ ] Tidak ada perubahan behavior lain
-- [ ] `go build ./...` sukses
+- [x] Goroutine di `notifyOwnerDebug` menggunakan `context.Background()` bukan `ctx` dari parameter
+- [x] Parameter `ctx` diganti `_ context.Context` (underscore) atau dipertahankan tapi tidak dipakai ke goroutine
+- [x] Tidak ada perubahan behavior lain
+- [x] `go build ./...` sukses
+
+## Implementation
+
+- **PR**: [#370](https://github.com/arkcode369/ark-intelligent/pull/370)
+- **Branch**: `feat/TASK-245-notifyownerdebug-context`
+- **Commit**: `d1fa038`
+- **Status**: In Review
 
 ## Referensi
 
