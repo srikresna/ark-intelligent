@@ -37,7 +37,7 @@
 - Tidak ada
 
 ### In Review
-- Tidak ada
+- TASK-SECURITY-001: Fix http.DefaultClient timeout (branch: feat/TASK-SECURITY-001-http-client-timeout, ready for PR)
 
 ### Blocked
 - Tidak ada
