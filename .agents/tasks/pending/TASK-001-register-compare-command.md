@@ -18,10 +18,13 @@ Verifikasi: grep -rn "RegisterCommand.*compare" . --include="*.go" → no result
 
 ## Acceptance Criteria
 
-- [ ] `/compare EUR GBP` dapat diakses user dan menampilkan side-by-side COT
-- [ ] `/compare` terdaftar di `handler.go` block "Register all commands"
-- [ ] `/compare` ditambahkan ke `relatedCommands` map di `keyboard_help.go` (optional, secondary)
-- [ ] `go build ./...` bersih
+- [x] `/compare EUR GBP` dapat diakses user dan menampilkan side-by-side COT
+- [x] `/compare` terdaftar di `handler.go` block "Register all commands"
+- [x] `/compare` ditambahkan ke `relatedCommands` map di `keyboard_help.go` (optional, secondary)
+- [x] `go build ./...` bersih
+
+## PR
+- PR #379: https://github.com/arkcode369/ark-intelligent/pull/379
 
 ---
 
