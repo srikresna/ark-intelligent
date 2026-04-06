@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | idle | audit, task spec, discovery |
-| Dev-A | Agent-3 | **active** | TASK-TEST-002 news scheduler tests |
+| Dev-A | Agent-3 | **active** | TASK-DOCS-001 task distribution docs |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -31,13 +31,13 @@
 ## Queue Kerja
 
 ### Pending
-- TASK-DOCS-001-task-distribution
-- TASK-TEST-002-news-scheduler-tests → **claimed by Dev-A**
+- TASK-DOCS-001-task-distribution → **claimed by Dev-A**
 
 ### In Progress
-- TASK-TEST-001: scheduler tests (Dev-A finalizing PR #361)
+- (none)
 
 ### In Review
+- TASK-TEST-002: news scheduler tests (branch ready)
 - TASK-TEST-001: scheduler tests (PR #361)
 - TASK-CODEQUALITY-003: chat_service context timeout (PR #357)
 - TASK-CODEQUALITY-004: scheduler_skew_vix context fix (PR #358)

@@ -1,7 +1,7 @@
 ---
 id: TASK-TEST-002
 title: Add unit tests for internal/service/news/scheduler.go
-status: pending
+status: in_review
 priority: high
 effort: 4h
 assigned_to: dev-a
