@@ -291,6 +291,7 @@ func NewHandler(d HandlerDeps) *Handler {
 	d.Bot.RegisterCommand("/l", h.cmdLevels)
 	d.Bot.RegisterCommand("/history", h.cmdHistory)
 	d.Bot.RegisterCommand("/h", h.cmdHistory)
+	d.Bot.RegisterCommand("/compare", h.cmdCompare) // COT side-by-side comparison
 
 	// Daily briefing command (TASK-029)
 	d.Bot.RegisterCommand("/briefing", h.cmdBriefing)
