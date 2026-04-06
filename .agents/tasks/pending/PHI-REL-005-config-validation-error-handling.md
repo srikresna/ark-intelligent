@@ -39,10 +39,17 @@ The `internal/config/config.go` file contains 4 `log.Fatal()` calls in the `vali
 - `internal/config/config.go` - Refactor validation to return errors
 - `cmd/bot/main.go` - Add error handling for config.Load()
 
+## Status
+
+**Assigned:** Dev-A  
+**PR:** #365 — https://github.com/arkcode369/ark-intelligent/pull/365  
+**Status:** In Review (pending QA)
+
 ## Estimation
 
 **Size:** Small (S)  
-**Estimated Time:** 1-2 hours
+**Estimated Time:** 1-2 hours  
+**Actual Time:** ~45 minutes
 
 ## Dependencies
 
@@ -51,3 +58,11 @@ None. Can be worked on independently.
 ## Related Issues
 
 - PHI-SETUP-001 (config validation improvements)
+
+## Validation Evidence
+
+```
+go build ./...       # PASS
+go vet ./...         # PASS (errors unrelated to this change)
+go test ./internal/config/... -v  # 26/26 PASS (20 existing + 6 new)
+```

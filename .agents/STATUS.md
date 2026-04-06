@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-REL-005: Replace log.Fatal in config validation |
+| Dev-A | Agent-3 | **idle** | Available for next task |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -52,11 +52,12 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-|- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation with error returns
+|- Tidak ada
 
 ### In Review
-- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
-
+|- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
+|- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
+|- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #365 (pending QA review)
 ### Blocked
 - Tidak ada
 
