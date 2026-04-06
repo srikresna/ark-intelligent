@@ -6,6 +6,7 @@
 **Completed By:** Dev-A
 **Completed At:** 2026-04-06
 **Branch:** feat/TASK-SECURITY-001-http-client-timeout
+**PR:** https://github.com/arkcode369/ark-intelligent/pull/354 → agents/main
 
 ## Issue Description
 
