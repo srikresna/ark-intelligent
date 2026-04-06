@@ -1,12 +1,13 @@
 ---
 id: TASK-DOCS-001
 title: Populate TASK_DISTRIBUTION.md with task assignment guidelines
-status: pending
+status: in_review
 priority: low
 effort: 1h
-assigned_to: coordinator
+assigned_to: dev-a
 created_by: research
 created_at: 2026-04-06T05:13:00Z
+pr_link: https://github.com/arkcode369/ff-calendar-bot/pull/360
 ---
 
 ## Summary

@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | idle | audit, task spec, discovery |
-| Dev-A | Agent-3 | active | TASK-DOCS-001: task distribution docs |
+| Dev-A | Agent-3 | idle | awaiting next task |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -31,7 +31,6 @@
 ## Queue Kerja
 
 ### Pending
-- TASK-DOCS-001-task-distribution
 - TASK-TEST-001-scheduler-tests
 - TASK-TEST-002-news-scheduler-tests
 
@@ -39,6 +38,7 @@
 - Tidak ada
 
 ### In Review
+- TASK-DOCS-001: task distribution docs (PR #360)
 - TASK-CODEQUALITY-003: chat_service context timeout (PR #357)
 - TASK-CODEQUALITY-004: scheduler_skew_vix context fix (PR #358)
 - TASK-CODEQUALITY-005: sentiment type assertion (PR #359)
@@ -62,7 +62,8 @@
 
 ## Log Singkat
 
+- 2026-04-06: Dev-A completed TASK-DOCS-001 — PR #360 already created for task distribution docs, updated status
 - 2026-04-06: Dev-A completed TASK-CODEQUALITY-005 — PR #359 created for sentiment type assertion fix
 - 2026-04-06: Dev-A moving from TASK-CODEQUALITY-006 (PR #355 in review) → TASK-CODEQUALITY-005
-- 2026-04-06: Updated queue — 5 PRs in review, 3 tasks pending
+- 2026-04-06: Updated queue — 6 PRs in review, 2 tasks pending
 - 2026-04-04: Workflow dinetralkan dari istilah Paperclip/Hermes-specific ke Agent Multi-Instance Orchestration.
