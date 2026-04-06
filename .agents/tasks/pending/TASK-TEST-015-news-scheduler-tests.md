@@ -153,12 +153,20 @@ func TestScheduler_Concurrency(t *testing.T) { }
 
 ---
 
+## Implementation
+
+**Branch:** `feat/TASK-TEST-015-news-scheduler-tests`  
+**PR:** #363 - https://github.com/arkcode369/ark-intelligent/pull/363  
+**Status:** In Review (pending QA approval)
+
+---
+
 ## Definition of Done
 
-- [ ] Test file created with comprehensive coverage
-- [ ] All tests passing (`go test ./internal/service/news/...`)
-- [ ] Coverage report shows 60%+ for news package
-- [ ] No race conditions detected (`go test -race`)
+- [x] Test file created with comprehensive coverage
+- [x] All tests passing (`go test ./internal/service/news/...`)
+- [ ] Coverage report shows 60%+ for news package (currently 14.4%, further tests needed)
+- [x] No race conditions detected (`go test -race`)
 - [ ] Code review approved by QA Agent
 - [ ] Merged to main branch
 
