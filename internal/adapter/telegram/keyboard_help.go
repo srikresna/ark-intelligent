@@ -111,6 +111,7 @@ var relatedCommands = map[string][]struct {
 	"macro":       {{Label: "📅 Calendar", Callback: "calendar"}, {Label: "🔄 Transition", Callback: "transition"}, {Label: "📊 Sentiment", Callback: "sentiment"}},
 	"quant":       {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Backtest", Callback: "backtest"}, {Label: "📈 Price", Callback: "price"}},
 	"calendar":    {{Label: "💥 Impact", Callback: "impact"}, {Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}},
+	"compare":     {{Label: "📉 COT", Callback: "cot"}, {Label: "📈 Bias", Callback: "bias"}, {Label: "📊 Rank", Callback: "rank"}},
 	"gex":         {{Label: "🔬 Alpha", Callback: "alpha"}, {Label: "📊 Sentiment", Callback: "sentiment"}, {Label: "📈 CryptoAlpha", Callback: "cryptoalpha"}},
 	"skew":        {{Label: "📊 GEX", Callback: "gex"}, {Label: "📈 IV Surface", Callback: "ivol"}, {Label: "🔬 Alpha", Callback: "alpha"}},
 	"sentiment":   {{Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Bias", Callback: "bias"}, {Label: "📊 Rank", Callback: "rank"}},
