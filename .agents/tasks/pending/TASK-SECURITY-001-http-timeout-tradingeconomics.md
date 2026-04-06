@@ -31,12 +31,15 @@ client := &http.Client{
 resp, err := client.Do(req)
 ```
 
-## Acceptance Criteria
+## Acceptance Criteria (Dev MUST validate before PR)
 
 - [ ] Replace `http.DefaultClient` with a custom `http.Client` with timeout
 - [ ] Timeout should be reasonable (suggested: 30 seconds)
 - [ ] Add unit test to verify timeout behavior (optional but recommended)
 - [ ] Verify no other occurrences of `http.DefaultClient` in the codebase
+- [ ] **VALIDATION: `go build ./...` passes**
+- [ ] **VALIDATION: `go vet ./...` passes**
+- [ ] **VALIDATION: No new test failures**
 
 ## Context
 

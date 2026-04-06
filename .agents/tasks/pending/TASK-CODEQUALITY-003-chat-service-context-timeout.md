@@ -38,12 +38,15 @@ func (cs *ChatService) notifyOwner(_ context.Context, html string) {
 }
 ```
 
-## Acceptance Criteria
+## Acceptance Criteria (Dev MUST validate before PR)
 
 - [ ] Add timeout to the background context in `notifyOwner`
 - [ ] Use reasonable timeout (suggested: 30 seconds for Telegram API calls)
 - [ ] Ensure proper cancel() defer
 - [ ] Check for similar patterns in other goroutine-spawning notification code
+- [ ] **VALIDATION: `go build ./...` passes**
+- [ ] **VALIDATION: `go vet ./...` passes**
+- [ ] **VALIDATION: No new test failures**
 
 ## Context
 

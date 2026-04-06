@@ -33,11 +33,14 @@ defer cancel()
 s.broadcastToActiveUsers(broadcastCtx, msg)
 ```
 
-## Acceptance Criteria
+## Acceptance Criteria (Dev MUST validate before PR)
 
 - [ ] Replace `context.Background()` with `parentCtx` (or child with timeout)
 - [ ] Verify the function receives `parentCtx` which is already available
 - [ ] Test that scheduler shutdown properly cancels in-flight broadcasts
+- [ ] **VALIDATION: `go build ./...` passes**
+- [ ] **VALIDATION: `go vet ./...` passes**
+- [ ] **VALIDATION: No new test failures**
 
 ## Context
 
