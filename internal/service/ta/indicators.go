@@ -802,10 +802,11 @@ func CalcOBV(bars []OHLCV) *OBVResult {
 		// For 5+ bars, average the 2 newest and 2 oldest for smoothing.
 		// For 2-4 bars, compare single newest vs oldest (no panic on short slices).
 		var newestAvg, oldestAvg float64
-		if len(series) >= 5 && len(series) >= 2 {
+		if len(series) >= 5 {
 			newestAvg = (series[0] + series[1]) / 2
 			oldestAvg = (series[len(series)-1] + series[len(series)-2]) / 2
-		} else if len(series) >= 1 {
+		} else {
+			// len(series) is 2-4
 			newestAvg = series[0]
 			oldestAvg = series[len(series)-1]
 		}
