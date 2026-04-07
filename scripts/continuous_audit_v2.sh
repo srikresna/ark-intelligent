@@ -96,13 +96,13 @@ EOF
                 pass=false
             fi
             
-            # Security check
-            SECRETS=$(grep -r "ghp_\|sk-[A-Za-z0-9]" --include="*.go" . 2>/dev/null | grep -v test | grep -v ".git" | wc -l || echo "0")
+            # Security check (look for actual GitHub/Stripe API keys, not just "sk" in words)
+            SECRETS=$(grep -rE "ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{32,}" --include="*.go" . 2>/dev/null | grep -v test | grep -v ".git" | wc -l || echo "0")
             if [ "$SECRETS" -eq 0 ]; then
                 echo "- ✅ No hardcoded secrets" >> "$report_file"
             else
                 echo "- ❌ $SECRETS hardcoded secrets found in .go files" >> "$report_file"
-                echo "  (Check: grep -r 'ghp_\|sk-' --include='*.go' . | grep -v test)" >> "$report_file"
+                echo "  (Check: grep -rE 'ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{32,}' --include='*.go' . | grep -v test)" >> "$report_file"
                 pass=false
             fi
             ;;
