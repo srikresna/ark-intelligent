@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-REL-005: Replace log.Fatal in config validation |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -69,6 +69,7 @@
 ||- **TASK-CODEQUALITY-006**: Dev-A — Add context timeout to impact_recorder.go → PR #355 (pending QA review)
 ||- **TASK-TEST-003**: Dev-A — Unit tests for format_cot.go → PR #388 (pending QA review)
 ||- **PHI-REL-006**: Dev-A — WorldBank goroutine panic recovery → PR #389 (pending QA review)
+||- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #369 (pending QA review)
 
 ### Blocked
 - Tidak ada
