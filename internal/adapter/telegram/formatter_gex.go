@@ -22,7 +22,7 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	sb.WriteString(fmt.Sprintf("💰 Spot: <code>%s</code>\n", gexFormatPrice(r.SpotPrice)))
 	sb.WriteString(fmt.Sprintf("📅 %s UTC\n", r.AnalyzedAt.Format("2006-01-02 15:04")))
 	if r.LowLiquidity {
-		sb.WriteString("⚠️ <i>Low liquidity — data may be less reliable</i>\n")
+		sb.WriteString("⚠️ <i>Likuiditas rendah — data mungkin kurang reliabel</i>\n")
 	}
 	sb.WriteString("\n")
 
@@ -31,9 +31,9 @@ func FormatGEXResult(r *gexsvc.GEXResult) string {
 	sb.WriteString(fmt.Sprintf("🌡️ <b>GEX REGIME:</b> %s %s (<code>%s</code>)\n",
 		regimeEmoji, r.Regime, gexFormatGEXValue(r.TotalGEX)))
 	if r.Regime == "POSITIVE_GEX" {
-		sb.WriteString("✅ Dealers net long gamma — range-bound / peredam volatilitas\n")
+		sb.WriteString("✅ Dealer net long gamma — range-bound / peredam volatilitas\n")
 	} else {
-		sb.WriteString("⚠️ Dealers net short gamma — volatilitas meningkat / trending\n")
+		sb.WriteString("⚠️ Dealer net short gamma — volatilitas meningkat / trending\n")
 	}
 	sb.WriteString("<i>📖 GEX (Gamma Exposure): ukuran sensitivitas harga terhadap posisi options dealer</i>\n\n")
 
@@ -112,7 +112,7 @@ func gexFormatGEXValue(v float64) string {
 // Uses fmtutil.ProgressBar for the bar rendering.
 func gexProfileBars(levels []gexsvc.GEXLevel, spot float64, maxLines int) string {
 	if len(levels) == 0 {
-		return "  (no data)\n"
+		return "  (tidak ada data)\n"
 	}
 
 	// Sort by distance to spot and take closest maxLines
@@ -206,13 +206,13 @@ func FormatIVSurface(r *gexsvc.IVSurfaceResult) string {
 	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", r.SignalReason))
 
 	// Term structure summary
-	sb.WriteString("📉 <b>TERM STRUCTURE</b>")
+	sb.WriteString("📉 <b>STRUKTUR TERM</b>")
 	if r.Backwardation {
 		sb.WriteString(" ⚠️ <i>(backwardation)</i>")
 	}
 	sb.WriteString("\n")
 	if len(r.TermStructure) == 0 {
-		sb.WriteString("  <i>no ATM IV data</i>\n")
+		sb.WriteString("  <i>tidak ada data ATM IV</i>\n")
 	} else {
 		sb.WriteString(ivTermStructureChart(r.TermStructure))
 	}
@@ -233,12 +233,12 @@ func FormatIVSurface(r *gexsvc.IVSurfaceResult) string {
 		count++
 	}
 	if count == 0 {
-		sb.WriteString("  <i>insufficient data</i>\n")
+		sb.WriteString("  <i>data tidak cukup</i>\n")
 	}
 	sb.WriteString("\n")
 
 	// Smile legend
-	sb.WriteString("<i>📖 Skew = Put wing IV − Call wing IV. Positive = bearish fear (put demand). Negative = call demand / bullish.</i>\n")
+	sb.WriteString("<i>📖 Skew = Put wing IV − Call wing IV. Positif = bearish fear (permintaan put). Negatif = permintaan call / bullish.</i>\n")
 
 	return truncateMsg(sb.String())
 }
@@ -259,7 +259,7 @@ func ivSignalEmoji(signal string) string {
 // Shows up to 8 data points.
 func ivTermStructureChart(pts []gexsvc.TermPoint) string {
 	if len(pts) == 0 {
-		return "  <i>no data</i>\n"
+		return "  <i>tidak ada data</i>\n"
 	}
 	// Find max IV for scaling.
 	maxIV := 1.0
@@ -353,7 +353,7 @@ func FormatSkewResult(r *gexsvc.SkewResult) string {
 
 	// Alerts (skew flips)
 	if len(r.Alerts) > 0 {
-		sb.WriteString("🚨 <b>SKEW FLIP DETECTED!</b>\n")
+		sb.WriteString("🚨 <b>SKEW FLIP TERDETEKSI!</b>\n")
 		for _, a := range r.Alerts {
 			sb.WriteString(fmt.Sprintf("  %s → %s (DTE %d, Δ ratio: %.3f)\n",
 				a.OldSkew, a.NewSkew, a.DTE, a.DeltaRatio))
@@ -376,11 +376,11 @@ func FormatSkewResult(r *gexsvc.SkewResult) string {
 		count++
 	}
 	if count == 0 {
-		sb.WriteString("  <i>insufficient data</i>\n")
+		sb.WriteString("  <i>data tidak cukup</i>\n")
 	}
 	sb.WriteString("\n")
 
-	sb.WriteString("<i>📖 Smile menunjukkan IV di berbagai moneyness. Skew slope negatif = normal (put protection); positif = inverse (call demand).</i>\n")
+	sb.WriteString("<i>📖 Smile menunjukkan IV di berbagai moneyness. Skew slope negatif = normal (put protection); positif = inverse (permintaan call).</i>\n")
 
 	return truncateMsg(sb.String())
 }

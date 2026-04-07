@@ -24,7 +24,7 @@ func sentimentGauge(score float64, width int) string {
 	}
 	bar[pos] = '|'
 
-	return "Fear " + string(bar) + " Greed"
+	return "Takut " + string(bar) + " Rakus"
 }
 
 // fearGreedEmoji returns an emoji indicator for the CNN F&G score.
@@ -97,9 +97,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 
 		// Contrarian signal
 		if data.CNNFearGreed <= 25 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear sering mendahului kenaikan\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Beli Contrarian</b> — Extreme fear sering mendahului kenaikan\n")
 		} else if data.CNNFearGreed >= 75 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed sering mendahului koreksi\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Jual Contrarian</b> — Extreme greed sering mendahului koreksi\n")
 		}
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
@@ -113,9 +113,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString(fmt.Sprintf("<code>[%s]</code>\n", gauge))
 		b.WriteString(fmt.Sprintf("<code>Score : %.0f / 100  %s %s</code>\n", data.CryptoFearGreed, emoji, data.CryptoFearGreedLabel))
 		if data.CryptoFearGreed <= 25 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Extreme fear di crypto bisa jadi zona akumulasi\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Beli Contrarian</b> — Extreme fear di crypto bisa jadi zona akumulasi\n")
 		} else if data.CryptoFearGreed >= 75 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Extreme greed di crypto sering mendahului koreksi\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Jual Contrarian</b> — Extreme greed di crypto sering mendahului koreksi\n")
 		}
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
@@ -194,9 +194,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 	// --- AAII contrarian signal ---
 	if data.AAIIAvailable {
 		if data.AAIIBearish >= 50 {
-			b.WriteString("<code>Signal: </code>🟢 <b>Contrarian BUY</b> — Bearish >50%% secara historis mendahului rally\n")
+			b.WriteString("<code>Signal: </code>🟢 <b>Beli Contrarian</b> — Bearish >50%% secara historis mendahului rally\n")
 		} else if data.AAIIBullish >= 50 {
-			b.WriteString("<code>Signal: </code>🔴 <b>Contrarian SELL</b> — Bullish >50%% secara historis mendahului koreksi\n")
+			b.WriteString("<code>Signal: </code>🔴 <b>Jual Contrarian</b> — Bullish >50%% secara historis mendahului koreksi\n")
 		}
 	}
 
@@ -261,9 +261,9 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 			} else if signalLabel == "CONTRARIAN_BEARISH" {
 				signalLabel = "Contrarian Bearish"
 			} else if signalLabel == "LEAN_BULLISH" {
-				signalLabel = "Lean Bullish"
+				signalLabel = "Condong Bullish"
 			} else if signalLabel == "LEAN_BEARISH" {
-				signalLabel = "Lean Bearish"
+				signalLabel = "Condong Bearish"
 			} else {
 				signalLabel = "Netral"
 			}

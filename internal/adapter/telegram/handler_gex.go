@@ -58,7 +58,7 @@ var validGEXSymbols = map[string]struct{}{
 // cmdGEX handles the /gex [SYMBOL] command.
 func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		h.sendUserError(ctx, chatID, fmt.Errorf("GEX engine not available"), "gex")
+		h.sendUserError(ctx, chatID, fmt.Errorf("mesin GEX tidak tersedia"), "gex")
 		return nil
 	}
 
@@ -85,8 +85,8 @@ func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args 
 	}
 
 	// Show loading indicator
-	loadingMsg := fmt.Sprintf("⏳ Fetching GEX data for <b>%s</b> from Deribit...\n"+
-		"<i>This may take 10–30 seconds (fetching option Greeks)</i>", sym)
+	loadingMsg := fmt.Sprintf("⏳ Mengambil data GEX <b>%s</b> dari Deribit...\n"+
+		"<i>Membutuhkan 10-30 detik (mengambil option Greeks)</i>", sym)
 	loadID, err := h.bot.SendLoading(ctx, chatID, loadingMsg)
 	if err != nil {
 		return fmt.Errorf("gex: send loading: %w", err)
@@ -160,14 +160,14 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 	sym := strings.ToUpper(parts[2])
 
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for GEX analysis.", sym))
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> tidak didukung untuk analisis GEX.", sym))
 	}
 
 	switch action {
 	case "sym", "refresh":
 		result, err := h.gex.Engine.Analyze(ctx, sym)
 		if err != nil {
-			errHTML := fmt.Sprintf("\u26a0\ufe0f <b>GEX analysis failed for %s</b>\n\n<i>%s</i>\n\nThis may be temporary \u2014 try again in a few minutes.", sym, err.Error())
+			errHTML := fmt.Sprintf("\u26a0\ufe0f <b>Analisis GEX gagal untuk %s</b>\n\n<i>%s</i>\n\nIni mungkin sementara — coba lagi dalam beberapa menit.", sym, err.Error())
 			kb := gexKeyboard(sym)
 			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
 			return nil
@@ -186,7 +186,7 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 // cmdIVSurface handles the /ivol [SYMBOL] command.
 func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		h.sendUserError(ctx, chatID, fmt.Errorf("IV Surface engine not available"), "ivol")
+		h.sendUserError(ctx, chatID, fmt.Errorf("mesin IV Surface tidak tersedia"), "ivol")
 		return nil
 	}
 
@@ -211,7 +211,7 @@ func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64,
 	}
 
 	loadID, err := h.bot.SendLoading(ctx, chatID,
-		fmt.Sprintf("⏳ Fetching IV Surface for <b>%s</b> from Deribit...\n<i>Analysing implied volatility across all strikes and expiries</i>", sym))
+		fmt.Sprintf("⏳ Mengambil IV Surface untuk <b>%s</b> dari Deribit...\n<i>Menganalisis implied volatility di seluruh strikes dan expiry</i>", sym))
 	if err != nil {
 		return fmt.Errorf("ivol: send loading: %w", err)
 	}
@@ -270,11 +270,11 @@ func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID i
 	}
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for IV Surface.", sym))
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> tidak didukung untuk IV Surface.", sym))
 	}
 	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
 	if err != nil {
-		errHTML := fmt.Sprintf("⚠️ <b>IV Surface failed for %s</b>\n\n<i>%s</i>", sym, err.Error())
+		errHTML := fmt.Sprintf("⚠️ <b>IV Surface gagal untuk %s</b>\n\n<i>%s</i>", sym, err.Error())
 		kb := ivolKeyboard(sym)
 		_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
 		return nil
@@ -291,7 +291,7 @@ func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID i
 // cmdSkew handles the /skew [SYMBOL] command.
 func (h *Handler) cmdSkew(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.gex == nil {
-		h.sendUserError(ctx, chatID, fmt.Errorf("Skew Analysis engine not available"), "skew")
+		h.sendUserError(ctx, chatID, fmt.Errorf("mesin Analisis Skew tidak tersedia"), "skew")
 		return nil
 	}
 
@@ -316,7 +316,7 @@ func (h *Handler) cmdSkew(ctx context.Context, chatID string, userID int64, args
 	}
 
 	loadID, err := h.bot.SendLoading(ctx, chatID,
-		fmt.Sprintf("⏳ Analysing IV Skew for <b>%s</b>...\n<i>Computing smile curves, put/call ratio, flip detection</i>", sym))
+		fmt.Sprintf("⏳ Menganalisis IV Skew untuk <b>%s</b>...\n<i>Menghitung smile curves, put/call ratio, deteksi flip</i>", sym))
 	if err != nil {
 		return fmt.Errorf("skew: send loading: %w", err)
 	}
@@ -374,11 +374,11 @@ func (h *Handler) handleSkewCallback(ctx context.Context, chatID string, msgID i
 	}
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
-		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for Skew analysis.", sym))
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> tidak didukung untuk analisis Skew.", sym))
 	}
 	result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
 	if err != nil {
-		errHTML := fmt.Sprintf("⚠️ <b>Skew analysis failed for %s</b>\n\n<i>%s</i>", sym, err.Error())
+		errHTML := fmt.Sprintf("⚠️ <b>Analisis Skew gagal untuk %s</b>\n\n<i>%s</i>", sym, err.Error())
 		kb := skewKeyboard(sym)
 		_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
 		return nil
