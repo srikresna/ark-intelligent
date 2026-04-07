@@ -35,8 +35,17 @@
 - **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
 - **TASK-TEST-003**: ✅ Fixed — Unit tests for format_cot.go (44 tests, 855 lines). Already merged to agents/main via PR #388.
 
+### Fixed (Ready for Merge)
+- **PHI-CTX-001**: ✅ Verified fixed — context.Background() usages in handler_cta.go, handler_quant.go, handler_vp.go no longer exist. Current codebase uses proper context patterns.
+- **TASK-BUG-001**: ✅ Fixed data race in handler_session.go — added sync.RWMutex protection (branch agents/research, commit 1ed3262)
+- **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
+- **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
+- **TASK-CODEQUALITY-003**: ✅ Fixed — Added context timeout to notifyOwner goroutine in chat_service.go (PR #356 merged)
+- **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
+- **TASK-TEST-002**: ✅ Fixed — Unit tests for handler_alpha.go (35 tests, 778 lines). Already merged to agents/main via PR #373.
+- **TASK-TEST-003**: ✅ Fixed — Unit tests for format_cot.go (44 tests, 855 lines). Already merged to agents/main via PR #388.
+
 ### Pending
-- **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
 - **TASK-TEST-004**: Tests for api.go Telegram API client (medium priority, 4-5h)
 - **TASK-TEST-005**: Tests for format_cta.go CTA formatters (medium priority, 4-5h)
 - **TASK-TEST-006**: Tests for formatter_quant.go Quant formatters (medium priority, 4-5h)
@@ -47,22 +56,20 @@
 - **TASK-TEST-011**: Tests for format_sentiment.go sentiment formatters (medium priority, 3-4h) — *new*
 - **TASK-TEST-012**: Tests for bot.go bot orchestration (medium priority, 4-5h) — *new*
 - **TASK-REFACTOR-001**: Extract magic numbers to constants (medium priority, 3-4h)
-- **TASK-REFACTOR-002**: Decompose keyboard.go into domain files (medium priority, 6-8h)
-- **TASK-CODEQUALITY-002**: ✅ Fixed — Replaced context.Background() with parentCtx in scheduler_skew_vix.go and chat_service.go
 - **TASK-CODEQUALITY-001**: Fix context.Background() in test files (low priority, 2-3h)
 - **TASK-DOCS-001**: Document emoji system standardization (low priority, 1-2h)
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
-- **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-||- _None currently active_
+|||- _None currently active_
 
 ### In Review
-|||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
-|||- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
-||- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
-||- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
-||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
+||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+||||- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
+|||- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
+|||- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
+|||- **TASK-TEST-002**: Dev-A — Unit tests for handler_alpha.go → PR #373 (pending QA review)
+|||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
 ||- **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
 ||- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
 ||- **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
@@ -128,19 +135,18 @@
 - **TASK-CODEQUALITY-002**: ✅ Fixed — Replaced context.Background() with parentCtx in scheduler_skew_vix.go and chat_service.go
 - **TASK-CODEQUALITY-001**: Fix context.Background() in test files (low priority, 2-3h)
 - **TASK-DOCS-001**: Document emoji system standardization (low priority, 1-2h)
-
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
-- **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-|- _None currently active_
+|||- _None currently active_
 
 ### In Review
-|- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
-|- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
-- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
-- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
-- **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
+||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+||||- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
+|||- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
+|||- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
+|||- **TASK-TEST-002**: Dev-A — Unit tests for handler_alpha.go → PR #373 (pending QA review)
+|||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
 - **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
 - **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
 
