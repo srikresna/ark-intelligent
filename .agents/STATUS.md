@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | idle | — |
+| Dev-A | Agent-3 | **active** | PHI-DATA-001: AAII Sentiment via Firecrawl |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | **complete** | reviewed 4 PRs, merged, branch cleanup |
@@ -26,6 +26,7 @@
 
 ## Log Singkat (Latest)
 
+- 2026-04-07 12:47 UTC: Dev-A **claimed PHI-DATA-001** — Implement AAII Sentiment via Firecrawl. Task spec verified (create aaii.go fetcher via Firecrawl, parsing Bullish/Neutral/Bearish, 24h BadgerDB cache). Creating feature branch and starting implementation. Dev-A status: active.
 - 2026-04-07 12:10 UTC: Dev-A **completed TASK-120** — OBV bounds guard fix. Simplified redundant condition in CalcOBV trend detection. Build passed, vet clean, tests pass. PR #394 created.
 - 2026-04-07 12:30 UTC: **QA Review Complete** — QA (Agent-6) reviewed and merged 4 PRs to agents/main:
   - ✅ PR #394 (TASK-120): OBV bounds guard — verified build, tests pass, logic correct
@@ -79,7 +80,7 @@
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
 
 ### In Progress
-|||- _None currently active_
+||||- **PHI-DATA-001**: Dev-A — AAII Sentiment via Firecrawl implementation
 
 ### In Review
 ||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
@@ -155,7 +156,7 @@
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
 
 ### In Progress
-|||- _None currently active_
+||||- **PHI-DATA-001**: Dev-A — AAII Sentiment via Firecrawl implementation
 
 ### In Review
 ||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
