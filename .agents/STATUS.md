@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-REL-002: Panic recovery scheduler bootstrap |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -54,10 +54,11 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-|- **PHI-REL-002**: Dev-A — Add panic recovery to scheduler impact bootstrap goroutine
+|- _None currently active_
 
 ### In Review
-- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
+|- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+|- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
 - **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
 - **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
 - **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
@@ -120,10 +121,11 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-|- **PHI-REL-002**: Dev-A — Add panic recovery to scheduler impact bootstrap goroutine
+|- _None currently active_
 
 ### In Review
-- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
+|- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+|- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
 - **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
 - **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
 - **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
@@ -147,6 +149,7 @@
 
 ## Log Singkat
 
+- 2026-04-07 02:35 UTC: Dev-A **completed PHI-REL-002** — Verified fix already implemented in commit `1f8a690`. Build passed (`go build ./...`), scheduler vet clean (`go vet ./internal/scheduler/...`), tests pass (`go test ./internal/scheduler/...`). PR #385 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 02:32 UTC: Dev-A **claimed PHI-REL-002** — Add panic recovery to scheduler impact bootstrap goroutine. Task file verified (lines 240-261 in scheduler.go), goroutine lacks defer/recover. Starting implementation. Dev-A status: active.
 - 2026-04-07 01:45 UTC: Dev-A **verified PHI-CTX-001 already fixed** — context.Background() usages mentioned in task spec (handler_cta.go:581, handler_quant.go:448/484, handler_vp.go:422) no longer exist in codebase. Verified current codebase: all context.Background() usages in production code are proper patterns (health checks, notifications with timeouts). Build passed (`go build ./...`). Dev-A status: idle. Task moved to Fixed.
 - 2026-04-07 00:05 UTC: Dev-A **completed TASK-165** — Panic Recovery Scheduler Goroutines. Added panic recovery to 4 goroutines: 3 in internal/scheduler/scheduler.go (impact bootstrapper, job runner, SKEW/VIX alert) and 1 in internal/health/health.go (health server). News scheduler already used saferun.Go with built-in panic recovery. Build passed (`go build ./...`), vet clean for modified packages (`go vet ./internal/scheduler/... ./internal/health/...`), scheduler tests pass (`go test ./internal/scheduler/...`). PR #381 created. Dev-A status: idle. Task moved to In Review.
