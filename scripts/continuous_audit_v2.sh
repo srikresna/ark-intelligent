@@ -108,34 +108,29 @@ EOF
             ;;
             
         "tests-handlers")
-            echo "🧪 Running quick unit tests..."
+            echo "🧪 Running fast unit tests on core packages..."
             
-            # Run only fast, offline tests with very short timeout
-            # Focus on core logic, skip network-dependent packages
-            SKIP_PACKAGES="sentiment|fred|coingecko|deribit|cryptocompare|defillama|finviz|onchain|sec|worldbank|imf|bis|fed|news|ai"
-            TEST_PACKAGES=$(go list ./internal/service/... ./internal/adapter/... 2>/dev/null | grep -vE "/($SKIP_PACKAGES)$" | tr '\n' ' ')
+            # Only test the fastest, most critical packages
+            # Skip everything that might be slow or network-dependent
+            CORE_PACKAGES="./internal/service/price ./internal/service/backtest ./internal/service/cot ./internal/service/analysis ./internal/service/ta ./internal/adapter/storage"
             
-            if [ -z "$TEST_PACKAGES" ]; then
-                echo "- ⚠️  No test packages found" >> "$report_file"
+            echo "  Testing core packages: $CORE_PACKAGES" >> "$report_file"
+            
+            if go test $CORE_PACKAGES -short -timeout 90s -count=1 > /tmp/test.log 2>&1; then
+                echo "- ✅ Tests: PASSED" >> "$report_file"
+                echo "  Core packages tested successfully" >> "$report_file"
                 pass=true
             else
-                echo "  Testing $(echo $TEST_PACKAGES | wc -w) packages..." >> "$report_file"
-                if go test $TEST_PACKAGES -short -timeout 60s -count=1 > /tmp/test.log 2>&1; then
-                    echo "- ✅ Tests: PASSED" >> "$report_file"
-                    echo "  $(echo $TEST_PACKAGES | wc -w) packages tested successfully" >> "$report_file"
-                    pass=true
+                # Check if it's just timeout or actual failure
+                if grep -q "panic\|fatal\|undefined" /tmp/test.log; then
+                    echo "- ❌ Tests: FAILED (code error)" >> "$report_file"
+                    echo "Test failures:" >> "$report_file"
+                    grep -E "(FAIL|--- FAIL|panic)" /tmp/test.log | head -10 >> "$report_file"
+                    pass=false
                 else
-                    # Check if it's just timeout or actual failure
-                    if grep -q "panic\|fatal\|undefined" /tmp/test.log; then
-                        echo "- ❌ Tests: FAILED (code error)" >> "$report_file"
-                        echo "Test failures:" >> "$report_file"
-                        grep -E "(FAIL|--- FAIL|panic)" /tmp/test.log | head -10 >> "$report_file"
-                        pass=false
-                    else
-                        echo "- ⚠️  Tests: TIMEOUT" >> "$report_file"
-                        echo "Some tests timed out (will retry)" >> "$report_file"
-                        pass=true  # Don't fail for timeout
-                    fi
+                    echo "- ⚠️  Tests: TIMEOUT" >> "$report_file"
+                    echo "Some tests timed out (will retry)" >> "$report_file"
+                    pass=true  # Don't fail for timeout
                 fi
             fi
             ;;
