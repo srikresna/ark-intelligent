@@ -3,6 +3,7 @@ package sentiment
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -113,7 +114,11 @@ func GetCachedOrFetch(ctx context.Context) (*SentimentData, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v.(*SentimentData), nil
+	data, ok := v.(*SentimentData)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type from singleflight: %T", v)
+	}
+	return data, nil
 }
 
 // InvalidateCache forces the next call to GetCachedOrFetch to re-fetch.
