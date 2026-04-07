@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-DATA-001 — AAII Sentiment via Firecrawl |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -33,6 +33,7 @@
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
 - **TASK-CODEQUALITY-003**: ✅ Fixed — Added context timeout to notifyOwner goroutine in chat_service.go (PR #356 merged)
 - **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
+- **PHI-DATA-001**: ✅ Already implemented — AAII Sentiment via Firecrawl exists in `internal/service/sentiment/sentiment.go` (lines 516-595). Features: Firecrawl scraping with JSON schema extraction, 6-hour TTL caching via BadgerDB, circuit breaker protection, `SentimentData` struct integration. Build passes, vet clean.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -55,7 +56,7 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-||- **PHI-DATA-001**: Dev-A — AAII Sentiment via Firecrawl (medium priority, 2-4h)
+||- _None currently active_
 
 ### In Review
 |||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
@@ -90,8 +91,9 @@
 
 ## Log Singkat
 
-|- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
-|- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
+||- 2026-04-07 06:05 UTC: Dev-A **verified PHI-DATA-001 already implemented** — AAII Sentiment via Firecrawl exists in `internal/service/sentiment/sentiment.go` (lines 516-595). Features: Firecrawl scraping with JSON schema extraction, circuit breaker `cbAAII`, 6-hour TTL caching via BadgerDB. Build passed (`go build ./...`), vet clean (`go vet ./...`). No code changes needed. Task moved to Fixed. Dev-A status: idle.
+||- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
+||- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
 |- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003**
 - 2026-04-06 04:25 UTC: Research Agent audit
 - 2026-04-07 00:50 UTC: Dev-A **completed TASK-CODEQUALITY-006** — Add context timeout to impact_recorder.go delayedRecord goroutine. Changed `context.Background()` to `context.WithTimeout(context.Background(), 5*time.Minute)` with proper `defer cancel()`. Build passed (`go build ./...`), vet clean (`go vet ./...`). PR #355 already exists. Dev-A status: idle. Task moved to In Review.
@@ -110,6 +112,7 @@
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
 - **TASK-CODEQUALITY-003**: ✅ Fixed — Added context timeout to notifyOwner goroutine in chat_service.go (PR #356 merged)
 - **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
+- **PHI-DATA-001**: ✅ Already implemented — AAII Sentiment via Firecrawl exists in `internal/service/sentiment/sentiment.go` (lines 516-595). Features: Firecrawl scraping with JSON schema extraction, 6-hour TTL caching via BadgerDB, circuit breaker protection, `SentimentData` struct integration. Build passes, vet clean.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -161,8 +164,9 @@
 
 ## Log Singkat
 
-|- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
-|- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
+||- 2026-04-07 06:05 UTC: Dev-A **verified PHI-DATA-001 already implemented** — AAII Sentiment via Firecrawl exists in `internal/service/sentiment/sentiment.go` (lines 516-595). Features: Firecrawl scraping with JSON schema extraction, circuit breaker `cbAAII`, 6-hour TTL caching via BadgerDB. Build passed (`go build ./...`), vet clean (`go vet ./...`). No code changes needed. Task moved to Fixed. Dev-A status: idle.
+||- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
+||- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
 |- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003**
 - 2026-04-06 04:25 UTC: Research Agent audit
 - 2026-04-07 02:35 UTC: Dev-A **completed PHI-REL-002** — Verified fix already implemented in commit `1f8a690`. Build passed (`go build ./...`), scheduler vet clean (`go vet ./internal/scheduler/...`), tests pass (`go test ./internal/scheduler/...`). PR #385 already exists. Dev-A status: idle. Task moved to In Review.
