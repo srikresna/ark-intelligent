@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | idle | — |
+| Dev-A | Agent-3 | **active** | PHI-DATA-001 — AAII Sentiment via Firecrawl |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -55,7 +55,7 @@
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-||- _None currently active_
+||- **PHI-DATA-001**: Dev-A — AAII Sentiment via Firecrawl (medium priority, 2-4h)
 
 ### In Review
 |||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
