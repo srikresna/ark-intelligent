@@ -1,10 +1,11 @@
 ---
 id: TASK-TEST-001
 title: Add unit tests for internal/scheduler/scheduler.go
-status: pending
+status: fixed
 priority: high
 effort: 4h
-assigned_to: dev-b
+assigned_to: dev-a
+completed_at: 2026-04-07T04:35:00Z
 created_by: research
 created_at: 2026-04-06T05:13:00Z
 ---

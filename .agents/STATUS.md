@@ -32,6 +32,7 @@
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
 - **TASK-CODEQUALITY-003**: ✅ Fixed — Added context timeout to notifyOwner goroutine in chat_service.go (PR #356 merged)
+- **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -50,12 +51,11 @@
 - **TASK-CODEQUALITY-002**: ✅ Fixed — Replaced context.Background() with parentCtx in scheduler_skew_vix.go and chat_service.go
 - **TASK-CODEQUALITY-001**: Fix context.Background() in test files (low priority, 2-3h)
 - **TASK-DOCS-001**: Document emoji system standardization (low priority, 1-2h)
-- **TASK-TEST-013**: Tests for scheduler.go — core orchestration (**high priority**, 6-8h) — *critical infrastructure*
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
 ### In Progress
-|- _None currently active_
+||- _None currently active_
 
 ### In Review
 ||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
@@ -86,7 +86,9 @@
 
 ## Log Singkat
 
-- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003** — Already fixed and merged via PR #356. Added context timeout (30s) to notifyOwner goroutine in chat_service.go. Build passed (`go build ./...`), vet clean (`go vet ./internal/service/ai/...`). STATUS.md updated to reflect task completion. Dev-A status: idle. Task moved to Fixed.
+|- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
+|- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
+|- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003**
 - 2026-04-06 04:25 UTC: Research Agent audit
 - 2026-04-07 00:50 UTC: Dev-A **completed TASK-CODEQUALITY-006** — Add context timeout to impact_recorder.go delayedRecord goroutine. Changed `context.Background()` to `context.WithTimeout(context.Background(), 5*time.Minute)` with proper `defer cancel()`. Build passed (`go build ./...`), vet clean (`go vet ./...`). PR #355 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:40 UTC: Dev-A **completed TASK-TEST-002** — Unit tests for handler_alpha.go signal generation. Branch already had 35 comprehensive tests (778 lines). Removed broken command_parse_test.go blocking test suite. Build passed (`go build ./...`), tests pass (`go test ./internal/adapter/telegram/...`), race test clean (`go test -race`). PR #373 already exists (updated with latest commit). Dev-A status: idle. Task moved to In Review.
@@ -103,6 +105,7 @@
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
 - **TASK-CODEQUALITY-003**: ✅ Fixed — Added context timeout to notifyOwner goroutine in chat_service.go (PR #356 merged)
+- **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -121,7 +124,7 @@
 - **TASK-CODEQUALITY-002**: ✅ Fixed — Replaced context.Background() with parentCtx in scheduler_skew_vix.go and chat_service.go
 - **TASK-CODEQUALITY-001**: Fix context.Background() in test files (low priority, 2-3h)
 - **TASK-DOCS-001**: Document emoji system standardization (low priority, 1-2h)
-- **TASK-TEST-013**: Tests for scheduler.go — core orchestration (**high priority**, 6-8h) — *critical infrastructure*
+
 - **TASK-TEST-014**: Tests for ta/indicators.go — technical indicators (**medium priority**, 6-8h) — *1025 lines of pure calculation logic*
 - **TASK-TEST-015**: Tests for news/scheduler.go — alert scheduling (**high priority**, 6-8h) — *new, 1,134 lines critical alert infrastructure*
 
@@ -154,7 +157,9 @@
 
 ## Log Singkat
 
-- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003** — Already fixed and merged via PR #356. Added context timeout (30s) to notifyOwner goroutine in chat_service.go. Build passed (`go build ./...`), vet clean (`go vet ./internal/service/ai/...`). STATUS.md updated to reflect task completion. Dev-A status: idle. Task moved to Fixed.
+|- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
+|- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
+|- 2026-04-07 04:25 UTC: Dev-A **verified TASK-CODEQUALITY-003**
 - 2026-04-06 04:25 UTC: Research Agent audit
 - 2026-04-07 02:35 UTC: Dev-A **completed PHI-REL-002** — Verified fix already implemented in commit `1f8a690`. Build passed (`go build ./...`), scheduler vet clean (`go vet ./internal/scheduler/...`), tests pass (`go test ./internal/scheduler/...`). PR #385 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 02:32 UTC: Dev-A **claimed PHI-REL-002** — Add panic recovery to scheduler impact bootstrap goroutine. Task file verified (lines 240-261 in scheduler.go), goroutine lacks defer/recover. Starting implementation. Dev-A status: active.
