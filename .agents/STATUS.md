@@ -31,6 +31,7 @@
 - **TASK-BUG-001**: ✅ Fixed data race in handler_session.go — added sync.RWMutex protection (branch agents/research, commit 1ed3262)
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
+- **TASK-023**: ✅ Verified fixed — Bollinger Squeeze detection bug already fixed in indicators.go. Uses `minSamples := period / 2` instead of requiring full period length. Tests pass (TestCalcBollinger_SqueezeDetection, TestCalcBollinger_NoSqueeze). Build and vet pass for ta package.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -98,6 +99,7 @@
 - **TASK-BUG-001**: ✅ Fixed data race in handler_session.go — added sync.RWMutex protection (branch agents/research, commit 1ed3262)
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
 - **PHI-SEC-002**: ✅ Goroutine limiter implemented — worker pool with semaphore (default 20 concurrent handlers), backpressure logging, configurable via HANDLER_CONCURRENCY env var, tests in worker_pool_test.go — already merged to agents/main
+- **TASK-023**: ✅ Verified fixed — Bollinger Squeeze detection bug already fixed in indicators.go. Uses `minSamples := period / 2` instead of requiring full period length. Tests pass (TestCalcBollinger_SqueezeDetection, TestCalcBollinger_NoSqueeze). Build and vet pass for ta package.
 
 ### Pending
 - **TASK-TEST-002**: Tests for handler_alpha.go signal generation (high priority, 4-6h)
@@ -149,6 +151,7 @@
 
 ## Log Singkat
 
+- 2026-04-07 03:10 UTC: Dev-A **verified TASK-023 already fixed** — Bollinger Squeeze detection bug in indicators.go:490-509 already fixed. Uses `minSamples := period / 2` (minimum 2 samples) instead of requiring full `period` length for bandwidth average calculation. Tests exist and pass: TestCalcBollinger_SqueezeDetection (squeeze=true detected correctly), TestCalcBollinger_NoSqueeze (squeeze=false for normal volatility). Build passed (`go build ./...`), ta package vet clean (`go vet ./internal/service/ta/...`). Task moved to Fixed.
 - 2026-04-07 02:35 UTC: Dev-A **completed PHI-REL-002** — Verified fix already implemented in commit `1f8a690`. Build passed (`go build ./...`), scheduler vet clean (`go vet ./internal/scheduler/...`), tests pass (`go test ./internal/scheduler/...`). PR #385 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 02:32 UTC: Dev-A **claimed PHI-REL-002** — Add panic recovery to scheduler impact bootstrap goroutine. Task file verified (lines 240-261 in scheduler.go), goroutine lacks defer/recover. Starting implementation. Dev-A status: active.
 - 2026-04-07 01:45 UTC: Dev-A **verified PHI-CTX-001 already fixed** — context.Background() usages mentioned in task spec (handler_cta.go:581, handler_quant.go:448/484, handler_vp.go:422) no longer exist in codebase. Verified current codebase: all context.Background() usages in production code are proper patterns (health checks, notifications with timeouts). Build passed (`go build ./...`). Dev-A status: idle. Task moved to Fixed.
