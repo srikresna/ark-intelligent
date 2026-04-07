@@ -306,12 +306,12 @@ func templateFallback() string {
 // notifyOwner sends a notification to the bot owner if the callback is set.
 // Non-blocking — fires in a goroutine with a timeout context to prevent
 // goroutine leaks if the notification callback hangs.
-func (cs *ChatService) notifyOwner(_ context.Context, html string) {
+func (cs *ChatService) notifyOwner(parentCtx context.Context, html string) {
 	if cs.ownerNotify == nil {
 		return
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 		defer cancel()
 		cs.ownerNotify(ctx, html)
 	}()

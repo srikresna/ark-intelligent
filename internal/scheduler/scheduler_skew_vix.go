@@ -17,7 +17,7 @@ import (
 // Called asynchronously from jobFREDAlerts to piggyback on the hourly cadence
 // without blocking FRED alert processing.
 func (s *Scheduler) checkSKEWVIXAlert(parentCtx context.Context) {
-	vixCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	vixCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 	defer cancel()
 
 	ts, err := vixsvc.FetchTermStructure(vixCtx)
