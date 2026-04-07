@@ -367,7 +367,12 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 	for i, job := range jobs {
 		wg.Add(1)
 		go func(idx int, j fetchJob) {
-			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error().Interface("panic", r).Str("series", j.id).Msg("PANIC in FRED fetch")
+				}
+				wg.Done()
+			}()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			obs := fetchSeries(ctx, client, j.id, apiKey, j.limit)
