@@ -26,6 +26,7 @@
 
 ## Log Singkat (Latest)
 
+- 2026-04-07 13:45 UTC: Dev-A **completed TASK-194** — Unit Test Coverage for Price + Backtest Services. Created 8 test files (1851 lines) covering: garch_test.go, hmm_regime_test.go, correlation_test.go, hurst_test.go, walkforward_test.go, montecarlo_test.go, stats_calculator_test.go, bootstrap_test.go. Build passed, vet clean, all tests pass. PR #396 created. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 12:10 UTC: Dev-A **completed TASK-120** — OBV bounds guard fix. Simplified redundant condition in CalcOBV trend detection. Build passed, vet clean, tests pass. PR #394 created.
 - 2026-04-07 12:30 UTC: **QA Review Complete** — QA (Agent-6) reviewed and merged 4 PRs to agents/main:
   - ✅ PR #394 (TASK-120): OBV bounds guard — verified build, tests pass, logic correct
@@ -81,16 +82,18 @@
 ### In Progress
 |||- _None currently active_
 
-### In Review
-||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+|### In Review
+||||||- **TASK-194**: Dev-A — Unit tests price + backtest services → PR #396 (pending QA review)
+|||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
 ||||- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
 |||- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
 |||- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
 |||- **TASK-TEST-002**: Dev-A — Unit tests for handler_alpha.go → PR #373 (pending QA review)
 |||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
 ||- **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
-||- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
-||- **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
+|### In Review
+||||||- **TASK-194**: Dev-A — Unit tests price + backtest services → PR #396 (pending QA review)
+|||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
 |||- **TASK-CODEQUALITY-006**: Dev-A — Add context timeout to impact_recorder.go → PR #355 (pending QA review)
 ||- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #369 (pending QA review)
 
@@ -157,18 +160,20 @@
 ### In Progress
 |||- _None currently active_
 
-### In Review
-||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
+|### In Review
+||||||- **TASK-194**: Dev-A — Unit tests price + backtest services → PR #396 (pending QA review)
+|||||- **PHI-REL-002**: Dev-A — Panic recovery scheduler bootstrap → PR #385 (pending QA review)
 ||||- **TASK-002**: Dev-A — Standardize loading feedback → PR #382 (pending QA review)
 |||- **TASK-001**: Dev-A — Register /compare command → PR #379 (pending QA review)
 |||- **PHI-SEC-001**: Dev-A — Fix keyring panic → PR #364 (pending QA review)
 |||- **TASK-TEST-002**: Dev-A — Unit tests for handler_alpha.go → PR #373 (pending QA review)
-|||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
-- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
-|- **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
-|||- **TASK-120**: Dev-A — OBV bounds guard fix → PR #394 (pending QA review)
-|||
-### Blocked
+||||- **TASK-TEST-015**: Dev-A — Unit tests for news/scheduler.go → PR #363 (pending QA review)
+|||- **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
+|||- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
+|||- **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
+||||- **TASK-120**: Dev-A — OBV bounds guard fix → PR #394 (pending QA review)
+
+|### Blocked
 - Tidak ada
 
 ---
