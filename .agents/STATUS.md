@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-REL-008: FRED fetcher goroutine panic recovery |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -71,6 +71,7 @@
 ||- **PHI-REL-006**: Dev-A — WorldBank goroutine panic recovery → PR #389 (pending QA review)
 ||- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #369 (pending QA review)
 ||- **PHI-REL-007**: Dev-A — BIS REER goroutine panic recovery → PR #390 (pending QA review)
+||- **PHI-REL-008**: Dev-A — FRED fetcher goroutine panic recovery → PR #391 (pending QA review)
 
 ### Blocked
 - Tidak ada
