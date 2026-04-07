@@ -117,7 +117,12 @@ func FetchWorldBankData(ctx context.Context) (*WorldBankData, error) {
 	for i, cc := range countryConfig {
 		wg.Add(1)
 		go func(idx int, code, currency string) {
-			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error().Interface("panic", r).Str("country", code).Str("currency", currency).Msg("PANIC in WorldBank fetch")
+				}
+				wg.Done()
+			}()
 			macro := fetchCountry(ctx, code, currency)
 			ch <- result{macro: macro, idx: idx}
 		}(i, cc.Code, cc.Currency)
