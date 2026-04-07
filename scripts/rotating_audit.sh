@@ -15,13 +15,14 @@ DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
 mkdir -p "$AUDIT_DIR"
 
 # Determine audit focus based on day of week
+# More frequent UI/UX and Feature audits
 case $DAY_OF_WEEK in
     1) FOCUS="build-security" ;;   # Monday: Build & Security
     2) FOCUS="tests-handlers" ;;   # Tuesday: Tests & Handlers
-    3) FOCUS="errors-panic" ;;     # Wednesday: Error Handling & Panic Recovery
-    4) FOCUS="api-performance" ;;  # Thursday: API & Performance
-    5) FOCUS="code-quality" ;;     # Friday: Code Quality & Deep Dive
-    6) FOCUS="comprehensive" ;;    # Saturday: Full Audit
+    3) FOCUS="ui-ux-flow" ;;       # Wednesday: UI/UX Flow Deep Dive
+    4) FOCUS="feature-logic" ;;    # Thursday: Feature Logic & Functionality
+    5) FOCUS="errors-panic" ;;     # Friday: Error Handling & Panic Recovery
+    6) FOCUS="comprehensive" ;;    # Saturday: Full Comprehensive Audit
     7) FOCUS="bug-hunting" ;;      # Sunday: Bug Hunting & Edge Cases
 esac
 
@@ -268,6 +269,113 @@ if [ "$FOCUS" = "code-quality" ] || [ "$FOCUS" = "comprehensive" ]; then
         echo "- ⚠️  Go vet: WARNINGS" >> "$REPORT_FILE"
         cat /tmp/vet.log >> "$REPORT_FILE"
     fi
+fi
+
+# ============================================
+# FOCUS 3: UI/UX FLOW (Wednesday)
+# ============================================
+if [ "$FOCUS" = "ui-ux-flow" ] || [ "$FOCUS" = "comprehensive" ]; then
+    echo "" >> "$REPORT_FILE"
+    echo "### 🎨 UI/UX Flow Deep Dive" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    
+    echo "**Menu Navigation:**" >> "$REPORT_FILE"
+    
+    # Check main keyboard
+    MAIN_KEYBOARD=$(grep -c "NewInlineKeyboard" internal/adapter/telegram/keyboard*.go 2>/dev/null || echo "0")
+    echo "- Main keyboards defined: $MAIN_KEYBOARD" >> "$REPORT_FILE"
+    
+    # Check callback handlers
+    CALLBACK_HANDLERS=$(grep -c "AddCallback\|HandleCallback" internal/adapter/telegram/*.go 2>/dev/null || echo "0")
+    echo "- Callback handlers registered: $CALLBACK_HANDLERS" >> "$REPORT_FILE"
+    
+    # Check loading states
+    LOADING_STATES=$(grep -c "SendLoading\|loading" internal/adapter/telegram/handler*.go 2>/dev/null || echo "0")
+    echo "- Loading indicators: $LOADING_STATES" >> "$REPORT_FILE"
+    
+    # Check error handling
+    ERROR_HANDLERS=$(grep -c "SendError\|error:" internal/adapter/telegram/*.go 2>/dev/null || echo "0")
+    echo "- Error handlers: $ERROR_HANDLERS" >> "$REPORT_FILE"
+    
+    # Check back navigation
+    BACK_BUTTONS=$(grep -c "Back\|Kembali" internal/adapter/telegram/*.go 2>/dev/null || echo "0")
+    echo "- Back buttons: $BACK_BUTTONS" >> "$REPORT_FILE"
+    
+    echo "" >> "$REPORT_FILE"
+    echo "**UX Quality Checks:**" >> "$REPORT_FILE"
+    echo "- [ ] All buttons have callbacks" >> "$REPORT_FILE"
+    echo "- [ ] Loading states show during async ops" >> "$REPORT_FILE"
+    echo "- [ ] Error messages are user-friendly" >> "$REPORT_FILE"
+    echo "- [ ] Navigation is intuitive" >> "$REPORT_FILE"
+    echo "- [ ] Home button available everywhere" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+fi
+
+# ============================================
+# FOCUS 4: FEATURE LOGIC (Thursday)
+# ============================================
+if [ "$FOCUS" = "feature-logic" ] || [ "$FOCUS" = "comprehensive" ]; then
+    echo "" >> "$REPORT_FILE"
+    echo "### 🧠 Feature Logic & Functionality" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    
+    echo "**Core Features Status:**" >> "$REPORT_FILE"
+    
+    # COT Feature
+    echo "- **COT Analysis**:" >> "$REPORT_FILE"
+    if [ -f "internal/service/cot/analyzer.go" ]; then
+        echo "  - [ ] Analyzer logic: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Seasonality engine: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Disaggregated data: Needs manual test" >> "$REPORT_FILE"
+    else
+        echo "  - ❌ Analyzer missing" >> "$REPORT_FILE"
+    fi
+    
+    # Price Feature
+    echo "- **Price Context**:" >> "$REPORT_FILE"
+    if [ -f "internal/service/price/fetcher.go" ]; then
+        echo "  - [ ] Price fetcher: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Moving averages: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Support/Resistance: Needs manual test" >> "$REPORT_FILE"
+    else
+        echo "  - ❌ Fetcher missing" >> "$REPORT_FILE"
+    fi
+    
+    # Calendar Feature
+    echo "- **Economic Calendar**:" >> "$REPORT_FILE"
+    if [ -f "internal/service/fred/fetcher.go" ]; then
+        echo "  - [ ] FRED integration: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Event filtering: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Impact scoring: Needs manual test" >> "$REPORT_FILE"
+    else
+        echo "  - ❌ FRED fetcher missing" >> "$REPORT_FILE"
+    fi
+    
+    # Backtest Feature
+    echo "- **Backtesting**:" >> "$REPORT_FILE"
+    if [ -f "internal/service/backtest/walkforward.go" ]; then
+        echo "  - [ ] Walkforward analysis: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Monte Carlo: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Stats calculation: Needs manual test" >> "$REPORT_FILE"
+    else
+        echo "  - ❌ Backtest engine missing" >> "$REPORT_FILE"
+    fi
+    
+    # Alpha Signals
+    echo "- **Alpha Signals (GEX/Wyckoff/SMC)**:" >> "$REPORT_FILE"
+    if [ -f "internal/adapter/telegram/handler_alpha.go" ]; then
+        echo "  - [ ] GEX calculation: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] Wyckoff analysis: Needs manual test" >> "$REPORT_FILE"
+        echo "  - [ ] SMC/ICT: Needs manual test" >> "$REPORT_FILE"
+    else
+        echo "  - ❌ Alpha handler missing" >> "$REPORT_FILE"
+    fi
+    
+    echo "" >> "$REPORT_FILE"
+    echo "**Manual Test Required:**" >> "$REPORT_FILE"
+    echo "⚠️  All features above require manual testing in Telegram bot" >> "$REPORT_FILE"
+    echo "Run: /outlook, /cot, /calendar, /bias, /alpha and verify outputs" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
 fi
 
 # ============================================
