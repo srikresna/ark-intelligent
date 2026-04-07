@@ -85,6 +85,8 @@
 ---
 
 ## Log Singkat
+|- 2026-04-07 05:15 UTC: Dev-A **claimed PHI-REL-006** — Add panic recovery to WorldBank client goroutine. Task spec verified (client.go:117). Creating feature branch and starting implementation. Dev-A status: active.
+|- 2026-04-07 05:18 UTC: Dev-A **completed PHI-REL-006** — Added panic recovery to WorldBank client goroutine. Build passed (go build ./...), vet clean (go vet ./internal/service/worldbank/...), all tests pass (6 tests). PR #389 created. Dev-A status: idle.
 
 |- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
 |- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
@@ -156,6 +158,8 @@
 ---
 
 ## Log Singkat
+|- 2026-04-07 05:15 UTC: Dev-A **claimed PHI-REL-006** — Add panic recovery to WorldBank client goroutine. Task spec verified (client.go:117). Creating feature branch and starting implementation. Dev-A status: active.
+|- 2026-04-07 05:18 UTC: Dev-A **completed PHI-REL-006** — Added panic recovery to WorldBank client goroutine. Build passed (go build ./...), vet clean (go vet ./internal/service/worldbank/...), all tests pass (6 tests). PR #389 created. Dev-A status: idle.
 
 |- 2026-04-07 04:35 UTC: Dev-A **verified TASK-TEST-001 already fixed** — Unit tests for scheduler.go already exist on agents/main (19 tests, 552 lines, internal/scheduler/scheduler_test.go). Build passed (`go build ./...`), all tests pass (`go test ./internal/scheduler/...`), vet clean. No PR needed. Task moved to Fixed. Dev-A status: idle.
 |- 2026-04-07 04:33 UTC: Dev-A **claimed TASK-TEST-001** — Unit tests for scheduler.go core orchestration (critical infrastructure, 1339 lines, zero coverage). Creating feature branch and starting implementation. Dev-A status: active.
