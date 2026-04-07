@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
@@ -20,8 +21,11 @@ type sessionCache struct {
 	fetchedAt time.Time
 }
 
-var sessionAnalysisCache = map[string]*sessionCache{}
-var sessionCacheTTL = 1 * time.Hour
+var (
+	sessionAnalysisCache   = map[string]*sessionCache{}
+	sessionCacheMutex      sync.RWMutex // protects sessionAnalysisCache
+	sessionCacheTTL        = 1 * time.Hour
+)
 
 // cmdSession handles /session [SYMBOL].
 func (h *Handler) cmdSession(ctx context.Context, chatID string, _ int64, args string) error {
@@ -53,8 +57,12 @@ func (h *Handler) cmdSession(ctx context.Context, chatID string, _ int64, args s
 		return err
 	}
 
-	// Check cache
-	if cached, ok := sessionAnalysisCache[mapping.Currency]; ok && time.Since(cached.fetchedAt) < sessionCacheTTL {
+	// Check cache (thread-safe read)
+	sessionCacheMutex.RLock()
+	cached, ok := sessionAnalysisCache[mapping.Currency]
+	sessionCacheMutex.RUnlock()
+	
+	if ok && time.Since(cached.fetchedAt) < sessionCacheTTL {
 		text := formatSessionAnalysis(cached.result)
 		kb := h.kb.SessionDetailMenu(mapping.Currency)
 		_, err := h.bot.SendWithKeyboard(ctx, chatID, text, kb)
@@ -90,8 +98,10 @@ func (h *Handler) cmdSession(ctx context.Context, chatID string, _ int64, args s
 		return sendErr
 	}
 
-	// Cache result
+	// Cache result (thread-safe write)
+	sessionCacheMutex.Lock()
 	sessionAnalysisCache[mapping.Currency] = &sessionCache{result: result, fetchedAt: time.Now()}
+	sessionCacheMutex.Unlock()
 
 	text := formatSessionAnalysis(result)
 	kb := h.kb.SessionDetailMenu(mapping.Currency)

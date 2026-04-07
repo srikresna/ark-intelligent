@@ -1,0 +1,161 @@
+# Research Agent Audit Report
+
+**Timestamp:** 2026-04-05 05:52 UTC  
+**Agent:** Research Agent (ff-calendar-bot)  
+**Scope:** Comprehensive codebase audit — 509 Go files
+
+---
+
+## Executive Summary
+
+**Status:** ✅ All agents idle, 0 blockers, codebase health: **stable**
+
+This audit verified all 22 pending tasks remain valid and actionable. **No new task specs created** — all critical issues already have task coverage. No files modified since last audit (05:38 UTC).
+
+---
+
+## Queue State Verification
+
+### Pending Tasks: 22
+All task specifications are valid and accurately describe current technical debt:
+
+| Task | Priority | Status |
+|------|----------|--------|
+| TASK-BUG-001 | High | Confirmed unfixed — data race in handler_session.go |
+| TASK-SECURITY-001 | High | Confirmed unfixed — http.DefaultClient timeout |
+| TASK-CODEQUALITY-002 | Medium | Confirmed — 10 context.Background() in production |
+| TASK-TEST-001 | High | **In Review** — 1,139 lines, 44 tests |
+| TASK-TEST-002 through TASK-TEST-015 | Medium | Valid — test coverage gaps identified |
+| TASK-REFACTOR-001/002 | Medium | Valid — code organization improvements |
+| TASK-DOCS-001 | Low | Valid — emoji system documentation |
+
+### In Progress: 0
+### In Review: 1
+- **TASK-TEST-001**: keyboard.go tests — on branch `feat/TASK-TEST-001-keyboard-tests`
+
+### Blocked: 0
+
+---
+
+## Technical Debt Verification
+
+### Critical Issues (Still Unfixed)
+
+#### 1. TASK-BUG-001: Data Race in handler_session.go
+**Location:** `internal/adapter/telegram/handler_session.go:23`  
+**Issue:** Global map `sessionAnalysisCache` accessed concurrently without synchronization
+
+```go
+var sessionAnalysisCache = map[string]*sessionCache{}  // Line 23
+// Line 57: READ — if cached, ok := sessionAnalysisCache[mapping.Currency]
+// Line 94: WRITE — sessionAnalysisCache[mapping.Currency] = &sessionCache{...}
+```
+
+**Risk:** Concurrent map access causes panic in Go when built with `-race` flag  
+**Fix:** Add `sync.RWMutex` or use `sync.Map`
+
+#### 2. TASK-SECURITY-001: HTTP DefaultClient Without Timeout
+**Location:** `internal/service/macro/tradingeconomics_client.go:246`  
+**Issue:** Using `http.DefaultClient` which has no timeout
+
+```go
+resp, err := http.DefaultClient.Do(req)  // Line 246
+```
+
+**Risk:** Request can hang indefinitely  
+**Fix:** Use a client with `Timeout` configured
+
+#### 3. TASK-CODEQUALITY-002: context.Background() in Production (10 occurrences)
+Files with `context.Background()` in production code:
+- `internal/service/news/impact_recorder.go` — 1 occurrence
+- `internal/service/news/scheduler.go` — 2 occurrences (with timeout wrappers)
+- `internal/service/ai/chat_service.go` — 1 occurrence
+- `internal/scheduler/scheduler_skew_vix.go` — 3 occurrences
+- `internal/health/health.go` — 2 occurrences (with timeout wrappers)
+- `cmd/bot/main.go` — 1 occurrence (entry point, acceptable)
+
+**Note:** Some have timeout wrappers and are justified. 9 need proper context propagation.
+
+---
+
+## Code Health Metrics
+
+| Metric | Count | Status |
+|--------|-------|--------|
+| Total Go files | 509 | — |
+| Test files | 108 | — |
+| Files without tests | 318 | 62.5% untested |
+| Test coverage | 26.9% | ⚠️ Low |
+| panic() in production | 1 | ✅ Justified (keyring.go init failure) |
+| time.Now() usages | 233 | ⚠️ Testing concern (not mockable) |
+| TODO/FIXME in production | 9 | ✅ Normal residue |
+| HTTP body.Close() | 13 | ✅ Proper cleanup |
+| Data race detected | 1 | ❌ TASK-BUG-001 |
+
+---
+
+## New Findings
+
+**No new actionable issues identified.**
+
+All known issues are tracked in existing tasks. The codebase is stable with:
+- ✅ No new security vulnerabilities
+- ✅ No new race conditions (only TASK-BUG-001 known)
+- ✅ No resource leaks (all HTTP bodies properly closed)
+- ✅ No SQL injection risks
+- ✅ No new files modified since last audit
+
+---
+
+## Test Coverage Gap Analysis
+
+| Tier | Files | Lines (avg) | Task Coverage |
+|------|-------|-------------|---------------|
+| Critical | 5 | 1000+ | ✅ All have tasks |
+| High | 8 | 600-999 | ⚠️ Some gaps |
+| Medium | 20 | 300-599 | ❌ No task coverage |
+| Low | 285 | <300 | ❌ No task coverage |
+
+### Largest untested files without task coverage:
+| File | Lines | Priority |
+|------|-------|----------|
+| unified_outlook.go | 909 | Low (AI service) |
+| fred/fetcher.go | 906 | Low (data fetcher) |
+| bybit/client.go | 762 | Low (exchange client) |
+| seasonal_context.go | 716 | Low (analysis) |
+
+These are lower priority than the existing 15 test tasks in the queue.
+
+---
+
+## Recommendations
+
+1. **QA should review TASK-TEST-001** — 1,139 lines of keyboard.go tests are ready for review
+2. **Prioritize TASK-BUG-001** — data race is a runtime risk (1-2h fix)
+3. **Prioritize TASK-SECURITY-001** — HTTP timeout can cause hangs (1h fix)
+4. **Assign TASK-CODEQUALITY-002** — context propagation fix (3-4h, 10 occurrences)
+5. **Continue test coverage work** — 318 files still untested (62.5% gap)
+
+---
+
+## Agent Coordination
+
+| Agent | Status | Ready For |
+|-------|--------|-----------|
+| Coordinator | Idle | Triage, assignment |
+| Research | Idle | Next scheduled audit |
+| Dev-A | Idle | Next task assignment |
+| Dev-B | Idle | Next task assignment |
+| Dev-C | Idle | Implementation |
+| QA | Idle | Review TASK-TEST-001 |
+
+---
+
+## Conclusion
+
+The codebase remains **stable** with no new issues identified. All 22 pending tasks are valid and actionable. No blockers. No stuck tasks. Ready for continued development.
+
+---
+
+*Report generated by Research Agent*  
+*Next scheduled audit: following cron schedule*
