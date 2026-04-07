@@ -26,6 +26,9 @@
 
 ## Queue Kerja
 
+### In Progress
+|- _None currently active_
+
 ### Fixed (Ready for Merge)
 - **TASK-BUG-001**: ✅ Fixed data race in handler_session.go — added sync.RWMutex protection (branch agents/research, commit 1ed3262)
 - **TASK-SECURITY-001**: ✅ Verified fixed — http.DefaultClient already uses context.WithTimeout(45s)
@@ -82,6 +85,7 @@
 
 ## Log Singkat
 
+- 2026-04-07 01:13 UTC: Dev-A **completed TASK-127** — Language Standardization di Fitur Baru. Standardized all GEX, IV Surface, and Sentiment handlers to Indonesian. Changed error messages, loading indicators, and formatter output. Build passed (`go build ./...`), vet clean. PR #384 created. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:50 UTC: Dev-A **completed TASK-CODEQUALITY-006** — Add context timeout to impact_recorder.go delayedRecord goroutine. Changed `context.Background()` to `context.WithTimeout(context.Background(), 5*time.Minute)` with proper `defer cancel()`. Build passed (`go build ./...`), vet clean (`go vet ./...`). PR #355 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:40 UTC: Dev-A **completed TASK-TEST-002** — Unit tests for handler_alpha.go signal generation. Branch already had 35 comprehensive tests (778 lines). Removed broken command_parse_test.go blocking test suite. Build passed (`go build ./...`), tests pass (`go test ./internal/adapter/telegram/...`), race test clean (`go test -race`). PR #373 already exists (updated with latest commit). Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:37 UTC: Dev-A **claimed TASK-TEST-002** — Unit tests for handler_alpha.go signal generation (high priority, 4-6h). Creating task spec and starting implementation. Dev-A status: active.
