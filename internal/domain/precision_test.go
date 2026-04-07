@@ -58,9 +58,8 @@ func TestPrecision_LargePositionCounts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			record := COTRecord{
 				ContractCode:   "TEST",
-				LevFundLong:    tt.long,
-				LevFundShort:   tt.short,
-				ReportType:     "TFF",
+				LevFundLong:    float64(tt.long),
+				LevFundShort:   float64(tt.short),
 			}
 
 			got := record.GetSmartMoneyNet("TFF")
@@ -374,13 +373,13 @@ func TestPrecision_IntegerOverflow(t *testing.T) {
 	// Typical COT values
 	typicalMaxOI := int64(50_000_000) // 50 million contracts (largest markets)
 
-	// Verify our int64 fields can handle realistic values
+	// Verify our fields can handle realistic values
 	record := COTRecord{
-		OpenInterest:   typicalMaxOI,
-		LevFundLong:    typicalMaxOI / 2,
-		LevFundShort:   typicalMaxOI / 4,
-		AssetMgrLong:   typicalMaxOI / 3,
-		AssetMgrShort:  typicalMaxOI / 6,
+		OpenInterest:   float64(typicalMaxOI),
+		LevFundLong:    float64(typicalMaxOI) / 2,
+		LevFundShort:   float64(typicalMaxOI) / 4,
+		AssetMgrLong:   float64(typicalMaxOI) / 3,
+		AssetMgrShort:  float64(typicalMaxOI) / 6,
 	}
 
 	// Verify calculations don't overflow
@@ -388,11 +387,11 @@ func TestPrecision_IntegerOverflow(t *testing.T) {
 		record.AssetMgrLong + record.AssetMgrShort
 
 	assert.True(t, total > 0, "Total positions should be positive")
-	assert.True(t, total < maxInt64/2, "Total should be well below int64 max")
+	assert.True(t, total < float64(maxInt64)/2, "Total should be well below int64 max")
 
 	// Verify net calculation is exact (within int64 range)
 	net := record.LevFundLong - record.LevFundShort
-	assert.Equal(t, typicalMaxOI/4, net, "Net position should be exact")
+	assert.Equal(t, float64(typicalMaxOI)/4, net, "Net position should be exact")
 }
 
 // TestPrecision_MomentumCalculation tests momentum calculation precision.

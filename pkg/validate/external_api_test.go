@@ -555,7 +555,8 @@ func TestIsValidationError(t *testing.T) {
 		t.Error("expected IsValidationError to return false for nil")
 	}
 
-	regularErr := json.Unmarshal([]byte("invalid"), nil)
+	var dummy map[string]interface{}
+	regularErr := json.Unmarshal([]byte("invalid"), &dummy)
 	if validate.IsValidationError(regularErr) {
 		t.Error("expected IsValidationError to return false for regular error")
 	}

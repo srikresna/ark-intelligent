@@ -225,10 +225,11 @@ func TestUnmarshalAndValidate(t *testing.T) {
 }
 
 func TestValidationError(t *testing.T) {
+	var dummy map[string]interface{}
 	err := &ValidationError{
 		Field:   "test_field",
 		Message: "test message",
-		Cause:   json.Unmarshal([]byte(`invalid`), nil),
+		Cause:   json.Unmarshal([]byte(`invalid`), &dummy),
 	}
 
 	if err.Error() == "" {
