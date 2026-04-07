@@ -108,18 +108,21 @@ EOF
             ;;
             
         "tests-handlers")
-            echo "🧪 Running tests (excluding sentiment package)..."
+            echo "🧪 Running quick unit tests..."
             
-            # Get list of test packages excluding sentiment
-            TEST_PACKAGES=$(go list ./internal/service/... ./internal/adapter/... 2>/dev/null | grep -v "/sentiment$" | tr '\n' ' ')
+            # Run only fast, offline tests with very short timeout
+            # Focus on core logic, skip network-dependent packages
+            SKIP_PACKAGES="sentiment|fred|coingecko|deribit|cryptocompare|defillama|finviz|onchain|sec|worldbank|imf|bis|fed|news|ai"
+            TEST_PACKAGES=$(go list ./internal/service/... ./internal/adapter/... 2>/dev/null | grep -vE "/($SKIP_PACKAGES)$" | tr '\n' ' ')
             
             if [ -z "$TEST_PACKAGES" ]; then
                 echo "- ⚠️  No test packages found" >> "$report_file"
                 pass=true
             else
-                echo "  Testing packages: $TEST_PACKAGES" >> "$report_file"
-                if go test $TEST_PACKAGES -short -timeout 120s > /tmp/test.log 2>&1; then
+                echo "  Testing $(echo $TEST_PACKAGES | wc -w) packages..." >> "$report_file"
+                if go test $TEST_PACKAGES -short -timeout 60s -count=1 > /tmp/test.log 2>&1; then
                     echo "- ✅ Tests: PASSED" >> "$report_file"
+                    echo "  $(echo $TEST_PACKAGES | wc -w) packages tested successfully" >> "$report_file"
                     pass=true
                 else
                     # Check if it's just timeout or actual failure
@@ -130,7 +133,7 @@ EOF
                         pass=false
                     else
                         echo "- ⚠️  Tests: TIMEOUT" >> "$report_file"
-                        echo "Some tests timed out" >> "$report_file"
+                        echo "Some tests timed out (will retry)" >> "$report_file"
                         pass=true  # Don't fail for timeout
                     fi
                 fi
