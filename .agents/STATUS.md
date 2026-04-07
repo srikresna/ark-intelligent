@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | PHI-REL-007: BIS REER goroutine panic recovery |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -70,6 +70,7 @@
 ||- **TASK-TEST-003**: Dev-A — Unit tests for format_cot.go → PR #388 (pending QA review)
 ||- **PHI-REL-006**: Dev-A — WorldBank goroutine panic recovery → PR #389 (pending QA review)
 ||- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #369 (pending QA review)
+||- **PHI-REL-007**: Dev-A — BIS REER goroutine panic recovery → PR #390 (pending QA review)
 
 ### Blocked
 - Tidak ada
