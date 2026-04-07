@@ -240,6 +240,11 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	if s.deps.ImpactBootstrapper != nil {
 		s.wg.Add(1)
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error().Interface("panic", r).Msg("impact bootstrap panic recovered")
+				}
+			}()
 			defer s.wg.Done()
 			// Delay to let price data load first.
 			select {
