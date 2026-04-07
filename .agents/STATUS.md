@@ -20,13 +20,21 @@
 | Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
-| QA | Agent-6 | idle | review, test, merge |
+| QA | Agent-6 | **complete** | reviewed 4 PRs, merged, branch cleanup |
 
 ---
 
 ## Log Singkat (Latest)
 
 - 2026-04-07 12:10 UTC: Dev-A **completed TASK-120** — OBV bounds guard fix. Simplified redundant condition in CalcOBV trend detection. Build passed, vet clean, tests pass. PR #394 created.
+- 2026-04-07 12:30 UTC: **QA Review Complete** — QA (Agent-6) reviewed and merged 4 PRs to agents/main:
+  - ✅ PR #394 (TASK-120): OBV bounds guard — verified build, tests pass, logic correct
+  - ✅ PR #389 (PHI-REL-006): WorldBank panic recovery — verified pattern, proper logging
+  - ✅ PR #390 (PHI-REL-007): BIS REER panic recovery — verified pattern, proper logging  
+  - ✅ PR #391 (PHI-REL-008): FRED fetcher panic recovery — verified pattern, proper logging
+  - ✅ Deleted 9 merged branches (cleanup)
+  - All PRs use consistent defer/recover pattern with structured logging
+  - STATUS.md updated to reflect merges
 
 ---
 
@@ -50,6 +58,10 @@
 - **TASK-TEST-001**: ✅ Fixed — Unit tests for scheduler.go (19 tests, 552 lines). Already merged to agents/main.
 - **TASK-TEST-002**: ✅ Fixed — Unit tests for handler_alpha.go (35 tests, 778 lines). Already merged to agents/main via PR #373.
 - **TASK-TEST-003**: ✅ Fixed — Unit tests for format_cot.go (44 tests, 855 lines). Already merged to agents/main via PR #388.
+- **TASK-120**: ✅ Fixed — OBV bounds guard fix, simplified redundant condition in CalcOBV. Merged to agents/main via PR #394.
+- **PHI-REL-006**: ✅ Fixed — WorldBank goroutine panic recovery with proper defer/recover. Merged to agents/main via PR #389.
+- **PHI-REL-007**: ✅ Fixed — BIS REER goroutine panic recovery with proper defer/recover. Merged to agents/main via PR #390.
+- **PHI-REL-008**: ✅ Fixed — FRED fetcher goroutine panic recovery with proper defer/recover. Merged to agents/main via PR #391.
 
 ### Pending
 - **TASK-TEST-004**: Tests for api.go Telegram API client (medium priority, 4-5h)
@@ -80,10 +92,7 @@
 ||- **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
 ||- **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
 |||- **TASK-CODEQUALITY-006**: Dev-A — Add context timeout to impact_recorder.go → PR #355 (pending QA review)
-|||- **PHI-REL-006**: Dev-A — WorldBank goroutine panic recovery → PR #389 (pending QA review)
 ||- **PHI-REL-005**: Dev-A — Replace log.Fatal in config validation → PR #369 (pending QA review)
-||- **PHI-REL-007**: Dev-A — BIS REER goroutine panic recovery → PR #390 (pending QA review)
-||- **PHI-REL-008**: Dev-A — FRED fetcher goroutine panic recovery → PR #391 (pending QA review)
 
 ### Blocked
 - Tidak ada
