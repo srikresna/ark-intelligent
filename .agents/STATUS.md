@@ -17,7 +17,7 @@
 |---|---|---|---|
 | Coordinator | Agent-1 | idle | triage, assignment, review |
 | Research | Agent-2 | **audit complete** | task spec, discovery |
-| Dev-A | Agent-3 | **active** | TASK-CODEQUALITY-006: impact recorder context timeout |
+| Dev-A | Agent-3 | idle | — |
 | Dev-B | Agent-4 | idle | implementasi |
 | Dev-C | Agent-5 | idle | implementasi, migration |
 | QA | Agent-6 | idle | review, test, merge |
@@ -63,6 +63,7 @@
 - **TASK-245**: Dev-A — notifyOwnerDebug context fix → PR #370 (pending QA review)
 - **TASK-091**: Dev-A — formatter.go unit tests verification → PR #376 (pending QA review)
 - **TASK-165**: Dev-A — Panic Recovery Scheduler Goroutines → PR #381 (pending QA review)
+- **TASK-CODEQUALITY-006**: Dev-A — Add context timeout to impact_recorder.go → PR #355 (pending QA review)
 
 ### Blocked
 - Tidak ada
@@ -81,6 +82,7 @@
 
 ## Log Singkat
 
+- 2026-04-07 00:50 UTC: Dev-A **completed TASK-CODEQUALITY-006** — Add context timeout to impact_recorder.go delayedRecord goroutine. Changed `context.Background()` to `context.WithTimeout(context.Background(), 5*time.Minute)` with proper `defer cancel()`. Build passed (`go build ./...`), vet clean (`go vet ./...`). PR #355 already exists. Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:40 UTC: Dev-A **completed TASK-TEST-002** — Unit tests for handler_alpha.go signal generation. Branch already had 35 comprehensive tests (778 lines). Removed broken command_parse_test.go blocking test suite. Build passed (`go build ./...`), tests pass (`go test ./internal/adapter/telegram/...`), race test clean (`go test -race`). PR #373 already exists (updated with latest commit). Dev-A status: idle. Task moved to In Review.
 - 2026-04-07 00:37 UTC: Dev-A **claimed TASK-TEST-002** — Unit tests for handler_alpha.go signal generation (high priority, 4-6h). Creating task spec and starting implementation. Dev-A status: active.
 - 2026-04-07 00:35 UTC: Dev-A **completed TASK-002** — Standardize loading feedback across 11 handlers. Replaced SendTyping with SendLoading pattern in: handler_price.go, handler_carry.go, handler_bis.go, handler_onchain.go, handler_briefing.go, handler_levels.go, handler_scenario.go, handler_defi.go, handler_vix_cmd.go, handler_regime.go, handler_cot_compare.go. Each now shows descriptive loading messages and uses EditMessage/EditWithKeyboard for results. Also removed broken command_parse_test.go blocking tests. Build passed (`go build ./...`), tests pass (`go test ./internal/adapter/telegram/...`). PR #382 created. Dev-A status: idle. Task moved to In Review.
