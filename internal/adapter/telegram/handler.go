@@ -324,6 +324,7 @@ func NewHandler(d HandlerDeps) *Handler {
 	d.Bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)
 	d.Bot.RegisterCallback("briefing:", h.cbBriefingRefresh)
 	d.Bot.RegisterCallback("hist:", h.cbHistory)
+	d.Bot.RegisterCallback("sentiment:", h.cbSentimentRefresh) // Sentiment refresh callback
 
 	// Onboarding completion tracking (TASK-204)
 	h.registerOnboardingProgress()

@@ -87,3 +87,49 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 	}
 	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
 }
+
+// cbSentimentRefresh handles the refresh button callback for sentiment data.
+func (h *Handler) cbSentimentRefresh(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	// Invalidate cache and re-fetch
+	sentiment.InvalidateCache()
+	
+	// Show loading
+	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "🧠 Refreshing sentiment data... ⏳")
+	
+	// Fetch with timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	
+	freshData, err := sentiment.GetCachedOrFetch(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("sentiment refresh failed")
+		
+		// Try stale cache
+		if staleData, ok := sentiment.GetStaleCache(); ok {
+			return h.bot.SendWithKeyboard(ctx, chatID,
+				fmt.Sprintf("⚠️ <b>Refresh gagal, menampilkan data terakhir</b>\n\n"+
+					"<i>Data terakhir: %s</i>\n\n"+
+					"%s", staleData.FetchedAt.Format("02 Jan 2006 15:04"),
+					h.fmt.FormatSentiment(staleData, h.currentMacroRegimeName(ctx))),
+				h.kb.RelatedCommandsKeyboard("sentiment", ""))
+		}
+		
+		return h.bot.SendMessage(ctx, chatID,
+			"❌ <b>Gagal refresh data sentiment</b>\n\n"+
+				"Silakan coba lagi dalam beberapa menit.")
+	}
+	
+	htmlMsg := h.fmt.FormatSentiment(freshData, h.currentMacroRegimeName(ctx))
+	kb := h.kb.RelatedCommandsKeyboard("sentiment", "")
+	refreshRow := []ports.InlineButton{
+		{Text: "🔄 Refresh", CallbackData: "sentiment:refresh"},
+	}
+	if len(kb.Rows) > 0 {
+		kb.Rows = append(kb.Rows, refreshRow)
+	} else {
+		kb.Rows = [][]ports.InlineButton{refreshRow}
+	}
+	
+	return h.bot.SendWithKeyboard(ctx, chatID, htmlMsg, kb)
+}

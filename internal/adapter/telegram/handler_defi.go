@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/defi"
 )
@@ -15,9 +16,14 @@ func (h *Handler) registerDeFiCommands() {
 func (h *Handler) cmdDeFi(ctx context.Context, chatID string, _ int64, _ string) error {
 	h.bot.SendTyping(ctx, chatID)
 
+	// Add timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	report := defi.GetCachedOrFetch(ctx)
 
 	txt := formatDeFiReport(report)
-	_, err := h.bot.SendHTML(ctx, chatID, txt)
+	kb := h.kb.RelatedCommandsKeyboard("sentiment", "")
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, txt, kb)
 	return err
 }

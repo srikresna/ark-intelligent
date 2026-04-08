@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/onchain"
 )
@@ -11,10 +12,15 @@ import (
 func (h *Handler) cmdOnChain(ctx context.Context, chatID string, _ int64, _ string) error {
 	h.bot.SendTyping(ctx, chatID)
 
+	// Add timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	report := onchain.GetCachedOrFetch(ctx)
 	btcHealth := onchain.GetBTCHealth(ctx)
 
 	txt := formatOnChainReport(report, btcHealth)
-	_, err := h.bot.SendHTML(ctx, chatID, txt)
+	kb := h.kb.RelatedCommandsKeyboard("sentiment", "")
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, txt, kb)
 	return err
 }

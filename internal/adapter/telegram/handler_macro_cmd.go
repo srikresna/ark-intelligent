@@ -332,7 +332,8 @@ func (h *Handler) cmdECB(ctx context.Context, chatID string, _ int64, _ string) 
 	}
 
 	htmlMsg := macro.FormatECBData(data)
-	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+	kb := h.kb.RelatedCommandsKeyboard("macro", "")
+	return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +353,8 @@ func (h *Handler) cmdSNB(ctx context.Context, chatID string, _ int64, _ string) 
 	}
 
 	htmlMsg := macro.FormatSNBData(data)
-	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+	kb := h.kb.RelatedCommandsKeyboard("macro", "")
+	return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +374,8 @@ func (h *Handler) cmdLeading(ctx context.Context, chatID string, _ int64, _ stri
 	}
 
 	htmlMsg := macro.FormatOECDCLIData(data)
-	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+	kb := h.kb.RelatedCommandsKeyboard("macro", "")
+	return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 }
 
 // ---------------------------------------------------------------------------
@@ -392,5 +395,6 @@ func (h *Handler) cmdSwaps(ctx context.Context, chatID string, _ int64, _ string
 	}
 
 	htmlMsg := macro.FormatDTCCData(data)
-	return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+	kb := h.kb.RelatedCommandsKeyboard("macro", "")
+	return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
 }
