@@ -56,6 +56,7 @@ func TestInitSentimentCache_NilDB(t *testing.T) {
 
 func TestInitSentimentCache_WithDB(t *testing.T) {
 	resetCacheState()
+	t.Cleanup(resetCacheState) // must run after defer cacheMu.RUnlock() to avoid deadlock
 	db := openTestBadger(t)
 	InitSentimentCache(db)
 	cacheMu.RLock()
@@ -63,7 +64,6 @@ func TestInitSentimentCache_WithDB(t *testing.T) {
 	if badgerDB == nil {
 		t.Error("expected badgerDB to be set after InitSentimentCache(db)")
 	}
-	resetCacheState()
 }
 
 // ---------------------------------------------------------------------------

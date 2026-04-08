@@ -29,7 +29,10 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 	if !forceRefresh && sentiment.CacheAge() >= 0 {
 		cacheStatus = "🧠 Loading sentiment data (from cache)... ⏳"
 	}
-	placeholderID, _ := h.bot.SendLoading(ctx, chatID, cacheStatus)
+	msgID, err := h.bot.SendLoading(ctx, chatID, cacheStatus)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to send loading indicator")
+	}
 
 	// Add timeout to prevent hanging
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -55,8 +58,8 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 				"<i>Data akan diperbarui otomatis begitu layanan kembali normal.</i>\n\n"+
 				"%s", ageStr, h.fmt.FormatSentiment(staleData, h.currentMacroRegimeName(ctx)))
 
-			if placeholderID > 0 {
-				return h.bot.EditMessage(ctx, chatID, placeholderID, text)
+			if msgID > 0 {
+				return h.bot.EditMessage(ctx, chatID, msgID, text)
 			}
 			return h.bot.SendMessage(ctx, chatID, text)
 		}
@@ -64,17 +67,16 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 		text := fmt.Sprintf("❌ <b>Gagal mengambil data sentiment</b>\n\n"+
 			"Silakan coba lagi dalam beberapa menit.\n\n"+
 			"<i>Technical details:</i> <code>%v</code>", err)
-		if placeholderID > 0 {
-			return h.bot.EditMessage(ctx, chatID, placeholderID, text)
+		if msgID > 0 {
+			return h.bot.EditMessage(ctx, chatID, msgID, text)
 		}
 		return h.bot.SendMessage(ctx, chatID, text)
 	}
 
 	if !data.CNNAvailable && !data.AAIIAvailable && !data.VIXAvailable {
-		text := "⚠️ <b>Sentiment data unavailable</b>\n\n" +
-			"All data sources are currently unavailable. Try again later."
-		if placeholderID > 0 {
-			return h.bot.EditMessage(ctx, chatID, placeholderID, text)
+		text := "⚠️ <b>Sentiment data unavailable</b>\n\nAll data sources are currently unavailable. Try again later."
+		if msgID > 0 {
+			return h.bot.EditMessage(ctx, chatID, msgID, text)
 		}
 		return h.bot.SendMessage(ctx, chatID, text)
 	}
@@ -92,14 +94,14 @@ func (h *Handler) cmdSentiment(ctx context.Context, chatID string, userID int64,
 		kb.Rows = [][]ports.InlineButton{refreshRow}
 	}
 
+	if msgID > 0 && len(kb.Rows) > 0 {
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, htmlMsg, kb)
+	}
 	if len(kb.Rows) > 0 {
-		if placeholderID > 0 {
-			return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
-		}
 		return h.bot.SendWithKeyboard(ctx, chatID, htmlMsg, kb)
 	}
-	if placeholderID > 0 {
-		return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
+	if msgID > 0 {
+		return h.bot.EditMessage(ctx, chatID, msgID, htmlMsg)
 	}
 	return h.bot.SendMessage(ctx, chatID, htmlMsg)
 }
@@ -109,9 +111,16 @@ func (h *Handler) cbSentimentRefresh(ctx context.Context, chatID string, msgID i
 	// Invalidate cache and re-fetch
 	sentiment.InvalidateCache()
 
+	// Delete old message
+	if msgID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
+	}
+
 	// Show loading
-	_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-	placeholderID, _ := h.bot.SendLoading(ctx, chatID, "🧠 Refreshing sentiment data... ⏳")
+	loadingMsgID, err := h.bot.SendLoading(ctx, chatID, "🧠 Refreshing sentiment data... ⏳")
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to send loading indicator")
+	}
 
 	// Fetch with timeout
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -129,16 +138,24 @@ func (h *Handler) cbSentimentRefresh(ctx context.Context, chatID string, msgID i
 				h.fmt.FormatSentiment(staleData, h.currentMacroRegimeName(ctx)))
 
 			kb := h.kb.RelatedCommandsKeyboard("sentiment", "")
-			if placeholderID > 0 {
-				return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, text, kb)
+			refreshRow := []ports.InlineButton{
+				{Text: "🔄 Refresh", CallbackData: "sentiment:refresh"},
+			}
+			if len(kb.Rows) > 0 {
+				kb.Rows = append(kb.Rows, refreshRow)
+			} else {
+				kb.Rows = [][]ports.InlineButton{refreshRow}
+			}
+
+			if loadingMsgID > 0 {
+				return h.bot.EditWithKeyboard(ctx, chatID, loadingMsgID, text, kb)
 			}
 			return h.bot.SendWithKeyboard(ctx, chatID, text, kb)
 		}
 
-		text := "❌ <b>Gagal refresh data sentiment</b>\n\n" +
-			"Silakan coba lagi dalam beberapa menit."
-		if placeholderID > 0 {
-			return h.bot.EditMessage(ctx, chatID, placeholderID, text)
+		text := "❌ <b>Gagal refresh data sentiment</b>\n\nSilakan coba lagi dalam beberapa menit."
+		if loadingMsgID > 0 {
+			return h.bot.EditMessage(ctx, chatID, loadingMsgID, text)
 		}
 		return h.bot.SendMessage(ctx, chatID, text)
 	}
@@ -153,14 +170,9 @@ func (h *Handler) cbSentimentRefresh(ctx context.Context, chatID string, msgID i
 	} else {
 		kb.Rows = [][]ports.InlineButton{refreshRow}
 	}
-	if len(kb.Rows) > 0 {
-		if placeholderID > 0 {
-			return h.bot.EditWithKeyboard(ctx, chatID, placeholderID, htmlMsg, kb)
-		}
-		return h.bot.SendWithKeyboard(ctx, chatID, htmlMsg, kb)
+
+	if loadingMsgID > 0 {
+		return h.bot.EditWithKeyboard(ctx, chatID, loadingMsgID, htmlMsg, kb)
 	}
-	if placeholderID > 0 {
-		return h.bot.EditMessage(ctx, chatID, placeholderID, htmlMsg)
-	}
-	return h.bot.SendMessage(ctx, chatID, htmlMsg)
+	return h.bot.SendWithKeyboard(ctx, chatID, htmlMsg, kb)
 }
