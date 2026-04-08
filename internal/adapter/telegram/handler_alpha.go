@@ -1,13 +1,17 @@
 package telegram
 
-// handler_alpha.go — Handlers for new factor/strategy/microstructure commands:
-//   /alpha       — unified dashboard with inline keyboard navigation
+// handler_alpha.go — Handlers for factor/strategy/microstructure commands:
+//   /radar       — unified signal radar dashboard
 //   /xfactors    — cross-sectional factor ranking
-//   /playbook    — strategy playbook (top long/short + macro context)
-//   /heat        — portfolio exposure heat
-//   /rankx       — compact rank leaderboard
+//   /intensity   — signal intensity (honest metric, not "portfolio heat")
 //   /transition  — regime transition warning
 //   /cryptoalpha — Bybit microstructure confirmation for top crypto signals
+//
+// REMOVED (merged into existing commands):
+//   /playbook    — merged into /bias (unified directional bias)
+//   /rankx       — merged into /rank (cross-sectional factor section)
+//   /alpha       — renamed to /radar
+//   /heat        — renamed to /intensity
 
 import (
 	"context"
@@ -115,17 +119,17 @@ func (h *Handler) WithAlpha(a *AlphaServices) *Handler {
 
 // registerAlphaCommands wires the new commands into the bot.
 func (h *Handler) registerAlphaCommands() {
-	// Unified alpha dashboard
-	h.bot.RegisterCommand("/alpha", h.cmdAlpha)
+	// Unified radar dashboard
+	h.bot.RegisterCommand("/radar", h.cmdAlpha)
 	h.bot.RegisterCallback("alpha:", h.handleAlphaCallback)
 
-	// Legacy individual commands (backward compatible)
+	// Individual commands
 	h.bot.RegisterCommand("/xfactors", h.cmdXFactors)
-	h.bot.RegisterCommand("/playbook", h.cmdPlaybook)
-	h.bot.RegisterCommand("/heat", h.cmdHeat)
-	h.bot.RegisterCommand("/rankx", h.cmdRankX)
 	h.bot.RegisterCommand("/transition", h.cmdTransition)
 	h.bot.RegisterCommand("/cryptoalpha", h.cmdCryptoAlpha)
+
+	// Signal intensity (renamed from /heat — honest about what it measures)
+	h.bot.RegisterCommand("/intensity", h.cmdSignalIntensity)
 }
 
 // ---------------------------------------------------------------------------
@@ -181,11 +185,11 @@ func (h *Handler) computeAlphaState(ctx context.Context) (*alphaState, error) {
 
 func (h *Handler) cmdAlpha(ctx context.Context, chatID string, _ int64, _ string) error {
 	if h.alpha == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Alpha Engine not configured.")
+		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Radar not configured.")
 		return err
 	}
 
-	loadID, _ := h.bot.SendLoading(ctx, chatID, "⚡ Menghitung Alpha Engine... ⏳")
+	loadID, _ := h.bot.SendLoading(ctx, chatID, "📡 Memindai sinyal... ⏳")
 
 	state, err := h.computeAlphaState(ctx)
 	if err != nil {
@@ -264,12 +268,12 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
 
 	case action == "heat":
-		txt := alphaExplainHeader("🌡️ Portfolio Heat",
-			"Mengukur total eksposur portfolio. COLD = aman untuk tambah posisi, OVERHEAT = kurangi posisi.")
+		txt := alphaExplainHeader("📡 Signal Intensity",
+			"Mengukur seberapa banyak sinyal kuat yang aktif dari algoritma. Ini BUKAN pengukuran posisi portfolio Anda.")
 		if state.playbook != nil {
-			txt += formatHeat(state.playbook.Heat)
+			txt += formatSignalIntensity(state.playbook.Heat)
 		} else {
-			txt += "⚠️ No heat data."
+			txt += "⚠️ No signal data."
 		}
 		kb := h.kb.AlphaDetailMenu()
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
@@ -353,7 +357,7 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 func formatAlphaSummary(state *alphaState) string {
 	var sb strings.Builder
 
-	sb.WriteString("<b>⚡ Alpha Engine Dashboard</b>\n")
+	sb.WriteString("<b>📡 Radar — Signal Dashboard</b>\n")
 	sb.WriteString(fmt.Sprintf("📅 <i>%s UTC</i>\n\n", state.computedAt.UTC().Format("02 Jan 2006 15:04")))
 
 	// Regime & stability assessment
@@ -411,24 +415,24 @@ func formatAlphaSummary(state *alphaState) string {
 	// Warnings
 	var warnings []string
 
-	// Portfolio heat
+	// Signal intensity (renamed from portfolio heat)
 	if state.playbook != nil {
 		heat := state.playbook.Heat
 		heatEmoji := alphaHeatEmoji(heat.HeatLevel)
 		var heatAdvice string
 		switch heat.HeatLevel {
 		case strategy.HeatCold:
-			heatAdvice = "aman untuk tambah posisi baru"
+			heatAdvice = "sedikit sinyal kuat aktif"
 		case strategy.HeatWarm:
-			heatAdvice = "masih aman tapi jangan terlalu agresif"
+			heatAdvice = "beberapa peluang terdeteksi"
 		case strategy.HeatHot:
-			heatAdvice = "hati-hati, kurangi agresivitas"
+			heatAdvice = "banyak sinyal kuat, pilih yang terbaik"
 		case strategy.HeatOverheat:
-			heatAdvice = "KURANGI POSISI segera!"
+			heatAdvice = "sangat banyak sinyal, fokus top picks"
 		default:
-			heatAdvice = "evaluasi eksposur"
+			heatAdvice = "evaluasi kondisi"
 		}
-		warnings = append(warnings, fmt.Sprintf("Portfolio heat: %s %s — %s",
+		warnings = append(warnings, fmt.Sprintf("Signal intensity: %s %s — %s",
 			string(heat.HeatLevel), heatEmoji, heatAdvice))
 
 		// Transition warning
@@ -549,55 +553,28 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 }
 
 // ---------------------------------------------------------------------------
-// /playbook — strategy playbook
+// /playbook — REMOVED: merged into /bias (see handler_cot_cmd.go formatUnifiedBias)
+// formatPlaybook is kept for the /alpha dashboard callback sub-view.
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdPlaybook(ctx context.Context, chatID string, _ int64, _ string) error {
+// ---------------------------------------------------------------------------
+// /rankx — REMOVED: merged into /rank (see handler_cot_cmd.go formatRankFactorSection)
+// formatRankX is kept for the /alpha dashboard callback sub-view.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// /intensity — signal intensity (renamed from /heat)
+// Measures how many strong algorithmic signals exist right now,
+// NOT actual portfolio exposure (bot has no position data).
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdSignalIntensity(ctx context.Context, chatID string, _ int64, _ string) error {
 	if h.alpha == nil || h.alpha.StrategyEngine == nil || h.alpha.ProfileBuilder == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Strategy Engine not configured.")
 		return err
 	}
 
-	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🎯 Menyusun Strategy Playbook... ⏳")
-	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
-	if err != nil || len(profiles) == 0 {
-		h.sendUserError(ctx, chatID, err, "alpha")
-		return nil
-	}
-
-	ranking := h.alpha.FactorEngine.Rank(profiles)
-	tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
-
-	in := strategy.Input{
-		Ranking:        ranking,
-		MacroRegime:    h.alpha.ProfileBuilder.GetMacroRegime(ctx),
-		COTBias:        h.alpha.ProfileBuilder.GetCOTBias(ctx),
-		VolRegime:      h.alpha.ProfileBuilder.GetVolRegime(ctx),
-		CarryBps:       h.alpha.ProfileBuilder.GetCarryBps(ctx),
-		TransitionProb: tProb,
-		TransitionFrom: tFrom,
-		TransitionTo:   tTo,
-	}
-	result := h.alpha.StrategyEngine.Generate(in)
-	kb := h.kb.AlphaDetailMenu()
-	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatPlaybook(result), kb)
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /heat — portfolio heat
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string) error {
-	if h.alpha == nil || h.alpha.StrategyEngine == nil || h.alpha.ProfileBuilder == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Strategy Engine not configured.")
-		return err
-	}
-
-	loadingID, _ := h.bot.SendLoading(ctx, chatID, "🌡️ Menghitung Portfolio Heat... ⏳")
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📡 Menghitung Signal Intensity... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
@@ -619,7 +596,7 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 		TransitionTo:   tTo,
 	})
 	kb := h.kb.AlphaDetailMenu()
-	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatHeat(result.Heat), kb)
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatSignalIntensity(result.Heat), kb)
 	return err
 }
 
@@ -627,26 +604,8 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 // /rankx — compact rank leaderboard
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdRankX(ctx context.Context, chatID string, _ int64, _ string) error {
-	if h.alpha == nil || h.alpha.FactorEngine == nil || h.alpha.ProfileBuilder == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Factor Engine not configured.")
-		return err
-	}
-
-	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📈 Menyusun RankX Leaderboard... ⏳")
-	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
-	if err != nil || len(profiles) == 0 {
-		h.sendUserError(ctx, chatID, err, "alpha")
-		return nil
-	}
-	result := h.alpha.FactorEngine.Rank(profiles)
-	kb := h.kb.AlphaDetailMenu()
-	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatRankX(result), kb)
-	return err
-}
+// cmdRankX — REMOVED: merged into /rank. Handler kept as comment for reference.
+// formatRankX is still used by the /alpha dashboard callback.
 
 // ---------------------------------------------------------------------------
 // /transition — regime transition warning
@@ -892,6 +851,46 @@ Eksposur Long:  %.2f
 Eksposur Short: %.2f
 Eksposur Net:   %+.2f
 Total: %.0f%%
+
+<i>%s</i>
+
+<i>%s UTC</i>`,
+		emoji, heat.HeatLevel,
+		heat.ActiveTrades,
+		heat.LongExposure,
+		heat.ShortExposure,
+		heat.NetExposure,
+		heat.TotalExposure*100,
+		advice,
+		fmtutil.FormatDateTimeUTC(heat.UpdatedAt))
+}
+
+// formatSignalIntensity renders signal intensity — honestly named version of "heat".
+// Measures how many strong algorithmic signals are active, NOT actual portfolio exposure.
+func formatSignalIntensity(heat strategy.PortfolioHeat) string {
+	emoji := alphaHeatEmoji(heat.HeatLevel)
+	var advice string
+	switch heat.HeatLevel {
+	case strategy.HeatCold:
+		advice = "Sedikit sinyal kuat — pasar kurang jelas arahnya"
+	case strategy.HeatWarm:
+		advice = "Beberapa peluang terdeteksi — evaluasi entry"
+	case strategy.HeatHot:
+		advice = "Banyak sinyal kuat aktif — pilih yang conviction tertinggi"
+	case strategy.HeatOverheat:
+		advice = "Sangat banyak sinyal — fokus pada top picks saja, jangan serakah"
+	default:
+		advice = "Evaluasi kondisi market"
+	}
+	return fmt.Sprintf(`<b>📡 Signal Intensity</b>
+<i>ℹ️ Mengukur seberapa banyak sinyal trading kuat yang aktif saat ini dari algoritma. Ini BUKAN pengukuran posisi portfolio Anda.</i>
+
+Level: %s <b>%s</b>
+Sinyal Aktif: %d
+Long Signals:  %.2f
+Short Signals: %.2f
+Net Direction: %+.2f
+Intensitas: %.0f%%
 
 <i>%s</i>
 

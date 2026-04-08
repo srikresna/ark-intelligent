@@ -269,7 +269,7 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 		return h.cmdCOT(ctx, chatID, userID, args)
 	case "cta":
 		return h.cmdCTA(ctx, chatID, userID, args)
-	case "alpha":
+	case "alpha", "radar":
 		return h.cmdAlpha(ctx, chatID, 0, args)
 	case "gex":
 		return h.cmdGEX(ctx, chatID, userID, args)
@@ -280,7 +280,7 @@ func (h *Handler) cbQuickCommand(ctx context.Context, chatID string, msgID int, 
 	case "intermarket":
 		return h.cmdIntermarket(ctx, chatID, 0, args)
 	case "playbook":
-		return h.cmdPlaybook(ctx, chatID, 0, args)
+		return h.cmdBias(ctx, chatID, userID, args) // playbook merged into /bias
 	case "transition":
 		return h.cmdTransition(ctx, chatID, 0, args)
 	case "cryptoalpha":

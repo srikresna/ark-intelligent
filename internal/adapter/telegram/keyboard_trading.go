@@ -476,11 +476,7 @@ func (kb *KeyboardBuilder) AlphaMenu() ports.InlineKeyboard {
 		Rows: [][]ports.InlineButton{
 			{
 				{Text: "📊 Factor Ranking", CallbackData: "alpha:factors"},
-				{Text: "🎯 Playbook", CallbackData: "alpha:playbook"},
-			},
-			{
-				{Text: "🌡 Portfolio Heat", CallbackData: "alpha:heat"},
-				{Text: "📈 RankX", CallbackData: "alpha:rankx"},
+				{Text: "📡 Signal Intensity", CallbackData: "alpha:heat"},
 			},
 			{
 				{Text: "🔄 Regime & Transisi", CallbackData: "alpha:transition"},

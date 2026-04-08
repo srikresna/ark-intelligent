@@ -8,11 +8,15 @@ import (
 	"strconv"
 	"strings"
 
+	"html"
+
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
+	"github.com/arkcode369/ark-intelligent/internal/service/factors"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -355,12 +359,33 @@ func (h *Handler) cmdBias(ctx context.Context, chatID string, userID int64, args
 		signals = filtered
 	}
 
-	html := h.fmt.FormatBiasHTML(signals, filterCurrency)
+	// Enrich with playbook data if alpha services are available (unified bias+playbook)
+	var playbookResult *strategy.PlaybookResult
+	if h.alpha != nil && h.alpha.FactorEngine != nil && h.alpha.StrategyEngine != nil && h.alpha.ProfileBuilder != nil {
+		profiles, profErr := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+		if profErr == nil && len(profiles) > 0 {
+			ranking := h.alpha.FactorEngine.Rank(profiles)
+			tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
+			in := strategy.Input{
+				Ranking:        ranking,
+				MacroRegime:    h.alpha.ProfileBuilder.GetMacroRegime(ctx),
+				COTBias:        h.alpha.ProfileBuilder.GetCOTBias(ctx),
+				VolRegime:      h.alpha.ProfileBuilder.GetVolRegime(ctx),
+				CarryBps:       h.alpha.ProfileBuilder.GetCarryBps(ctx),
+				TransitionProb: tProb,
+				TransitionFrom: tFrom,
+				TransitionTo:   tTo,
+			}
+			playbookResult = h.alpha.StrategyEngine.Generate(in)
+		}
+	}
+
+	htmlOut := formatUnifiedBias(signals, playbookResult, filterCurrency)
 	kb := h.kb.RelatedCommandsKeyboard("bias", filterCurrency)
 	if len(kb.Rows) > 0 {
-		return h.bot.EditWithKeyboard(ctx, chatID, loadingID, html, kb)
+		return h.bot.EditWithKeyboardChunked(ctx, chatID, loadingID, htmlOut, kb)
 	}
-	return h.bot.EditMessage(ctx, chatID, loadingID, html)
+	return h.bot.EditMessage(ctx, chatID, loadingID, htmlOut)
 }
 
 // cmdHistory shows COT positioning history for a currency.
@@ -659,9 +684,289 @@ func (h *Handler) cmdRank(ctx context.Context, chatID string, userID int64, args
 		}
 	}
 
+	// Cross-sectional factor ranking enrichment (best-effort, non-fatal)
+	if h.alpha != nil && h.alpha.FactorEngine != nil && h.alpha.ProfileBuilder != nil {
+		profiles, profErr := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+		if profErr == nil && len(profiles) > 0 {
+			ranking := h.alpha.FactorEngine.Rank(profiles)
+			html += formatRankFactorSection(ranking)
+		}
+	}
+
 	kb := h.kb.RelatedCommandsKeyboard("rank", "")
 	if len(kb.Rows) > 0 {
 		return h.bot.EditWithKeyboard(ctx, chatID, loadingID, html, kb)
 	}
 	return h.bot.EditMessage(ctx, chatID, loadingID, html)
+}
+
+// ---------------------------------------------------------------------------
+// formatUnifiedBias — Unified bias output merging COT signals + strategy playbook
+// ---------------------------------------------------------------------------
+
+// formatUnifiedBias produces a single unified output per currency, combining
+// COT pattern signals from the detector with strategy playbook conviction data.
+// If playbookResult is nil, falls back to COT-only format.
+func formatUnifiedBias(signals []cot.Signal, pb *strategy.PlaybookResult, filterCurrency string) string {
+	var b strings.Builder
+
+	b.WriteString("🎯 <b>DIRECTIONAL BIAS</b>\n")
+	if filterCurrency != "" {
+		b.WriteString(fmt.Sprintf("<i>Filter: %s</i>\n", html.EscapeString(filterCurrency)))
+	}
+
+	// Show macro regime context if playbook is available
+	if pb != nil && pb.MacroRegime != "" {
+		regimeDesc := regimeIndonesian(pb.MacroRegime)
+		b.WriteString(fmt.Sprintf("📊 Regime: <b>%s</b> — <i>%s</i>\n", html.EscapeString(pb.MacroRegime), regimeDesc))
+	}
+	if pb != nil && pb.Transition.IsActive {
+		b.WriteString(fmt.Sprintf("⚠️ Transisi: %s → %s (%.0f%%)\n",
+			html.EscapeString(pb.Transition.FromRegime),
+			html.EscapeString(pb.Transition.ToRegime),
+			pb.Transition.Probability*100))
+	}
+	b.WriteString("\n")
+
+	if len(signals) == 0 && (pb == nil || len(pb.Playbook) == 0) {
+		b.WriteString("Tidak ada bias yang terdeteksi saat ini.\n")
+		b.WriteString("\n<i>Tip: Bias muncul saat ada extreme positioning, smart money moves, divergence, atau momentum shift.</i>")
+		return b.String()
+	}
+
+	// Build playbook lookup by currency
+	playbookByCcy := make(map[string]strategy.PlaybookEntry)
+	if pb != nil {
+		for _, e := range pb.Playbook {
+			if e.Direction != strategy.DirectionFlat {
+				playbookByCcy[e.Currency] = e
+			}
+		}
+	}
+
+	// Build COT signal lookup by currency (group multiple signals per ccy)
+	cotByCcy := make(map[string][]cot.Signal)
+	var ccyOrder []string
+	ccySeen := make(map[string]bool)
+	for _, s := range signals {
+		cotByCcy[s.Currency] = append(cotByCcy[s.Currency], s)
+		if !ccySeen[s.Currency] {
+			ccyOrder = append(ccyOrder, s.Currency)
+			ccySeen[s.Currency] = true
+		}
+	}
+
+	// Add currencies that are in playbook but NOT in COT signals
+	if pb != nil {
+		// Collect playbook entries sorted by conviction
+		type pbEntry struct {
+			ccy string
+			e   strategy.PlaybookEntry
+		}
+		var pbOnly []pbEntry
+		for ccy, e := range playbookByCcy {
+			if !ccySeen[ccy] {
+				pbOnly = append(pbOnly, pbEntry{ccy, e})
+			}
+		}
+		// Sort by conviction descending
+		for i := 0; i < len(pbOnly); i++ {
+			for j := i + 1; j < len(pbOnly); j++ {
+				if pbOnly[j].e.Conviction > pbOnly[i].e.Conviction {
+					pbOnly[i], pbOnly[j] = pbOnly[j], pbOnly[i]
+				}
+			}
+		}
+		for _, p := range pbOnly {
+			ccyOrder = append(ccyOrder, p.ccy)
+		}
+	}
+
+	// Render unified entries
+	count := 0
+	for _, ccy := range ccyOrder {
+		if count >= 12 {
+			remaining := len(ccyOrder) - count
+			if remaining > 0 {
+				b.WriteString(fmt.Sprintf("\n<i>... +%d lainnya</i>", remaining))
+			}
+			break
+		}
+
+		cotSignals := cotByCcy[ccy]
+		pbEntry, hasPB := playbookByCcy[ccy]
+
+		// Determine direction from playbook (preferred) or COT signal
+		dirIcon := "⚪"
+		dirLabel := "NEUTRAL"
+		if hasPB {
+			if pbEntry.Direction == strategy.DirectionLong {
+				dirIcon = "🟢"
+				dirLabel = "LONG"
+			} else if pbEntry.Direction == strategy.DirectionShort {
+				dirIcon = "🔴"
+				dirLabel = "SHORT"
+			}
+		} else if len(cotSignals) > 0 {
+			if cotSignals[0].Direction == "BULLISH" {
+				dirIcon = "🟢"
+				dirLabel = "LONG"
+			} else {
+				dirIcon = "🔴"
+				dirLabel = "SHORT"
+			}
+		}
+
+		// Header line: direction + currency + conviction
+		if hasPB {
+			convEmoji := alphaConvEmoji(pbEntry.ConvLevel)
+			convBar := alphaConvBar(pbEntry.Conviction)
+			b.WriteString(fmt.Sprintf("%s <b>%s</b> — %s (%s %s) %s\n",
+				dirIcon, html.EscapeString(ccy), dirLabel,
+				string(pbEntry.ConvLevel), convEmoji, convBar))
+		} else {
+			b.WriteString(fmt.Sprintf("%s <b>%s</b> — %s\n",
+				dirIcon, html.EscapeString(ccy), dirLabel))
+		}
+
+		// COT pattern signals
+		for _, s := range cotSignals {
+			strengthBar := strings.Repeat("█", s.Strength) + strings.Repeat("░", 5-s.Strength)
+			b.WriteString(fmt.Sprintf("├ COT: %s [%s] %d/5 (%.0f%%)\n",
+				s.Type, strengthBar, s.Strength, s.Confidence))
+		}
+
+		// Factor + regime + carry enrichment from playbook
+		if hasPB {
+			// Factor scores
+			parts := make([]string, 0, 4)
+			if pbEntry.FactorScore != 0 {
+				parts = append(parts, fmt.Sprintf("Factor:%+.2f", pbEntry.FactorScore))
+			}
+			if pbEntry.RateDiffBps != 0 {
+				parts = append(parts, fmt.Sprintf("Carry:%+.0fbps", pbEntry.RateDiffBps))
+			}
+			if len(parts) > 0 {
+				b.WriteString(fmt.Sprintf("├ %s\n", strings.Join(parts, " | ")))
+			}
+
+			// Regime fit
+			if pbEntry.RegimeFit == "ALIGNED" {
+				b.WriteString("├ Regime: ✓ mendukung\n")
+			} else if pbEntry.RegimeFit == "AGAINST_REGIME" {
+				b.WriteString("├ Regime: ✗ melawan\n")
+			}
+			if pbEntry.VolatilityRegime == "EXPANDING" {
+				b.WriteString("├ Vol: ⚠️ expanding\n")
+			}
+		}
+
+		// Confluence count
+		confluence := unifiedConfluenceCount(cotSignals, hasPB, pbEntry)
+		b.WriteString(fmt.Sprintf("└ Konfluensi: %d sumber\n\n", confluence))
+
+		count++
+	}
+
+	// Signal intensity summary (replaces misleading "portfolio heat")
+	if pb != nil {
+		heat := pb.Heat
+		intensityEmoji := alphaHeatEmoji(heat.HeatLevel)
+		var intensityLabel string
+		switch heat.HeatLevel {
+		case strategy.HeatCold:
+			intensityLabel = "rendah — sedikit sinyal kuat"
+		case strategy.HeatWarm:
+			intensityLabel = "sedang — beberapa peluang terdeteksi"
+		case strategy.HeatHot:
+			intensityLabel = "tinggi — banyak sinyal kuat aktif"
+		case strategy.HeatOverheat:
+			intensityLabel = "sangat tinggi — pilih hanya yang terbaik"
+		default:
+			intensityLabel = "evaluasi"
+		}
+		b.WriteString(fmt.Sprintf("📡 <b>Signal Intensity:</b> %s %s — <i>%s</i>\n",
+			string(heat.HeatLevel), intensityEmoji, intensityLabel))
+	}
+
+	b.WriteString("\n<i>Tip: </i><code>/bias EUR</code> | <code>/cot EUR</code> | <code>/rank</code>")
+	return b.String()
+}
+
+// unifiedConfluenceCount counts how many independent sources confirm the direction.
+func unifiedConfluenceCount(cotSignals []cot.Signal, hasPB bool, pb strategy.PlaybookEntry) int {
+	count := 0
+	if len(cotSignals) > 0 {
+		count++ // COT positioning
+	}
+	if hasPB {
+		if pb.FactorScore > 0.10 || pb.FactorScore < -0.10 {
+			count++ // Factor momentum
+		}
+		if pb.COTBias == "BULLISH" || pb.COTBias == "BEARISH" {
+			count++ // COT bias from alpha engine (may overlap but adds confidence)
+		}
+		if pb.RegimeFit == "ALIGNED" {
+			count++ // Macro regime confirmation
+		}
+		if pb.RateDiffBps > 20 || pb.RateDiffBps < -20 {
+			count++ // Carry
+		}
+	}
+	return count
+}
+
+// ---------------------------------------------------------------------------
+// formatRankFactorSection — appended to /rank when alpha engine is available
+// ---------------------------------------------------------------------------
+
+func formatRankFactorSection(result *factors.RankingResult) string {
+	if result == nil || len(result.Assets) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n<b>📊 CROSS-SECTIONAL FACTOR RANKING</b>\n")
+	sb.WriteString("<i>Momentum, Trend Quality, Carry, Low-Vol — top/bottom 5</i>\n\n")
+
+	all := result.Assets
+	topN := 5
+	if topN > len(all) {
+		topN = len(all)
+	}
+	top := all[:topN]
+
+	// Bottom: skip any already in top
+	topSet := make(map[string]bool, topN)
+	for _, a := range top {
+		topSet[a.Currency] = true
+	}
+	bottom := make([]factors.RankedAsset, 0, 5)
+	for i := len(all) - 1; i >= 0 && len(bottom) < 5; i-- {
+		if !topSet[all[i].Currency] {
+			bottom = append(bottom, all[i])
+		}
+	}
+
+	sb.WriteString("<b>🟢 Top Long:</b>\n")
+	for _, a := range top {
+		emoji := alphaSignalEmoji(string(a.Signal))
+		sb.WriteString(fmt.Sprintf("  %s <b>%s</b> %.2f | Mom:%.2f TQ:%.2f CA:%.2f LV:%.2f\n",
+			emoji, html.EscapeString(a.Currency), a.CompositeScore,
+			a.Scores.Momentum, a.Scores.TrendQuality,
+			a.Scores.CarryAdjusted, a.Scores.LowVol))
+	}
+
+	if len(bottom) > 0 {
+		sb.WriteString("\n<b>🔴 Top Short:</b>\n")
+		for _, a := range bottom {
+			emoji := alphaSignalEmoji(string(a.Signal))
+			sb.WriteString(fmt.Sprintf("  %s <b>%s</b> %.2f | Mom:%.2f TQ:%.2f CA:%.2f LV:%.2f\n",
+				emoji, html.EscapeString(a.Currency), a.CompositeScore,
+				a.Scores.Momentum, a.Scores.TrendQuality,
+				a.Scores.CarryAdjusted, a.Scores.LowVol))
+		}
+	}
+
+	return sb.String()
 }

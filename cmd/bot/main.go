@@ -382,7 +382,7 @@ func main() {
 	// Wire alpha services (Factor + Strategy + Microstructure engines)
 	if alphaServices != nil {
 		handler.WithAlpha(alphaServices)
-		log.Info().Msg("Alpha commands registered (/xfactors /playbook /heat /rankx /transition /cryptoalpha)")
+		log.Info().Msg("Radar commands registered (/radar /xfactors /intensity /transition /cryptoalpha — /playbook merged into /bias, /rankx merged into /rank)")
 	}
 
 	// Wire CTA services (Classical Technical Analysis engine)
