@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
@@ -165,10 +166,16 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 
 	switch action {
 	case "sym", "refresh":
+		// Add timeout to prevent hanging
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
 		result, err := h.gex.Engine.Analyze(ctx, sym)
 		if err != nil {
 			log.Error().Err(err).Str("symbol", sym).Msg("GEX analysis failed")
-		errHTML := fmt.Sprintf("⚠️ <b>GEX analysis failed for %s</b>\n\n<i>Data source may be temporarily unavailable. Try again in a few minutes.</i>", sym)
+			errHTML := fmt.Sprintf("⚠️ <b>GEX analysis failed for %s</b>\n\n"+
+				"<i>Error: %v</i>\n\n"+
+				"Data source may be temporarily unavailable. Try again in a few minutes.", sym, err)
 			kb := gexKeyboard(sym)
 			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
 			return nil
