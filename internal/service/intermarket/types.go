@@ -64,18 +64,18 @@ type CorrelationStatus string
 
 const (
 	StatusAligned   CorrelationStatus = "ALIGNED"   // actual matches expected direction
-	StatusDiverging CorrelationStatus = "DIVERGING"  // slightly off
-	StatusBroken    CorrelationStatus = "BROKEN"     // strongly opposite to expected
+	StatusDiverging CorrelationStatus = "DIVERGING" // slightly off
+	StatusBroken    CorrelationStatus = "BROKEN"    // strongly opposite to expected
 )
 
 // IntermarketSignal holds the computed result for a single rule.
 type IntermarketSignal struct {
-	Rule        IntermarketRule
-	ActualCorr  float64           // rolling 20D Pearson correlation
-	Status      CorrelationStatus
-	Implication string            // trading implication text
-	Strength    float64           // 0–1 confidence in the signal
-	Insufficient bool             // true if not enough data points
+	Rule         IntermarketRule
+	ActualCorr   float64 // rolling 20D Pearson correlation
+	Status       CorrelationStatus
+	Implication  string  // trading implication text
+	Strength     float64 // 0–1 confidence in the signal
+	Insufficient bool    // true if not enough data points
 }
 
 // IntermarketResult is the full output of Engine.Analyze.

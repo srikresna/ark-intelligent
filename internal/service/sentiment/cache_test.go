@@ -82,15 +82,15 @@ func TestSaveThenLoadFromBadger_RoundTrip(t *testing.T) {
 	db := openTestBadger(t)
 
 	original := &SentimentData{
-		CNNFearGreed:    65.5,
-		CNNAvailable:    true,
-		AAIIBullish:     42.0,
-		AAIIBearish:     28.5,
-		AAIINeutral:     29.5,
-		AAIIAvailable:   true,
-		PutCallTotal:    0.95,
+		CNNFearGreed:     65.5,
+		CNNAvailable:     true,
+		AAIIBullish:      42.0,
+		AAIIBearish:      28.5,
+		AAIINeutral:      29.5,
+		AAIIAvailable:    true,
+		PutCallTotal:     0.95,
 		PutCallAvailable: true,
-		FetchedAt:       time.Now().Round(time.Second), // round to avoid nanosecond JSON precision issues
+		FetchedAt:        time.Now().Round(time.Second), // round to avoid nanosecond JSON precision issues
 	}
 
 	// Save synchronously (saveToBadger is normally async).

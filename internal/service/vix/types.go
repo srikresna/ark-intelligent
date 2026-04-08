@@ -5,11 +5,11 @@ import "time"
 // VIXTermStructure holds VIX spot, futures term structure, and derived signals.
 type VIXTermStructure struct {
 	// Raw data
-	Spot  float64 // VIX spot index
-	M1    float64 // Front-month VIX futures settle price
-	M2    float64 // Second-month VIX futures settle price
-	M3    float64 // Third-month VIX futures settle price
-	VVIX  float64 // VIX of VIX (vol-of-vol)
+	Spot float64 // VIX spot index
+	M1   float64 // Front-month VIX futures settle price
+	M2   float64 // Second-month VIX futures settle price
+	M3   float64 // Third-month VIX futures settle price
+	VVIX float64 // VIX of VIX (vol-of-vol)
 
 	// Contract symbols
 	M1Symbol string // e.g. "/VXK26"

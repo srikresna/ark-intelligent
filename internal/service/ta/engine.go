@@ -12,11 +12,11 @@ type FullResult struct {
 	Snapshot    *IndicatorSnapshot
 	Confluence  *ConfluenceResult
 	Zones       *ZoneResult
-	Patterns    []CandlePattern   // from patterns.go
-	Divergences []Divergence      // from divergence.go
-	ICT         *ICTResult        // from ict.go — nil if insufficient data
-	SMC         *SMCResult        // convenience accessor — same as Snapshot.SMC
-	Wyckoff     *WyckoffSummary   // populated by caller (avoids circular import with wyckoff pkg)
+	Patterns    []CandlePattern // from patterns.go
+	Divergences []Divergence    // from divergence.go
+	ICT         *ICTResult      // from ict.go — nil if insufficient data
+	SMC         *SMCResult      // convenience accessor — same as Snapshot.SMC
+	Wyckoff     *WyckoffSummary // populated by caller (avoids circular import with wyckoff pkg)
 	ComputedAt  time.Time
 }
 
@@ -88,7 +88,6 @@ func (e *Engine) ComputeSnapshot(bars []OHLCV) *IndicatorSnapshot {
 	// Killzone: classify current trading session
 	kz := ClassifyKillzone(time.Now())
 	snap.Killzone = &kz
-
 
 	// VWAP: anchored volume-weighted average price (needs volume data)
 	if hasVolume(bars) {
@@ -177,6 +176,7 @@ func (e *Engine) ComputeFullForTF(bars []OHLCV, tf string) *FullResult {
 		ComputedAt:  time.Now(),
 	}
 }
+
 // ---------------------------------------------------------------------------
 
 // ComputeMTF calculates multi-timeframe analysis from OHLCV data keyed by

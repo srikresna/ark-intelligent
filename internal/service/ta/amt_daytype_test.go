@@ -45,7 +45,7 @@ func buildNormalDay(date string) []OHLCV {
 func buildPShapeDay(date string) []OHLCV {
 	// Range: 1.0720 – 1.0850 (130 pips). Lower tail: 1.0720–1.0760. Upper volume heavy.
 	return []OHLCV{
-		makeAMTBar(date+" 00:30", 1.0760, 1.0780, 1.0720, 1.0770, 50),  // lower tail, low vol
+		makeAMTBar(date+" 00:30", 1.0760, 1.0780, 1.0720, 1.0770, 50), // lower tail, low vol
 		makeAMTBar(date+" 01:00", 1.0770, 1.0800, 1.0760, 1.0795, 60),
 		makeAMTBar(date+" 01:30", 1.0795, 1.0830, 1.0790, 1.0825, 200), // move into upper half
 		makeAMTBar(date+" 02:00", 1.0825, 1.0845, 1.0820, 1.0840, 250), // heavy upper vol
@@ -58,7 +58,7 @@ func buildPShapeDay(date string) []OHLCV {
 func buildBShapeDay(date string) []OHLCV {
 	// Range: 1.0800 – 1.0930 (130 pips). Upper tail: 1.0900–1.0930. Lower vol heavy.
 	return []OHLCV{
-		makeAMTBar(date+" 00:30", 1.0920, 1.0930, 1.0900, 1.0910, 40),  // upper tail, low vol
+		makeAMTBar(date+" 00:30", 1.0920, 1.0930, 1.0900, 1.0910, 40), // upper tail, low vol
 		makeAMTBar(date+" 01:00", 1.0910, 1.0925, 1.0880, 1.0885, 60),
 		makeAMTBar(date+" 01:30", 1.0885, 1.0890, 1.0840, 1.0845, 200), // drop into lower half
 		makeAMTBar(date+" 02:00", 1.0845, 1.0855, 1.0810, 1.0815, 280), // heavy lower vol

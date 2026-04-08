@@ -13,20 +13,20 @@ import (
 // BaselineResult holds the comparison between the actual system performance
 // and a random baseline computed via Monte Carlo simulation.
 type BaselineResult struct {
-	RandomWinRate1W  float64 `json:"random_win_rate_1w"`
-	RandomWinRate2W  float64 `json:"random_win_rate_2w"`
-	RandomWinRate4W  float64 `json:"random_win_rate_4w"`
-	RandomAvgReturn  float64 `json:"random_avg_return"`
-	SystemEdge1W     float64 `json:"system_edge_1w"`
-	SystemEdge2W     float64 `json:"system_edge_2w"`
-	SystemEdge4W     float64 `json:"system_edge_4w"`
-	SystemWinRate1W  float64 `json:"system_win_rate_1w"`
-	SystemWinRate2W  float64 `json:"system_win_rate_2w"`
-	SystemWinRate4W  float64 `json:"system_win_rate_4w"`
-	SystemEV         float64 `json:"system_ev"`
-	RandomEV         float64 `json:"random_ev"`
-	EVEdge           float64 `json:"ev_edge"`
-	NumSimulations   int     `json:"num_simulations"`
+	RandomWinRate1W float64 `json:"random_win_rate_1w"`
+	RandomWinRate2W float64 `json:"random_win_rate_2w"`
+	RandomWinRate4W float64 `json:"random_win_rate_4w"`
+	RandomAvgReturn float64 `json:"random_avg_return"`
+	SystemEdge1W    float64 `json:"system_edge_1w"`
+	SystemEdge2W    float64 `json:"system_edge_2w"`
+	SystemEdge4W    float64 `json:"system_edge_4w"`
+	SystemWinRate1W float64 `json:"system_win_rate_1w"`
+	SystemWinRate2W float64 `json:"system_win_rate_2w"`
+	SystemWinRate4W float64 `json:"system_win_rate_4w"`
+	SystemEV        float64 `json:"system_ev"`
+	RandomEV        float64 `json:"random_ev"`
+	EVEdge          float64 `json:"ev_edge"`
+	NumSimulations  int     `json:"num_simulations"`
 }
 
 // BaselineGenerator computes random-strategy baselines to quantify system edge.

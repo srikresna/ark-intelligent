@@ -41,14 +41,14 @@ type FactorContribution struct {
 
 // DecompositionResult holds the full factor decomposition output.
 type DecompositionResult struct {
-	Factors          []FactorContribution `json:"factors"`
-	RSquared         float64              `json:"r_squared"`
-	AdjRSquared      float64              `json:"adj_r_squared"`
-	ResidualPct      float64              `json:"residual_pct"`       // % unexplained
-	SampleSize       int                  `json:"sample_size"`
-	TopFactor        string               `json:"top_factor"`         // Highest contributing factor
-	EdgeSource       string               `json:"edge_source"`        // Where the alpha comes from
-	PerCurrency      map[string]*DecompositionResult `json:"per_currency,omitempty"`
+	Factors     []FactorContribution            `json:"factors"`
+	RSquared    float64                         `json:"r_squared"`
+	AdjRSquared float64                         `json:"adj_r_squared"`
+	ResidualPct float64                         `json:"residual_pct"` // % unexplained
+	SampleSize  int                             `json:"sample_size"`
+	TopFactor   string                          `json:"top_factor"`  // Highest contributing factor
+	EdgeSource  string                          `json:"edge_source"` // Where the alpha comes from
+	PerCurrency map[string]*DecompositionResult `json:"per_currency,omitempty"`
 }
 
 // NewFactorDecomposer creates a new decomposer.
@@ -137,7 +137,7 @@ func decomposeSignals(signals []domain.PersistedSignal, label string) *Decomposi
 
 	// Determine which factors have variance (i.e., have real data)
 	type activeFactor struct {
-		idx  int      // original index (0-3)
+		idx  int // original index (0-3)
 		name string
 		norm []float64
 		raw  []float64

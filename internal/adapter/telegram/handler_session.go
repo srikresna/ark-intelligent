@@ -22,9 +22,9 @@ type sessionCache struct {
 }
 
 var (
-	sessionAnalysisCache   = map[string]*sessionCache{}
-	sessionCacheMutex      sync.RWMutex // protects sessionAnalysisCache
-	sessionCacheTTL        = 1 * time.Hour
+	sessionAnalysisCache = map[string]*sessionCache{}
+	sessionCacheMutex    sync.RWMutex // protects sessionAnalysisCache
+	sessionCacheTTL      = 1 * time.Hour
 )
 
 // cmdSession handles /session [SYMBOL].
@@ -61,7 +61,7 @@ func (h *Handler) cmdSession(ctx context.Context, chatID string, _ int64, args s
 	sessionCacheMutex.RLock()
 	cached, ok := sessionAnalysisCache[mapping.Currency]
 	sessionCacheMutex.RUnlock()
-	
+
 	if ok && time.Since(cached.fetchedAt) < sessionCacheTTL {
 		text := formatSessionAnalysis(cached.result)
 		kb := h.kb.SessionDetailMenu(mapping.Currency)

@@ -23,10 +23,10 @@ import (
 
 // OverlayEngine computes and caches RegimeOverlay results.
 type OverlayEngine struct {
-	dailyRepo  DailyStore
-	cotRepo    ports.COTRepository
-	mu         sync.Mutex
-	cache      map[string]*cacheEntry // key: "symbol:timeframe"
+	dailyRepo DailyStore
+	cotRepo   ports.COTRepository
+	mu        sync.Mutex
+	cache     map[string]*cacheEntry // key: "symbol:timeframe"
 }
 
 // DailyStore is the minimal interface needed by the overlay engine.

@@ -139,7 +139,7 @@ func TestPearsonCorrelation_ReturnsInValidRange(t *testing.T) {
 // Test the exported correlation types and constants
 func TestCorrelationMatrix_Structure(t *testing.T) {
 	matrix := &domain.CorrelationMatrix{
-		Period: 20,
+		Period:     20,
 		Currencies: []string{"EUR", "USD", "GBP"},
 		Matrix: map[string]map[string]float64{
 			"EUR": {"USD": 0.5, "GBP": 0.7},

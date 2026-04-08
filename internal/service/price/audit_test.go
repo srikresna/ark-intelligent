@@ -216,8 +216,8 @@ func TestHurst_Audit_MeanRevertingSignal(t *testing.T) {
 
 	for i := 299; i >= 0; i-- {
 		prices[i] = domain.PriceRecord{
-			Date: now.AddDate(0, 0, -(299-i)),
-			Close: price, High: price*1.005, Low: price*0.995, Open: price,
+			Date:  now.AddDate(0, 0, -(299 - i)),
+			Close: price, High: price * 1.005, Low: price * 0.995, Open: price,
 		}
 		noise := rng.NormFloat64() * 0.5
 		price += reversion*(meanLevel-price) + noise

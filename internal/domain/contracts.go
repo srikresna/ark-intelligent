@@ -11,21 +11,21 @@ type ContractCode string
 
 // Known CFTC contract codes.
 const (
-	ContractEUR   ContractCode = "099741"
-	ContractGBP   ContractCode = "096742"
-	ContractJPY   ContractCode = "097741"
-	ContractAUD   ContractCode = "232741"
-	ContractNZD   ContractCode = "112741"
-	ContractCAD   ContractCode = "090741"
-	ContractCHF   ContractCode = "092741"
-	ContractDXY   ContractCode = "098662"
-	ContractGold  ContractCode = "088691"
-	ContractOil   ContractCode = "067651"
+	ContractEUR    ContractCode = "099741"
+	ContractGBP    ContractCode = "096742"
+	ContractJPY    ContractCode = "097741"
+	ContractAUD    ContractCode = "232741"
+	ContractNZD    ContractCode = "112741"
+	ContractCAD    ContractCode = "090741"
+	ContractCHF    ContractCode = "092741"
+	ContractDXY    ContractCode = "098662"
+	ContractGold   ContractCode = "088691"
+	ContractOil    ContractCode = "067651"
 	ContractSilver ContractCode = "084691"
 	ContractCopper ContractCode = "085692"
-	ContractSP500 ContractCode = "13874A"
+	ContractSP500  ContractCode = "13874A"
 	ContractNasdaq ContractCode = "209742"
-	ContractBTC   ContractCode = "133741"
+	ContractBTC    ContractCode = "133741"
 )
 
 // ContractInfo holds display metadata for a CFTC contract.

@@ -14,7 +14,7 @@ import (
 // weighted averaging per CTA_SPEC.md.
 type MTFResult struct {
 	Timeframes    map[string]*ConfluenceResult // "15m", "30m", "1h", "4h", "daily", "weekly"
-	WeightedScore float64                       // -100 to +100
+	WeightedScore float64                      // -100 to +100
 	WeightedGrade string
 	Alignment     string   // "STRONG_BULLISH", "BULLISH", "MIXED", "BEARISH", "STRONG_BEARISH"
 	Matrix        []MTFRow // for display
@@ -35,13 +35,13 @@ type MTFRow struct {
 
 // tfWeights maps canonical timeframe names to their multi-timeframe weight.
 var tfWeights = map[string]float64{
-	"daily": 0.30,
-	"12h":   0.15,
-	"6h":    0.10,
-	"4h":    0.20,
-	"1h":    0.10,
-	"30m":   0.05,
-	"15m":   0.05,
+	"daily":  0.30,
+	"12h":    0.15,
+	"6h":     0.10,
+	"4h":     0.20,
+	"1h":     0.10,
+	"30m":    0.05,
+	"15m":    0.05,
 	"weekly": 0.05,
 }
 

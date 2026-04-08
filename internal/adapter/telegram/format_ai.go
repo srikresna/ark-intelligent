@@ -2,13 +2,13 @@ package telegram
 
 import (
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 	"html"
 	"math"
 	"sort"
 	"strings"
 	"time"
-	"github.com/arkcode369/ark-intelligent/internal/domain"
-	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // FormatWeeklyOutlook formats the AI-generated weekly market outlook.

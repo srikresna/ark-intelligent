@@ -25,8 +25,8 @@ var TrackedExchanges = []string{"Binance", "Coinbase", "OKX", "Bybit"}
 
 // package-level cache.
 var (
-	globalCache *VolumeSummary //nolint:gochecknoglobals
-	cacheMu     sync.RWMutex  //nolint:gochecknoglobals
+	globalCache *VolumeSummary                      //nolint:gochecknoglobals
+	cacheMu     sync.RWMutex                        //nolint:gochecknoglobals
 	client      = httpclient.NewClient(httpTimeout) //nolint:gochecknoglobals
 )
 

@@ -10,11 +10,11 @@ import (
 type CrossVolRegime string
 
 const (
-	CrossVolNormal        CrossVolRegime = "NORMAL"
-	CrossVolEnergyRisk    CrossVolRegime = "ENERGY_RISK"
-	CrossVolBroadRiskOff  CrossVolRegime = "BROAD_RISK_OFF"
+	CrossVolNormal         CrossVolRegime = "NORMAL"
+	CrossVolEnergyRisk     CrossVolRegime = "ENERGY_RISK"
+	CrossVolBroadRiskOff   CrossVolRegime = "BROAD_RISK_OFF"
 	CrossVolSmallCapStress CrossVolRegime = "SMALL_CAP_STRESS"
-	CrossVolSystemic      CrossVolRegime = "SYSTEMIC"
+	CrossVolSystemic       CrossVolRegime = "SYSTEMIC"
 )
 
 // CrossVolResult holds the cross-asset volatility dashboard analysis.
@@ -84,10 +84,10 @@ func (vs *VolSuite) computeCrossVolPercentiles(ctx context.Context, client *http
 
 	// Compute percentile for each cross-asset ratio
 	type ratioCalc struct {
-		url        string
-		current    float64
-		target     *float64
-		name       string
+		url     string
+		current float64
+		target  *float64
+		name    string
 	}
 
 	calcs := []ratioCalc{
@@ -178,10 +178,10 @@ func FormatCrossVolDashboard(vs *VolSuite, vixSpot float64, cv *CrossVolResult) 
 
 	// Visual bar chart for each ratio
 	type barEntry struct {
-		label   string
-		value   float64
-		pctile  float64
-		fmtVal  string
+		label  string
+		value  float64
+		pctile float64
+		fmtVal string
 	}
 
 	entries := []barEntry{}

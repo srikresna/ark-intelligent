@@ -464,8 +464,8 @@ func joinParts(parts []string) string {
 const eiaDataCacheTTL = 12 * time.Hour
 
 var (
-	eiaGlobalCacheMu  sync.Mutex
-	eiaGlobalCache    *EIASeasonalData
+	eiaGlobalCacheMu   sync.Mutex
+	eiaGlobalCache     *EIASeasonalData
 	eiaGlobalFetchedAt time.Time
 )
 

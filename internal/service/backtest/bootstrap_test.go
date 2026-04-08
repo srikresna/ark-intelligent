@@ -52,16 +52,16 @@ func TestBootstrapper_Run_WithCOTData(t *testing.T) {
 	mockCOT := &bootstrapMockCOTRepo{
 		history: []domain.COTAnalysis{
 			{
-				Contract:     contractEUR,
-				ReportDate:   time.Now().Add(-30 * 24 * time.Hour),
-				NetPosition:  75000,
-				COTIndex:     75.0,
+				Contract:    contractEUR,
+				ReportDate:  time.Now().Add(-30 * 24 * time.Hour),
+				NetPosition: 75000,
+				COTIndex:    75.0,
 			},
 			{
-				Contract:     contractEUR,
-				ReportDate:   time.Now().Add(-23 * 24 * time.Hour),
-				NetPosition:  72000,
-				COTIndex:     72.0,
+				Contract:    contractEUR,
+				ReportDate:  time.Now().Add(-23 * 24 * time.Hour),
+				NetPosition: 72000,
+				COTIndex:    72.0,
 			},
 		},
 	}
@@ -88,10 +88,10 @@ func TestBootstrapper_Run_DuplicateDetection(t *testing.T) {
 	mockCOT := &bootstrapMockCOTRepo{
 		history: []domain.COTAnalysis{
 			{
-				Contract:     contractEUR,
-				ReportDate:   baseTime,
-				NetPosition:  75000,
-				COTIndex:     75.0,
+				Contract:    contractEUR,
+				ReportDate:  baseTime,
+				NetPosition: 75000,
+				COTIndex:    75.0,
 			},
 		},
 	}
@@ -116,10 +116,10 @@ func TestBootstrapper_Run_ConfidenceIntervals(t *testing.T) {
 	mockCOT := &bootstrapMockCOTRepo{
 		history: []domain.COTAnalysis{
 			{
-				Contract:     contractEUR,
-				ReportDate:   time.Now().Add(-30 * 24 * time.Hour),
-				NetPosition:  75000,
-				COTIndex:     75.0,
+				Contract:    contractEUR,
+				ReportDate:  time.Now().Add(-30 * 24 * time.Hour),
+				NetPosition: 75000,
+				COTIndex:    75.0,
 			},
 		},
 	}

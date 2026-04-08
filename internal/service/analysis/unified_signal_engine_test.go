@@ -162,7 +162,7 @@ func TestComputeUnifiedSignalForCurrency_NilSafe(t *testing.T) {
 // TestScoreToRecommendation tests grade/recommendation classification boundaries.
 func TestScoreToGrade(t *testing.T) {
 	cases := []struct {
-		score    float64
+		score     float64
 		wantGrade string
 	}{
 		{90, "A+"},

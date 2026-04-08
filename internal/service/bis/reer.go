@@ -36,12 +36,12 @@ var log = logger.Component("bis") //nolint:gochecknoglobals
 //	B = Broad basket (60+ trading partners, preferred over Narrow)
 //	TYPE: A = CPI-deflated (REER), N = Nominal (NEER)
 const (
-	bisBaseURL    = "https://stats.bis.org/api/v2/data/BIS,WS_EER,1.0"
-	startPeriod   = "2019-01" // 5+ years for long-term average
-	cacheTTL      = 24 * time.Hour
-	httpTimeout   = 20 * time.Second
-	ltAvgWindow   = 60 // months for long-term average (5 years)
-	fairZonePct   = 5.0 // ±5% deviation = FAIR
+	bisBaseURL  = "https://stats.bis.org/api/v2/data/BIS,WS_EER,1.0"
+	startPeriod = "2019-01" // 5+ years for long-term average
+	cacheTTL    = 24 * time.Hour
+	httpTimeout = 20 * time.Second
+	ltAvgWindow = 60  // months for long-term average (5 years)
+	fairZonePct = 5.0 // ±5% deviation = FAIR
 )
 
 // currencyConfig maps BIS country codes to display currency names.

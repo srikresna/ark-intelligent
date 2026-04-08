@@ -47,12 +47,12 @@ func (cb *ContextBuilder) Build(ctx context.Context, contractCode, currency stri
 
 	// Weekly change (latest vs previous week)
 	if len(records) >= 2 && records[1].Close > 0 {
-		pc.WeeklyChgPct = roundN(((records[0].Close - records[1].Close) / records[1].Close) * 100, 4)
+		pc.WeeklyChgPct = roundN(((records[0].Close-records[1].Close)/records[1].Close)*100, 4)
 	}
 
 	// Monthly change (latest vs ~4 weeks ago)
 	if len(records) >= 5 && records[4].Close > 0 {
-		pc.MonthlyChgPct = roundN(((records[0].Close - records[4].Close) / records[4].Close) * 100, 4)
+		pc.MonthlyChgPct = roundN(((records[0].Close-records[4].Close)/records[4].Close)*100, 4)
 	}
 
 	// 4-week moving average
@@ -127,13 +127,13 @@ func (cb *ContextBuilder) BuildAll(ctx context.Context) (map[string]*domain.Pric
 type CurrencyStrength struct {
 	ContractCode  string  `json:"contract_code"`
 	Currency      string  `json:"currency"`
-	PriceScore    float64 `json:"price_score"`     // Momentum-based score
-	COTScore      float64 `json:"cot_score"`       // COT positioning score
-	CombinedScore float64 `json:"combined_score"`  // Weighted average
-	PriceRank     int     `json:"price_rank"`      // 1 = strongest
+	PriceScore    float64 `json:"price_score"`    // Momentum-based score
+	COTScore      float64 `json:"cot_score"`      // COT positioning score
+	CombinedScore float64 `json:"combined_score"` // Weighted average
+	PriceRank     int     `json:"price_rank"`     // 1 = strongest
 	COTRank       int     `json:"cot_rank"`
 	CombinedRank  int     `json:"combined_rank"`
-	Divergence    bool    `json:"divergence"`       // Price trend contradicts COT
+	Divergence    bool    `json:"divergence"` // Price trend contradicts COT
 	DivergenceMsg string  `json:"divergence_msg,omitempty"`
 }
 

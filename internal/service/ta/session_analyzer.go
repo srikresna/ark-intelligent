@@ -65,35 +65,35 @@ var standardSessions = []sessionWindow{
 type SessionCharacter string
 
 const (
-	CharTrending  SessionCharacter = "TRENDING"
-	CharRanging   SessionCharacter = "RANGING"
-	CharVolatile  SessionCharacter = "VOLATILE"
-	CharCalm      SessionCharacter = "CALM"
-	CharMixed     SessionCharacter = "MIXED"
+	CharTrending SessionCharacter = "TRENDING"
+	CharRanging  SessionCharacter = "RANGING"
+	CharVolatile SessionCharacter = "VOLATILE"
+	CharCalm     SessionCharacter = "CALM"
+	CharMixed    SessionCharacter = "MIXED"
 )
 
 // SessionStrategy is the recommended approach for a session.
 type SessionStrategy string
 
 const (
-	StratBreakout     SessionStrategy = "BREAKOUT"
-	StratMeanRevert   SessionStrategy = "MEAN_REVERSION"
-	StratTrend        SessionStrategy = "TREND_FOLLOWING"
-	StratNeutral      SessionStrategy = "NEUTRAL"
+	StratBreakout   SessionStrategy = "BREAKOUT"
+	StratMeanRevert SessionStrategy = "MEAN_REVERSION"
+	StratTrend      SessionStrategy = "TREND_FOLLOWING"
+	StratNeutral    SessionStrategy = "NEUTRAL"
 )
 
 // SessionStats holds computed statistics for one session over the rolling window.
 type SessionStats struct {
-	Session       string          // e.g. "LONDON"
-	Label         string          // e.g. "London"
-	ADXAvg        float64         // average ADX across sessions
-	RangeAvgPips  float64         // average H-L range (pip units × 10000)
-	VolatilityPct float64         // avg bar-to-bar % change (annualized proxy)
-	PctTrending   float64         // % of sessions where ADX > 25
-	PctRanging    float64         // % of sessions where ADX < 20
+	Session       string           // e.g. "LONDON"
+	Label         string           // e.g. "London"
+	ADXAvg        float64          // average ADX across sessions
+	RangeAvgPips  float64          // average H-L range (pip units × 10000)
+	VolatilityPct float64          // avg bar-to-bar % change (annualized proxy)
+	PctTrending   float64          // % of sessions where ADX > 25
+	PctRanging    float64          // % of sessions where ADX < 20
 	Character     SessionCharacter // dominant character
 	Strategy      SessionStrategy  // recommended strategy
-	SampleCount   int             // number of sessions analyzed
+	SampleCount   int              // number of sessions analyzed
 }
 
 // SessionAnalysisResult holds analysis for all sessions + current context.
@@ -101,7 +101,7 @@ type SessionAnalysisResult struct {
 	Currency       string
 	CurrentSession string // which session is active right now
 	CurrentTime    time.Time
-	MinUntilNext   int    // minutes until next session boundary
+	MinUntilNext   int // minutes until next session boundary
 	NextSession    string
 
 	Tokyo   *SessionStats

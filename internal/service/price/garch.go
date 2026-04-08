@@ -24,31 +24,31 @@ import (
 
 // GARCHResult holds the output of a GARCH(1,1) estimation.
 type GARCHResult struct {
-	Omega          float64 `json:"omega"`            // Long-run variance weight
-	Alpha          float64 `json:"alpha"`            // Shock coefficient
-	Beta           float64 `json:"beta"`             // Persistence coefficient
-	Persistence    float64 `json:"persistence"`      // α + β (closer to 1 = more persistent)
-	LongRunVar     float64 `json:"long_run_var"`     // ω / (1 - α - β)
-	LongRunVol     float64 `json:"long_run_vol"`     // √(LongRunVar)
-	CurrentVar     float64 `json:"current_var"`      // Latest conditional variance σ²(t)
-	CurrentVol     float64 `json:"current_vol"`      // √(CurrentVar) — current volatility estimate
-	ForecastVar1   float64 `json:"forecast_var_1"`   // 1-step ahead forecast σ²(t+1)
-	ForecastVol1   float64 `json:"forecast_vol_1"`   // √(ForecastVar1)
-	ForecastVar5   float64 `json:"forecast_var_5"`   // 5-step ahead forecast σ²(t+5)
-	ForecastVol5   float64 `json:"forecast_vol_5"`   // √(ForecastVar5)
-	VolRatio       float64 `json:"vol_ratio"`        // CurrentVol / LongRunVol — >1 = above average
-	VolForecast    string  `json:"vol_forecast"`     // "INCREASING", "DECREASING", "STABLE"
-	Converged      bool    `json:"converged"`        // Whether estimation converged
-	LogLikelihood  float64 `json:"log_likelihood"`   // Final log-likelihood
-	SampleSize     int     `json:"sample_size"`      // Number of returns used
+	Omega         float64 `json:"omega"`          // Long-run variance weight
+	Alpha         float64 `json:"alpha"`          // Shock coefficient
+	Beta          float64 `json:"beta"`           // Persistence coefficient
+	Persistence   float64 `json:"persistence"`    // α + β (closer to 1 = more persistent)
+	LongRunVar    float64 `json:"long_run_var"`   // ω / (1 - α - β)
+	LongRunVol    float64 `json:"long_run_vol"`   // √(LongRunVar)
+	CurrentVar    float64 `json:"current_var"`    // Latest conditional variance σ²(t)
+	CurrentVol    float64 `json:"current_vol"`    // √(CurrentVar) — current volatility estimate
+	ForecastVar1  float64 `json:"forecast_var_1"` // 1-step ahead forecast σ²(t+1)
+	ForecastVol1  float64 `json:"forecast_vol_1"` // √(ForecastVar1)
+	ForecastVar5  float64 `json:"forecast_var_5"` // 5-step ahead forecast σ²(t+5)
+	ForecastVol5  float64 `json:"forecast_vol_5"` // √(ForecastVar5)
+	VolRatio      float64 `json:"vol_ratio"`      // CurrentVol / LongRunVol — >1 = above average
+	VolForecast   string  `json:"vol_forecast"`   // "INCREASING", "DECREASING", "STABLE"
+	Converged     bool    `json:"converged"`      // Whether estimation converged
+	LogLikelihood float64 `json:"log_likelihood"` // Final log-likelihood
+	SampleSize    int     `json:"sample_size"`    // Number of returns used
 }
 
 // GARCHVolatilityContext extends VolatilityContext with GARCH-based forecasts.
 type GARCHVolatilityContext struct {
 	*VolatilityContext
 	GARCH              *GARCHResult `json:"garch,omitempty"`
-	GARCHMultiplier    float64      `json:"garch_multiplier"`     // Confidence multiplier from GARCH
-	CombinedMultiplier float64      `json:"combined_multiplier"`  // ATR + GARCH combined
+	GARCHMultiplier    float64      `json:"garch_multiplier"`    // Confidence multiplier from GARCH
+	CombinedMultiplier float64      `json:"combined_multiplier"` // ATR + GARCH combined
 }
 
 // EstimateGARCH fits a GARCH(1,1) model to daily/weekly returns using

@@ -38,7 +38,7 @@ func TestWalkForwardAnalyzer_Analyze_SingleElement(t *testing.T) {
 			{
 				ContractCode: "EUR",
 				Outcome1W:    domain.OutcomeWin,
-			ReportDate:    time.Now().Add(-7 * 24 * time.Hour),
+				ReportDate:   time.Now().Add(-7 * 24 * time.Hour),
 			},
 		},
 	}
@@ -84,7 +84,7 @@ func TestWalkForwardAnalyzer_Analyze_WinLossSignals(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    outcome,
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 
@@ -110,7 +110,7 @@ func TestWalkForwardAnalyzer_Analyze_OverfitDetection(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    outcome,
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 
@@ -133,7 +133,7 @@ func TestWalkForwardAnalyzer_Analyze_WindowStructure(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    domain.OutcomeWin,
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 
@@ -168,7 +168,7 @@ func TestWalkForwardAnalyzer_Analyze_CountsValid(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    outcome,
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 

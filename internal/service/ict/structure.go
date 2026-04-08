@@ -4,10 +4,11 @@ package ict
 // events from a pre-computed list of swing points.
 //
 // Rules:
-//   BOS:   In an uptrend, price closes above the previous swing high (continuation).
-//          In a downtrend, price closes below the previous swing low.
-//   CHoCH: In an uptrend, price closes below the most recent swing low (reversal).
-//          In a downtrend, price closes above the most recent swing high.
+//
+//	BOS:   In an uptrend, price closes above the previous swing high (continuation).
+//	       In a downtrend, price closes below the previous swing low.
+//	CHoCH: In an uptrend, price closes below the most recent swing low (reversal).
+//	       In a downtrend, price closes above the most recent swing high.
 //
 // To avoid flooding the output, only one CHoCH per trend transition is emitted.
 func DetectStructure(swings []swingPoint) []StructureEvent {

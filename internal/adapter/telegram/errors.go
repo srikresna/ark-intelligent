@@ -225,7 +225,6 @@ func sessionExpiredMessage(command string) string {
 	return "⏳ <b>Sesi berakhir</b>\n\nData sudah expired. Ketik <code>/" + command + "</code> untuk memulai ulang."
 }
 
-
 // ---------------------------------------------------------------------------
 // Callback Toast — success message without error logging
 // ---------------------------------------------------------------------------

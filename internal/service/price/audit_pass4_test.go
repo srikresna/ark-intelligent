@@ -136,11 +136,11 @@ func TestGARCH_Pass4_VolRatioConsistency(t *testing.T) {
 func TestGARCH_Pass4_ConfidenceMultiplierThresholds(t *testing.T) {
 	// Test each threshold of GARCHConfidenceMultiplier
 	testCases := []struct {
-		name       string
-		volRatio   float64
-		fcastVol   float64
-		lrVol      float64
-		wantMult   float64
+		name     string
+		volRatio float64
+		fcastVol float64
+		lrVol    float64
+		wantMult float64
 	}{
 		{"very_high_vol", 2.0, 0.031, 0.02, 0.75}, // forecastRatio = 0.031/0.02 = 1.55 > 1.50
 		{"elevated_vol", 1.3, 0.026, 0.02, 0.85},
@@ -476,9 +476,9 @@ func TestIntraday_Pass4_SMACalculation(t *testing.T) {
 
 func TestIntraday_Pass4_ATRCalculation(t *testing.T) {
 	bars := []domain.IntradayBar{
-		{High: 110, Low: 95, Close: 105},  // newest, TR = max(15, |110-100|, |95-100|) = 15
-		{High: 108, Low: 98, Close: 100},  // TR = max(10, |108-102|, |98-102|) = 10
-		{High: 105, Low: 96, Close: 102},  // prevClose for bar[1]
+		{High: 110, Low: 95, Close: 105}, // newest, TR = max(15, |110-100|, |95-100|) = 15
+		{High: 108, Low: 98, Close: 100}, // TR = max(10, |108-102|, |98-102|) = 10
+		{High: 105, Low: 96, Close: 102}, // prevClose for bar[1]
 	}
 
 	atr := computeIntradayATR(bars, 2)

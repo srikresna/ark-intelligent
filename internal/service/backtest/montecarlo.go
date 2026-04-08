@@ -15,7 +15,7 @@ import (
 // MonteCarloResult holds the aggregate output of a Monte Carlo bootstrap simulation.
 type MonteCarloResult struct {
 	NumSimulations    int     `json:"num_simulations"`
-	WeeksResampled    int     `json:"weeks_resampled"`    // Number of historical weekly returns used
+	WeeksResampled    int     `json:"weeks_resampled"` // Number of historical weekly returns used
 	MedianReturn      float64 `json:"median_return"`
 	P5Return          float64 `json:"p5_return"`
 	P95Return         float64 `json:"p95_return"`

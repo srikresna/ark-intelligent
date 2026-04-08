@@ -13,10 +13,10 @@ type WyckoffPhase string
 
 const (
 	PhaseAccumulation WyckoffPhase = "ACCUMULATION" // Phase A-E classic accumulation
-	PhaseMarkup       WyckoffPhase = "MARKUP"        // trending up after accumulation
-	PhaseDistribution WyckoffPhase = "DISTRIBUTION"  // Phase A-E classic distribution
-	PhaseMarkdown     WyckoffPhase = "MARKDOWN"       // trending down after distribution
-	PhaseTransition   WyckoffPhase = "TRANSITION"     // unclear / changing
+	PhaseMarkup       WyckoffPhase = "MARKUP"       // trending up after accumulation
+	PhaseDistribution WyckoffPhase = "DISTRIBUTION" // Phase A-E classic distribution
+	PhaseMarkdown     WyckoffPhase = "MARKDOWN"     // trending down after distribution
+	PhaseTransition   WyckoffPhase = "TRANSITION"   // unclear / changing
 )
 
 // TradingRange defines the price range in which price has been consolidating.

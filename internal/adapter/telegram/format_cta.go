@@ -750,7 +750,6 @@ func formatCTAVWAPDelta(state *ctaState) string {
 	return sb.String()
 }
 
-
 func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult) string {
 	var sb strings.Builder
 	tfLabel := strings.ToUpper(tf)
@@ -932,7 +931,6 @@ func formatCTATimeframeDetail(state *ctaState, tf string, result *ta.FullResult)
 			sb.WriteString(fmt.Sprintf("  ⚠️ Violations: %s\n", strings.Join(ew.RulesViolated, "; ")))
 		}
 	}
-
 
 	if len(result.Patterns) > 0 {
 		sb.WriteString("\n🕯 <b>Pola:</b>\n")

@@ -57,9 +57,9 @@ func TestPrecision_LargePositionCounts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := COTRecord{
-				ContractCode:   "TEST",
-				LevFundLong:    float64(tt.long),
-				LevFundShort:   float64(tt.short),
+				ContractCode: "TEST",
+				LevFundLong:  float64(tt.long),
+				LevFundShort: float64(tt.short),
 			}
 
 			got := record.GetSmartMoneyNet("TFF")
@@ -180,11 +180,11 @@ func computeCOTIndexForTest(nets []float64) float64 {
 // TestPrecision_PercentageOfOI tests percentage calculations.
 func TestPrecision_PercentageOfOI(t *testing.T) {
 	tests := []struct {
-		name          string
-		netPosition   int64
-		openInterest  int64
-		wantPct       float64
-		wantValid     bool
+		name         string
+		netPosition  int64
+		openInterest int64
+		wantPct      float64
+		wantValid    bool
 	}{
 		{
 			name:         "normal percentage",
@@ -197,8 +197,8 @@ func TestPrecision_PercentageOfOI(t *testing.T) {
 			name:         "zero OI",
 			netPosition:  1000,
 			openInterest: 0,
-			wantPct:      0,      // division by zero should be handled
-			wantValid:    false,  // or return 0 with safe division
+			wantPct:      0,     // division by zero should be handled
+			wantValid:    false, // or return 0 with safe division
 		},
 		{
 			name:         "100% of OI",
@@ -249,9 +249,9 @@ func TestPrecision_PercentageOfOI(t *testing.T) {
 // TestPrecision_RatioCalculations tests long/short ratio precision.
 func TestPrecision_RatioCalculations(t *testing.T) {
 	tests := []struct {
-		name     string
-		long     int64
-		short    int64
+		name      string
+		long      int64
+		short     int64
 		wantRatio float64
 	}{
 		{
@@ -375,11 +375,11 @@ func TestPrecision_IntegerOverflow(t *testing.T) {
 
 	// Verify our fields can handle realistic values
 	record := COTRecord{
-		OpenInterest:   float64(typicalMaxOI),
-		LevFundLong:    float64(typicalMaxOI) / 2,
-		LevFundShort:   float64(typicalMaxOI) / 4,
-		AssetMgrLong:   float64(typicalMaxOI) / 3,
-		AssetMgrShort:  float64(typicalMaxOI) / 6,
+		OpenInterest:  float64(typicalMaxOI),
+		LevFundLong:   float64(typicalMaxOI) / 2,
+		LevFundShort:  float64(typicalMaxOI) / 4,
+		AssetMgrLong:  float64(typicalMaxOI) / 3,
+		AssetMgrShort: float64(typicalMaxOI) / 6,
 	}
 
 	// Verify calculations don't overflow

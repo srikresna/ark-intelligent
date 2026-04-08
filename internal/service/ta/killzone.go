@@ -102,8 +102,8 @@ func NextKillzoneInfo(t time.Time) (name string, startsIn int) {
 
 	// Collect all start times for today + wraparound for tomorrow
 	type kzStart struct {
-		name      string
-		startMin  int
+		name     string
+		startMin int
 	}
 
 	var starts []kzStart

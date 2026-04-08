@@ -45,17 +45,17 @@ func (cb *IntradayContextBuilder) Build(ctx context.Context, contractCode, curre
 
 	// 4H change (latest bar)
 	if len(bars) >= 2 && bars[1].Close > 0 {
-		ic.Chg4H = roundN(((bars[0].Close - bars[1].Close) / bars[1].Close) * 100, 4)
+		ic.Chg4H = roundN(((bars[0].Close-bars[1].Close)/bars[1].Close)*100, 4)
 	}
 
 	// 12H change (3 bars)
 	if len(bars) >= 4 && bars[3].Close > 0 {
-		ic.Chg12H = roundN(((bars[0].Close - bars[3].Close) / bars[3].Close) * 100, 4)
+		ic.Chg12H = roundN(((bars[0].Close-bars[3].Close)/bars[3].Close)*100, 4)
 	}
 
 	// 24H change (6 bars)
 	if len(bars) >= 7 && bars[6].Close > 0 {
-		ic.Chg24H = roundN(((bars[0].Close - bars[6].Close) / bars[6].Close) * 100, 4)
+		ic.Chg24H = roundN(((bars[0].Close-bars[6].Close)/bars[6].Close)*100, 4)
 	}
 
 	// Intraday Moving Averages
@@ -174,7 +174,7 @@ func computeIntradayROC(bars []domain.IntradayBar, period int) float64 {
 	if len(bars) <= period || bars[period].Close == 0 {
 		return 0
 	}
-	return roundN(((bars[0].Close - bars[period].Close) / bars[period].Close) * 100, 4)
+	return roundN(((bars[0].Close-bars[period].Close)/bars[period].Close)*100, 4)
 }
 
 func computeSessionRange(bars []domain.IntradayBar) (float64, float64) {

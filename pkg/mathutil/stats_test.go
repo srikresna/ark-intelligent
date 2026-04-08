@@ -71,9 +71,9 @@ func TestStdDevSample(t *testing.T) {
 		{"empty", nil, 0},
 		{"single", []float64{5}, 0},
 		{"identical", []float64{3, 3, 3}, 0},
-		{"two_elements", []float64{0, 10}, math.Sqrt(50)},                                        // ss=50+50=100, 100/(2-1)=100, sqrt=10
-		{"simple", []float64{2, 4, 4, 4, 5, 5, 7, 9}, math.Sqrt(32.0 / 7.0)},                    // population var=4, sample var=32/7
-		{"three_elements", []float64{1, 2, 3}, 1.0},                                               // mean=2, ss=2, 2/(3-1)=1, sqrt=1
+		{"two_elements", []float64{0, 10}, math.Sqrt(50)},                    // ss=50+50=100, 100/(2-1)=100, sqrt=10
+		{"simple", []float64{2, 4, 4, 4, 5, 5, 7, 9}, math.Sqrt(32.0 / 7.0)}, // population var=4, sample var=32/7
+		{"three_elements", []float64{1, 2, 3}, 1.0},                          // mean=2, ss=2, 2/(3-1)=1, sqrt=1
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -167,9 +167,9 @@ func TestPercentileDoesNotMutateInput(t *testing.T) {
 
 func TestNormalize(t *testing.T) {
 	tests := []struct {
-		name       string
+		name            string
 		value, min, max float64
-		want       float64
+		want            float64
 	}{
 		{"midpoint", 50, 0, 100, 50},
 		{"at_min", 0, 0, 100, 0},
@@ -192,9 +192,9 @@ func TestNormalize(t *testing.T) {
 
 func TestMinMaxIndex(t *testing.T) {
 	tests := []struct {
-		name                   string
-		current, minN, maxN    float64
-		want                   float64
+		name                string
+		current, minN, maxN float64
+		want                float64
 	}{
 		{"midpoint", 50, 0, 100, 50},
 		{"at_min", 0, 0, 100, 0},
@@ -280,9 +280,9 @@ func TestEMA(t *testing.T) {
 
 func TestRateOfChange(t *testing.T) {
 	tests := []struct {
-		name             string
+		name              string
 		current, previous float64
-		want             float64
+		want              float64
 	}{
 		{"zero_previous", 10, 0, 0},
 		{"no_change", 10, 10, 0},
@@ -334,9 +334,9 @@ func TestMomentum(t *testing.T) {
 
 func TestZScore(t *testing.T) {
 	tests := []struct {
-		name                    string
-		value, mean, stddev     float64
-		want                    float64
+		name                string
+		value, mean, stddev float64
+		want                float64
 	}{
 		{"zero_stddev", 5, 3, 0, 0},
 		{"at_mean", 5, 5, 1, 0},
@@ -357,9 +357,9 @@ func TestZScore(t *testing.T) {
 
 func TestExponentialDecay(t *testing.T) {
 	tests := []struct {
-		name                    string
-		value, tVal, halfLife   float64
-		want                    float64
+		name                  string
+		value, tVal, halfLife float64
+		want                  float64
 	}{
 		{"zero_halflife", 100, 1, 0, 0},
 		{"negative_halflife", 100, 1, -5, 0},
@@ -409,9 +409,9 @@ func TestCumulativeDecaySum(t *testing.T) {
 
 func TestClamp(t *testing.T) {
 	tests := []struct {
-		name             string
-		value, min, max  float64
-		want             float64
+		name            string
+		value, min, max float64
+		want            float64
 	}{
 		{"within_range", 5, 0, 10, 5},
 		{"at_min", 0, 0, 10, 0},
@@ -523,10 +523,10 @@ func TestMaxFloat64(t *testing.T) {
 
 func TestConsecutiveDirection(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     []float64
-		wantN    int
-		wantDir  float64
+		name    string
+		data    []float64
+		wantN   int
+		wantDir float64
 	}{
 		{"empty", nil, 0, 0},
 		{"single_positive", []float64{5}, 1, 1},

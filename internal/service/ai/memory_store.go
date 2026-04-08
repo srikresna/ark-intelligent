@@ -49,8 +49,8 @@ func NewMemoryStore(persister MemoryPersister) *MemoryStore {
 
 // memoryCommand represents a parsed memory tool command.
 type memoryCommand struct {
-	Command  string `json:"command"`            // "view", "create", "edit", "delete"
-	Path     string `json:"path"`               // file/directory path
+	Command  string `json:"command"`             // "view", "create", "edit", "delete"
+	Path     string `json:"path"`                // file/directory path
 	FileText string `json:"file_text,omitempty"` // for "create"
 	OldStr   string `json:"old_str,omitempty"`   // for "edit"
 	NewStr   string `json:"new_str,omitempty"`   // for "edit"

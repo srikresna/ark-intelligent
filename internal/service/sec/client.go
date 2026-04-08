@@ -37,7 +37,7 @@ var targetInstitutions = []Institution{ //nolint:gochecknoglobals
 
 // package-level cache.
 var (
-	globalCache *EdgarData  //nolint:gochecknoglobals
+	globalCache *EdgarData //nolint:gochecknoglobals
 	cacheMu     sync.RWMutex
 	httpClient  = httpclient.New(httpclient.WithTimeout(httpTimeout)) //nolint:gochecknoglobals
 )
@@ -120,9 +120,9 @@ func FetchAll(ctx context.Context) (*EdgarData, error) {
 
 // submissionsResponse is the JSON structure from the submissions endpoint.
 type submissionsResponse struct {
-	CIK           string         `json:"cik"`
-	Name          string         `json:"name"`
-	RecentFilings recentFilings  `json:"filings"`
+	CIK           string        `json:"cik"`
+	Name          string        `json:"name"`
+	RecentFilings recentFilings `json:"filings"`
 }
 
 type recentFilings struct {

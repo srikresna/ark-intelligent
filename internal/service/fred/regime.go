@@ -10,27 +10,27 @@ import (
 
 // MacroRegime holds the classified macro environment and bias.
 type MacroRegime struct {
-	Name         string // e.g., "DISINFLATIONARY", "INFLATIONARY", "STRESS", "STAGFLATION"
-	YieldCurve   string // human-readable yield curve label (2Y-10Y)
-	Yield3M10Y   string // human-readable 3M-10Y spread label
-	Yield2Y30Y   string // human-readable 2Y-30Y spread label
-	Inflation    string // human-readable inflation label
-	M2Label      string // M2 YoY growth label
-	FinStress    string // human-readable financial stress label
-	Labor        string // human-readable labor market label
-	SahmLabel    string // Sahm Rule label
-	SahmAlert    bool   // true if Sahm Rule is triggered (≥0.5)
-	MonPolicy    string // monetary policy stance label
-	SOFRLabel    string // SOFR vs IORB spread label
-	Growth       string // growth trajectory label
-	USDStrength  string // USD index label
-	FedBalance   string // Fed balance sheet QT/QE status
-	TGALabel      string // TGA balance status label
+	Name           string // e.g., "DISINFLATIONARY", "INFLATIONARY", "STRESS", "STAGFLATION"
+	YieldCurve     string // human-readable yield curve label (2Y-10Y)
+	Yield3M10Y     string // human-readable 3M-10Y spread label
+	Yield2Y30Y     string // human-readable 2Y-30Y spread label
+	Inflation      string // human-readable inflation label
+	M2Label        string // M2 YoY growth label
+	FinStress      string // human-readable financial stress label
+	Labor          string // human-readable labor market label
+	SahmLabel      string // Sahm Rule label
+	SahmAlert      bool   // true if Sahm Rule is triggered (≥0.5)
+	MonPolicy      string // monetary policy stance label
+	SOFRLabel      string // SOFR vs IORB spread label
+	Growth         string // growth trajectory label
+	USDStrength    string // USD index label
+	FedBalance     string // Fed balance sheet QT/QE status
+	TGALabel       string // TGA balance status label
 	LiquidityLabel string // Net liquidity regime label
-	RecessionRisk string // "LOW", "ELEVATED", "HIGH — SAHM TRIGGERED"
-	Bias         string // directional bias e.g., "USD BEARISH bias, Gold BULLISH"
-	Description  string // narrative explanation
-	Score        int    // composite risk score 0-100 (higher = more risk-off)
+	RecessionRisk  string // "LOW", "ELEVATED", "HIGH — SAHM TRIGGERED"
+	Bias           string // directional bias e.g., "USD BEARISH bias, Gold BULLISH"
+	Description    string // narrative explanation
+	Score          int    // composite risk score 0-100 (higher = more risk-off)
 }
 
 // TradingImplication represents a structured per-asset trading signal derived from macro regime.

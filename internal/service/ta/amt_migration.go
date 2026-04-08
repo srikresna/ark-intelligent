@@ -35,15 +35,15 @@ type DayMigration struct {
 	VA   ValueArea
 
 	// Relative to previous day
-	POCShift       float64            // POC today - POC yesterday (positive = up)
-	VAOverlap      float64            // fraction of today's VA that overlaps with yesterday (0–1)
-	Direction      MigrationDirection // direction of value migration
-	MGILevels      []MGILevel         // acceptance/rejection at key levels
+	POCShift  float64            // POC today - POC yesterday (positive = up)
+	VAOverlap float64            // fraction of today's VA that overlaps with yesterday (0–1)
+	Direction MigrationDirection // direction of value migration
+	MGILevels []MGILevel         // acceptance/rejection at key levels
 }
 
 // CompositeVA holds a composite Value Area computed over multiple days.
 type CompositeVA struct {
-	Period string  // "WEEKLY" | "MONTHLY"
+	Period string // "WEEKLY" | "MONTHLY"
 	POC    float64
 	VAH    float64
 	VAL    float64

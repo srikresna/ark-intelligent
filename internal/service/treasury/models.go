@@ -19,26 +19,26 @@ type AuctionResult struct {
 	AuctionDateStr  string    `json:"auctionDate"` // "01/15/2026"
 	IssueDate       string    `json:"issueDate"`
 	MaturityDate    string    `json:"maturityDate"`
-	HighYield       string    `json:"highYield"`             // Clearing rate as string
-	BidToCoverRatio string    `json:"bidToCoverRatio"`       // e.g. "2.45"
-	DirectBidder    string    `json:"percentageDealer"`      // Direct bidder %
-	IndirectBidder  string    `json:"percentageIndirect"`    // Indirect bidder % (foreign CBs)
-	AllottedAmt     string    `json:"totalAccepted"`         // Allotted amount
-	OfferingAmt     string    `json:"offeringAmount"`        // Total offering
-	CompetitiveTend string    `json:"competitiveTendered"`   // Total competitive bids
+	HighYield       string    `json:"highYield"`           // Clearing rate as string
+	BidToCoverRatio string    `json:"bidToCoverRatio"`     // e.g. "2.45"
+	DirectBidder    string    `json:"percentageDealer"`    // Direct bidder %
+	IndirectBidder  string    `json:"percentageIndirect"`  // Indirect bidder % (foreign CBs)
+	AllottedAmt     string    `json:"totalAccepted"`       // Allotted amount
+	OfferingAmt     string    `json:"offeringAmount"`      // Total offering
+	CompetitiveTend string    `json:"competitiveTendered"` // Total competitive bids
 }
 
 // ParsedAuction is a cleaned/parsed version of AuctionResult with numeric fields.
 type ParsedAuction struct {
-	SecurityType    string
-	SecurityTerm    string
-	AuctionDate     time.Time
-	HighYield       float64
-	BidToCover      float64
-	DirectPct       float64
-	IndirectPct     float64
-	AllottedAmt     float64
-	OfferingAmt     float64
+	SecurityType string
+	SecurityTerm string
+	AuctionDate  time.Time
+	HighYield    float64
+	BidToCover   float64
+	DirectPct    float64
+	IndirectPct  float64
+	AllottedAmt  float64
+	OfferingAmt  float64
 }
 
 // AuctionAnalysis contains trend analysis computed over recent auctions.
@@ -46,11 +46,11 @@ type AuctionAnalysis struct {
 	SecurityTerm     string
 	LatestBidToCover float64
 	AvgBidToCover    float64
-	BidToCoverTrend  string  // "IMPROVING", "DETERIORATING", "STABLE"
+	BidToCoverTrend  string // "IMPROVING", "DETERIORATING", "STABLE"
 	LatestIndirect   float64
 	AvgIndirect      float64
-	IndirectTrend    string  // "RISING", "FALLING", "STABLE"
-	DemandSignal     string  // "STRONG", "NORMAL", "WEAK"
+	IndirectTrend    string // "RISING", "FALLING", "STABLE"
+	DemandSignal     string // "STRONG", "NORMAL", "WEAK"
 	Count            int
 }
 

@@ -77,10 +77,10 @@ func TestComputeUSDAggregate_DXDivergence(t *testing.T) {
 	// Cross-pairs say bearish USD, DX says bullish → divergence.
 	contracts := domain.DefaultCOTContracts
 	analyses := []domain.COTAnalysis{
-		makeAnalysis("099741", "EUR", 100000, 200000),  // long EUR = short USD
-		makeAnalysis("096742", "GBP", 80000, 200000),   // long GBP = short USD
-		makeAnalysis("097741", "JPY", 60000, 200000),   // long JPY = short USD
-		makeAnalysis("098662", "USD", 50000, 200000),    // long DX = long USD
+		makeAnalysis("099741", "EUR", 100000, 200000), // long EUR = short USD
+		makeAnalysis("096742", "GBP", 80000, 200000),  // long GBP = short USD
+		makeAnalysis("097741", "JPY", 60000, 200000),  // long JPY = short USD
+		makeAnalysis("098662", "USD", 50000, 200000),  // long DX = long USD
 	}
 
 	agg := ComputeUSDAggregate(analyses, contracts)
@@ -102,10 +102,10 @@ func TestComputeUSDAggregate_DXDivergence(t *testing.T) {
 func TestComputeUSDAggregate_MixedSignals(t *testing.T) {
 	contracts := domain.DefaultCOTContracts
 	analyses := []domain.COTAnalysis{
-		makeAnalysis("099741", "EUR", 80000, 200000),   // short USD
-		makeAnalysis("096742", "GBP", -70000, 200000),  // long USD
-		makeAnalysis("097741", "JPY", 5000, 200000),    // near neutral
-		makeAnalysis("232741", "AUD", -40000, 200000),  // long USD
+		makeAnalysis("099741", "EUR", 80000, 200000),  // short USD
+		makeAnalysis("096742", "GBP", -70000, 200000), // long USD
+		makeAnalysis("097741", "JPY", 5000, 200000),   // near neutral
+		makeAnalysis("232741", "AUD", -40000, 200000), // long USD
 	}
 
 	agg := ComputeUSDAggregate(analyses, contracts)
@@ -157,14 +157,14 @@ func TestComputeUSDAggregate_FallbackNoOI(t *testing.T) {
 
 func TestFormatUSDAggregate_NonEmpty(t *testing.T) {
 	agg := USDAggregate{
-		Score:         -35.2,
-		Direction:     "BEARISH",
-		Contributions: map[string]float64{"EUR": -0.40, "GBP": -0.20},
-		DXDirectScore: 0.15,
-		DXDirectDir:   "BULLISH",
-		Divergence:    true,
+		Score:          -35.2,
+		Direction:      "BEARISH",
+		Contributions:  map[string]float64{"EUR": -0.40, "GBP": -0.20},
+		DXDirectScore:  0.15,
+		DXDirectDir:    "BULLISH",
+		Divergence:     true,
 		DivergenceDesc: "DX says BULLISH, cross-pairs say BEARISH",
-		ConvictionPct: 85,
+		ConvictionPct:  85,
 		HighConviction: true,
 	}
 

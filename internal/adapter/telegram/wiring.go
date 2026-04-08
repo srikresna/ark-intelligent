@@ -48,11 +48,11 @@ func NewBot(token, defaultChatID string) *Bot {
 	}
 
 	return &Bot{
-		token:     token,
-		defaultID: defaultChatID,
-		ownerID:   ownerID,
-		apiBase:   fmt.Sprintf("https://api.telegram.org/bot%s", token),
-		httpClient: httpclient.NewClient(60 * time.Second), // long-polling timeout + buffer
+		token:       token,
+		defaultID:   defaultChatID,
+		ownerID:     ownerID,
+		apiBase:     fmt.Sprintf("https://api.telegram.org/bot%s", token),
+		httpClient:  httpclient.NewClient(60 * time.Second), // long-polling timeout + buffer
 		commands:    make(map[string]CommandHandler),
 		callbacks:   make(map[string]CallbackHandler),
 		userLimiter: newUserRateLimiter(),

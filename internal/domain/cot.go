@@ -66,7 +66,7 @@ type COTRecord struct {
 	ReportDate   time.Time `json:"report_date"`   // Report as-of date (Tuesday)
 
 	// Open Interest
-	OpenInterest    float64 `json:"open_interest"`
+	OpenInterest float64 `json:"open_interest"`
 
 	// --- A. TFF (Financials: Currencies/Bonds) ---
 	DealerLong    float64 `json:"dealer_long"`
@@ -110,8 +110,8 @@ type COTRecord struct {
 
 	// DISAGG Spread positions
 	ManagedMoneySpread float64 `json:"managed_money_spread"`
-	ProdMercSpread    float64 `json:"prod_merc_spread"`
-	SwapDealerSpread  float64 `json:"swap_dealer_spread"`
+	ProdMercSpread     float64 `json:"prod_merc_spread"`
+	SwapDealerSpread   float64 `json:"swap_dealer_spread"`
 
 	// DISAGG WoW changes
 	ProdMercLongChg      float64 `json:"prod_merc_long_chg"`
@@ -153,8 +153,8 @@ type COTRecord struct {
 	NetChange float64 `json:"net_change"`
 
 	// --- E. Options Positions (computed: Combined - FuturesOnly) ---
-	HasOptions         bool    `json:"has_options,omitempty"`          // true if options data was computed
-	OptionsOI          float64 `json:"opt_oi,omitempty"`              // Options-only open interest
+	HasOptions         bool    `json:"has_options,omitempty"` // true if options data was computed
+	OptionsOI          float64 `json:"opt_oi,omitempty"`      // Options-only open interest
 	OptSmartMoneyLong  float64 `json:"opt_smart_money_long,omitempty"`
 	OptSmartMoneyShort float64 `json:"opt_smart_money_short,omitempty"`
 	OptCommercialLong  float64 `json:"opt_commercial_long,omitempty"`
@@ -295,14 +295,14 @@ type COTAnalysis struct {
 	SmartDumbDivergence bool   `json:"smart_dumb_divergence"`
 
 	// --- D. Open Interest Analysis ---
-	OpenInterest      float64 `json:"open_interest"`
-	OpenInterestChg   float64 `json:"open_interest_chg"`
-	OIPctChange       float64 `json:"oi_pct_change"`
-	OITrend           string  `json:"oi_trend"`
+	OpenInterest    float64 `json:"open_interest"`
+	OpenInterestChg float64 `json:"open_interest_chg"`
+	OIPctChange     float64 `json:"oi_pct_change"`
+	OITrend         string  `json:"oi_trend"`
 	// 4-Week Open Interest Momentum
-	OI4WTrend      string  `json:"oi_4w_trend"`       // "ACCUMULATING", "DISTRIBUTING", "MIXED", "INSUFFICIENT"
-	OI4WMomentum   float64 `json:"oi_4w_momentum"`    // avg weekly OI change over 4 weeks (%)
-	OI4WAccumCount int     `json:"oi_4w_accum_count"` // consecutive weeks of OI rising (positive=accum, negative=distrib)
+	OI4WTrend         string  `json:"oi_4w_trend"`       // "ACCUMULATING", "DISTRIBUTING", "MIXED", "INSUFFICIENT"
+	OI4WMomentum      float64 `json:"oi_4w_momentum"`    // avg weekly OI change over 4 weeks (%)
+	OI4WAccumCount    int     `json:"oi_4w_accum_count"` // consecutive weeks of OI rising (positive=accum, negative=distrib)
 	Top4Concentration float64 `json:"top4_concentration"`
 	Top4LongPct       float64 `json:"top4_long_pct"`  // Top-4 long % of OI
 	Top4ShortPct      float64 `json:"top4_short_pct"` // Top-4 short % of OI
@@ -317,10 +317,10 @@ type COTAnalysis struct {
 	ConsecutiveWeeks int               `json:"consecutive_weeks"` // Now used in display
 
 	// --- F. Advanced Signals ---
-	ShortTermBias  string        `json:"short_term_bias"`
-	DivergenceFlag bool          `json:"divergence_flag"`
-	CrowdingIndex  float64       `json:"crowding_index"`
-	SentimentScore float64       `json:"sentiment_score"`
+	ShortTermBias  string         `json:"short_term_bias"`
+	DivergenceFlag bool           `json:"divergence_flag"`
+	CrowdingIndex  float64        `json:"crowding_index"`
+	SentimentScore float64        `json:"sentiment_score"`
 	SignalStrength SignalStrength `json:"signal_strength"`
 
 	// --- G. Institutional Outlier Alerts (TFF) ---
@@ -343,16 +343,16 @@ type COTAnalysis struct {
 
 	// --- H. Trader Concentration (NEW: from traders_* API fields) ---
 	// Number of unique traders per category — thin market / crowding detection.
-	DealerShortTraders  int     `json:"dealer_short_traders"`  // Low = highly concentrated (risky)
-	LevFundLongTraders  int     `json:"lev_fund_long_traders"` // Low = thin consensus
-	LevFundShortTraders int     `json:"lev_fund_short_traders"`
-	AssetMgrLongTraders int     `json:"asset_mgr_long_traders"`
-	MMoneyLongTraders   int     `json:"mmoney_long_traders"`  // DISAGG
-	MMoneyShortTraders  int     `json:"mmoney_short_traders"` // DISAGG
-	TotalTraders        int     `json:"total_traders"`
-	TraderConcentration string  `json:"trader_concentration"` // "THIN", "NORMAL", "DEEP"
-	ThinMarketAlert     bool    `json:"thin_market_alert"`    // true if key category < threshold
-	ThinMarketDesc      string  `json:"thin_market_desc"`     // e.g. "Only 9 dealers short EUR"
+	DealerShortTraders  int    `json:"dealer_short_traders"`  // Low = highly concentrated (risky)
+	LevFundLongTraders  int    `json:"lev_fund_long_traders"` // Low = thin consensus
+	LevFundShortTraders int    `json:"lev_fund_short_traders"`
+	AssetMgrLongTraders int    `json:"asset_mgr_long_traders"`
+	MMoneyLongTraders   int    `json:"mmoney_long_traders"`  // DISAGG
+	MMoneyShortTraders  int    `json:"mmoney_short_traders"` // DISAGG
+	TotalTraders        int    `json:"total_traders"`
+	TraderConcentration string `json:"trader_concentration"` // "THIN", "NORMAL", "DEEP"
+	ThinMarketAlert     bool   `json:"thin_market_alert"`    // true if key category < threshold
+	ThinMarketDesc      string `json:"thin_market_desc"`     // e.g. "Only 9 dealers short EUR"
 
 	// --- I. FRED-Adjusted Scores ---
 	RegimeAdjustedScore float64 `json:"regime_adjusted_score"`
@@ -377,16 +377,16 @@ type SocrataRecord struct {
 	OpenInterest string `json:"open_interest_all"`
 
 	// --- A. TFF positions ---
-	DealerPositionsLong    string `json:"dealer_positions_long_all"`
-	DealerPositionsShort   string `json:"dealer_positions_short_all"`
-	DealerPositionsSpread  string `json:"dealer_positions_spread_all"`
-	AssetMgrPositionsLong  string `json:"asset_mgr_positions_long"`
-	AssetMgrPositionsShort string `json:"asset_mgr_positions_short"`
+	DealerPositionsLong     string `json:"dealer_positions_long_all"`
+	DealerPositionsShort    string `json:"dealer_positions_short_all"`
+	DealerPositionsSpread   string `json:"dealer_positions_spread_all"`
+	AssetMgrPositionsLong   string `json:"asset_mgr_positions_long"`
+	AssetMgrPositionsShort  string `json:"asset_mgr_positions_short"`
 	AssetMgrPositionsSpread string `json:"asset_mgr_positions_spread"`
-	LevMoneyPositionsLong  string `json:"lev_money_positions_long"`
-	LevMoneyPositionsShort string `json:"lev_money_positions_short"`
+	LevMoneyPositionsLong   string `json:"lev_money_positions_long"`
+	LevMoneyPositionsShort  string `json:"lev_money_positions_short"`
 	LevMoneyPositionsSpread string `json:"lev_money_positions_spread"`
-	OtherReptSpread        string `json:"other_rept_positions_spread"`
+	OtherReptSpread         string `json:"other_rept_positions_spread"`
 
 	// TFF WoW changes (CFTC-computed, more accurate than manual diff)
 	ChangeDealerLong    string `json:"change_in_dealer_long_all"`
@@ -407,13 +407,13 @@ type SocrataRecord struct {
 	TradersTotAll        string `json:"traders_tot_all"`
 
 	// --- B. Disaggregated positions ---
-	ProdMercPositionsLong  string `json:"prod_merc_positions_long"`
-	ProdMercPositionsShort string `json:"prod_merc_positions_short"`
-	SwapPositionsLong      string `json:"swap_positions_long_all"`
-	SwapPositionsShort     string `json:"swap__positions_short_all"` // double underscore API quirk
-	MMoneyPositionsLong    string `json:"m_money_positions_long_all"`
-	MMoneyPositionsShort   string `json:"m_money_positions_short_all"`
-	MMoneyPositionsSpread  string `json:"m_money_positions_spread"`
+	ProdMercPositionsLong   string `json:"prod_merc_positions_long"`
+	ProdMercPositionsShort  string `json:"prod_merc_positions_short"`
+	SwapPositionsLong       string `json:"swap_positions_long_all"`
+	SwapPositionsShort      string `json:"swap__positions_short_all"` // double underscore API quirk
+	MMoneyPositionsLong     string `json:"m_money_positions_long_all"`
+	MMoneyPositionsShort    string `json:"m_money_positions_short_all"`
+	MMoneyPositionsSpread   string `json:"m_money_positions_spread"`
 	ProdMercPositionsSpread string `json:"prod_merc_positions_spread"`
 	SwapPositionsSpread     string `json:"swap_positions_spread_all"`
 
@@ -426,8 +426,8 @@ type SocrataRecord struct {
 	ChangeMMoneyShort   string `json:"change_in_m_money_short_all"`
 
 	// Shared WoW changes (both TFF and DISAGG)
-	ChangeNonReptLong  string `json:"change_in_nonrept_long_all"`
-	ChangeNonReptShort string `json:"change_in_nonrept_short_all"`
+	ChangeNonReptLong    string `json:"change_in_nonrept_long_all"`
+	ChangeNonReptShort   string `json:"change_in_nonrept_short_all"`
 	ChangeOtherReptLong  string `json:"change_in_other_rept_long"`
 	ChangeOtherReptShort string `json:"change_in_other_rept_short"`
 

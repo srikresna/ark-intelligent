@@ -39,12 +39,12 @@ func TestAlignToBucket(t *testing.T) {
 		wantH   int
 		wantM   int
 	}{
-		{time.Date(2024, 1, 1, 0, 17, 30, 0, time.UTC), 30, 0, 0},   // 00:17 → 00:00 bucket
-		{time.Date(2024, 1, 1, 1, 45, 0, 0, time.UTC), 60, 1, 0},    // 01:45 → 01:00 bucket
-		{time.Date(2024, 1, 1, 5, 30, 0, 0, time.UTC), 240, 4, 0},   // 05:30 → 04:00 bucket
-		{time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), 15, 0, 0},     // exact boundary
-		{time.Date(2024, 1, 1, 0, 14, 59, 0, time.UTC), 15, 0, 0},   // just before boundary
-		{time.Date(2024, 1, 1, 0, 15, 0, 0, time.UTC), 15, 0, 15},   // exactly next bucket
+		{time.Date(2024, 1, 1, 0, 17, 30, 0, time.UTC), 30, 0, 0}, // 00:17 → 00:00 bucket
+		{time.Date(2024, 1, 1, 1, 45, 0, 0, time.UTC), 60, 1, 0},  // 01:45 → 01:00 bucket
+		{time.Date(2024, 1, 1, 5, 30, 0, 0, time.UTC), 240, 4, 0}, // 05:30 → 04:00 bucket
+		{time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), 15, 0, 0},   // exact boundary
+		{time.Date(2024, 1, 1, 0, 14, 59, 0, time.UTC), 15, 0, 0}, // just before boundary
+		{time.Date(2024, 1, 1, 0, 15, 0, 0, time.UTC), 15, 0, 15}, // exactly next bucket
 	}
 
 	for _, tt := range tests {

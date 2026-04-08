@@ -6,19 +6,19 @@ package domain
 
 // CarryPairSnapshot holds point-in-time carry data for a single FX pair.
 type CarryPairSnapshot struct {
-	Currency     string  `json:"currency"`       // e.g. "AUD"
-	Spread       float64 `json:"spread"`         // annualized rate differential (bps)
-	DailyAccrual float64 `json:"daily_accrual"`  // daily carry earned (bps)
-	Direction    string  `json:"direction"`       // "LONG" or "SHORT"
+	Currency     string  `json:"currency"`      // e.g. "AUD"
+	Spread       float64 `json:"spread"`        // annualized rate differential (bps)
+	DailyAccrual float64 `json:"daily_accrual"` // daily carry earned (bps)
+	Direction    string  `json:"direction"`     // "LONG" or "SHORT"
 }
 
 // UnwindRisk classifies the current carry unwind danger level.
 type UnwindRisk string
 
 const (
-	UnwindNormal   UnwindRisk = "NORMAL"
-	UnwindNarrow   UnwindRisk = "NARROWING"
-	UnwindAlert    UnwindRisk = "UNWIND"
+	UnwindNormal UnwindRisk = "NORMAL"
+	UnwindNarrow UnwindRisk = "NARROWING"
+	UnwindAlert  UnwindRisk = "UNWIND"
 )
 
 // CarryMonitorResult holds the full carry trade dashboard output.

@@ -6,14 +6,16 @@ import "math"
 // patterns are present.
 //
 // Bullish Absorption (index returned in bullish slice):
-//   A bar has a large negative delta (sellers dominated) BUT its range is
-//   compressed relative to the average range AND the bar did not close near
-//   its low — indicating that buyers were absorbing the supply.
+//
+//	A bar has a large negative delta (sellers dominated) BUT its range is
+//	compressed relative to the average range AND the bar did not close near
+//	its low — indicating that buyers were absorbing the supply.
 //
 // Bearish Absorption (index returned in bearish slice):
-//   A bar has a large positive delta (buyers dominated) BUT its range is
-//   compressed AND the bar did not close near its high — sellers absorbing
-//   demand.
+//
+//	A bar has a large positive delta (buyers dominated) BUT its range is
+//	compressed AND the bar did not close near its high — sellers absorbing
+//	demand.
 //
 // Thresholds use the median absolute delta and median range of the window.
 func detectAbsorption(bars []DeltaBar) (bullish, bearish []int) {

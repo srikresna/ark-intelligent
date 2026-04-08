@@ -43,7 +43,7 @@ type Fetcher struct {
 // Both keys are optional — Yahoo Finance fallback requires no key.
 func NewFetcher(twelveDataKeys []string, avKeys []string) *Fetcher {
 	return &Fetcher{
-		httpClient: httpclient.NewClient(30 * time.Second),
+		httpClient:     httpclient.NewClient(30 * time.Second),
 		twelveDataKeys: twelveDataKeys,
 		avKeys:         avKeys,
 		cbTwelveData:   circuitbreaker.New("twelve-data", 3, 5*time.Minute),
@@ -616,7 +616,7 @@ func (f *Fetcher) fetchSyntheticCross(ctx context.Context, mapping domain.PriceS
 			Date:         num.Date,
 			Open:         num.Open / den.Open,
 			High:         num.High / den.Low, // max ratio when num is high and den is low
-			Low:          num.Low / den.High,  // min ratio when num is low and den is high
+			Low:          num.Low / den.High, // min ratio when num is low and den is high
 			Close:        num.Close / den.Close,
 			Source:       "synthetic",
 		}

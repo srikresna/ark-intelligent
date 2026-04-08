@@ -2,10 +2,10 @@ package telegram
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"sort"
+	"strings"
 )
 
 // FormatCalendarDay builds a message for a single day of events.

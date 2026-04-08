@@ -28,12 +28,12 @@ type RetentionPolicy struct {
 func DefaultRetentionPolicy() RetentionPolicy {
 	return RetentionPolicy{
 		EventMaxAge:    6 * 30 * 24 * time.Hour,  // ~6 months
-		COTMaxAge:      52 * 7 * 24 * time.Hour,   // 52 weeks
-		RevisionMaxAge: 6 * 30 * 24 * time.Hour,   // ~6 months
-		HistoryMaxAge:  24 * 30 * 24 * time.Hour,   // ~24 months
-		PriceMaxAge:    260 * 7 * 24 * time.Hour,   // ~5 years (matches seasonal analysis window)
-		SignalMaxAge:   52 * 7 * 24 * time.Hour,    // 52 weeks
-		IntradayMaxAge: 60 * 24 * time.Hour,        // 60 days
+		COTMaxAge:      52 * 7 * 24 * time.Hour,  // 52 weeks
+		RevisionMaxAge: 6 * 30 * 24 * time.Hour,  // ~6 months
+		HistoryMaxAge:  24 * 30 * 24 * time.Hour, // ~24 months
+		PriceMaxAge:    260 * 7 * 24 * time.Hour, // ~5 years (matches seasonal analysis window)
+		SignalMaxAge:   52 * 7 * 24 * time.Hour,  // 52 weeks
+		IntradayMaxAge: 60 * 24 * time.Hour,      // 60 days
 	}
 }
 

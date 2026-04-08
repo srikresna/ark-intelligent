@@ -25,8 +25,8 @@ var log = logger.Component("worldbank") //nolint:gochecknoglobals
 // World Bank indicator series IDs.
 const (
 	seriesGDPGrowth      = "NY.GDP.MKTP.KD.ZG" // GDP Growth Rate (%)
-	seriesCurrentAccount = "BN.CAB.XOKA.CD"     // Current Account Balance (USD)
-	seriesCPIInflation   = "FP.CPI.TOTL.ZG"     // CPI Inflation (%)
+	seriesCurrentAccount = "BN.CAB.XOKA.CD"    // Current Account Balance (USD)
+	seriesCPIInflation   = "FP.CPI.TOTL.ZG"    // CPI Inflation (%)
 )
 
 // countryConfig maps ISO-2 country codes to their display currency name.
@@ -64,10 +64,10 @@ type WorldBankData struct {
 
 // cache fields (package-level, protected by cacheMu).
 var (
-	globalCache  *WorldBankData //nolint:gochecknoglobals
-	cacheMu      sync.RWMutex
-	cacheTTL     = 24 * time.Hour //nolint:gochecknoglobals
-	httpClient   = httpclient.New() //nolint:gochecknoglobals
+	globalCache *WorldBankData //nolint:gochecknoglobals
+	cacheMu     sync.RWMutex
+	cacheTTL    = 24 * time.Hour   //nolint:gochecknoglobals
+	httpClient  = httpclient.New() //nolint:gochecknoglobals
 )
 
 // GetCachedOrFetch returns cached data if within TTL, otherwise fetches fresh
@@ -179,9 +179,9 @@ func fetchCountry(ctx context.Context, code, currency string) CountryMacro {
 type worldBankResponse [2]json.RawMessage
 
 type wbDataPoint struct {
-	Date     string   `json:"date"`
-	Value    *float64 `json:"value"` // pointer because value can be null
-	Country  wbEntity `json:"country"`
+	Date    string   `json:"date"`
+	Value   *float64 `json:"value"` // pointer because value can be null
+	Country wbEntity `json:"country"`
 }
 
 type wbEntity struct {

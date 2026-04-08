@@ -77,8 +77,8 @@ type ICTResult struct {
 	OrderBlocks []OrderBlock
 	Structure   []StructureEvent
 	Sweeps      []LiquiditySweep
-	Bias        string    // "BULLISH" | "BEARISH" | "NEUTRAL"
-	Killzone    string    // current killzone if applicable (e.g. "London", "New York")
-	Summary     string    // human-readable narrative
+	Bias        string // "BULLISH" | "BEARISH" | "NEUTRAL"
+	Killzone    string // current killzone if applicable (e.g. "London", "New York")
+	Summary     string // human-readable narrative
 	AnalyzedAt  time.Time
 }

@@ -214,7 +214,7 @@ func TestCheckAlerts_NoAlerts_NoChange(t *testing.T) {
 		YieldSpread: 1.0,
 		Spread3M10Y: 0.5,
 		NFCI:        0.0,
-		SahmRule:     0.1,
+		SahmRule:    0.1,
 		VIX:         20,
 	}
 	alerts := CheckAlerts(same, same)

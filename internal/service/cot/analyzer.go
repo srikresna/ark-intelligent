@@ -529,15 +529,15 @@ func (a *Analyzer) computeMetrics(current domain.COTRecord, history []domain.COT
 	// === Trader Concentration Analysis (NEW) ===
 	// Populate trader counts from record
 	if rt == "TFF" {
-		analysis.DealerShortTraders  = current.DealerShortTraders
-		analysis.LevFundLongTraders  = current.LevFundLongTraders
+		analysis.DealerShortTraders = current.DealerShortTraders
+		analysis.LevFundLongTraders = current.LevFundLongTraders
 		analysis.LevFundShortTraders = current.LevFundShortTraders
 		analysis.AssetMgrLongTraders = current.AssetMgrLongTraders
-		analysis.TotalTraders        = current.TotalTraders
+		analysis.TotalTraders = current.TotalTraders
 	} else {
-		analysis.MMoneyLongTraders  = current.MMoneyLongTraders
+		analysis.MMoneyLongTraders = current.MMoneyLongTraders
 		analysis.MMoneyShortTraders = current.MMoneyShortTraders
-		analysis.TotalTraders       = current.TotalTradersDisag
+		analysis.TotalTraders = current.TotalTradersDisag
 	}
 
 	// Thin market detection: flag when key category has very few traders

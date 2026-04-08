@@ -24,12 +24,12 @@ type ExcursionResult struct {
 	EntryPrice   float64 `json:"entry_price"`
 
 	// Maximum Favorable Excursion — max move in signal direction (positive = favorable)
-	MFEPct    float64 `json:"mfe_pct"`    // As percentage
-	MFEDay    int     `json:"mfe_day"`    // Day # when MFE occurred (1-based)
+	MFEPct float64 `json:"mfe_pct"` // As percentage
+	MFEDay int     `json:"mfe_day"` // Day # when MFE occurred (1-based)
 
 	// Maximum Adverse Excursion — max move against signal direction (positive = adverse)
-	MAEPct    float64 `json:"mae_pct"`    // As percentage
-	MAEDay    int     `json:"mae_day"`    // Day # when MAE occurred
+	MAEPct float64 `json:"mae_pct"` // As percentage
+	MAEDay int     `json:"mae_day"` // Day # when MAE occurred
 
 	// Optimal exit
 	OptimalExitDay int     `json:"optimal_exit_day"` // Day with best close in signal direction
@@ -42,15 +42,15 @@ type ExcursionResult struct {
 
 // ExcursionSummary holds aggregated MFE/MAE stats across multiple signals.
 type ExcursionSummary struct {
-	TotalSignals   int     `json:"total_signals"`
-	AvgMFEPct      float64 `json:"avg_mfe_pct"`
-	AvgMAEPct      float64 `json:"avg_mae_pct"`
-	AvgOptimalDay  float64 `json:"avg_optimal_day"`
-	AvgOptimalRet  float64 `json:"avg_optimal_ret"`
+	TotalSignals  int     `json:"total_signals"`
+	AvgMFEPct     float64 `json:"avg_mfe_pct"`
+	AvgMAEPct     float64 `json:"avg_mae_pct"`
+	AvgOptimalDay float64 `json:"avg_optimal_day"`
+	AvgOptimalRet float64 `json:"avg_optimal_ret"`
 
 	// MFE says "signal was right" but weekly close says "LOSS"
-	MissedWins     int     `json:"missed_wins"`      // MFE > threshold but outcome = LOSS
-	MissedWinPct   float64 `json:"missed_win_pct"`   // % of losses that were actually profitable intraweek
+	MissedWins   int     `json:"missed_wins"`    // MFE > threshold but outcome = LOSS
+	MissedWinPct float64 `json:"missed_win_pct"` // % of losses that were actually profitable intraweek
 
 	// Optimal holding period distribution
 	OptimalDayDist []int `json:"optimal_day_dist"` // Count per day (index 0 = day 1, index N = day N+1)
@@ -67,7 +67,7 @@ type ExcursionTypeSummary struct {
 	AvgMAEPct     float64 `json:"avg_mae_pct"`
 	AvgOptimalDay float64 `json:"avg_optimal_day"`
 	MissedWins    int     `json:"missed_wins"`
-	WinRate       float64 `json:"win_rate"` // Traditional weekly close win rate
+	WinRate       float64 `json:"win_rate"`     // Traditional weekly close win rate
 	MFEWinRate    float64 `json:"mfe_win_rate"` // Win rate if exited at MFE > 0.3%
 }
 

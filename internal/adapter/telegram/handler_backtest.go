@@ -42,13 +42,13 @@ func (h *Handler) cmdReport(ctx context.Context, chatID string, userID int64, ar
 
 // knownSignalTypes is the canonical set of signal type names.
 var knownSignalTypes = map[string]bool{
-	"SMART_MONEY":        true,
+	"SMART_MONEY":         true,
 	"EXTREME_POSITIONING": true,
-	"DIVERGENCE":         true,
-	"MOMENTUM_SHIFT":     true,
-	"CONCENTRATION":      true,
-	"CROWD_CONTRARIAN":   true,
-	"THIN_MARKET":        true,
+	"DIVERGENCE":          true,
+	"MOMENTUM_SHIFT":      true,
+	"CONCENTRATION":       true,
+	"CROWD_CONTRARIAN":    true,
+	"THIN_MARKET":         true,
 }
 
 // cmdBacktest handles /backtest [contract|all|signals|SIGNAL_TYPE]

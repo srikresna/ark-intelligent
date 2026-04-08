@@ -17,16 +17,16 @@ var log = logger.Component("microstructure")
 
 // Signal is the actionable microstructure signal for a symbol.
 type Signal struct {
-	Symbol      string
-	Category    string // "linear", "spot"
-	BidAskImbalance float64 // positive = bid heavy, negative = ask heavy
-	TakerBuyRatio   float64 // fraction of recent trades that are taker buys (0-1)
-	OIChange        float64 // open interest change % over recent period
-	FundingRate     float64 // current funding rate (decimal, e.g. 0.0001)
-	LongShortRatio  float64 // longs / shorts ratio (>1 = more longs)
-	Bias            Bias    // derived directional bias
-	ConfirmEntry    bool    // true = microstructure confirms a directional entry
-	Strength        float64 // 0-1 strength of the signal
+	Symbol          string
+	Category        string                  // "linear", "spot"
+	BidAskImbalance float64                 // positive = bid heavy, negative = ask heavy
+	TakerBuyRatio   float64                 // fraction of recent trades that are taker buys (0-1)
+	OIChange        float64                 // open interest change % over recent period
+	FundingRate     float64                 // current funding rate (decimal, e.g. 0.0001)
+	LongShortRatio  float64                 // longs / shorts ratio (>1 = more longs)
+	Bias            Bias                    // derived directional bias
+	ConfirmEntry    bool                    // true = microstructure confirms a directional entry
+	Strength        float64                 // 0-1 strength of the signal
 	FundingStats    *bybit.FundingRateStats // historical funding rate analysis (nil if unavailable)
 	UpdatedAt       time.Time
 

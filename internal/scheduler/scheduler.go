@@ -27,9 +27,9 @@ import (
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
+	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
-	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
@@ -104,24 +104,24 @@ type Intervals struct {
 
 // Scheduler manages all background periodic jobs.
 type Scheduler struct {
-	deps         *Deps
-	stopCh       chan struct{}
-	stopOnce     sync.Once
-	wg           sync.WaitGroup
-	running      bool
-	mu           sync.Mutex      // lifecycle mutex (Start/Stop)
-	fredMu          sync.Mutex      // protects lastFREDData + lastFREDBroadcast
-	lastFREDData    *fred.MacroData // previous FRED snapshot for alert diffing
-	lastFREDBroadcast time.Time    // last time FRED alerts were broadcast (dedup guard)
+	deps              *Deps
+	stopCh            chan struct{}
+	stopOnce          sync.Once
+	wg                sync.WaitGroup
+	running           bool
+	mu                sync.Mutex      // lifecycle mutex (Start/Stop)
+	fredMu            sync.Mutex      // protects lastFREDData + lastFREDBroadcast
+	lastFREDData      *fred.MacroData // previous FRED snapshot for alert diffing
+	lastFREDBroadcast time.Time       // last time FRED alerts were broadcast (dedup guard)
 
-	lastTailRisk     string     // previous VolSuite TailRisk state for SKEW/VIX alert diffing
+	lastTailRisk     string       // previous VolSuite TailRisk state for SKEW/VIX alert diffing
 	regimeMu         sync.RWMutex // protects regimeEngine access
-		cotBroadcastMu   sync.Mutex // protects lastCOTBroadcast
-	lastCOTBroadcast time.Time  // last date successfully broadcast to prevent duplicates
+	cotBroadcastMu   sync.Mutex   // protects lastCOTBroadcast
+	lastCOTBroadcast time.Time    // last date successfully broadcast to prevent duplicates
 
-	carryMu          sync.Mutex               // protects lastCarryResult + lastCarryBroadcast
-	lastCarryResult  *domain.CarryMonitorResult // previous carry snapshot for alert diffing
-	lastCarryBroadcast time.Time               // last time carry alerts were broadcast (dedup guard)
+	carryMu            sync.Mutex                 // protects lastCarryResult + lastCarryBroadcast
+	lastCarryResult    *domain.CarryMonitorResult // previous carry snapshot for alert diffing
+	lastCarryBroadcast time.Time                  // last time carry alerts were broadcast (dedup guard)
 
 	alertGate *AlertGate // quiet hours + alert type + daily cap (TASK-202)
 }
@@ -426,7 +426,6 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 			{Text: "âï¸ Pengaturan Alert", CallbackData: "set:alerts"},
 		},
 	}}
-
 
 	count := 0
 	for userID, prefs := range activeUsers {

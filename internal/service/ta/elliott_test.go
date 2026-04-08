@@ -142,7 +142,7 @@ func TestAnalyzeElliott_Rule1Violation(t *testing.T) {
 	// Descend to W0 swing LOW at 100
 	bars = append(bars, buildBarHL(115, 117, 113))
 	bars = append(bars, buildBarHL(108, 110, 106))
-	bars = append(bars, buildBarHL(101, 103, 99))  // swing low ~100
+	bars = append(bars, buildBarHL(101, 103, 99)) // swing low ~100
 	bars = append(bars, buildBarHL(103, 105, 101))
 	bars = append(bars, buildBarHL(106, 108, 104))
 	bars = append(bars, buildBarHL(109, 111, 107)) // W0 low confirmed
@@ -158,10 +158,10 @@ func TestAnalyzeElliott_Rule1Violation(t *testing.T) {
 	// W2 LOW at 92 (−28 from 120, retraces 140% of W1 → VIOLATION)
 	bars = append(bars, buildBarHL(108, 110, 106))
 	bars = append(bars, buildBarHL(100, 102, 98))
-	bars = append(bars, buildBarHL(93, 95, 91))   // swing low ~92 (below W0=100 → >100% retrace)
+	bars = append(bars, buildBarHL(93, 95, 91)) // swing low ~92 (below W0=100 → >100% retrace)
 	bars = append(bars, buildBarHL(95, 97, 93))
 	bars = append(bars, buildBarHL(97, 99, 95))
-	bars = append(bars, buildBarHL(99, 101, 97))  // W2 low confirmed
+	bars = append(bars, buildBarHL(99, 101, 97)) // W2 low confirmed
 
 	// W3 HIGH at 130
 	bars = append(bars, buildBarHL(107, 109, 97))

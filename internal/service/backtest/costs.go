@@ -42,7 +42,7 @@ func CostAdjustedReturn(rawReturnPct float64, spreadBps float64) float64 {
 
 // CostAnalysisResult holds before/after cost comparison for a group of signals.
 type CostAnalysisResult struct {
-	GroupLabel      string  `json:"group_label"`
+	GroupLabel     string  `json:"group_label"`
 	RawAvgReturn1W float64 `json:"raw_avg_return_1w"`
 	NetAvgReturn1W float64 `json:"net_avg_return_1w"`
 	RawEV          float64 `json:"raw_ev"`

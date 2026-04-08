@@ -56,17 +56,17 @@ type WyckoffPhase struct {
 
 // WyckoffResult is the full output of an analysis run.
 type WyckoffResult struct {
-	Symbol        string          // e.g. "EURUSD"
-	Timeframe     string          // e.g. "H4"
-	Schematic     string          // "ACCUMULATION" | "DISTRIBUTION" | "UNKNOWN"
-	CurrentPhase  string          // "A", "B", "C", "D", "E", "UNDEFINED"
-	Phases        []WyckoffPhase  // ordered list of identified phases
-	Events        []WyckoffEvent  // all events (across all phases)
-	TradingRange  [2]float64      // [support, resistance] of identified range
-	CauseBuilt    float64         // composite "cause" energy score (0–100)
-	ProjectedMove float64         // estimated breakout magnitude in price units
-	Confidence    string          // "HIGH", "MEDIUM", "LOW"
-	Summary       string          // narrative summary ≤ 300 chars
-	AvgVolume     float64         // mean volume over analyzed bars (for formatter)
+	Symbol        string         // e.g. "EURUSD"
+	Timeframe     string         // e.g. "H4"
+	Schematic     string         // "ACCUMULATION" | "DISTRIBUTION" | "UNKNOWN"
+	CurrentPhase  string         // "A", "B", "C", "D", "E", "UNDEFINED"
+	Phases        []WyckoffPhase // ordered list of identified phases
+	Events        []WyckoffEvent // all events (across all phases)
+	TradingRange  [2]float64     // [support, resistance] of identified range
+	CauseBuilt    float64        // composite "cause" energy score (0–100)
+	ProjectedMove float64        // estimated breakout magnitude in price units
+	Confidence    string         // "HIGH", "MEDIUM", "LOW"
+	Summary       string         // narrative summary ≤ 300 chars
+	AvgVolume     float64        // mean volume over analyzed bars (for formatter)
 	AnalyzedAt    time.Time
 }

@@ -2,12 +2,12 @@ package telegram
 
 import (
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/domain"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"html"
 	"math"
 	"sort"
 	"strings"
-	"github.com/arkcode369/ark-intelligent/internal/domain"
-	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 )
 
 // momentumLabel converts MomentumDirection to readable label.

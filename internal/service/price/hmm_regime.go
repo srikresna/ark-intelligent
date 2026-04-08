@@ -34,10 +34,10 @@ const (
 
 // HMMResult holds the output of HMM regime analysis.
 type HMMResult struct {
-	CurrentState       string        `json:"current_state"`       // RISK_ON, RISK_OFF, CRISIS, TRENDING
-	StateProbabilities [4]float64    `json:"state_probabilities"` // P(state) at current time
-	TransitionMatrix   [4][4]float64 `json:"transition_matrix"`   // Estimated transition probs
-	ViterbiPath        []string      `json:"viterbi_path,omitempty"` // Last N states (most likely path)
+	CurrentState       string        `json:"current_state"`                // RISK_ON, RISK_OFF, CRISIS, TRENDING
+	StateProbabilities [4]float64    `json:"state_probabilities"`          // P(state) at current time
+	TransitionMatrix   [4][4]float64 `json:"transition_matrix"`            // Estimated transition probs
+	ViterbiPath        []string      `json:"viterbi_path,omitempty"`       // Last N states (most likely path)
 	TransitionWarning  string        `json:"transition_warning,omitempty"` // Early warning if regime change likely
 	SampleSize         int           `json:"sample_size"`
 	Converged          bool          `json:"converged"`
@@ -46,9 +46,9 @@ type HMMResult struct {
 
 // HMMModel holds fitted HMM parameters.
 type HMMModel struct {
-	Pi [hmmNumStates]float64                       // Initial state distribution
-	A  [hmmNumStates][hmmNumStates]float64         // Transition matrix
-	B  [hmmNumStates][hmmNumEmissions]float64      // Emission matrix
+	Pi [hmmNumStates]float64                  // Initial state distribution
+	A  [hmmNumStates][hmmNumStates]float64    // Transition matrix
+	B  [hmmNumStates][hmmNumEmissions]float64 // Emission matrix
 }
 
 // EstimateHMMRegime fits a 4-state HMM to daily returns and infers the current regime.
@@ -123,14 +123,14 @@ func EstimateHMMRegime(prices []domain.PriceRecord) (*HMMResult, error) {
 	warning := detectTransitionWarning(currentState, stateProbs, model.A)
 
 	result := &HMMResult{
-		CurrentState:      stateLabel(currentState),
+		CurrentState:       stateLabel(currentState),
 		StateProbabilities: stateProbs,
-		TransitionMatrix:  model.A,
-		ViterbiPath:       viterbiPath,
-		TransitionWarning: warning,
-		SampleSize:        len(returns),
-		Converged:         converged,
-		Iterations:        iter,
+		TransitionMatrix:   model.A,
+		ViterbiPath:        viterbiPath,
+		TransitionWarning:  warning,
+		SampleSize:         len(returns),
+		Converged:          converged,
+		Iterations:         iter,
 	}
 
 	return result, nil

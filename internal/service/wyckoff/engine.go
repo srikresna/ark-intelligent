@@ -26,9 +26,9 @@ func NewEngine() *Engine {
 func (e *Engine) Analyze(symbol, timeframe string, bars []ta.OHLCV) *WyckoffResult {
 	now := time.Now()
 	result := &WyckoffResult{
-		Symbol:    symbol,
-		Timeframe: timeframe,
-		Schematic: "UNKNOWN",
+		Symbol:     symbol,
+		Timeframe:  timeframe,
+		Schematic:  "UNKNOWN",
 		Confidence: "LOW",
 		AnalyzedAt: now,
 	}

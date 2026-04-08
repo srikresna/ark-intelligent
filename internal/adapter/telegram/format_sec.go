@@ -197,4 +197,3 @@ func (f *Formatter) FormatSEC13FAlerts(alerts []sec.SignificantNewPosition) stri
 	}
 	return b.String()
 }
-

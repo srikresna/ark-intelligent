@@ -215,7 +215,7 @@ func generateRandomPricesHMM(n int) []domain.PriceRecord {
 	vol := 0.015
 	for i := n - 1; i >= 0; i-- {
 		prices[i] = domain.PriceRecord{Close: price}
-		ret := (float64(i%5)-2) * vol * 0.5 // Some pattern
+		ret := (float64(i%5) - 2) * vol * 0.5 // Some pattern
 		price *= (1 + ret)
 	}
 	return prices
@@ -226,7 +226,7 @@ func generateTrendingPrices(n int, dailyDrift float64) []domain.PriceRecord {
 	price := 100.0
 	for i := n - 1; i >= 0; i-- {
 		prices[i] = domain.PriceRecord{Close: price}
-		ret := dailyDrift + (math.Sin(float64(i)*0.1)*0.005)
+		ret := dailyDrift + (math.Sin(float64(i)*0.1) * 0.005)
 		price *= (1 + ret)
 	}
 	return prices

@@ -14,9 +14,10 @@ import (
 // cmdScenario handles /scenario [CURRENCY] [DAYS] — Monte Carlo price scenarios.
 //
 // Examples:
-//   /scenario EUR       → 30-day EUR/USD scenario
-//   /scenario XAU 60    → 60-day gold scenario
-//   /scenario BTC 14    → 14-day BTC scenario
+//
+//	/scenario EUR       → 30-day EUR/USD scenario
+//	/scenario XAU 60    → 60-day gold scenario
+//	/scenario BTC 14    → 14-day BTC scenario
 func (h *Handler) cmdScenario(ctx context.Context, chatID string, _ int64, args string) error {
 	if h.quant == nil || h.quant.DailyPriceRepo == nil {
 		_, err := h.bot.SendHTML(ctx, chatID,

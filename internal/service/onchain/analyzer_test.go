@@ -88,10 +88,10 @@ func TestParseFloat_EdgeCases(t *testing.T) {
 
 func TestCountConsecutiveOutflow(t *testing.T) {
 	flows := []ExchangeFlow{
-		{NetFlow: 10},   // inflow
-		{NetFlow: -5},   // outflow
-		{NetFlow: -10},  // outflow
-		{NetFlow: -3},   // outflow
+		{NetFlow: 10},  // inflow
+		{NetFlow: -5},  // outflow
+		{NetFlow: -10}, // outflow
+		{NetFlow: -3},  // outflow
 	}
 	got := countConsecutiveOutflow(flows)
 	if got != 3 {

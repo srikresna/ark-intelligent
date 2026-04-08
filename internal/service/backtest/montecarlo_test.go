@@ -75,8 +75,8 @@ func TestMonteCarloSimulator_Simulate_ValidResultStructure(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    domain.OutcomeWin,
-			Return1W:        float64(i%5) - 2.0, // Some variation
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			Return1W:     float64(i%5) - 2.0, // Some variation
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 
@@ -117,8 +117,8 @@ func TestMonteCarloSimulator_Simulate_DifferentNumSims(t *testing.T) {
 		signals[i] = domain.PersistedSignal{
 			ContractCode: "EUR",
 			Outcome1W:    domain.OutcomeWin,
-			Return1W:        1.0,
-			ReportDate:    baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
+			Return1W:     1.0,
+			ReportDate:   baseTime.Add(time.Duration(i*7) * 24 * time.Hour),
 		}
 	}
 

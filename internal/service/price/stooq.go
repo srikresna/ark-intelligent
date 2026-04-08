@@ -3,9 +3,9 @@ package price
 import (
 	"bytes"
 	"context"
-	"math"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"

@@ -2,9 +2,9 @@ package telegram
 
 import (
 	"fmt"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"strings"
 )
 
 // FormatWorldBankFundamentals formats the World Bank global macro fundamentals section.

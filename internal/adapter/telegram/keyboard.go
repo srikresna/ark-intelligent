@@ -13,6 +13,7 @@ import (
 //   - "cot:XXX"   -> COT detail for currency/contract
 //   - "set:XXX"   -> Settings toggle action
 //   - "alert:XXX" -> Alert action (mute, dismiss)
+//
 // Standardized button label constants.
 const (
 	btnExpand  = "📖 Detail Lengkap"
@@ -32,20 +33,20 @@ func NewKeyboardBuilder() *KeyboardBuilder {
 
 const (
 	// Navigation — generic
-	btnBack       = "◀ Kembali"
-	btnHome       = "🏠 Menu Utama"
-	btnPrevDay    = "◀ Kemarin"
-	btnNextDay    = "Besok ▶"
-	btnPrevWeek   = "◀ Minggu Lalu"
-	btnNextWeek   = "Minggu Depan ▶"
-	btnPrevMonth  = "◀ Bulan Lalu"
-	btnNextMonth  = "Bulan Depan ▶"
+	btnBack      = "◀ Kembali"
+	btnHome      = "🏠 Menu Utama"
+	btnPrevDay   = "◀ Kemarin"
+	btnNextDay   = "Besok ▶"
+	btnPrevWeek  = "◀ Minggu Lalu"
+	btnNextWeek  = "Minggu Depan ▶"
+	btnPrevMonth = "◀ Bulan Lalu"
+	btnNextMonth = "Bulan Depan ▶"
 
 	// Navigation — context-specific back buttons (Indonesian, per UX standard)
-	btnBackRingkasan = "◀ Ringkasan"   // back to summary/overview
-	btnBackDashboard = "◀ Dashboard"   // back to main section dashboard
-	btnBackKategori  = "◀ Kategori"    // back to category list
-	btnBackGrid      = "◀ Grid"        // back to seasonal grid overview
+	btnBackRingkasan = "◀ Ringkasan" // back to summary/overview
+	btnBackDashboard = "◀ Dashboard" // back to main section dashboard
+	btnBackKategori  = "◀ Kategori"  // back to category list
+	btnBackGrid      = "◀ Grid"      // back to seasonal grid overview
 
 	// Calendar
 	btnThisMonth = "Bulan Ini"

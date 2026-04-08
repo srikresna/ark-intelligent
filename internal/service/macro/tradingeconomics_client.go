@@ -1,8 +1,9 @@
 // Package macro — TradingEconomics scraper via Firecrawl.
 //
 // Scrapes key macro indicators for G10 countries:
-//   GDP growth rate, CPI, unemployment rate, manufacturing PMI,
-//   consumer confidence.
+//
+//	GDP growth rate, CPI, unemployment rate, manufacturing PMI,
+//	consumer confidence.
 //
 // Data is cached in BadgerDB with a 6h TTL (macro data changes slowly).
 // Rate limit: max 1 scrape per country per 6h (enforced by cache TTL).

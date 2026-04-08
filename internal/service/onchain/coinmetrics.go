@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	baseURL    = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
+	baseURL     = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
 	httpTimeout = 20 * time.Second
-	cacheTTL   = 6 * time.Hour
+	cacheTTL    = 6 * time.Hour
 )
 
 // tracked assets.
@@ -41,8 +41,8 @@ type coinMetricsDataPoint struct {
 
 // package-level cache.
 var (
-	globalReport *OnChainReport //nolint:gochecknoglobals
-	cacheMu      sync.RWMutex  //nolint:gochecknoglobals
+	globalReport *OnChainReport                      //nolint:gochecknoglobals
+	cacheMu      sync.RWMutex                        //nolint:gochecknoglobals
 	client       = httpclient.NewClient(httpTimeout) //nolint:gochecknoglobals
 )
 

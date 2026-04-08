@@ -125,11 +125,11 @@ func TestLoadTypeStats_WinRateCalculation(t *testing.T) {
 // TestLoadTypeStats_SuppressionThreshold verifies suppression logic.
 func TestLoadTypeStats_SuppressionThreshold(t *testing.T) {
 	tests := []struct {
-		name       string
-		wins       int
-		losses     int
-		wantSupp   bool
-		wantEdge   bool
+		name     string
+		wins     int
+		losses   int
+		wantSupp bool
+		wantEdge bool
 	}{
 		// n=15, win=4 (26.7%) → suppressed
 		{"low_winrate_large_n", 4, 11, true, false},
@@ -176,18 +176,18 @@ func TestLoadTypeStats_SuppressionThreshold(t *testing.T) {
 // TestRiskContext_ConfidenceAdjustment verifies VIX multiplier math.
 func TestRiskContext_ConfidenceAdjustment(t *testing.T) {
 	tests := []struct {
-		name       string
-		vix        float64
-		baseConf   float64
-		wantLow    float64
-		wantHigh   float64
+		name     string
+		vix      float64
+		baseConf float64
+		wantLow  float64
+		wantHigh float64
 	}{
-		{"panic_vix35", 35, 80, 50, 58},     // 80 * 0.70 = 56, ± margin
-		{"elevated_vix25", 25, 80, 64, 70},  // 80 * 0.85 = 68
-		{"normal_vix17", 17, 80, 76, 84},    // 80 * 1.00 = 80
-		{"low_vix12", 12, 80, 88, 96},       // 80 * 1.15 = 92
-		{"clamp_max", 10, 95, 95, 100},      // 95 * 1.15 = 109.25 → clamped to 100
-		{"clamp_min", 40, 10, 5, 8},         // 10 * 0.70 = 7 → above min 0
+		{"panic_vix35", 35, 80, 50, 58},    // 80 * 0.70 = 56, ± margin
+		{"elevated_vix25", 25, 80, 64, 70}, // 80 * 0.85 = 68
+		{"normal_vix17", 17, 80, 76, 84},   // 80 * 1.00 = 80
+		{"low_vix12", 12, 80, 88, 96},      // 80 * 1.15 = 92
+		{"clamp_max", 10, 95, 95, 100},     // 95 * 1.15 = 109.25 → clamped to 100
+		{"clamp_min", 40, 10, 5, 8},        // 10 * 0.70 = 7 → above min 0
 	}
 
 	for _, tt := range tests {

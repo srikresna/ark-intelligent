@@ -16,11 +16,11 @@ import (
 
 // HorizonStat holds performance metrics for a single time horizon.
 type HorizonStat struct {
-	Horizon        string  // "+1W", "+2W", "+4W"
-	Evaluated      int     // Number of evaluated signals at this horizon
-	WinRate        float64 // Win rate as percentage (0-100)
-	AvgReturn      float64 // Average return at this horizon (%)
-	MaxDrawdown    float64 // Worst single-trade loss at this horizon (%)
+	Horizon         string  // "+1W", "+2W", "+4W"
+	Evaluated       int     // Number of evaluated signals at this horizon
+	WinRate         float64 // Win rate as percentage (0-100)
+	AvgReturn       float64 // Average return at this horizon (%)
+	MaxDrawdown     float64 // Worst single-trade loss at this horizon (%)
 	RiskRewardRatio float64 // Avg win / |Avg loss|
 }
 

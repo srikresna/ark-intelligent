@@ -21,10 +21,10 @@ type cachedMacroData struct {
 }
 
 var (
-	globalCache    *cachedMacroData
-	cacheMu        sync.RWMutex
-	cacheTTL       = defaultTTL //nolint:gochecknoglobals
-	postFetchHook  func(context.Context, *MacroData) //nolint:gochecknoglobals
+	globalCache     *cachedMacroData
+	cacheMu         sync.RWMutex
+	cacheTTL        = defaultTTL                      //nolint:gochecknoglobals
+	postFetchHook   func(context.Context, *MacroData) //nolint:gochecknoglobals
 	postFetchHookMu sync.RWMutex                      //nolint:gochecknoglobals
 )
 

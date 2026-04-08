@@ -145,8 +145,8 @@ func TestTopKeyLevels_ReturnsTopN(t *testing.T) {
 		t.Fatalf("expected 2 key levels, got %d", len(keys))
 	}
 	// Should be 80000 (abs 900e6) and 82000 (abs 200e6)
-	absFirst := math.Abs(levels[1].NetGEX)   // 80000 → 900e6
-	absSecond := math.Abs(levels[2].NetGEX)  // 82000 → 200e6
+	absFirst := math.Abs(levels[1].NetGEX)  // 80000 → 900e6
+	absSecond := math.Abs(levels[2].NetGEX) // 82000 → 200e6
 	if absFirst < absSecond {
 		t.Error("expected 80000 (largest abs GEX) to be first key level")
 	}

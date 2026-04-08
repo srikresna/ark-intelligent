@@ -19,22 +19,22 @@ type PositionSizeInput struct {
 type PositionSizeResult struct {
 	// ATR-based stop distance
 	ATRStopDistance float64 `json:"atr_stop_distance"` // 1.5x ATR from entry
-	ATRStopPrice   float64 `json:"atr_stop_price"`    // Entry - 1.5*ATR (for longs)
-	ATRStopPct     float64 `json:"atr_stop_pct"`      // Stop distance as %
+	ATRStopPrice    float64 `json:"atr_stop_price"`    // Entry - 1.5*ATR (for longs)
+	ATRStopPct      float64 `json:"atr_stop_pct"`      // Stop distance as %
 
 	// Position sizing
-	RiskAmount     float64 `json:"risk_amount"`      // $ risked per trade
-	PositionSize   float64 `json:"position_size"`    // Units/lots to trade
-	PositionValue  float64 `json:"position_value"`   // Total position value
+	RiskAmount    float64 `json:"risk_amount"`    // $ risked per trade
+	PositionSize  float64 `json:"position_size"`  // Units/lots to trade
+	PositionValue float64 `json:"position_value"` // Total position value
 
 	// Volatility context
 	VolatilityTier string  `json:"volatility_tier"` // "LOW", "NORMAL", "HIGH", "EXTREME"
 	ATRMultiplier  float64 `json:"atr_multiplier"`  // Applied multiplier (1.5-2.5)
 
 	// Risk/reward framework
-	RR1Target      float64 `json:"rr1_target"`      // 1:1 R:R target price
-	RR2Target      float64 `json:"rr2_target"`      // 1:2 R:R target price
-	RR3Target      float64 `json:"rr3_target"`      // 1:3 R:R target price
+	RR1Target float64 `json:"rr1_target"` // 1:1 R:R target price
+	RR2Target float64 `json:"rr2_target"` // 1:2 R:R target price
+	RR3Target float64 `json:"rr3_target"` // 1:3 R:R target price
 }
 
 // ComputePositionSize calculates ATR-based position sizing.
@@ -100,9 +100,9 @@ func classifyVolatility(normalizedATR float64) (string, float64) {
 type EntryTimingResult struct {
 	Recommendation string  `json:"recommendation"` // "ENTER_NOW", "WAIT_PULLBACK", "WAIT_BREAKOUT", "AVOID"
 	Reasoning      string  `json:"reasoning"`
-	IdealEntry     float64 `json:"ideal_entry"`     // Suggested entry price
-	MaxEntry       float64 `json:"max_entry"`       // Don't enter above this (for longs)
-	Urgency        int     `json:"urgency"`         // 1-5 (5 = most urgent)
+	IdealEntry     float64 `json:"ideal_entry"` // Suggested entry price
+	MaxEntry       float64 `json:"max_entry"`   // Don't enter above this (for longs)
+	Urgency        int     `json:"urgency"`     // 1-5 (5 = most urgent)
 }
 
 // ComputeEntryTiming analyzes daily price context to suggest optimal entry timing.

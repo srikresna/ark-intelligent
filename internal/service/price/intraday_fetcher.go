@@ -312,13 +312,13 @@ func aggregateToInterval(hourBars []domain.IntradayBar, contractCode string, tar
 	})
 
 	type bucket struct {
-		open    float64
-		high    float64
-		low     float64
-		close   float64
-		volume  float64
-		ts      time.Time
-		count   int
+		open   float64
+		high   float64
+		low    float64
+		close  float64
+		volume float64
+		ts     time.Time
+		count  int
 	}
 
 	buckets := make(map[string]*bucket)

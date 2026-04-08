@@ -33,8 +33,8 @@ type ECBData struct {
 	MRRValue float64 // percent
 
 	// M3 money supply growth (year-over-year, percent)
-	M3Date  time.Time
-	M3YoY   float64
+	M3Date time.Time
+	M3YoY  float64
 
 	// EUR/USD official exchange rate (monthly average)
 	EURUSDDate  time.Time

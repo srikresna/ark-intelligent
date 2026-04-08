@@ -142,7 +142,7 @@ func TestSplitMessage_UnclosedCodeTag(t *testing.T) {
 
 func TestSplitMessage_MultibyteUTF8(t *testing.T) {
 	// Use multi-byte chars (emoji = 4 bytes each)
-	emoji := "\U0001F600" // 😀
+	emoji := "\U0001F600"              // 😀
 	msg := strings.Repeat(emoji, 2000) // 8000 bytes, 2000 runes
 	chunks := splitMessage(msg, 4096)
 	if len(chunks) < 2 {

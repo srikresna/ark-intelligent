@@ -7,9 +7,9 @@ package health
 
 import (
 	"context"
-	"os/exec"
 	"encoding/json"
 	"net/http"
+	"os/exec"
 	"sync/atomic"
 	"time"
 

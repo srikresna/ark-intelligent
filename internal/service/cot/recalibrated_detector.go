@@ -52,7 +52,7 @@ type SignalTypeStats struct {
 type RecalibratedDetector struct {
 	base          *SignalDetector
 	signalRepo    ports.SignalRepository
-	mu            sync.RWMutex // protects typeStats, granularStats, regimeStats, currentRegime
+	mu            sync.RWMutex                // protects typeStats, granularStats, regimeStats, currentRegime
 	typeStats     map[string]*SignalTypeStats // pooled by signal type
 	granularStats map[string]*SignalTypeStats // keyed "TYPE:CURRENCY"
 	regimeStats   map[string]*SignalTypeStats // keyed "TYPE:REGIME" e.g. "MOMENTUM_SHIFT:STRESS"

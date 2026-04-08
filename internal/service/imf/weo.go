@@ -28,9 +28,9 @@ var log = logger.Component("imf") //nolint:gochecknoglobals
 
 // IMF DataMapper indicator codes relevant to FX analysis.
 const (
-	indicatorGDPGrowth      = "NGDP_RPCH"    // Real GDP growth (%)
-	indicatorCPIInflation   = "PCPIPCH"       // CPI Inflation (%)
-	indicatorCurrentAccount = "BCA_NGDPDP"    // Current Account Balance (% of GDP)
+	indicatorGDPGrowth      = "NGDP_RPCH"  // Real GDP growth (%)
+	indicatorCPIInflation   = "PCPIPCH"    // CPI Inflation (%)
+	indicatorCurrentAccount = "BCA_NGDPDP" // Current Account Balance (% of GDP)
 )
 
 const baseURL = "https://www.imf.org/external/datamapper/api/v1"
@@ -71,9 +71,9 @@ type IMFWEOData struct {
 
 // package-level cache, protected by cacheMu.
 var (
-	globalCache *IMFWEOData    //nolint:gochecknoglobals
-	cacheMu     sync.RWMutex   //nolint:gochecknoglobals
-	cacheTTL    = 24 * time.Hour //nolint:gochecknoglobals
+	globalCache *IMFWEOData                                                //nolint:gochecknoglobals
+	cacheMu     sync.RWMutex                                               //nolint:gochecknoglobals
+	cacheTTL    = 24 * time.Hour                                           //nolint:gochecknoglobals
 	httpClient  = httpclient.New(httpclient.WithTimeout(20 * time.Second)) //nolint:gochecknoglobals
 )
 

@@ -14,10 +14,10 @@ type CorrelationPair struct {
 
 // CorrelationMatrix holds the full NxN correlation matrix.
 type CorrelationMatrix struct {
-	Currencies []string                       `json:"currencies"`
-	Matrix     map[string]map[string]float64  `json:"matrix"`    // [A][B] = r
-	Period     int                            `json:"period"`    // Rolling window
-	Breakdowns []CorrelationBreakdown         `json:"breakdowns,omitempty"`
+	Currencies []string                      `json:"currencies"`
+	Matrix     map[string]map[string]float64 `json:"matrix"` // [A][B] = r
+	Period     int                           `json:"period"` // Rolling window
+	Breakdowns []CorrelationBreakdown        `json:"breakdowns,omitempty"`
 }
 
 // CorrelationBreakdown flags when a historically correlated pair diverges.
@@ -26,8 +26,8 @@ type CorrelationBreakdown struct {
 	CurrencyB      string  `json:"currency_b"`
 	CurrentCorr    float64 `json:"current_corr"`    // Recent 20-day
 	HistoricalCorr float64 `json:"historical_corr"` // 60-day baseline
-	Delta          float64 `json:"delta"`            // Current - Historical
-	Severity       string  `json:"severity"`         // "HIGH", "MEDIUM", "LOW"
+	Delta          float64 `json:"delta"`           // Current - Historical
+	Severity       string  `json:"severity"`        // "HIGH", "MEDIUM", "LOW"
 }
 
 // CorrelationCluster groups highly correlated currencies.

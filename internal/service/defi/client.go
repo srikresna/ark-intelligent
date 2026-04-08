@@ -14,18 +14,18 @@ import (
 )
 
 const (
-	protocolsURL    = "https://api.llama.fi/v2/protocols"
-	chainsURL       = "https://api.llama.fi/v2/chains"
-	dexOverviewURL  = "https://api.llama.fi/overview/dexs"
-	stablecoinsURL  = "https://stablecoins.llama.fi/stablecoins"
-	clientTimeout   = 20 * time.Second
-	cacheTTL        = 4 * time.Hour
+	protocolsURL   = "https://api.llama.fi/v2/protocols"
+	chainsURL      = "https://api.llama.fi/v2/chains"
+	dexOverviewURL = "https://api.llama.fi/overview/dexs"
+	stablecoinsURL = "https://stablecoins.llama.fi/stablecoins"
+	clientTimeout  = 20 * time.Second
+	cacheTTL       = 4 * time.Hour
 )
 
 var (
-	globalReport *DeFiReport    //nolint:gochecknoglobals
-	cacheMu      sync.RWMutex  //nolint:gochecknoglobals
-	client       = httpclient.NewClient(clientTimeout) //nolint:gochecknoglobals
+	globalReport *DeFiReport                                    //nolint:gochecknoglobals
+	cacheMu      sync.RWMutex                                   //nolint:gochecknoglobals
+	client       = httpclient.NewClient(clientTimeout)          //nolint:gochecknoglobals
 	dlog         = log.With().Str("component", "defi").Logger() //nolint:gochecknoglobals
 )
 
@@ -132,14 +132,14 @@ func fetchAll(ctx context.Context) *DeFiReport {
 
 // llamaProtocol matches the DefiLlama /v2/protocols response shape.
 type llamaProtocol struct {
-	Name     string  `json:"name"`
-	Symbol   string  `json:"symbol"`
-	TVL      float64 `json:"tvl"`
-	Change1H float64 `json:"change_1h"`
-	Change1D float64 `json:"change_1d"`
-	Change7D float64 `json:"change_7d"`
-	Chain    string  `json:"chain"`
-	Category string  `json:"category"`
+	Name     string   `json:"name"`
+	Symbol   string   `json:"symbol"`
+	TVL      float64  `json:"tvl"`
+	Change1H float64  `json:"change_1h"`
+	Change1D float64  `json:"change_1d"`
+	Change7D float64  `json:"change_7d"`
+	Chain    string   `json:"chain"`
+	Category string   `json:"category"`
 	Chains   []string `json:"chains"`
 }
 
@@ -212,11 +212,11 @@ func fetchProtocolsTVL(ctx context.Context) ([]ProtocolTVL, []ChainTVL, error) {
 
 // llamaDEXOverview matches the DefiLlama /overview/dexs response.
 type llamaDEXOverview struct {
-	TotalDataChart       []any `json:"totalDataChart"`
-	Total24h             float64 `json:"total24h"`
-	Total48hto24h        float64 `json:"total48hto24h"`
-	TotalDataChartBreakdown []any `json:"totalDataChartBreakdown"`
-	Protocols            []llamaDEXProtocol `json:"protocols"`
+	TotalDataChart          []any              `json:"totalDataChart"`
+	Total24h                float64            `json:"total24h"`
+	Total48hto24h           float64            `json:"total48hto24h"`
+	TotalDataChartBreakdown []any              `json:"totalDataChartBreakdown"`
+	Protocols               []llamaDEXProtocol `json:"protocols"`
 }
 
 type llamaDEXProtocol struct {
@@ -271,12 +271,12 @@ type llamaStablecoinsResp struct {
 }
 
 type llamaStablecoin struct {
-	Name     string `json:"name"`
-	Symbol   string `json:"symbol"`
+	Name       string                        `json:"name"`
+	Symbol     string                        `json:"symbol"`
 	CircSupply map[string]map[string]float64 `json:"chainCirculating"`
-	Chains   []string `json:"chains"`
-	PegType  string `json:"pegType"`
-	Price    float64 `json:"price"`
+	Chains     []string                      `json:"chains"`
+	PegType    string                        `json:"pegType"`
+	Price      float64                       `json:"price"`
 }
 
 func fetchStablecoins(ctx context.Context) ([]StablecoinData, float64, float64, error) {

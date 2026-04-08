@@ -2,14 +2,13 @@ package telegram
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"sort"
+	"strings"
 )
-
 
 // regimeAdvisory returns a short advisory note based on the macro regime.
 func regimeAdvisory(regimeName string) string {

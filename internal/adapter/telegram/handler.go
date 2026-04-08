@@ -226,39 +226,39 @@ func NewHandler(d HandlerDeps) *Handler {
 	d.Bot.RegisterCommand("/rank", h.cmdRank)
 	d.Bot.RegisterCommand("/macro", h.cmdMacro)
 	d.Bot.RegisterCommand("/ecb", h.cmdECB)           // ECB monetary policy dashboard (SDW)
-	d.Bot.RegisterCommand("/leading", h.cmdLeading)    // OECD Composite Leading Indicators
-	d.Bot.RegisterCommand("/eurostat", h.cmdEurostat)  // EU economy dashboard (Eurostat)
-	d.Bot.RegisterCommand("/eu", h.cmdEurostat)        // EU economy alias
+	d.Bot.RegisterCommand("/leading", h.cmdLeading)   // OECD Composite Leading Indicators
+	d.Bot.RegisterCommand("/eurostat", h.cmdEurostat) // EU economy dashboard (Eurostat)
+	d.Bot.RegisterCommand("/eu", h.cmdEurostat)       // EU economy alias
 	d.Bot.RegisterCommand("/snb", h.cmdSNB)           // SNB balance sheet / FX intervention proxy
-	d.Bot.RegisterCommand("/swaps", h.cmdSwaps)        // DTCC FX swap institutional flows
-	d.Bot.RegisterCommand("/tedge", h.cmdTEdge)        // TradingEconomics global macro dashboard
-	d.Bot.RegisterCommand("/globalm", h.cmdTEdge)      // alias for /tedge
+	d.Bot.RegisterCommand("/swaps", h.cmdSwaps)       // DTCC FX swap institutional flows
+	d.Bot.RegisterCommand("/tedge", h.cmdTEdge)       // TradingEconomics global macro dashboard
+	d.Bot.RegisterCommand("/globalm", h.cmdTEdge)     // alias for /tedge
 	d.Bot.RegisterCommand("/bias", h.cmdBias)
 	d.Bot.RegisterCommand("/backtest", h.cmdBacktest)
 	d.Bot.RegisterCommand("/accuracy", h.cmdAccuracy)
 	d.Bot.RegisterCommand("/report", h.cmdReport)
 	d.Bot.RegisterCommand("/impact", h.cmdImpact)
 	d.Bot.RegisterCommand("/sentiment", h.cmdSentiment)
-	d.Bot.RegisterCommand("/vix", h.cmdVix)                // CBOE volatility index dashboard (VIX + vol suite)
+	d.Bot.RegisterCommand("/vix", h.cmdVix) // CBOE volatility index dashboard (VIX + vol suite)
 	d.Bot.RegisterCommand("/seasonal", h.cmdSeasonal)
 	d.Bot.RegisterCommand("/price", h.cmdPrice)             // Daily price context
 	d.Bot.RegisterCommand("/levels", h.cmdLevels)           // Support/resistance levels + position sizing
 	d.Bot.RegisterCommand("/intermarket", h.cmdIntermarket) // Intermarket correlation signals
 	d.Bot.RegisterCommand("/flows", h.cmdFlows)             // Cross-asset flow divergence detection
-	d.Bot.RegisterCommand("/treasury", h.cmdTreasury)     // US Treasury auction results
-	d.Bot.RegisterCommand("/13f", h.cmdSEC)             // SEC EDGAR 13F institutional holdings
-	d.Bot.RegisterCommand("/signal", h.cmdSignal)         // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
-	d.Bot.RegisterCommand("/setalert", h.cmdSetAlert)  // Per-pair COT alert management
-	d.Bot.RegisterCommand("/onchain", h.cmdOnChain)    // On-chain exchange flow metrics (CoinMetrics)
-	d.Bot.RegisterCommand("/defi", h.cmdDeFi)          // DeFi health dashboard (DefiLlama)
-	d.Bot.RegisterCommand("/carry", h.cmdCarry)         // Carry trade monitor & unwind detector
-	d.Bot.RegisterCommand("/bis", h.cmdBIS)            // BIS Statistics: CB policy rates + credit gaps + REER
-	d.Bot.RegisterCommand("/cbrates", h.cmdBIS)        // Central bank policy rates (alias for /bis)
-	d.Bot.RegisterCommand("/orderflow", h.cmdOrderFlow)   // Estimated delta & order flow analysis
-	d.Bot.RegisterCommand("/market", h.cmdMarket)      // Cross-asset market overview (Finviz via Firecrawl)
-	d.Bot.RegisterCommand("/session", h.cmdSession)       // Trading session behavior analysis (London/NY/Tokyo)
-	d.Bot.RegisterCommand("/scenario", h.cmdScenario)    // Monte Carlo price scenario generator
-	d.Bot.RegisterCommand("/regime", h.cmdRegime)        // Multi-asset regime dashboard (HMM states)
+	d.Bot.RegisterCommand("/treasury", h.cmdTreasury)       // US Treasury auction results
+	d.Bot.RegisterCommand("/13f", h.cmdSEC)                 // SEC EDGAR 13F institutional holdings
+	d.Bot.RegisterCommand("/signal", h.cmdSignal)           // Unified directional signal (COT+CTA+Quant+Sentiment+Seasonal)
+	d.Bot.RegisterCommand("/setalert", h.cmdSetAlert)       // Per-pair COT alert management
+	d.Bot.RegisterCommand("/onchain", h.cmdOnChain)         // On-chain exchange flow metrics (CoinMetrics)
+	d.Bot.RegisterCommand("/defi", h.cmdDeFi)               // DeFi health dashboard (DefiLlama)
+	d.Bot.RegisterCommand("/carry", h.cmdCarry)             // Carry trade monitor & unwind detector
+	d.Bot.RegisterCommand("/bis", h.cmdBIS)                 // BIS Statistics: CB policy rates + credit gaps + REER
+	d.Bot.RegisterCommand("/cbrates", h.cmdBIS)             // Central bank policy rates (alias for /bis)
+	d.Bot.RegisterCommand("/orderflow", h.cmdOrderFlow)     // Estimated delta & order flow analysis
+	d.Bot.RegisterCommand("/market", h.cmdMarket)           // Cross-asset market overview (Finviz via Firecrawl)
+	d.Bot.RegisterCommand("/session", h.cmdSession)         // Trading session behavior analysis (London/NY/Tokyo)
+	d.Bot.RegisterCommand("/scenario", h.cmdScenario)       // Monte Carlo price scenario generator
+	d.Bot.RegisterCommand("/regime", h.cmdRegime)           // Multi-asset regime dashboard (HMM states)
 
 	// Membership & upgrade info
 	d.Bot.RegisterCommand("/membership", h.cmdMembership)
@@ -298,11 +298,11 @@ func NewHandler(d HandlerDeps) *Handler {
 
 	// Multi-word command+arg aliases for power users (TASK-203)
 	// These combine command + default argument for the most common workflows.
-	d.Bot.RegisterCommand("/ce", h.cmdCOT)            // /ce EUR = /cot EUR
-	d.Bot.RegisterCommand("/ca", h.cmdCTA)             // /ca EUR = /cta EUR
-	d.Bot.RegisterCommand("/qe", h.cmdQuant)           // /qe EUR = /quant EUR
-	d.Bot.RegisterCommand("/bta", h.cmdBacktestAll)    // /bta    = /backtest all
-	d.Bot.RegisterCommand("/of", h.cmdOutlookFRED)     // /of     = /outlook fred
+	d.Bot.RegisterCommand("/ce", h.cmdCOT)          // /ce EUR = /cot EUR
+	d.Bot.RegisterCommand("/ca", h.cmdCTA)          // /ca EUR = /cta EUR
+	d.Bot.RegisterCommand("/qe", h.cmdQuant)        // /qe EUR = /quant EUR
+	d.Bot.RegisterCommand("/bta", h.cmdBacktestAll) // /bta    = /backtest all
+	d.Bot.RegisterCommand("/of", h.cmdOutlookFRED)  // /of     = /outlook fred
 
 	// Register callback handlers
 	d.Bot.RegisterCallback("cot:", h.cbCOTDetail)
@@ -332,6 +332,7 @@ func NewHandler(d HandlerDeps) *Handler {
 	log.Info().Int("commands", 52).Int("callbacks", 12).Msg("registered commands and callback prefixes")
 	return h
 }
+
 // ---------------------------------------------------------------------------
 // AI cooldown helper
 // ---------------------------------------------------------------------------
@@ -407,6 +408,7 @@ func currencyToContractCode(currency string) string {
 	}
 	return currency // Return as-is if not mapped
 }
+
 // cbShare handles "share:<type>:<key>" callbacks.
 // Generates a plain-text, copy-paste friendly version of the analysis
 // and sends it wrapped in <code> tags for easy copying in Telegram.

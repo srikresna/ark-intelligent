@@ -55,9 +55,9 @@ type apiTopVolCoin struct {
 		FullName string `json:"FullName"`
 	} `json:"CoinInfo"`
 	RAW map[string]struct {
-		VOLUME24HOURTO   float64 `json:"VOLUME24HOURTO"`
-		CHANGEPCT24HOUR  float64 `json:"CHANGEPCT24HOUR"`
-		PRICE            float64 `json:"PRICE"`
+		VOLUME24HOURTO  float64 `json:"VOLUME24HOURTO"`
+		CHANGEPCT24HOUR float64 `json:"CHANGEPCT24HOUR"`
+		PRICE           float64 `json:"PRICE"`
 	} `json:"RAW"`
 }
 

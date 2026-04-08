@@ -48,10 +48,10 @@ type OrderBlock struct {
 
 // LiquidityLevel represents a cluster of equal highs or equal lows.
 type LiquidityLevel struct {
-	Price  float64
-	Type   string // "BUY_SIDE" (equal highs) or "SELL_SIDE" (equal lows)
-	Swept  bool   // price broke briefly then closed back inside
-	Count  int    // number of pivots clustered at this level
+	Price float64
+	Type  string // "BUY_SIDE" (equal highs) or "SELL_SIDE" (equal lows)
+	Swept bool   // price broke briefly then closed back inside
+	Count int    // number of pivots clustered at this level
 }
 
 // ---------------------------------------------------------------------------

@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	blockchainChartsURL = "https://api.blockchain.info/charts"
-	blockchainStatsURL  = "https://api.blockchain.info/stats"
-	blockchainTimeout   = 15 * time.Second
-	blockchainCacheTTL  = 4 * time.Hour
+	blockchainChartsURL   = "https://api.blockchain.info/charts"
+	blockchainStatsURL    = "https://api.blockchain.info/stats"
+	blockchainTimeout     = 15 * time.Second
+	blockchainCacheTTL    = 4 * time.Hour
 	mempoolCongestedBytes = 100 * 1024 * 1024 // 100 MB
 )
 
 var (
-	bcGlobalHealth *BTCNetworkHealth  //nolint:gochecknoglobals
-	bcCacheMu      sync.RWMutex      //nolint:gochecknoglobals
+	bcGlobalHealth *BTCNetworkHealth                         //nolint:gochecknoglobals
+	bcCacheMu      sync.RWMutex                              //nolint:gochecknoglobals
 	bcClient       = httpclient.NewClient(blockchainTimeout) //nolint:gochecknoglobals
 )
 

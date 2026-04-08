@@ -130,12 +130,12 @@ func FREDRegimeMultiplier(currency string, regime fred.MacroRegime) float64 {
 	}
 
 	matrix := map[string]row{
-		"INFLATIONARY":   {+15, -10, -10, +5},
+		"INFLATIONARY":    {+15, -10, -10, +5},
 		"DISINFLATIONARY": {-5, +10, +10, 0},
-		"STRESS":         {-10, 0, -20, +20},
-		"RECESSION":      {-15, 0, -20, +20},
-		"STAGFLATION":    {0, -5, -15, +15},
-		"GOLDILOCKS":     {-5, +5, +15, -5},
+		"STRESS":          {-10, 0, -20, +20},
+		"RECESSION":       {-15, 0, -20, +20},
+		"STAGFLATION":     {0, -5, -15, +15},
+		"GOLDILOCKS":      {-5, +5, +15, -5},
 	}
 
 	r, ok := matrix[regime.Name]

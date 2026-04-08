@@ -7,18 +7,18 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
-	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
-	"github.com/arkcode369/ark-intelligent/internal/service/imf"
-	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
-	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/internal/service/fed"
+	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
-	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
-	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
+	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -33,7 +33,7 @@ type UnifiedOutlookData struct {
 	MacroComposites    *domain.MacroComposites
 	PriceContexts      map[string]*domain.PriceContext
 	DailyPriceContexts map[string]*domain.DailyPriceContext
-	RiskContext         *domain.RiskContext
+	RiskContext        *domain.RiskContext
 	SentimentData      *sentiment.SentimentData
 	SeasonalData       map[string]*pricesvc.SeasonalPattern
 	BacktestStats      *domain.BacktestStats
@@ -44,24 +44,24 @@ type UnifiedOutlookData struct {
 	IMFData            *imf.IMFWEOData
 	FedWatchData       *fed.FedWatchData
 	EurostatData       *macro.EurostatData
-	FedSpeeches        *fred.FedSpeechData  // Recent Fed speeches (scraper via Firecrawl)
+	FedSpeeches        *fred.FedSpeechData // Recent Fed speeches (scraper via Firecrawl)
 	// ICTContexts holds ICT/SMC structure analysis for major symbols (H4 timeframe).
 	// Key = symbol (e.g. "EURUSD"), Value = ICTResult. May be nil if ICT not configured.
-	ICTContexts        map[string]*ictsvc.ICTResult
+	ICTContexts map[string]*ictsvc.ICTResult
 	// GEXResults holds Gamma Exposure analysis for crypto assets (Deribit options data).
 	// Key = symbol (e.g. "BTC", "ETH"), Value = GEXResult. May be nil if GEX not configured.
-	GEXResults         map[string]*gexsvc.GEXResult
+	GEXResults map[string]*gexsvc.GEXResult
 	// WyckoffContexts holds Wyckoff structure analysis for major symbols (Daily timeframe).
 	// Only includes results with Confidence != "LOW".
 	// Key = symbol (e.g. "EURUSD"), Value = WyckoffResult.
-	WyckoffContexts    map[string]*wyckoffsvc.WyckoffResult
+	WyckoffContexts map[string]*wyckoffsvc.WyckoffResult
 	// MicrostructureData holds Bybit orderbook/flow microstructure signals for crypto.
 	// Typically BTC and ETH. May be nil if alpha services not configured.
 	MicrostructureData []*microstructure.Signal
 	// EIAData holds EIA weekly energy inventory data (crude, gasoline, distillate).
 	// May be nil if EIA_API_KEY is not configured.
-	EIAData            *pricesvc.EIASeasonalData
-	Language           string
+	EIAData  *pricesvc.EIASeasonalData
+	Language string
 }
 
 // buildEIASummary returns a one-line EIA crude oil inventory summary with 4-week trend.
@@ -559,7 +559,6 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString("\n")
 		}
 	}
-
 
 	// -----------------------------------------------------------------------
 	// Section: IMF WEO Forecasts (Forward-Looking)

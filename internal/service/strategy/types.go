@@ -15,15 +15,15 @@ type PlaybookEntry struct {
 	Currency     string
 	Name         string
 
-	Direction   Direction // LONG, SHORT, FLAT
-	Conviction  float64   // 0.0 to 1.0 (1.0 = highest confidence)
-	ConvLevel   ConvictionLevel
+	Direction  Direction // LONG, SHORT, FLAT
+	Conviction float64   // 0.0 to 1.0 (1.0 = highest confidence)
+	ConvLevel  ConvictionLevel
 
 	// Supporting evidence
-	FactorScore   float64 // composite factor score [-1, +1]
-	COTBias       string  // "BULLISH", "BEARISH", "NEUTRAL"
-	RegimeFit     string  // how well trade fits macro regime
-	RateDiffBps   float64 // carry in bps
+	FactorScore float64 // composite factor score [-1, +1]
+	COTBias     string  // "BULLISH", "BEARISH", "NEUTRAL"
+	RegimeFit   string  // how well trade fits macro regime
+	RateDiffBps float64 // carry in bps
 
 	// Risk info
 	VolatilityRegime string // "EXPANDING", "CONTRACTING", "NORMAL"
@@ -46,10 +46,10 @@ const (
 type ConvictionLevel string
 
 const (
-	ConvictionHigh     ConvictionLevel = "HIGH"
-	ConvictionMedium   ConvictionLevel = "MEDIUM"
-	ConvictionLow      ConvictionLevel = "LOW"
-	ConvictionAvoid    ConvictionLevel = "AVOID"
+	ConvictionHigh   ConvictionLevel = "HIGH"
+	ConvictionMedium ConvictionLevel = "MEDIUM"
+	ConvictionLow    ConvictionLevel = "LOW"
+	ConvictionAvoid  ConvictionLevel = "AVOID"
 )
 
 // ConvictionToLevel maps float conviction to a label.
@@ -126,11 +126,11 @@ type TransitionWarning struct {
 
 // PlaybookResult is the full output from the Strategy Engine.
 type PlaybookResult struct {
-	Playbook   []PlaybookEntry
-	Heat       PortfolioHeat
-	Transition TransitionWarning
+	Playbook    []PlaybookEntry
+	Heat        PortfolioHeat
+	Transition  TransitionWarning
 	MacroRegime string // current FRED macro regime
-	ComputedAt time.Time
+	ComputedAt  time.Time
 }
 
 // TopLong returns the top n long ideas sorted by conviction.

@@ -61,14 +61,14 @@ func computeTrend(latest, previous, threshold float64) SeriesTrend {
 // MacroData holds the latest values for all tracked FRED series.
 type MacroData struct {
 	// Yield curve
-	Yield2Y         float64     // DGS2  — 2-Year Treasury Constant Maturity Rate
-	Yield5Y         float64     // DGS5  — 5-Year Treasury Constant Maturity Rate
-	Yield10Y        float64     // DGS10 — 10-Year Treasury Constant Maturity Rate
-	Yield30Y        float64     // DGS30 — 30-Year Treasury Constant Maturity Rate
-	Yield3M         float64     // DGS3MO — 3-Month Treasury (for 3M-10Y spread)
-	YieldSpread     float64     // DGS10 - DGS2 (positive = normal, negative = inverted)
-	Spread3M10Y     float64     // DGS10 - DGS3MO (better recession predictor)
-	Spread2Y30Y     float64     // DGS30 - DGS2 (long-end term premium)
+	Yield2Y          float64     // DGS2  — 2-Year Treasury Constant Maturity Rate
+	Yield5Y          float64     // DGS5  — 5-Year Treasury Constant Maturity Rate
+	Yield10Y         float64     // DGS10 — 10-Year Treasury Constant Maturity Rate
+	Yield30Y         float64     // DGS30 — 30-Year Treasury Constant Maturity Rate
+	Yield3M          float64     // DGS3MO — 3-Month Treasury (for 3M-10Y spread)
+	YieldSpread      float64     // DGS10 - DGS2 (positive = normal, negative = inverted)
+	Spread3M10Y      float64     // DGS10 - DGS3MO (better recession predictor)
+	Spread2Y30Y      float64     // DGS30 - DGS2 (long-end term premium)
 	YieldSpreadTrend SeriesTrend // trend: is spread steepening or flattening?
 
 	// Inflation
@@ -79,8 +79,8 @@ type MacroData struct {
 	CPITrend     SeriesTrend
 
 	// Financial stress & liquidity
-	NFCI      float64     // NFCI — National Financial Conditions Index (negative = loose)
-	TedSpread float64     // BAMLH0A0HYM2 — ICE BofA HY OAS (credit stress proxy, %)
+	NFCI      float64 // NFCI — National Financial Conditions Index (negative = loose)
+	TedSpread float64 // BAMLH0A0HYM2 — ICE BofA HY OAS (credit stress proxy, %)
 	NFCITrend SeriesTrend
 
 	// Short-term rates & liquidity
@@ -93,8 +93,8 @@ type MacroData struct {
 	ClaimsTrend   SeriesTrend // trend: claims rising or falling?
 
 	// Monetary policy
-	FedFundsRate float64 // FEDFUNDS — Effective Federal Funds Rate (%)
-	M2Growth     float64 // M2SL — computed YoY growth % (NOT level)
+	FedFundsRate  float64 // FEDFUNDS — Effective Federal Funds Rate (%)
+	M2Growth      float64 // M2SL — computed YoY growth % (NOT level)
 	M2GrowthTrend SeriesTrend
 
 	// Fed Dot Plot (Summary of Economic Projections)
@@ -125,23 +125,23 @@ type MacroData struct {
 	VIXTrend SeriesTrend // trend: VIX rising or falling?
 
 	// Wage growth — sticky inflation indicator
-	WageGrowth     float64     // AHETPI — Average Hourly Earnings YoY%
+	WageGrowth      float64 // AHETPI — Average Hourly Earnings YoY%
 	WageGrowthTrend SeriesTrend
 
 	// Forward inflation expectations
 	ForwardInflation float64 // T5YIFR — 5Y5Y Forward Inflation Expectation Rate
 
 	// ISM New Orders — leading growth indicator
-	ISMNewOrders     float64     // NAPMNOI — ISM Manufacturing New Orders Index
+	ISMNewOrders      float64 // NAPMNOI — ISM Manufacturing New Orders Index
 	ISMNewOrdersTrend SeriesTrend
 
 	// Nonfarm Payrolls — labor breadth
-	NFP       float64     // PAYEMS — Nonfarm Payrolls (level, thousands)
-	NFPChange float64     // MoM change (thousands)
+	NFP       float64 // PAYEMS — Nonfarm Payrolls (level, thousands)
+	NFPChange float64 // MoM change (thousands)
 	NFPTrend  SeriesTrend
 
 	// Consumer Sentiment — leading growth proxy
-	ConsumerSentiment     float64     // UMCSENT — UMich Consumer Sentiment
+	ConsumerSentiment      float64 // UMCSENT — UMich Consumer Sentiment
 	ConsumerSentimentTrend SeriesTrend
 
 	// Sentiment surveys (populated separately via sentiment package)
@@ -149,89 +149,89 @@ type MacroData struct {
 	AAIIBullBear float64 // Bull/Bear ratio (>1 = bullish sentiment)
 
 	// --- Extended Labor Market ---
-	JOLTSOpenings      float64     // JTSJOL — JOLTS Job Openings (thousands)
-	JOLTSOpeningsTrend SeriesTrend
-	JOLTSQuitRate      float64     // JTSQUR — JOLTS Quit Rate (%)
-	JOLTSQuitRateTrend SeriesTrend
-	JOLTSHiringRate      float64     // JTSHIR — JOLTS Hiring Rate (%)
-	JOLTSHiringRateTrend SeriesTrend
-	ContinuingClaims      float64     // CCSA — Continuing Claims
+	JOLTSOpenings         float64 // JTSJOL — JOLTS Job Openings (thousands)
+	JOLTSOpeningsTrend    SeriesTrend
+	JOLTSQuitRate         float64 // JTSQUR — JOLTS Quit Rate (%)
+	JOLTSQuitRateTrend    SeriesTrend
+	JOLTSHiringRate       float64 // JTSHIR — JOLTS Hiring Rate (%)
+	JOLTSHiringRateTrend  SeriesTrend
+	ContinuingClaims      float64 // CCSA — Continuing Claims
 	ContinuingClaimsTrend SeriesTrend
-	U6Unemployment     float64     // LNS13025703 — U-6 Unemployment Rate (%)
-	EmpPopRatio        float64     // EMRATIO — Employment-Population Ratio (%)
+	U6Unemployment        float64 // LNS13025703 — U-6 Unemployment Rate (%)
+	EmpPopRatio           float64 // EMRATIO — Employment-Population Ratio (%)
 	AvgHourlyEarningsPriv float64 // CES0500000003 — Avg Hourly Earnings All Private ($/hr)
 	AvgHourlyEarningsYoY  float64 // CEU0500000008 — Avg Hourly Earnings YoY (%)
 
 	// --- Extended Inflation ---
-	MedianCPI          float64     // MEDCPIM158SFRBCLE — Cleveland Fed Median CPI (%)
-	MedianCPITrend     SeriesTrend
-	StickyCPI          float64     // CORESTICKM159SFRBATL — Atlanta Fed Sticky CPI (%)
-	StickyCPITrend     SeriesTrend
-	PPICommodities     float64     // PPIACO — PPI All Commodities (YoY%)
+	MedianCPI           float64 // MEDCPIM158SFRBCLE — Cleveland Fed Median CPI (%)
+	MedianCPITrend      SeriesTrend
+	StickyCPI           float64 // CORESTICKM159SFRBATL — Atlanta Fed Sticky CPI (%)
+	StickyCPITrend      SeriesTrend
+	PPICommodities      float64 // PPIACO — PPI All Commodities (YoY%)
 	PPICommoditiesTrend SeriesTrend
-	MichInflExp1Y      float64     // MICH — Michigan Inflation Expectations 1Y (%)
-	ClevelandInfExp1Y  float64     // EXPINF1YR — Cleveland Fed Expected Inflation 1Y (%)
-	ClevelandInfExp10Y float64     // EXPINF10YR — Cleveland Fed Expected Inflation 10Y (%)
-	CoreCPINSA    float64 // CUUR0000SA0L1E — CPI Less Food & Energy (NSA)
-	PPIFinished   float64 // WPSFD4131 — PPI Finished Goods Less Food & Energy (YoY%)
-	PPIFinishedTrend SeriesTrend
+	MichInflExp1Y       float64 // MICH — Michigan Inflation Expectations 1Y (%)
+	ClevelandInfExp1Y   float64 // EXPINF1YR — Cleveland Fed Expected Inflation 1Y (%)
+	ClevelandInfExp10Y  float64 // EXPINF10YR — Cleveland Fed Expected Inflation 10Y (%)
+	CoreCPINSA          float64 // CUUR0000SA0L1E — CPI Less Food & Energy (NSA)
+	PPIFinished         float64 // WPSFD4131 — PPI Finished Goods Less Food & Energy (YoY%)
+	PPIFinishedTrend    SeriesTrend
 
 	// --- Extended Yield Curve ---
-	Yield1Y     float64 // DGS1 — 1-Year Treasury
-	Yield7Y     float64 // DGS7 — 7-Year Treasury
-	Yield20Y    float64 // DGS20 — 20-Year Treasury
+	Yield1Y      float64 // DGS1 — 1-Year Treasury
+	Yield7Y      float64 // DGS7 — 7-Year Treasury
+	Yield20Y     float64 // DGS20 — 20-Year Treasury
 	RealYield10Y float64 // DFII10 — 10Y TIPS Real Yield (%)
 	RealYield5Y  float64 // DFII5 — 5Y TIPS Real Yield (%)
 	Spread10Y2Y  float64 // T10Y2Y — pre-computed by FRED
 	Spread10Y3M  float64 // T10Y3M — pre-computed by FRED
 
 	// --- Credit & Financial Conditions ---
-	BBBSpread         float64     // BAMLC0A4CBBB — BBB Corporate Spread (%)
-	AAASpread         float64     // BAMLC0A1CAAA — AAA Corporate Spread (%)
-	StLouisStress     float64     // STLFSI4 — St. Louis Financial Stress Index
+	BBBSpread          float64 // BAMLC0A4CBBB — BBB Corporate Spread (%)
+	AAASpread          float64 // BAMLC0A1CAAA — AAA Corporate Spread (%)
+	StLouisStress      float64 // STLFSI4 — St. Louis Financial Stress Index
 	StLouisStressTrend SeriesTrend
-	ReverseRepo       float64     // RRPONTSYD — Reverse Repo (billions)
-	TotalReserves     float64 // TOTRESNS — Total Reserves in Banking System (millions)
-	SeniorLoanSurvey  float64 // DRTSCILM — Fed Senior Loan Officer Survey C&I Tightening (%)
+	ReverseRepo        float64 // RRPONTSYD — Reverse Repo (billions)
+	TotalReserves      float64 // TOTRESNS — Total Reserves in Banking System (millions)
+	SeniorLoanSurvey   float64 // DRTSCILM — Fed Senior Loan Officer Survey C&I Tightening (%)
 
 	// --- Housing & Consumer ---
-	HousingStarts      float64     // HOUST — Housing Starts (thousands, ann.)
-	HousingStartsTrend SeriesTrend
-	BuildingPermits      float64     // PERMIT — Building Permits (thousands, ann.)
-	BuildingPermitsTrend SeriesTrend
-	CaseShillerHPI     float64     // CSUSHPINSA — Case-Shiller Home Price Index
-	MortgageRate30Y    float64     // MORTGAGE30US — 30Y Mortgage Rate (%)
-	RetailSalesExFood  float64     // RSXFS — Retail Sales Ex Food (YoY%)
-	SavingsRate        float64     // PSAVERT — Personal Savings Rate (%)
-	RealDisposableInc     float64     // DSPIC96 — Real Disposable Personal Income (billions)
+	HousingStarts          float64 // HOUST — Housing Starts (thousands, ann.)
+	HousingStartsTrend     SeriesTrend
+	BuildingPermits        float64 // PERMIT — Building Permits (thousands, ann.)
+	BuildingPermitsTrend   SeriesTrend
+	CaseShillerHPI         float64 // CSUSHPINSA — Case-Shiller Home Price Index
+	MortgageRate30Y        float64 // MORTGAGE30US — 30Y Mortgage Rate (%)
+	RetailSalesExFood      float64 // RSXFS — Retail Sales Ex Food (YoY%)
+	SavingsRate            float64 // PSAVERT — Personal Savings Rate (%)
+	RealDisposableInc      float64 // DSPIC96 — Real Disposable Personal Income (billions)
 	RealDisposableIncTrend SeriesTrend
 
 	// --- VIX Term Structure ---
 	VIX3M         float64 // VXVCLS — VIX3M (3-Month VIX)
 	VIXTermRatio  float64 // Computed: VIX / VIX3M
 	VIXTermRegime string  // BACKWARDATION, FLAT, CONTANGO
-	VIX6M          float64 // VXMTCLS — VIX6M (6-Month VIX)
-	VIX3M6MRatio   float64 // Computed: VIX3M / VIX6M (medium-term slope)
+	VIX6M         float64 // VXMTCLS — VIX6M (6-Month VIX)
+	VIX3M6MRatio  float64 // Computed: VIX3M / VIX6M (medium-term slope)
 
 	// --- Global Macro: Eurozone ---
-	EZ_CPI          float64 // CP0000EZ19M086NEST — Eurozone HICP (YoY%)
-	EZ_GDP          float64 // CLVMNACSCAB1GQEA19 — Eurozone Real GDP (QoQ%)
-	EZ_Unemployment float64 // LRHUTTTTEZM156S — Eurozone Unemployment (%)
-	EZ_Rate         float64 // IR3TIB01EZM156N — Eurozone 3M Interbank Rate (%)
-	EZ_10Y          float64 // IRLTLT01EZM156N — Eurozone 10Y Government Bond Yield (%)
-	EZ_BrentCrude   float64 // MCOILBRENTEU — Brent Crude Oil ($/barrel)
-	EZ_FinConditions float64 // EA19FCHI — Euro Area Financial Conditions Index
+	EZ_CPI                  float64 // CP0000EZ19M086NEST — Eurozone HICP (YoY%)
+	EZ_GDP                  float64 // CLVMNACSCAB1GQEA19 — Eurozone Real GDP (QoQ%)
+	EZ_Unemployment         float64 // LRHUTTTTEZM156S — Eurozone Unemployment (%)
+	EZ_Rate                 float64 // IR3TIB01EZM156N — Eurozone 3M Interbank Rate (%)
+	EZ_10Y                  float64 // IRLTLT01EZM156N — Eurozone 10Y Government Bond Yield (%)
+	EZ_BrentCrude           float64 // MCOILBRENTEU — Brent Crude Oil ($/barrel)
+	EZ_FinConditions        float64 // EA19FCHI — Euro Area Financial Conditions Index
 	GlobalPolicyUncertainty float64 // GEPUCURRENT — Global Economic Policy Uncertainty Index
 
 	// --- Global Macro: UK ---
-	UK_CPI          float64 // GBRCPIALLMINMEI — UK CPI (YoY%)
-	UK_Unemployment float64 // LRHUTTTTGBM156S — UK Unemployment (%)
+	UK_CPI            float64 // GBRCPIALLMINMEI — UK CPI (YoY%)
+	UK_Unemployment   float64 // LRHUTTTTGBM156S — UK Unemployment (%)
 	UK_IndustrialProd float64 // GBRPROINDMISMEI — UK Industrial Production (YoY%)
 
 	// --- Global Macro: Japan ---
-	JP_CPI          float64 // JPNCPIALLMINMEI — Japan CPI (YoY%)
-	JP_Unemployment float64 // LRHUTTTTJPM156S — Japan Unemployment (%)
-	JP_10Y          float64 // IRLTLT01JPM156N — Japan 10Y Bond Yield (%)
+	JP_CPI            float64 // JPNCPIALLMINMEI — Japan CPI (YoY%)
+	JP_Unemployment   float64 // LRHUTTTTJPM156S — Japan Unemployment (%)
+	JP_10Y            float64 // IRLTLT01JPM156N — Japan 10Y Bond Yield (%)
 	JP_IndustrialProd float64 // JPNPROINDMISMEI — Japan Industrial Production (YoY%)
 
 	// --- Global Macro: Australia ---
@@ -243,7 +243,7 @@ type MacroData struct {
 	CA_Unemployment float64 // LRHUTTTTCAM156S — Canada Unemployment (%)
 
 	// --- Global Macro: New Zealand ---
-	NZ_CPI          float64 // NZLCPIALLQINMEI — NZ CPI (QoQ%)
+	NZ_CPI float64 // NZLCPIALLQINMEI — NZ CPI (QoQ%)
 
 	// --- CBOE Put/Call (populated separately) ---
 	PutCallTotal  float64 // CBOE Total Put/Call Ratio
@@ -349,9 +349,9 @@ func FetchMacroData(ctx context.Context) (*MacroData, error) {
 		// Global - NZ (quarterly CPI — need 14 obs for yoy)
 		{"NZLCPIALLQINMEI", 14},
 		// NYSE Market Breadth
-		{"ADVN", 5},  // NYSE Advancing Issues (daily)
-		{"DECN", 5},  // NYSE Declining Issues (daily)
-		{"NHNL", 5},  // NYSE Net New Highs (weekly)
+		{"ADVN", 5}, // NYSE Advancing Issues (daily)
+		{"DECN", 5}, // NYSE Declining Issues (daily)
+		{"NHNL", 5}, // NYSE Net New Highs (weekly)
 	}
 
 	// Parallel fetch with semaphore

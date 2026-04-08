@@ -218,7 +218,7 @@ func TestClassifySchematic_VolumeAbsorption(t *testing.T) {
 
 func TestProjectedMove(t *testing.T) {
 	tr := [2]float64{1.0800, 1.1000} // 200-pip range
-	cause := 80.0                     // 80% cause score → multiplier 1.3
+	cause := 80.0                    // 80% cause score → multiplier 1.3
 	move := projectedMove(tr, cause)
 
 	rangeW := tr[1] - tr[0]

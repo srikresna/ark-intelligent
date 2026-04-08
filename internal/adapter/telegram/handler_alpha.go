@@ -10,9 +10,9 @@ package telegram
 //   /cryptoalpha — Bybit microstructure confirmation for top crypto signals
 
 import (
-	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"sort"
 	"strings"
@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/factors"
-	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/cryptocompare"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"

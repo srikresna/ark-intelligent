@@ -294,7 +294,7 @@ func TestEngine_ConvictionBoundedAtOne(t *testing.T) {
 	)
 	result := eng.Generate(strategy.Input{
 		Ranking:     ranking,
-		MacroRegime: "EXPANSION", // aligned → boost
+		MacroRegime: "EXPANSION",                            // aligned → boost
 		COTBias:     map[string]string{"099741": "BULLISH"}, // confirmed → further boost
 	})
 

@@ -2,9 +2,9 @@ package telegram
 
 import (
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"strconv"
 	"strings"
-	"github.com/arkcode369/ark-intelligent/internal/domain"
 )
 
 // <b>, <i>, <code>, <pre>, <a>, <s>, <u>, <tg-spoiler>
@@ -32,9 +32,10 @@ func parseNumeric(s string) *float64 {
 // CPI miss, trade deficit) show the correct color for the currency.
 //
 // impactDirection semantics (MQL5):
-//   0 = neutral/unknown  → fall back to raw numeric comparison
-//   1 = higher actual is bullish for the currency (e.g. NFP, GDP)
-//   2 = higher actual is bearish for the currency (e.g. Unemployment Claims, CPI when above target)
+//
+//	0 = neutral/unknown  → fall back to raw numeric comparison
+//	1 = higher actual is bullish for the currency (e.g. NFP, GDP)
+//	2 = higher actual is bearish for the currency (e.g. Unemployment Claims, CPI when above target)
 func directionArrow(actual, forecast string, impactDirection ...int) string {
 	if actual == "" || forecast == "" {
 		return "⚪ Pending"
@@ -159,7 +160,6 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 	return truncateMsg(b.String())
 }
 
-
 // FormatAlertManagement formats the alert management sub-menu display (TASK-202).
 func (f *Formatter) FormatAlertManagement(prefs domain.UserPrefs) string {
 	var b strings.Builder
@@ -236,18 +236,18 @@ func contractCodeToFriendly(code string) string {
 		string(domain.ContractSilver): "SILVER",
 		string(domain.ContractCopper): "COPPER",
 		string(domain.ContractOil):    "OIL",
-		"022651": "ULSD",
-		"111659": "RBOB",
-		"043602": "BOND10",
-		"020601": "BOND30",
-		"044601": "BOND5",
-		"042601": "BOND2",
-		"13874A": "SPX",
+		"022651":                      "ULSD",
+		"111659":                      "RBOB",
+		"043602":                      "BOND10",
+		"020601":                      "BOND30",
+		"044601":                      "BOND5",
+		"042601":                      "BOND2",
+		"13874A":                      "SPX",
 		string(domain.ContractNasdaq): "NDX",
-		"124601": "DJI",
-		"239742": "RUT",
+		"124601":                      "DJI",
+		"239742":                      "RUT",
 		string(domain.ContractBTC):    "BTC",
-		"146021": "ETH",
+		"146021":                      "ETH",
 	}
 	if friendly, ok := m[code]; ok {
 		return friendly

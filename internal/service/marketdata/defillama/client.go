@@ -39,8 +39,8 @@ type TVLSummary struct {
 
 // package-level cache (protected by cacheMu).
 var (
-	globalCache *TVLSummary    //nolint:gochecknoglobals
-	cacheMu     sync.RWMutex   //nolint:gochecknoglobals
+	globalCache *TVLSummary                         //nolint:gochecknoglobals
+	cacheMu     sync.RWMutex                        //nolint:gochecknoglobals
 	httpClient  = httpclient.NewClient(httpTimeout) //nolint:gochecknoglobals
 )
 

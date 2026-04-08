@@ -65,10 +65,10 @@ func (d *EurostatData) IsZero() bool {
 
 // eurostatResponse represents the Eurostat JSON-stat 2.0 response.
 type eurostatResponse struct {
-	Value     map[string]float64       `json:"value"`
-	Dimension map[string]eurostatDim   `json:"dimension"`
-	ID        []string                 `json:"id"`
-	Size      []int                    `json:"size"`
+	Value     map[string]float64     `json:"value"`
+	Dimension map[string]eurostatDim `json:"dimension"`
+	ID        []string               `json:"id"`
+	Size      []int                  `json:"size"`
 }
 
 type eurostatDim struct {

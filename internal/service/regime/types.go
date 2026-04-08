@@ -17,9 +17,9 @@ type RegimeOverlay struct {
 	Timeframe string `json:"timeframe"`
 
 	// Sub-model results
-	HMMState      string  `json:"hmm_state"`       // RISK_ON | RISK_OFF | CRISIS
-	HMMConfidence float64 `json:"hmm_confidence"`  // 0..1 — highest state probability
-	HMMScore      float64 `json:"hmm_score"`       // -100..+100 contribution
+	HMMState      string  `json:"hmm_state"`      // RISK_ON | RISK_OFF | CRISIS
+	HMMConfidence float64 `json:"hmm_confidence"` // 0..1 — highest state probability
+	HMMScore      float64 `json:"hmm_score"`      // -100..+100 contribution
 
 	GARCHVolRegime string  `json:"garch_vol_regime"` // EXPANDING | NORMAL | CONTRACTING
 	VolRatio       float64 `json:"vol_ratio"`        // current/long-run vol
@@ -40,13 +40,13 @@ type RegimeOverlay struct {
 	WeightCOT   float64 `json:"weight_cot"`
 
 	// Composite output
-	UnifiedScore float64 `json:"unified_score"`  // -100..+100
-	OverlayColor string  `json:"overlay_color"`  // 🟢 | 🟡 | 🔴
-	Label        string  `json:"label"`          // BULLISH | NEUTRAL | BEARISH | RISK-OFF | CRISIS
-	Description  string  `json:"description"`    // one-line human summary
+	UnifiedScore float64 `json:"unified_score"` // -100..+100
+	OverlayColor string  `json:"overlay_color"` // 🟢 | 🟡 | 🔴
+	Label        string  `json:"label"`         // BULLISH | NEUTRAL | BEARISH | RISK-OFF | CRISIS
+	Description  string  `json:"description"`   // one-line human summary
 
 	// Diagnostics
-	ModelsUsed []string  `json:"models_used"`  // which sub-models contributed
+	ModelsUsed []string  `json:"models_used"` // which sub-models contributed
 	ComputedAt time.Time `json:"computed_at"`
 }
 

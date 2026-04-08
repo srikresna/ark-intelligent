@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -36,7 +36,7 @@ type Message struct {
 	Chat            Chat        `json:"chat"`
 	From            *User       `json:"from,omitempty"`
 	Text            string      `json:"text"`
-	Caption         string      `json:"caption,omitempty"`           // Caption for media messages
+	Caption         string      `json:"caption,omitempty"` // Caption for media messages
 	Date            int64       `json:"date"`
 	MessageThreadID int         `json:"message_thread_id,omitempty"` // For groups with topics
 	Photo           []PhotoSize `json:"photo,omitempty"`             // Photo messages (multiple sizes)
@@ -115,7 +115,6 @@ type sentMessage struct {
 // ---------------------------------------------------------------------------
 // Bot — Core Telegram bot engine
 // ---------------------------------------------------------------------------
-
 
 // CommandHandler handles a specific bot command.
 type CommandHandler func(ctx context.Context, chatID string, userID int64, args string) error

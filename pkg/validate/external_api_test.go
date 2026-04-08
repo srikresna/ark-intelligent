@@ -118,10 +118,10 @@ type bybitResponse struct {
 	Result  struct {
 		Symbol string `json:"symbol" validate:"required"`
 		List   []struct {
-			Price  string `json:"price"`
-			Size   string `json:"size"`
-			Side   string `json:"side" validate:"required"`
-			Time   string `json:"time"`
+			Price string `json:"price"`
+			Size  string `json:"size"`
+			Side  string `json:"side" validate:"required"`
+			Time  string `json:"time"`
 		} `json:"list"`
 	} `json:"result"`
 }
@@ -144,11 +144,11 @@ func (r *bybitResponse) Validate() error {
 
 // mql5Event simulates MQL5 economic calendar event.
 type mql5Event struct {
-	ID          int    `json:"Id"`
-	EventName   string `json:"EventName" validate:"required"`
-	Importance  string `json:"Importance"`
+	ID           int    `json:"Id"`
+	EventName    string `json:"EventName" validate:"required"`
+	Importance   string `json:"Importance"`
 	CurrencyCode string `json:"CurrencyCode"`
-	FullDate    string `json:"FullDate" validate:"required"`
+	FullDate     string `json:"FullDate" validate:"required"`
 }
 
 // massiveResponse simulates Massive API response.
@@ -177,11 +177,11 @@ func (r *massiveResponse) Validate() error {
 
 // claudeResponse simulates Claude API response.
 type claudeResponse struct {
-	ID         string `json:"id" validate:"required"`
-	Type       string `json:"type" validate:"required"`
-	Model      string `json:"model" validate:"required"`
-	Role       string `json:"role" validate:"required"`
-	Content    []struct {
+	ID      string `json:"id" validate:"required"`
+	Type    string `json:"type" validate:"required"`
+	Model   string `json:"model" validate:"required"`
+	Role    string `json:"role" validate:"required"`
+	Content []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"content"`

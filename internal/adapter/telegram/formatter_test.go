@@ -438,9 +438,9 @@ func TestFormatPairName(t *testing.T) {
 		{"USD", "JPY", "USDJPY"},
 		{"USD", "CHF", "USDCHF"},
 		{"USD", "CAD", "USDCAD"},
-		{"USD", "EUR", "EURUSD"},   // reversed — USD quote
-		{"EUR", "GBP", "EURGBP"},   // cross pair
-		{"AUD", "NZD", "AUDNZD"},   // cross pair
+		{"USD", "EUR", "EURUSD"}, // reversed — USD quote
+		{"EUR", "GBP", "EURGBP"}, // cross pair
+		{"AUD", "NZD", "AUDNZD"}, // cross pair
 	}
 	for _, tt := range tests {
 		if got := formatPairName(tt.long, tt.short); got != tt.want {
@@ -702,8 +702,8 @@ func TestSignalConfluenceInterpretation(t *testing.T) {
 		spec, comm, rt string
 		wantContains   string
 	}{
-		{"BULLISH", "BULLISH", "DISAGGREGATED", ""},  // aligned
-		{"BULLISH", "BEARISH", "TFF", ""},              // divergent
+		{"BULLISH", "BULLISH", "DISAGGREGATED", ""},     // aligned
+		{"BULLISH", "BEARISH", "TFF", ""},               // divergent
 		{"STRONG_BULLISH", "STRONG_BULLISH", "TFF", ""}, // strong alignment
 	}
 	for _, tt := range tests {

@@ -54,9 +54,9 @@ func TestSafeDiv(t *testing.T) {
 
 func TestClampFloat(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		f, min, max float64
-		want       float64
+		want        float64
 	}{
 		{"within range", 5, 0, 10, 5},
 		{"below min", -1, 0, 10, 0},
@@ -79,9 +79,9 @@ func TestClampFloat(t *testing.T) {
 
 func TestSanitizeFloat(t *testing.T) {
 	tests := []struct {
-		name     string
-		f, fb    float64
-		want     float64
+		name  string
+		f, fb float64
+		want  float64
 	}{
 		{"normal", 42, 0, 42},
 		{"NaN", math.NaN(), -1, -1},

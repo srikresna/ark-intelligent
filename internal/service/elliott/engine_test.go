@@ -52,7 +52,7 @@ func syntheticWave5Bars(p0, p1, p2, p3, p4, p5 float64) []ta.OHLCV {
 
 func TestRule1_Wave2CannotRetraceOver100Pct(t *testing.T) {
 	waves := []Wave{
-		{Number: "1", Direction: "UP", Start: 100, End: 200}, // W1 = +100 pts
+		{Number: "1", Direction: "UP", Start: 100, End: 200},  // W1 = +100 pts
 		{Number: "2", Direction: "DOWN", Start: 200, End: 50}, // W2 = -150 pts (>100%)
 		{Number: "3", Direction: "UP", Start: 50, End: 300},
 		{Number: "4", Direction: "DOWN", Start: 300, End: 220},
@@ -70,7 +70,7 @@ func TestRule1_Wave2CannotRetraceOver100Pct(t *testing.T) {
 
 func TestRule1_Wave2ValidRetrace(t *testing.T) {
 	waves := []Wave{
-		{Number: "1", Direction: "UP", Start: 100, End: 200}, // W1 = +100
+		{Number: "1", Direction: "UP", Start: 100, End: 200},     // W1 = +100
 		{Number: "2", Direction: "DOWN", Start: 200, End: 138.2}, // ~61.8% retrace
 		{Number: "3", Direction: "UP", Start: 138.2, End: 320},
 		{Number: "4", Direction: "DOWN", Start: 320, End: 280},
@@ -89,11 +89,11 @@ func TestRule1_Wave2ValidRetrace(t *testing.T) {
 
 func TestRule2_Wave3CannotBeShortest(t *testing.T) {
 	waves := []Wave{
-		{Number: "1", Direction: "UP", Start: 100, End: 200},  // W1 = 100 pts
+		{Number: "1", Direction: "UP", Start: 100, End: 200}, // W1 = 100 pts
 		{Number: "2", Direction: "DOWN", Start: 200, End: 150},
-		{Number: "3", Direction: "UP", Start: 150, End: 200},  // W3 = 50 pts (shortest!)
+		{Number: "3", Direction: "UP", Start: 150, End: 200}, // W3 = 50 pts (shortest!)
 		{Number: "4", Direction: "DOWN", Start: 200, End: 170},
-		{Number: "5", Direction: "UP", Start: 170, End: 340},  // W5 = 170 pts
+		{Number: "5", Direction: "UP", Start: 170, End: 340}, // W5 = 170 pts
 	}
 	validateImpulse(waves)
 

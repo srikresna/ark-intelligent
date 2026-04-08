@@ -65,7 +65,7 @@ func TestCalculateSurpriseScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := calculateSurpriseScore(tt.actual, tt.forecast, tt.previous)
-			
+
 			if tt.expectedSign > 0 {
 				assert.Greater(t, score, 0.0, "Expected positive surprise")
 			} else if tt.expectedSign < 0 {
@@ -165,7 +165,7 @@ func TestAlertFilteringByImpact(t *testing.T) {
 // TestFreeTierAlertFiltering tests that free tier users only get USD + High impact
 func TestFreeTierAlertFiltering(t *testing.T) {
 	scheduler := &Scheduler{}
-	
+
 	// Create alert filter for free tier
 	scheduler.alertFilter = func(ctx context.Context, userID int64, prefsCurrencies, prefsImpacts []string) ([]string, []string) {
 		// Free tier: USD only, High impact only
@@ -173,10 +173,10 @@ func TestFreeTierAlertFiltering(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Test free tier user
 	currencies, impacts := scheduler.alertFilter(ctx, 12345, []string{"ALL"}, []string{"all"})
-	
+
 	assert.Equal(t, []string{"USD"}, currencies)
 	assert.Equal(t, []string{"high"}, impacts)
 }
@@ -184,7 +184,7 @@ func TestFreeTierAlertFiltering(t *testing.T) {
 // TestBannedUserFiltering tests that banned users don't receive alerts
 func TestBannedUserFiltering(t *testing.T) {
 	scheduler := &Scheduler{}
-	
+
 	// Set up ban check function
 	scheduler.isBanned = func(ctx context.Context, userID int64) bool {
 		return userID == 99999 // User 99999 is banned
@@ -202,7 +202,7 @@ func TestBannedUserFiltering(t *testing.T) {
 // TestAlertGateQuietHours tests quiet hours enforcement
 func TestAlertGateQuietHours(t *testing.T) {
 	scheduler := &Scheduler{}
-	
+
 	// Alert gate that blocks alerts during quiet hours (10 PM - 6 AM)
 	scheduler.alertGate = func(prefs domain.UserPrefs, alertType string) (bool, string) {
 		hour := time.Now().Hour()
@@ -215,7 +215,7 @@ func TestAlertGateQuietHours(t *testing.T) {
 	// Test that gate function exists and returns values
 	testPrefs := domain.UserPrefs{}
 	ok, reason := scheduler.alertGate(testPrefs, "economic")
-	
+
 	// Result depends on current time, but function should work
 	_ = ok
 	_ = reason
@@ -225,11 +225,11 @@ func TestAlertGateQuietHours(t *testing.T) {
 // TestDailyAlertCap tests daily alert limit tracking
 func TestDailyAlertCap(t *testing.T) {
 	scheduler := &Scheduler{}
-	
+
 	// Set up delivery recorder for counting
 	deliveryCount := make(map[string]int)
 	var mu sync.Mutex
-	
+
 	scheduler.recordDelivery = func(ctx context.Context, chatID string) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -237,16 +237,16 @@ func TestDailyAlertCap(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Simulate multiple deliveries
 	for i := 0; i < 5; i++ {
 		scheduler.recordDelivery(ctx, "user123")
 	}
-	
+
 	mu.Lock()
 	count := deliveryCount["user123"]
 	mu.Unlock()
-	
+
 	assert.Equal(t, 5, count, "Should have recorded 5 deliveries")
 }
 
@@ -256,12 +256,12 @@ func TestSentRemindersReset(t *testing.T) {
 		sentReminders: make(map[string]bool),
 		lastResetDay:  "2026-04-05", // Yesterday
 	}
-	
+
 	// Add a reminder
 	scheduler.sentMu.Lock()
 	scheduler.sentReminders["event123:30"] = true
 	scheduler.sentMu.Unlock()
-	
+
 	// Simulate daily reset check
 	today := time.Now().Format("2006-01-02")
 	if scheduler.lastResetDay != today {
@@ -270,11 +270,11 @@ func TestSentRemindersReset(t *testing.T) {
 		scheduler.lastResetDay = today
 		scheduler.sentMu.Unlock()
 	}
-	
+
 	scheduler.sentMu.Lock()
 	count := len(scheduler.sentReminders)
 	scheduler.sentMu.Unlock()
-	
+
 	// After reset, should be empty (or 1 if same day)
 	assert.GreaterOrEqual(t, count, 0)
 }
@@ -282,46 +282,46 @@ func TestSentRemindersReset(t *testing.T) {
 // TestConfluenceScoreCalculation tests COT confluence score calculation
 func TestConfluenceScoreCalculation(t *testing.T) {
 	tests := []struct {
-		name           string
-		extremeLong    bool
-		extremeShort   bool
-		netPosition    int64
-		percentile     float64
-		eventBias      string
+		name            string
+		extremeLong     bool
+		extremeShort    bool
+		netPosition     int64
+		percentile      float64
+		eventBias       string
 		expectedNonZero bool
 	}{
 		{
-			name:           "bullish with extreme long",
-			extremeLong:    true,
-			netPosition:    85000,
-			percentile:     95.0,
-			eventBias:      "bullish",
+			name:            "bullish with extreme long",
+			extremeLong:     true,
+			netPosition:     85000,
+			percentile:      95.0,
+			eventBias:       "bullish",
 			expectedNonZero: true,
 		},
 		{
-			name:           "bearish with extreme short",
-			extremeShort:   true,
-			netPosition:    -85000,
-			percentile:     5.0,
-			eventBias:      "bearish",
+			name:            "bearish with extreme short",
+			extremeShort:    true,
+			netPosition:     -85000,
+			percentile:      5.0,
+			eventBias:       "bearish",
 			expectedNonZero: true,
 		},
 		{
-			name:           "neutral COT data",
-			extremeLong:    false,
-			extremeShort:   false,
-			netPosition:    0,
-			percentile:     50.0,
-			eventBias:      "bullish",
+			name:            "neutral COT data",
+			extremeLong:     false,
+			extremeShort:    false,
+			netPosition:     0,
+			percentile:      50.0,
+			eventBias:       "bullish",
 			expectedNonZero: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := calculateConfluenceScore(tt.extremeLong, tt.extremeShort, 
+			score := calculateConfluenceScore(tt.extremeLong, tt.extremeShort,
 				tt.netPosition, tt.percentile, tt.eventBias)
-			
+
 			if tt.expectedNonZero {
 				assert.NotZero(t, score, "Expected non-zero confluence score")
 			}
@@ -354,12 +354,12 @@ func TestFedSpeechCache(t *testing.T) {
 
 	scheduler := &Scheduler{}
 	scheduler.updateFedSpeeches(speeches)
-	
+
 	// Verify speeches were stored
 	scheduler.latestFedMu.RLock()
 	storedSpeeches := scheduler.latestFedSpeeches
 	scheduler.latestFedMu.RUnlock()
-	
+
 	assert.Len(t, storedSpeeches, 2)
 	assert.Equal(t, "Fed Chair Powell: Interest Rate Decision", storedSpeeches[0].Title)
 }
@@ -367,7 +367,7 @@ func TestFedSpeechCache(t *testing.T) {
 // TestImpactRecordingHorizons tests price impact recording for different timeframes
 func TestImpactRecordingHorizons(t *testing.T) {
 	timeHorizons := []string{"15m", "30m", "1h", "4h"}
-	
+
 	// Verify all expected timeframes are present
 	assert.Contains(t, timeHorizons, "15m")
 	assert.Contains(t, timeHorizons, "30m")
@@ -384,13 +384,13 @@ func calculateSurpriseScore(actual, forecast, previous float64) float64 {
 	}
 	// Sigma calculation
 	sigma := (actual - forecast) / forecast
-	
+
 	// Adjust by previous trend
 	if previous != 0 {
 		trend := (forecast - previous) / previous
 		sigma = sigma - (trend * 0.3) // 30% trend adjustment
 	}
-	
+
 	return sigma * 100 // Convert to percentage points
 }
 
@@ -414,24 +414,24 @@ func shouldAlertForImpact(userImpacts []string, eventImpact string) bool {
 
 func calculateConfluenceScore(extremeLong, extremeShort bool, netPosition int64, percentile float64, eventBias string) float64 {
 	score := 0.0
-	
+
 	// Positioning alignment
 	if eventBias == "bullish" && extremeLong {
 		score += 0.4
 	} else if eventBias == "bearish" && extremeShort {
 		score += 0.4
 	}
-	
+
 	// Percentile strength (distance from 50%)
 	score += (percentile - 50) / 100 * 0.3
-	
+
 	// Net position magnitude (normalized)
 	mag := float64(netPosition)
 	if mag < 0 {
 		mag = -mag
 	}
 	score += mag / 100000 * 0.3
-	
+
 	return score
 }
 

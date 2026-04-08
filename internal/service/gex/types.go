@@ -13,8 +13,8 @@ type GEXLevel struct {
 
 // GEXResult is the complete gamma exposure profile for a crypto asset.
 type GEXResult struct {
-	Symbol     string // e.g. "BTC"
-	SpotPrice  float64
+	Symbol    string // e.g. "BTC"
+	SpotPrice float64
 
 	// Aggregate GEX across all strikes
 	TotalGEX float64 // positive = damping, negative = amplifying
@@ -34,7 +34,7 @@ type GEXResult struct {
 	MaxPain   float64 // strike that minimises total option holder value
 
 	// Market regime derived from TotalGEX sign
-	Regime     string // "POSITIVE_GEX" | "NEGATIVE_GEX"
+	Regime      string // "POSITIVE_GEX" | "NEGATIVE_GEX"
 	Implication string // human-readable interpretation
 
 	// LowLiquidity is true when the number of instruments with meaningful

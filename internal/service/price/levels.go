@@ -11,29 +11,29 @@ import (
 
 // KeyLevel represents a support or resistance price level derived from daily data.
 type KeyLevel struct {
-	Price     float64 `json:"price"`
-	Type      string  `json:"type"`      // "SUPPORT", "RESISTANCE", "PIVOT"
-	Strength  int     `json:"strength"`  // 1-5 (how many times tested)
-	Source    string  `json:"source"`    // e.g. "DMA200", "SWING_LOW", "CLUSTER"
-	Distance  float64 `json:"distance"`  // % distance from current price
+	Price    float64 `json:"price"`
+	Type     string  `json:"type"`     // "SUPPORT", "RESISTANCE", "PIVOT"
+	Strength int     `json:"strength"` // 1-5 (how many times tested)
+	Source   string  `json:"source"`   // e.g. "DMA200", "SWING_LOW", "CLUSTER"
+	Distance float64 `json:"distance"` // % distance from current price
 }
 
 // LevelsContext holds computed support/resistance levels for a contract.
 type LevelsContext struct {
-	ContractCode string      `json:"contract_code"`
-	Currency     string      `json:"currency"`
-	CurrentPrice float64     `json:"current_price"`
-	DailyATR     float64     `json:"daily_atr"`
-	Levels       []KeyLevel  `json:"levels"`
+	ContractCode string     `json:"contract_code"`
+	Currency     string     `json:"currency"`
+	CurrentPrice float64    `json:"current_price"`
+	DailyATR     float64    `json:"daily_atr"`
+	Levels       []KeyLevel `json:"levels"`
 
 	// Key levels summary
 	NearestSupport    *KeyLevel `json:"nearest_support,omitempty"`
 	NearestResistance *KeyLevel `json:"nearest_resistance,omitempty"`
-	DailyPivot        float64   `json:"daily_pivot"`       // (H + L + C) / 3
-	PivotR1           float64   `json:"pivot_r1"`          // 2*P - L
-	PivotS1           float64   `json:"pivot_s1"`          // 2*P - H
-	PivotR2           float64   `json:"pivot_r2"`          // P + (H - L)
-	PivotS2           float64   `json:"pivot_s2"`          // P - (H - L)
+	DailyPivot        float64   `json:"daily_pivot"` // (H + L + C) / 3
+	PivotR1           float64   `json:"pivot_r1"`    // 2*P - L
+	PivotS1           float64   `json:"pivot_s1"`    // 2*P - H
+	PivotR2           float64   `json:"pivot_r2"`    // P + (H - L)
+	PivotS2           float64   `json:"pivot_s2"`    // P - (H - L)
 }
 
 // LevelsBuilder computes support/resistance levels from daily price data.

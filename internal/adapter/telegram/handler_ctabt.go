@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
 // ---------------------------------------------------------------------------
@@ -374,12 +374,12 @@ func (h *Handler) showCTABTTrades(ctx context.Context, chatID string, msgID int,
 
 // backtestChartInput is the JSON structure for the backtest chart Python script.
 type backtestChartInput struct {
-	EquityCurve []float64          `json:"equity_curve"`
-	TradeDates  []string           `json:"trade_dates"`
-	TradePnL    []float64          `json:"trade_pnl"`
-	Drawdown    []float64          `json:"drawdown"`
-	Symbol      string             `json:"symbol"`
-	Timeframe   string             `json:"timeframe"`
+	EquityCurve []float64           `json:"equity_curve"`
+	TradeDates  []string            `json:"trade_dates"`
+	TradePnL    []float64           `json:"trade_pnl"`
+	Drawdown    []float64           `json:"drawdown"`
+	Symbol      string              `json:"symbol"`
+	Timeframe   string              `json:"timeframe"`
 	Params      backtestChartParams `json:"params"`
 }
 
@@ -564,8 +564,6 @@ func normalizeTimeframe(tf string) string {
 		return "daily"
 	}
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Formatters — Indonesian language

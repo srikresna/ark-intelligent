@@ -2,10 +2,10 @@ package telegram
 
 import (
 	"fmt"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"strings"
 )
 
 // sentimentGauge builds a visual gauge bar for Fear & Greed (0-100).
@@ -120,7 +120,6 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 	} else {
 		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
-
 
 	// --- Crypto Global Market Data (alternative.me v2) ---
 	if data.CryptoGlobalAvailable {
@@ -367,7 +366,6 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		b.WriteString("<code>Data tidak tersedia</code>\n")
 	}
 
-
 	// --- Deribit DVOL - Crypto Volatility Index ---
 	if data.DVOLAvailable {
 		b.WriteString("\n<b>Crypto Volatility (Deribit DVOL)</b>\n")
@@ -581,7 +579,7 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 		} else {
 			b.WriteString("→ <i>Ekstrem (>35): Pasar sangat panik. Biasanya ini saat bottom (dasar).</i>\n")
 		}
-		
+
 		if data.VIXContango {
 			b.WriteString("→ <i>Struktur normal: Orang tidak khawatir untuk jangka panjang.</i>\n")
 		} else {
@@ -620,4 +618,3 @@ func (f *Formatter) FormatSentiment(data *sentiment.SentimentData, macroRegime s
 
 	return b.String()
 }
-

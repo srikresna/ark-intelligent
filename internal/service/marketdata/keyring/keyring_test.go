@@ -6,27 +6,27 @@ import (
 
 func TestKeyring_New(t *testing.T) {
 	tests := []struct {
-		name     string
-		keys     []string
-		wantLen  int
+		name      string
+		keys      []string
+		wantLen   int
 		wantEmpty bool
 	}{
 		{
-			name:     "with keys",
-			keys:     []string{"key1", "key2", "key3"},
-			wantLen:  3,
+			name:      "with keys",
+			keys:      []string{"key1", "key2", "key3"},
+			wantLen:   3,
 			wantEmpty: false,
 		},
 		{
-			name:     "empty keys",
-			keys:     []string{},
-			wantLen:  0,
+			name:      "empty keys",
+			keys:      []string{},
+			wantLen:   0,
 			wantEmpty: true,
 		},
 		{
-			name:     "nil keys",
-			keys:     nil,
-			wantLen:  0,
+			name:      "nil keys",
+			keys:      nil,
+			wantLen:   0,
 			wantEmpty: true,
 		},
 	}

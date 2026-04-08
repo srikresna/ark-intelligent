@@ -152,11 +152,11 @@ func TestDetectDivergence_BullishDiv(t *testing.T) {
 	//
 	// We construct bars manually with explicit CumDelta values.
 	bars := []DeltaBar{
-		{OHLCV: ta.OHLCV{Close: 1.00}, CumDelta: 500},  // newest — lower close, higher cum
+		{OHLCV: ta.OHLCV{Close: 1.00}, CumDelta: 500}, // newest — lower close, higher cum
 		{OHLCV: ta.OHLCV{Close: 1.01}, CumDelta: 400},
 		{OHLCV: ta.OHLCV{Close: 1.02}, CumDelta: 300},
 		{OHLCV: ta.OHLCV{Close: 1.03}, CumDelta: 200},
-		{OHLCV: ta.OHLCV{Close: 1.05}, CumDelta: 100},  // prior section: high close, low cum
+		{OHLCV: ta.OHLCV{Close: 1.05}, CumDelta: 100}, // prior section: high close, low cum
 		{OHLCV: ta.OHLCV{Close: 1.04}, CumDelta: 50},
 	}
 	got := detectDivergence(bars)

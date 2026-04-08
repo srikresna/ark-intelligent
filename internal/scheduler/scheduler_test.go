@@ -78,9 +78,9 @@ func (m *mockMessenger) DeleteMessage(ctx context.Context, chatID string, msgID 
 }
 
 type mockPrefsRepository struct {
-	mu           sync.Mutex
-	users        map[int64]domain.UserPrefs
-	getAllErr    error
+	mu        sync.Mutex
+	users     map[int64]domain.UserPrefs
+	getAllErr error
 }
 
 func (m *mockPrefsRepository) Get(ctx context.Context, userID int64) (domain.UserPrefs, error) {
@@ -113,8 +113,6 @@ func (m *mockPrefsRepository) GetAllActive(ctx context.Context) (map[int64]domai
 	}
 	return result, nil
 }
-
-
 
 // ============================================================================
 // Test Setup Helpers

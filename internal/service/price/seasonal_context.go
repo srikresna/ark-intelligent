@@ -21,13 +21,13 @@ import (
 
 // SeasonalContextDeps holds all optional dependencies for advanced analysis.
 type SeasonalContextDeps struct {
-	PriceRepo  ports.PriceRepository
-	COTRepo    ports.COTRepository
-	NewsRepo   ports.NewsRepository
-	MacroData  *fred.MacroData   // current FRED data snapshot
-	Regimes    map[string]string // date -> regime name (historical)
-	VIXPrice   float64           // current VIX level
-	EIAData    *EIASeasonalData  // nil if EIA unavailable
+	PriceRepo ports.PriceRepository
+	COTRepo   ports.COTRepository
+	NewsRepo  ports.NewsRepository
+	MacroData *fred.MacroData   // current FRED data snapshot
+	Regimes   map[string]string // date -> regime name (historical)
+	VIXPrice  float64           // current VIX level
+	EIAData   *EIASeasonalData  // nil if EIA unavailable
 }
 
 // EnrichPattern adds advanced context (regime, COT, events, etc.) to a base pattern.

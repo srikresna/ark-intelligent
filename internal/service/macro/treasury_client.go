@@ -31,16 +31,16 @@ var tenors = []string{"5", "7", "10", "20", "30"}
 
 // YieldRow holds yield data for a single date.
 type YieldRow struct {
-	Date        time.Time
+	Date                  time.Time
 	Y5, Y7, Y10, Y20, Y30 float64 // yield in percent
 }
 
 // Breakevens holds computed breakeven inflation per tenor for a single date.
 type Breakevens struct {
-	Date                   time.Time
-	BE5, BE7, BE10, BE20, BE30             float64 // nominal - real, in percent
-	Nominal5, Nominal10, Nominal30         float64
-	Real5, Real10, Real30                  float64
+	Date                           time.Time
+	BE5, BE7, BE10, BE20, BE30     float64 // nominal - real, in percent
+	Nominal5, Nominal10, Nominal30 float64
+	Real5, Real10, Real30          float64
 }
 
 // IsZero returns true if no breakeven data is available.

@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
-	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/pkg/saferun"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
@@ -83,7 +83,7 @@ type Scheduler struct {
 	impactRecorder *ImpactRecorder
 
 	// latestFedSpeeches caches the most recent Fed speeches for AI context.
-	latestFedMu      sync.RWMutex
+	latestFedMu       sync.RWMutex
 	latestFedSpeeches []FedSpeech
 }
 

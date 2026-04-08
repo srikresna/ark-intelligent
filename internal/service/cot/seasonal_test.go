@@ -10,10 +10,10 @@ import (
 // makeRecord creates a minimal COTRecord for testing seasonal analysis.
 func makeRecord(date time.Time, assetLong, assetShort float64) domain.COTRecord {
 	return domain.COTRecord{
-		ContractCode: "099741",
-		ContractName: "Euro FX",
-		ReportDate:   date,
-		AssetMgrLong: assetLong,
+		ContractCode:  "099741",
+		ContractName:  "Euro FX",
+		ReportDate:    date,
+		AssetMgrLong:  assetLong,
 		AssetMgrShort: assetShort,
 	}
 }
@@ -101,9 +101,9 @@ func TestClassifyTrend(t *testing.T) {
 
 func TestComputeSmartNet(t *testing.T) {
 	rec := domain.COTRecord{
-		AssetMgrLong:     50000,
-		AssetMgrShort:    20000,
-		ManagedMoneyLong: 80000,
+		AssetMgrLong:      50000,
+		AssetMgrShort:     20000,
+		ManagedMoneyLong:  80000,
 		ManagedMoneyShort: 30000,
 	}
 

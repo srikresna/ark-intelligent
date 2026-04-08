@@ -40,12 +40,12 @@ type PositionRisk struct {
 // RiskParityResult is the output of portfolio-level position sizing.
 type RiskParityResult struct {
 	AdjustedPositions []AdjustedPosition `json:"adjusted_positions"`
-	TotalHeatPct      float64            `json:"total_heat_pct"`      // Sum of individual risk as % of account
-	KellyFraction     float64            `json:"kelly_fraction"`      // Full Kelly fraction
-	HalfKelly         float64            `json:"half_kelly"`          // Half-Kelly (recommended)
-	UsedFraction      float64            `json:"used_fraction"`       // Fraction actually applied
-	Recommendation    SizingAdvice       `json:"recommendation"`      // SCALE_DOWN / BALANCED / SCALE_UP
-	HeatBreakdown     []HeatEntry        `json:"heat_breakdown"`      // Per-position heat
+	TotalHeatPct      float64            `json:"total_heat_pct"` // Sum of individual risk as % of account
+	KellyFraction     float64            `json:"kelly_fraction"` // Full Kelly fraction
+	HalfKelly         float64            `json:"half_kelly"`     // Half-Kelly (recommended)
+	UsedFraction      float64            `json:"used_fraction"`  // Fraction actually applied
+	Recommendation    SizingAdvice       `json:"recommendation"` // SCALE_DOWN / BALANCED / SCALE_UP
+	HeatBreakdown     []HeatEntry        `json:"heat_breakdown"` // Per-position heat
 	MaxHeatPct        float64            `json:"max_heat_pct"`
 	ComputedAt        time.Time          `json:"computed_at"`
 }

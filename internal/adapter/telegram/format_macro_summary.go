@@ -2,11 +2,10 @@ package telegram
 
 import (
 	"fmt"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"strings"
 )
-
 
 // FormatMacroSummary formats a plain-language executive summary of the macro regime.
 // Designed for non-finance users: leads with "so what", follows with "why".
@@ -448,4 +447,3 @@ func (f *Formatter) FormatRegimePerformance(matrix *fred.RegimePerformanceMatrix
 
 	return b.String()
 }
-

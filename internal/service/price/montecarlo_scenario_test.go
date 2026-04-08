@@ -178,7 +178,7 @@ func TestGenerateScenario_MedianNearCurrentPrice(t *testing.T) {
 
 	cfg := &ScenarioConfig{
 		NumPaths:    2000, // more paths for stability
-		HorizonDays: 5,   // short horizon
+		HorizonDays: 5,    // short horizon
 	}
 	result, err := GenerateScenario(prices, "EUR/USD", cfg)
 	if err != nil {

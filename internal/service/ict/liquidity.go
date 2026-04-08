@@ -8,9 +8,10 @@ import (
 // high/low (liquidity grab) and then close back inside, suggesting a reversal.
 //
 // Criteria for a sweep:
-//   SWEEP_HIGH: bar's High > previous swing high, but Close < that swing high.
-//   SWEEP_LOW:  bar's Low  < previous swing low,  but Close > that swing low.
-//   Reversed=true if the following candle confirms (close in the opposite direction).
+//
+//	SWEEP_HIGH: bar's High > previous swing high, but Close < that swing high.
+//	SWEEP_LOW:  bar's Low  < previous swing low,  but Close > that swing low.
+//	Reversed=true if the following candle confirms (close in the opposite direction).
 func DetectLiquiditySweeps(bars []ta.OHLCV, swings []swingPoint) []LiquiditySweep {
 	n := len(bars)
 	if n < swingLookback*2+2 || len(swings) < 2 {

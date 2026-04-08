@@ -199,11 +199,11 @@ func TestParseDateTimeISO(t *testing.T) {
 
 func TestParseFFDate(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		wantErr  bool
+		name      string
+		input     string
+		wantErr   bool
 		wantMonth time.Month
-		wantDay  int
+		wantDay   int
 	}{
 		{"ISO format", "2025-03-11", false, time.March, 11},
 		{"Mon Jan 2 format", "Tue Mar 11", false, time.March, 11},
@@ -283,14 +283,14 @@ func TestIsSameDay(t *testing.T) {
 		},
 		{
 			"UTC vs WIB same WIB day",
-			time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),  // 07:00 WIB Jun 15
-			time.Date(2025, 6, 15, 10, 0, 0, 0, WIB),       // 10:00 WIB Jun 15
+			time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC), // 07:00 WIB Jun 15
+			time.Date(2025, 6, 15, 10, 0, 0, 0, WIB),     // 10:00 WIB Jun 15
 			true,
 		},
 		{
 			"UTC late becomes next day in WIB",
-			time.Date(2025, 6, 15, 20, 0, 0, 0, time.UTC),  // 03:00 WIB Jun 16
-			time.Date(2025, 6, 15, 10, 0, 0, 0, WIB),       // Jun 15 WIB
+			time.Date(2025, 6, 15, 20, 0, 0, 0, time.UTC), // 03:00 WIB Jun 16
+			time.Date(2025, 6, 15, 10, 0, 0, 0, WIB),      // Jun 15 WIB
 			false,
 		},
 		{
@@ -313,15 +313,15 @@ func TestIsSameDay(t *testing.T) {
 
 func TestIsWeekend(t *testing.T) {
 	tests := []struct {
-		name string
+		name  string
 		input time.Time
 		want  bool
 	}{
-		{"saturday", time.Date(2025, 6, 14, 12, 0, 0, 0, WIB), true},  // Saturday
-		{"sunday", time.Date(2025, 6, 15, 12, 0, 0, 0, WIB), true},    // Sunday
-		{"monday", time.Date(2025, 6, 16, 12, 0, 0, 0, WIB), false},   // Monday
+		{"saturday", time.Date(2025, 6, 14, 12, 0, 0, 0, WIB), true},   // Saturday
+		{"sunday", time.Date(2025, 6, 15, 12, 0, 0, 0, WIB), true},     // Sunday
+		{"monday", time.Date(2025, 6, 16, 12, 0, 0, 0, WIB), false},    // Monday
 		{"wednesday", time.Date(2025, 6, 18, 12, 0, 0, 0, WIB), false}, // Wednesday
-		{"friday", time.Date(2025, 6, 20, 12, 0, 0, 0, WIB), false},   // Friday
+		{"friday", time.Date(2025, 6, 20, 12, 0, 0, 0, WIB), false},    // Friday
 		{
 			"UTC friday night becomes saturday WIB",
 			time.Date(2025, 6, 20, 18, 0, 0, 0, time.UTC), // Sat 01:00 WIB

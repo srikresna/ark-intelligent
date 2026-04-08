@@ -30,10 +30,10 @@ func TestConfluenceScoreV2_NilMacroData(t *testing.T) {
 func TestConfluenceScoreV2_WithMacroData(t *testing.T) {
 	// With macro data: weights are 35/20/45 (COT/surprise/macro).
 	macro := &fred.MacroData{
-		YieldSpread:   0.5,      // > 0 → +10
-		CorePCE:       2.0,      // < 2.5 → +25
-		NFCI:          -0.5,     // nfciScore = Clamp(20, -25, 25) = 20
-		InitialClaims: 200_000,  // < 220k → +15
+		YieldSpread:   0.5,     // > 0 → +10
+		CorePCE:       2.0,     // < 2.5 → +25
+		NFCI:          -0.5,    // nfciScore = Clamp(20, -25, 25) = 20
+		InitialClaims: 200_000, // < 220k → +15
 		// macroScore = 10+25+20+15 = 70
 	}
 	a := domain.COTAnalysis{
@@ -70,11 +70,11 @@ func TestConfluenceScoreV2_ExtremeBullish(t *testing.T) {
 
 func TestConfluenceScoreV2_ExtremeBearish(t *testing.T) {
 	macro := &fred.MacroData{
-		YieldSpread:   -1.0,   // no +30
-		CorePCE:       4.0,    // > 2.5, no +30
-		NFCI:          2.0,    // positive → no +20, stressScore = -100
+		YieldSpread:   -1.0,    // no +30
+		CorePCE:       4.0,     // > 2.5, no +30
+		NFCI:          2.0,     // positive → no +20, stressScore = -100
 		InitialClaims: 400_000, // > 250k → no +20
-		GDPGrowth:     -2.0,   // negative → gdpFactor = -15
+		GDPGrowth:     -2.0,    // negative → gdpFactor = -15
 	}
 	a := domain.COTAnalysis{
 		Contract:       baseContract("TFF"),

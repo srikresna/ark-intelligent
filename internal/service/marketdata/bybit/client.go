@@ -576,7 +576,6 @@ func (c *Client) GetOpenInterestHistory(ctx context.Context, category, symbol, i
 	return data, nil
 }
 
-
 // ---------------------------------------------------------------------------
 // Funding Rate History
 // ---------------------------------------------------------------------------

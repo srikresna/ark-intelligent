@@ -3,8 +3,8 @@ package telegram
 import (
 	"context"
 
-	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/scheduler"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 )
 
 // RegimeAlertProvider provides regime state data for the /regime command.

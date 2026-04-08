@@ -26,14 +26,14 @@ var log = logger.Component("fed")
 
 // FedWatchData holds CME FedWatch market-implied rate probabilities.
 type FedWatchData struct {
-	NextMeetingDate    string  `json:"next_meeting_date"`    // e.g. "2026-05-07"
-	HoldProbability    float64 `json:"hold_probability"`     // %
-	Cut25Probability   float64 `json:"cut_25_probability"`   // %
-	Cut50Probability   float64 `json:"cut_50_probability"`   // %
-	Hike25Probability  float64 `json:"hike_25_probability"`  // %
-	ImpliedYearEndRate float64 `json:"implied_year_end_rate"` // bps implied from Dec futures
-	MeetingCount       int     `json:"meeting_count"`        // FOMC meetings remaining until Dec
-	Available          bool    `json:"available"`
+	NextMeetingDate    string    `json:"next_meeting_date"`     // e.g. "2026-05-07"
+	HoldProbability    float64   `json:"hold_probability"`      // %
+	Cut25Probability   float64   `json:"cut_25_probability"`    // %
+	Cut50Probability   float64   `json:"cut_50_probability"`    // %
+	Hike25Probability  float64   `json:"hike_25_probability"`   // %
+	ImpliedYearEndRate float64   `json:"implied_year_end_rate"` // bps implied from Dec futures
+	MeetingCount       int       `json:"meeting_count"`         // FOMC meetings remaining until Dec
+	Available          bool      `json:"available"`
 	FetchedAt          time.Time `json:"fetched_at"`
 }
 

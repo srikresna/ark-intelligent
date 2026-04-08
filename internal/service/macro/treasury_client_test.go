@@ -81,9 +81,9 @@ func TestSafeBreakeven(t *testing.T) {
 		nom, real, want float64
 	}{
 		{4.43, 2.21, 2.22},
-		{0, 2.21, 0},   // missing nominal → 0
-		{4.43, 0, 0},   // missing real → 0
-		{0, 0, 0},      // both missing → 0
+		{0, 2.21, 0},     // missing nominal → 0
+		{4.43, 0, 0},     // missing real → 0
+		{0, 0, 0},        // both missing → 0
 		{4.0, 4.5, -0.5}, // negative (unusual but valid)
 	}
 	for _, c := range cases {

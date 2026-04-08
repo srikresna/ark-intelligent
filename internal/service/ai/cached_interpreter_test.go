@@ -17,11 +17,11 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockAIAnalyzer struct {
-	available   bool
-	callCount   int
-	mu          sync.Mutex
-	returnVal   string
-	returnErr   error
+	available bool
+	callCount int
+	mu        sync.Mutex
+	returnVal string
+	returnErr error
 }
 
 func (m *mockAIAnalyzer) AnalyzeCOT(_ context.Context, _ []domain.COTAnalysis) (string, error) {

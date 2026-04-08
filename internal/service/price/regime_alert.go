@@ -33,19 +33,19 @@ const (
 
 // RegimeState tracks the current HMM regime and its history for one asset.
 type RegimeState struct {
-	Symbol           string    `json:"symbol"`
-	ContractCode     string    `json:"contract_code"`
-	CurrentState     string    `json:"current_state"`       // RISK_ON, RISK_OFF, CRISIS
-	RegimeStartDate  time.Time `json:"regime_start_date"`   // When this regime started
-	DaysInRegime     int       `json:"days_in_regime"`      // Days in current regime
-	MeanDuration     float64   `json:"mean_duration"`       // Historical mean regime duration
-	PreviousState    string    `json:"previous_state"`      // State before current
-	CrisisProb       float64   `json:"crisis_prob"`         // Current P(CRISIS)
-	AlertTier        AlertTier `json:"alert_tier"`          // Current alert tier
-	LastAlertTime    time.Time `json:"last_alert_time"`     // For cooldown
-	LastAlertTier    AlertTier `json:"last_alert_tier"`     // Last tier we alerted on
+	Symbol             string     `json:"symbol"`
+	ContractCode       string     `json:"contract_code"`
+	CurrentState       string     `json:"current_state"`       // RISK_ON, RISK_OFF, CRISIS
+	RegimeStartDate    time.Time  `json:"regime_start_date"`   // When this regime started
+	DaysInRegime       int        `json:"days_in_regime"`      // Days in current regime
+	MeanDuration       float64    `json:"mean_duration"`       // Historical mean regime duration
+	PreviousState      string     `json:"previous_state"`      // State before current
+	CrisisProb         float64    `json:"crisis_prob"`         // Current P(CRISIS)
+	AlertTier          AlertTier  `json:"alert_tier"`          // Current alert tier
+	LastAlertTime      time.Time  `json:"last_alert_time"`     // For cooldown
+	LastAlertTier      AlertTier  `json:"last_alert_tier"`     // Last tier we alerted on
 	StateProbabilities [4]float64 `json:"state_probabilities"` // [RISK_ON, RISK_OFF, CRISIS, TRENDING]
-	UpdatedAt        time.Time `json:"updated_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 // RegimeAlert is emitted when a regime transition is detected.

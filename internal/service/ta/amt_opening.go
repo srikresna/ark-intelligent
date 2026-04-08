@@ -47,13 +47,13 @@ type ValueArea struct {
 
 // OpeningClassification holds the full opening type analysis.
 type OpeningClassification struct {
-	Date          time.Time   // date being analysed
-	OpenPrice     float64     // first bar's open
-	OpenLocation  string      // "ABOVE_VA" | "BELOW_VA" | "INSIDE_VA"
-	YesterdayVA   ValueArea   // reference Value Area
-	Type          OpeningType // classified opening type
-	Implication   string      // trading implication text
-	Confidence    string      // "HIGH" | "MEDIUM" | "LOW"
+	Date         time.Time   // date being analysed
+	OpenPrice    float64     // first bar's open
+	OpenLocation string      // "ABOVE_VA" | "BELOW_VA" | "INSIDE_VA"
+	YesterdayVA  ValueArea   // reference Value Area
+	Type         OpeningType // classified opening type
+	Implication  string      // trading implication text
+	Confidence   string      // "HIGH" | "MEDIUM" | "LOW"
 
 	// First-period direction tracking (for OTD/ORR detection)
 	FirstPeriodHigh  float64

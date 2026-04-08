@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
+	"github.com/arkcode369/ark-intelligent/internal/service/vix"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
 	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
-	"github.com/arkcode369/ark-intelligent/internal/service/dvol"
-	"github.com/arkcode369/ark-intelligent/internal/service/vix"
 )
 
 var log = logger.Component("sentiment")
@@ -37,36 +37,36 @@ var log = logger.Component("sentiment")
 // SentimentFetcher holds the HTTP client and per-source circuit breakers.
 // Use NewSentimentFetcher() to construct, or use the package-level defaultFetcher.
 type SentimentFetcher struct {
-	httpClient *http.Client
-	cbCNN      *circuitbreaker.Breaker
-	cbAAII     *circuitbreaker.Breaker
-	cbCBOE     *circuitbreaker.Breaker
-	cbCrypto   *circuitbreaker.Breaker
-	cbVIX      *circuitbreaker.Breaker
-	cbMyfxbook *circuitbreaker.Breaker
+	httpClient     *http.Client
+	cbCNN          *circuitbreaker.Breaker
+	cbAAII         *circuitbreaker.Breaker
+	cbCBOE         *circuitbreaker.Breaker
+	cbCrypto       *circuitbreaker.Breaker
+	cbVIX          *circuitbreaker.Breaker
+	cbMyfxbook     *circuitbreaker.Breaker
 	cbCryptoGlobal *circuitbreaker.Breaker
-	cbInsider   *circuitbreaker.Breaker
-	vixCache    *vix.Cache
-	dvolFetcher *dvol.Fetcher
-	cbDVOL      *circuitbreaker.Breaker
+	cbInsider      *circuitbreaker.Breaker
+	vixCache       *vix.Cache
+	dvolFetcher    *dvol.Fetcher
+	cbDVOL         *circuitbreaker.Breaker
 }
 
 // NewSentimentFetcher creates a SentimentFetcher with per-source circuit breakers.
 // Each breaker opens after 3 consecutive failures and resets after 5 minutes.
 func NewSentimentFetcher() *SentimentFetcher {
 	return &SentimentFetcher{
-		httpClient: httpclient.New(),
-		cbCNN:      circuitbreaker.New("sentiment-cnn", 3, 5*time.Minute),
-		cbAAII:     circuitbreaker.New("sentiment-aaii", 3, 5*time.Minute),
-		cbCBOE:     circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
-		cbCrypto:   circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
-		cbVIX:      circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
-		cbMyfxbook: circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
+		httpClient:     httpclient.New(),
+		cbCNN:          circuitbreaker.New("sentiment-cnn", 3, 5*time.Minute),
+		cbAAII:         circuitbreaker.New("sentiment-aaii", 3, 5*time.Minute),
+		cbCBOE:         circuitbreaker.New("sentiment-cboe", 3, 5*time.Minute),
+		cbCrypto:       circuitbreaker.New("sentiment-crypto-fg", 3, 5*time.Minute),
+		cbVIX:          circuitbreaker.New("sentiment-vix", 3, 10*time.Minute),
+		cbMyfxbook:     circuitbreaker.New("sentiment-myfxbook", 3, 5*time.Minute),
 		cbCryptoGlobal: circuitbreaker.New("sentiment-crypto-global", 3, 5*time.Minute),
-		cbInsider:  circuitbreaker.New("sentiment-insider", 3, 10*time.Minute),
-		vixCache:    vix.NewCache(),
-		dvolFetcher: dvol.NewFetcher(),
-		cbDVOL:      circuitbreaker.New("sentiment-dvol", 3, 10*time.Minute),
+		cbInsider:      circuitbreaker.New("sentiment-insider", 3, 10*time.Minute),
+		vixCache:       vix.NewCache(),
+		dvolFetcher:    dvol.NewFetcher(),
+		cbDVOL:         circuitbreaker.New("sentiment-dvol", 3, 10*time.Minute),
 	}
 }
 
@@ -219,7 +219,6 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 		log.Debug().Str("source", "myfxbook").Err(err).Msg("sentiment: Myfxbook circuit breaker rejected or source unavailable")
 	}
 
-
 	// Deribit DVOL - Crypto Volatility Index - wrapped in circuit breaker
 	if err := f.cbDVOL.Execute(func() error {
 		dvolResult, dvolErr := f.dvolFetcher.Fetch(ctx)
@@ -250,6 +249,7 @@ func (f *SentimentFetcher) Fetch(ctx context.Context) (*SentimentData, error) {
 
 	return data, nil
 }
+
 type SentimentData struct {
 	// AAII Investor Sentiment Survey
 	AAIIBullish   float64 // % bullish
@@ -269,10 +269,10 @@ type SentimentData struct {
 	CNNAvailable      bool
 
 	// CBOE Put/Call Ratios
-	PutCallTotal   float64 // Total Put/Call Ratio
-	PutCallEquity  float64 // Equity Put/Call Ratio
-	PutCallIndex   float64 // Index Put/Call Ratio
-	PutCallSignal  string  // "EXTREME FEAR", "FEAR", "NEUTRAL", "COMPLACENCY", "EXTREME COMPLACENCY"
+	PutCallTotal     float64 // Total Put/Call Ratio
+	PutCallEquity    float64 // Equity Put/Call Ratio
+	PutCallIndex     float64 // Index Put/Call Ratio
+	PutCallSignal    string  // "EXTREME FEAR", "FEAR", "NEUTRAL", "COMPLACENCY", "EXTREME COMPLACENCY"
 	PutCallAvailable bool
 
 	// Crypto Fear & Greed Index (alternative.me)
@@ -281,30 +281,30 @@ type SentimentData struct {
 	CryptoFearGreedAvailable bool
 
 	// Crypto Global Market Data (alternative.me v2)
-	CryptoTotalMarketCap    float64 // Total crypto market cap USD
-	CryptoBTCDominance      float64 // BTC dominance %
-	CryptoActiveCurrencies  int     // Number of active currencies
-	CryptoActiveMarkets     int     // Number of active markets
-	CryptoGlobalAvailable   bool
+	CryptoTotalMarketCap   float64 // Total crypto market cap USD
+	CryptoBTCDominance     float64 // BTC dominance %
+	CryptoActiveCurrencies int     // Number of active currencies
+	CryptoActiveMarkets    int     // Number of active markets
+	CryptoGlobalAvailable  bool
 
 	// Crypto Top Tickers (alternative.me v2)
 	CryptoTopTickers       []CryptoTicker // Top 20 cryptos by rank
 	CryptoTickersAvailable bool
 
 	// VIX Term Structure (CBOE)
-	VIXSpot      float64 // VIX spot index level
-	VIXM1        float64 // Front-month VIX futures settle
-	VIXM2        float64 // Second-month VIX futures settle
-	VIXM3        float64 // Third-month VIX futures settle
-	VVIX         float64 // VIX of VIX
-	VIXContango  bool    // true if M1 > Spot (normal/risk-on)
-	VIXSlopePct  float64 // (M2-M1)/M1 * 100
-	VIXFullSlope float64 // (M3-M1)/M1 * 100 — 2-month slope
-	VIXCalM2M3   float64 // M3 - M2 (forward premium/discount)
-	VIXFullContango      bool // true if M3 > M2 > M1 > Spot
-	VIXFullBackwardation bool // true if M3 < M2 < M1 < Spot
-	VIXRegime    string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
-	VIXAvailable bool
+	VIXSpot              float64 // VIX spot index level
+	VIXM1                float64 // Front-month VIX futures settle
+	VIXM2                float64 // Second-month VIX futures settle
+	VIXM3                float64 // Third-month VIX futures settle
+	VVIX                 float64 // VIX of VIX
+	VIXContango          bool    // true if M1 > Spot (normal/risk-on)
+	VIXSlopePct          float64 // (M2-M1)/M1 * 100
+	VIXFullSlope         float64 // (M3-M1)/M1 * 100 — 2-month slope
+	VIXCalM2M3           float64 // M3 - M2 (forward premium/discount)
+	VIXFullContango      bool    // true if M3 > M2 > M1 > Spot
+	VIXFullBackwardation bool    // true if M3 < M2 < M1 < Spot
+	VIXRegime            string  // "EXTREME_FEAR", "FEAR", "ELEVATED", "RISK_ON_NORMAL", "RISK_ON_COMPLACENT"
+	VIXAvailable         bool
 
 	// MOVE Index (bond volatility)
 	MOVELevel      float64 // ICE BofA MOVE index level
@@ -334,7 +334,7 @@ type SentimentData struct {
 	DVOLETHSpike        bool    // ETH DVOL spike
 	DVOLETHAvailable    bool
 
-	DVOLAvailable       bool    // True if any DVOL data available
+	DVOLAvailable bool // True if any DVOL data available
 
 	// Cross-Asset Volatility Suite (CBOE indices)
 	VolSKEW        float64  // S&P 500 tail risk index
@@ -478,10 +478,10 @@ const firecrawlScrapeURL = "https://api.firecrawl.dev/v1/scrape"
 
 // aaiiFCRequest is the Firecrawl scrape request body for AAII.
 type aaiiFCRequest struct {
-	URL         string       `json:"url"`
-	Formats     []string     `json:"formats"`
-	WaitFor     int          `json:"waitFor"`
-	JSONOptions *fcJSONOpts  `json:"jsonOptions,omitempty"`
+	URL         string      `json:"url"`
+	Formats     []string    `json:"formats"`
+	WaitFor     int         `json:"waitFor"`
+	JSONOptions *fcJSONOpts `json:"jsonOptions,omitempty"`
 }
 
 type fcJSONOpts struct {
@@ -494,10 +494,10 @@ type aaiiFCResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
 		JSON struct {
-			LatestWeek  string  `json:"latest_week"`
-			BullishPct  float64 `json:"bullish_pct"`
-			NeutralPct  float64 `json:"neutral_pct"`
-			BearishPct  float64 `json:"bearish_pct"`
+			LatestWeek string  `json:"latest_week"`
+			BullishPct float64 `json:"bullish_pct"`
+			NeutralPct float64 `json:"neutral_pct"`
+			BearishPct float64 `json:"bearish_pct"`
 		} `json:"json"`
 	} `json:"data"`
 }
@@ -667,16 +667,16 @@ func fetchCryptoFearGreed(ctx context.Context, client *http.Client, data *Sentim
 
 // CryptoTicker represents a single cryptocurrency ticker from alternative.me v2.
 type CryptoTicker struct {
-	Name            string  // e.g. "Bitcoin"
-	Symbol          string  // e.g. "BTC"
-	Rank            int     // CoinMarketCap rank
-	PriceUSD        float64 // Current price in USD
-	PercentChange1h float64 // 1-hour % change
+	Name             string  // e.g. "Bitcoin"
+	Symbol           string  // e.g. "BTC"
+	Rank             int     // CoinMarketCap rank
+	PriceUSD         float64 // Current price in USD
+	PercentChange1h  float64 // 1-hour % change
 	PercentChange24h float64 // 24-hour % change
-	PercentChange7d float64 // 7-day % change
-	MarketCapUSD    float64 // Market cap in USD
-	Volume24hUSD    float64 // 24h volume in USD
-	VolToMcapRatio  float64 // Volume / MarketCap (liquidity health)
+	PercentChange7d  float64 // 7-day % change
+	MarketCapUSD     float64 // Market cap in USD
+	Volume24hUSD     float64 // 24h volume in USD
+	VolToMcapRatio   float64 // Volume / MarketCap (liquidity health)
 }
 
 const (
@@ -687,22 +687,22 @@ const (
 // cryptoGlobalResponse models the alternative.me v2 global response.
 type cryptoGlobalResponse struct {
 	Data struct {
-		ActiveCurrencies    int    `json:"active_cryptocurrencies"`
-		ActiveMarkets       int    `json:"active_markets"`
-		BTCPercentage       float64 `json:"bitcoin_percentage_of_market_cap"`
-		TotalMarketCapUSD   map[string]float64 `json:"total_market_cap"`
-		TotalVolume24hUSD   map[string]float64 `json:"total_24h_volume"`
+		ActiveCurrencies  int                `json:"active_cryptocurrencies"`
+		ActiveMarkets     int                `json:"active_markets"`
+		BTCPercentage     float64            `json:"bitcoin_percentage_of_market_cap"`
+		TotalMarketCapUSD map[string]float64 `json:"total_market_cap"`
+		TotalVolume24hUSD map[string]float64 `json:"total_24h_volume"`
 	} `json:"data"`
 }
 
 // cryptoTickerResponse models the alternative.me v2 ticker (array) response.
 type cryptoTickerResponse struct {
 	Data []struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Symbol   string `json:"symbol"`
-		Rank     int    `json:"rank"`
-		Quotes   map[string]struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Symbol string `json:"symbol"`
+		Rank   int    `json:"rank"`
+		Quotes map[string]struct {
 			Price            float64 `json:"price"`
 			Volume24h        float64 `json:"volume_24h"`
 			MarketCap        float64 `json:"market_cap"`

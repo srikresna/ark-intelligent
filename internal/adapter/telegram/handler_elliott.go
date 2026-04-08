@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
-	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/elliott"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 

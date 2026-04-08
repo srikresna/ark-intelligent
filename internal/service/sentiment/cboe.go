@@ -14,9 +14,9 @@ import (
 
 // CBOEPutCallData holds the latest CBOE put/call ratio data.
 type CBOEPutCallData struct {
-	TotalPC   float64   // Total Put/Call Ratio
-	EquityPC  float64   // Equity-only Put/Call Ratio
-	IndexPC   float64   // Index Put/Call Ratio
+	TotalPC   float64 // Total Put/Call Ratio
+	EquityPC  float64 // Equity-only Put/Call Ratio
+	IndexPC   float64 // Index Put/Call Ratio
 	Available bool
 	FetchedAt time.Time
 }

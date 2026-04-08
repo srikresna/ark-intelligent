@@ -13,10 +13,10 @@ import (
 
 func TestDominantOutcome_Hold(t *testing.T) {
 	d := &FedWatchData{
-		Available:       true,
-		HoldProbability: 65.2,
-		Cut25Probability: 20.0,
-		Cut50Probability: 5.0,
+		Available:         true,
+		HoldProbability:   65.2,
+		Cut25Probability:  20.0,
+		Cut50Probability:  5.0,
 		Hike25Probability: 9.8,
 	}
 	got := DominantOutcome(d)
@@ -28,10 +28,10 @@ func TestDominantOutcome_Hold(t *testing.T) {
 
 func TestDominantOutcome_Cut25(t *testing.T) {
 	d := &FedWatchData{
-		Available:        true,
-		HoldProbability:  30.0,
-		Cut25Probability: 55.5,
-		Cut50Probability: 10.0,
+		Available:         true,
+		HoldProbability:   30.0,
+		Cut25Probability:  55.5,
+		Cut50Probability:  10.0,
 		Hike25Probability: 4.5,
 	}
 	got := DominantOutcome(d)
@@ -43,10 +43,10 @@ func TestDominantOutcome_Cut25(t *testing.T) {
 
 func TestDominantOutcome_Cut50(t *testing.T) {
 	d := &FedWatchData{
-		Available:        true,
-		HoldProbability:  10.0,
-		Cut25Probability: 25.0,
-		Cut50Probability: 60.0,
+		Available:         true,
+		HoldProbability:   10.0,
+		Cut25Probability:  25.0,
+		Cut50Probability:  60.0,
 		Hike25Probability: 5.0,
 	}
 	got := DominantOutcome(d)
@@ -58,10 +58,10 @@ func TestDominantOutcome_Cut50(t *testing.T) {
 
 func TestDominantOutcome_Hike(t *testing.T) {
 	d := &FedWatchData{
-		Available:        true,
-		HoldProbability:  15.0,
-		Cut25Probability: 5.0,
-		Cut50Probability: 0.0,
+		Available:         true,
+		HoldProbability:   15.0,
+		Cut25Probability:  5.0,
+		Cut50Probability:  0.0,
 		Hike25Probability: 80.0,
 	}
 	got := DominantOutcome(d)

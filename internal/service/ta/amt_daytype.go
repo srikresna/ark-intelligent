@@ -54,9 +54,9 @@ type DayClassification struct {
 	IBPercent float64 // IBRange / DayRange × 100
 
 	// Extension (how much range was added beyond IB)
-	ExtensionUp   float64 // bars above IBHigh
-	ExtensionDown float64 // bars below IBLow
-	NetExtension  float64 // positive = up bias, negative = down bias
+	ExtensionUp    float64 // bars above IBHigh
+	ExtensionDown  float64 // bars below IBLow
+	NetExtension   float64 // positive = up bias, negative = down bias
 	ExtensionRatio float64 // (ExtensionUp+ExtensionDown) / IBRange
 
 	// Profile shape

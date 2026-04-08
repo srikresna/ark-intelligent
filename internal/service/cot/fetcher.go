@@ -413,8 +413,8 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 
 		// DISAGG spread
 		ManagedMoneySpread: socrataFloat(sr.MMoneyPositionsSpread),
-		ProdMercSpread:    socrataFloat(sr.ProdMercPositionsSpread),
-		SwapDealerSpread:  socrataFloat(sr.SwapPositionsSpread),
+		ProdMercSpread:     socrataFloat(sr.ProdMercPositionsSpread),
+		SwapDealerSpread:   socrataFloat(sr.SwapPositionsSpread),
 
 		// DISAGG WoW changes
 		ProdMercLongChg:      socrataFloat(sr.ChangeProdMercLong),

@@ -22,7 +22,7 @@ func TestNewAlphaStateCache(t *testing.T) {
 func TestAlphaStateCache_ConcurrentAccess(t *testing.T) {
 	cache := newAlphaStateCache()
 	var wg sync.WaitGroup
-	
+
 	// Concurrent writes
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -34,7 +34,7 @@ func TestAlphaStateCache_ConcurrentAccess(t *testing.T) {
 			cache.mu.Unlock()
 		}(i)
 	}
-	
+
 	// Concurrent reads
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -46,13 +46,13 @@ func TestAlphaStateCache_ConcurrentAccess(t *testing.T) {
 			cache.mu.Unlock()
 		}(i)
 	}
-	
+
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Success
@@ -87,7 +87,7 @@ func TestFormatScore(t *testing.T) {
 			expected: "0",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatScore(tt.score)
@@ -118,7 +118,7 @@ func TestFormatCarry(t *testing.T) {
 			expected: "0.0",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatCarry(tt.bps)
@@ -164,7 +164,7 @@ func TestFormatSignalEmoji(t *testing.T) {
 			expected: "❓",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatSignalEmoji(tt.signal)
@@ -187,7 +187,7 @@ func TestRegimeDisplayName(t *testing.T) {
 		{name: "volatile", regime: "volatile"},
 		{name: "unknown", regime: "unknown"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := regimeDisplayName(tt.regime)
@@ -208,7 +208,7 @@ func TestCOTEmoji(t *testing.T) {
 		{name: "mixed", bias: "mixed", expected: "🔄"},
 		{name: "unknown", bias: "unknown", expected: "❓"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := cotEmoji(tt.bias)
@@ -226,15 +226,15 @@ func TestAlphaState_TTL(t *testing.T) {
 	freshState := &alphaState{
 		computedAt: time.Now(),
 	}
-	
+
 	// Should be valid (not expired)
 	assert.True(t, time.Since(freshState.computedAt) < alphaStateTTL)
-	
+
 	// Create state that is expired
 	expiredState := &alphaState{
 		computedAt: time.Now().Add(-2 * alphaStateTTL),
 	}
-	
+
 	// Should be expired
 	assert.True(t, time.Since(expiredState.computedAt) > alphaStateTTL)
 }

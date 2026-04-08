@@ -13,10 +13,10 @@ func approxEqual(a, b, tolerance float64) bool {
 
 func TestMapRange(t *testing.T) {
 	tests := []struct {
-		name                         string
-		value, inMin, inMax          float64
-		outMin, outMax               float64
-		want                         float64
+		name                string
+		value, inMin, inMax float64
+		outMin, outMax      float64
+		want                float64
 	}{
 		{"midpoint", 5, 0, 10, 0, 100, 50},
 		{"at_min", 0, 0, 10, 0, 100, 0},
@@ -47,9 +47,9 @@ func TestMapRange(t *testing.T) {
 
 func TestClamp(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		v, min, max float64
-		want       float64
+		want        float64
 	}{
 		{"within_range", 50, 0, 100, 50},
 		{"at_min", 0, 0, 100, 0},
@@ -75,12 +75,12 @@ func TestClamp(t *testing.T) {
 func TestComputeLaborHealth(t *testing.T) {
 	t.Run("healthy_labor_market", func(t *testing.T) {
 		data := &MacroData{
-			InitialClaims:    200_000,  // low claims
+			InitialClaims:    200_000, // low claims
 			ContinuingClaims: 1_600_000,
-			UnemployRate:     3.5,      // low unemployment
+			UnemployRate:     3.5, // low unemployment
 			U6Unemployment:   7.0,
-			JOLTSOpenings:    11_000,   // high openings
-			JOLTSQuitRate:    2.8,      // high quit rate
+			JOLTSOpenings:    11_000, // high openings
+			JOLTSQuitRate:    2.8,    // high quit rate
 			EmpPopRatio:      61.0,
 		}
 		got := computeLaborHealth(data)
@@ -94,12 +94,12 @@ func TestComputeLaborHealth(t *testing.T) {
 
 	t.Run("weakening_labor_market", func(t *testing.T) {
 		data := &MacroData{
-			InitialClaims:    340_000,  // high claims
+			InitialClaims:    340_000, // high claims
 			ContinuingClaims: 2_400_000,
-			UnemployRate:     6.5,      // rising unemployment
+			UnemployRate:     6.5, // rising unemployment
 			U6Unemployment:   11.0,
-			JOLTSOpenings:    6_500,    // low openings
-			JOLTSQuitRate:    1.6,      // low quit rate
+			JOLTSOpenings:    6_500, // low openings
+			JOLTSQuitRate:    1.6,   // low quit rate
 			EmpPopRatio:      56.0,
 		}
 		got := computeLaborHealth(data)
@@ -113,7 +113,7 @@ func TestComputeLaborHealth(t *testing.T) {
 
 	t.Run("sahm_rule_override_caps_at_20", func(t *testing.T) {
 		data := &MacroData{
-			InitialClaims: 200_000,  // otherwise healthy
+			InitialClaims: 200_000, // otherwise healthy
 			JOLTSOpenings: 11_000,
 			UnemployRate:  3.5,
 			EmpPopRatio:   61.0,
@@ -127,7 +127,7 @@ func TestComputeLaborHealth(t *testing.T) {
 
 	t.Run("sahm_rule_low_score_passes_through", func(t *testing.T) {
 		data := &MacroData{
-			InitialClaims: 340_000,  // weak data
+			InitialClaims: 340_000, // weak data
 			JOLTSOpenings: 6_200,
 			UnemployRate:  6.8,
 			SahmRule:      0.5, // triggered
@@ -162,12 +162,12 @@ func TestComputeLaborHealth(t *testing.T) {
 func TestComputeInflationMomentum(t *testing.T) {
 	t.Run("high_inflation", func(t *testing.T) {
 		data := &MacroData{
-			CorePCE:       3.4,
-			MedianCPI:     4.8,
-			StickyCPI:     5.5,
+			CorePCE:        3.4,
+			MedianCPI:      4.8,
+			StickyCPI:      5.5,
 			PPICommodities: 8.0,
-			Breakeven5Y:   2.9,
-			MichInflExp1Y: 4.5,
+			Breakeven5Y:    2.9,
+			MichInflExp1Y:  4.5,
 		}
 		got := computeInflationMomentum(data)
 		if got < 0.5 {
@@ -180,12 +180,12 @@ func TestComputeInflationMomentum(t *testing.T) {
 
 	t.Run("low_inflation", func(t *testing.T) {
 		data := &MacroData{
-			CorePCE:       1.6,
-			MedianCPI:     2.1,
-			StickyCPI:     2.1,
+			CorePCE:        1.6,
+			MedianCPI:      2.1,
+			StickyCPI:      2.1,
 			PPICommodities: -4.0,
-			Breakeven5Y:   1.6,
-			MichInflExp1Y: 2.1,
+			Breakeven5Y:    1.6,
+			MichInflExp1Y:  2.1,
 		}
 		got := computeInflationMomentum(data)
 		if got > -0.5 {
@@ -277,8 +277,8 @@ func TestComputeYieldCurveSignal(t *testing.T) {
 		{
 			name: "uses_precomputed_spread10y2y",
 			data: &MacroData{
-				YieldSpread: 0.5,     // would be NORMAL
-				Spread10Y2Y: -0.3,    // override: INVERTED
+				YieldSpread: 0.5,  // would be NORMAL
+				Spread10Y2Y: -0.3, // override: INVERTED
 				Spread10Y3M: -0.2,
 			},
 			want: "INVERTED",
@@ -307,13 +307,13 @@ func TestComputeYieldCurveSignal(t *testing.T) {
 func TestComputeCreditStress(t *testing.T) {
 	t.Run("low_stress", func(t *testing.T) {
 		data := &MacroData{
-			TedSpread:    2.8,   // low HY spread
-			BBBSpread:    1.2,
-			AAASpread:    0.4,
-			NFCI:         -0.4,  // loose
+			TedSpread:     2.8, // low HY spread
+			BBBSpread:     1.2,
+			AAASpread:     0.4,
+			NFCI:          -0.4, // loose
 			StLouisStress: -0.8,
-			SOFR:         5.30,
-			IORB:         5.32,
+			SOFR:          5.30,
+			IORB:          5.32,
 		}
 		got := computeCreditStress(data)
 		if got > 25 {
@@ -326,13 +326,13 @@ func TestComputeCreditStress(t *testing.T) {
 
 	t.Run("high_stress", func(t *testing.T) {
 		data := &MacroData{
-			TedSpread:    7.5,   // wide HY spread
-			BBBSpread:    3.8,
-			AAASpread:    1.8,
-			NFCI:         0.6,   // tight
+			TedSpread:     7.5, // wide HY spread
+			BBBSpread:     3.8,
+			AAASpread:     1.8,
+			NFCI:          0.6, // tight
 			StLouisStress: 1.8,
-			SOFR:         5.50,
-			IORB:         5.30,
+			SOFR:          5.50,
+			IORB:          5.30,
 		}
 		got := computeCreditStress(data)
 		if got < 70 {
@@ -424,11 +424,11 @@ func TestComputeHousingPulse(t *testing.T) {
 func TestComputeSentimentComposite(t *testing.T) {
 	t.Run("extreme_fear", func(t *testing.T) {
 		data := &MacroData{
-			CNNFearGreed:      10,    // extreme fear (contrarian bullish)
-			AAIIBullBear:      0.4,   // bearish crowd
-			PutCallTotal:      1.2,   // high put/call
-			VIX:               33,    // high VIX
-			ConsumerSentiment: 55,    // low sentiment
+			CNNFearGreed:      10,  // extreme fear (contrarian bullish)
+			AAIIBullBear:      0.4, // bearish crowd
+			PutCallTotal:      1.2, // high put/call
+			VIX:               33,  // high VIX
+			ConsumerSentiment: 55,  // low sentiment
 		}
 		got := computeSentimentComposite(data)
 		if got < 50 {
@@ -438,11 +438,11 @@ func TestComputeSentimentComposite(t *testing.T) {
 
 	t.Run("extreme_greed", func(t *testing.T) {
 		data := &MacroData{
-			CNNFearGreed:      90,    // extreme greed (contrarian bearish)
-			AAIIBullBear:      1.8,   // bullish crowd
-			PutCallTotal:      0.65,  // low put/call
-			VIX:               13,    // low VIX
-			ConsumerSentiment: 95,    // high sentiment
+			CNNFearGreed:      90,   // extreme greed (contrarian bearish)
+			AAIIBullBear:      1.8,  // bullish crowd
+			PutCallTotal:      0.65, // low put/call
+			VIX:               13,   // low VIX
+			ConsumerSentiment: 95,   // high sentiment
 		}
 		got := computeSentimentComposite(data)
 		if got > -50 {
@@ -494,19 +494,19 @@ func TestComputeComposites(t *testing.T) {
 			JOLTSQuitRate:    2.5,
 			EmpPopRatio:      60.5,
 			// Inflation
-			CorePCE:       2.8,
-			MedianCPI:     3.5,
-			StickyCPI:     4.0,
+			CorePCE:        2.8,
+			MedianCPI:      3.5,
+			StickyCPI:      4.0,
 			PPICommodities: 3.0,
-			Breakeven5Y:   2.3,
-			MichInflExp1Y: 3.2,
+			Breakeven5Y:    2.3,
+			MichInflExp1Y:  3.2,
 			// Yield curve
 			Spread10Y2Y: -0.3,
 			Spread10Y3M: -0.1,
 			// Credit
-			TedSpread:    4.0,
-			BBBSpread:    2.0,
-			NFCI:         -0.2,
+			TedSpread:     4.0,
+			BBBSpread:     2.0,
+			NFCI:          -0.2,
 			StLouisStress: 0.5,
 			// Housing
 			BuildingPermits:      1400,

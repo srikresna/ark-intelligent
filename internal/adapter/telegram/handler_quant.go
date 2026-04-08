@@ -5,10 +5,10 @@ package telegram
 
 import (
 	"bytes"
-	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"os"
 	"os/exec"
@@ -43,15 +43,15 @@ type RegimeOverlayEngine interface {
 // ---------------------------------------------------------------------------
 
 type quantState struct {
-	symbol         string
-	currency       string
-	timeframe      string
-	contractCode   string
-	bars           map[string][]ta.OHLCV  // tf → bars
-	volCone        *pricesvc.VolCone      // cached vol cone result
-	wyckoff        *pricesvc.WyckoffResult // cached Wyckoff phase analysis
-	regimeOverlay  RegimeHeaderProvider   // optional regime overlay header
-	createdAt      time.Time
+	symbol        string
+	currency      string
+	timeframe     string
+	contractCode  string
+	bars          map[string][]ta.OHLCV   // tf → bars
+	volCone       *pricesvc.VolCone       // cached vol cone result
+	wyckoff       *pricesvc.WyckoffResult // cached Wyckoff phase analysis
+	regimeOverlay RegimeHeaderProvider    // optional regime overlay header
+	createdAt     time.Time
 }
 
 var quantStateTTL = config.QuantStateTTL
@@ -420,13 +420,13 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 // ---------------------------------------------------------------------------
 
 type quantEngineResult struct {
-	Mode       string                 `json:"mode"`
-	Symbol     string                 `json:"symbol"`
-	Success    bool                   `json:"success"`
-	Error      string                 `json:"error"`
+	Mode       string         `json:"mode"`
+	Symbol     string         `json:"symbol"`
+	Success    bool           `json:"success"`
+	Error      string         `json:"error"`
 	Result     map[string]any `json:"result"`
-	TextOutput string                 `json:"text_output"`
-	ChartPath  string                 `json:"chart_path"`
+	TextOutput string         `json:"text_output"`
+	ChartPath  string         `json:"chart_path"`
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ type quantEngineInput struct {
 	Timeframe  string                       `json:"timeframe"`
 	Bars       []chartBar                   `json:"bars"`
 	MultiAsset map[string][]quantAssetClose `json:"multi_asset,omitempty"`
-	Params     map[string]any       `json:"params,omitempty"`
+	Params     map[string]any               `json:"params,omitempty"`
 }
 
 type quantAssetClose struct {

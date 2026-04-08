@@ -180,12 +180,12 @@ func buildWaveLegs(seg []SwingPoint, w1Dir string) []Wave {
 		}
 
 		waves = append(waves, Wave{
-			Number:   labels[i],
-			Kind:     kind,
-			Start:    start.Price,
-			End:      end.Price,
-			StartBar: start.Index,
-			EndBar:   endBar,
+			Number:    labels[i],
+			Kind:      kind,
+			Start:     start.Price,
+			End:       end.Price,
+			StartBar:  start.Index,
+			EndBar:    endBar,
 			Direction: dir,
 		})
 	}

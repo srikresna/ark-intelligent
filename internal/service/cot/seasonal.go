@@ -27,9 +27,9 @@ type COTSeasonalPoint struct {
 
 // COTSeasonalResult is the full seasonal report for a single contract.
 type COTSeasonalResult struct {
-	ContractCode string `json:"contract_code"`
-	Currency     string `json:"currency"`
-	CurrentWeek  int    `json:"current_week"`  // ISO week of the analysis date
+	ContractCode string  `json:"contract_code"`
+	Currency     string  `json:"currency"`
+	CurrentWeek  int     `json:"current_week"` // ISO week of the analysis date
 	CurrentNet   float64 `json:"current_net"`  // Latest actual net position
 
 	// Comparison vs historical average for the current week

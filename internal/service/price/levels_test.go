@@ -43,13 +43,13 @@ func TestClassifyLevel(t *testing.T) {
 		level   float64
 		want    string
 	}{
-		{current: 0, level: 1.0, want: "SUPPORT"},          // zero current → SUPPORT
-		{current: 1.0, level: 1.0, want: "SUPPORT"},        // exactly equal (within 0.01%) → SUPPORT
-		{current: 1.0, level: 1.00005, want: "SUPPORT"},    // within 0.01% above → SUPPORT
-		{current: 1.0, level: 0.99, want: "SUPPORT"},       // below current → SUPPORT
-		{current: 1.0, level: 1.005, want: "RESISTANCE"},   // above current → RESISTANCE
-		{current: 1.2, level: 1.5, want: "RESISTANCE"},     // clearly above → RESISTANCE
-		{current: 1.5, level: 1.2, want: "SUPPORT"},        // clearly below → SUPPORT
+		{current: 0, level: 1.0, want: "SUPPORT"},        // zero current → SUPPORT
+		{current: 1.0, level: 1.0, want: "SUPPORT"},      // exactly equal (within 0.01%) → SUPPORT
+		{current: 1.0, level: 1.00005, want: "SUPPORT"},  // within 0.01% above → SUPPORT
+		{current: 1.0, level: 0.99, want: "SUPPORT"},     // below current → SUPPORT
+		{current: 1.0, level: 1.005, want: "RESISTANCE"}, // above current → RESISTANCE
+		{current: 1.2, level: 1.5, want: "RESISTANCE"},   // clearly above → RESISTANCE
+		{current: 1.5, level: 1.2, want: "SUPPORT"},      // clearly below → SUPPORT
 	}
 	for _, tt := range tests {
 		got := classifyLevel(tt.current, tt.level)

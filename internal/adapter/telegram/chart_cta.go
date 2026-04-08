@@ -22,23 +22,23 @@ import (
 
 // chartInput is the JSON structure passed to the Python chart renderer.
 type chartInput struct {
-	Symbol     string            `json:"symbol"`
-	Timeframe  string            `json:"timeframe"`
-	Mode       string            `json:"mode,omitempty"`
-	Bars       []chartBar        `json:"bars"`
-	Indicators chartIndicators   `json:"indicators"`
-	Fibonacci  chartFib          `json:"fibonacci"`
-	Patterns   []chartPattern    `json:"patterns"`
-	Ichimoku   *chartIchimoku    `json:"ichimoku,omitempty"`
-	Zones      *chartZones       `json:"zones,omitempty"`
+	Symbol     string          `json:"symbol"`
+	Timeframe  string          `json:"timeframe"`
+	Mode       string          `json:"mode,omitempty"`
+	Bars       []chartBar      `json:"bars"`
+	Indicators chartIndicators `json:"indicators"`
+	Fibonacci  chartFib        `json:"fibonacci"`
+	Patterns   []chartPattern  `json:"patterns"`
+	Ichimoku   *chartIchimoku  `json:"ichimoku,omitempty"`
+	Zones      *chartZones     `json:"zones,omitempty"`
 }
 
 type chartIchimoku struct {
-	TenkanSen  []float64 `json:"tenkan_sen"`
-	KijunSen   []float64 `json:"kijun_sen"`
+	TenkanSen   []float64 `json:"tenkan_sen"`
+	KijunSen    []float64 `json:"kijun_sen"`
 	SenkouSpanA []float64 `json:"senkou_span_a"`
 	SenkouSpanB []float64 `json:"senkou_span_b"`
-	ChikouSpan []float64 `json:"chikou_span"`
+	ChikouSpan  []float64 `json:"chikou_span"`
 }
 
 type chartZones struct {

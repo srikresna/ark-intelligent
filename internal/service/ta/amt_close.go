@@ -14,9 +14,9 @@ type CloseLocation string
 
 const (
 	CloseAboveVAH CloseLocation = "ABOVE_VAH" // Bullish: close above Value Area High
-	CloseAtPOC    CloseLocation = "AT_POC"     // Neutral: close near Point of Control
-	CloseInsideVA CloseLocation = "INSIDE_VA"  // Balanced: close within VA but not at POC
-	CloseBelowVAL CloseLocation = "BELOW_VAL"  // Bearish: close below Value Area Low
+	CloseAtPOC    CloseLocation = "AT_POC"    // Neutral: close near Point of Control
+	CloseInsideVA CloseLocation = "INSIDE_VA" // Balanced: close within VA but not at POC
+	CloseBelowVAL CloseLocation = "BELOW_VAL" // Bearish: close below Value Area Low
 )
 
 // CloseClassification holds the close location analysis for a single day.
@@ -33,8 +33,8 @@ type CloseClassification struct {
 	DistFromVAL float64 // close distance from VAL (positive = above)
 
 	// Follow-through (populated only when next day data is available)
-	NextDayDirection string  // "BULLISH" | "BEARISH" | "FLAT" | "" (no data yet)
-	FollowedThrough  bool    // did price continue in the direction implied by close location?
+	NextDayDirection string // "BULLISH" | "BEARISH" | "FLAT" | "" (no data yet)
+	FollowedThrough  bool   // did price continue in the direction implied by close location?
 }
 
 // AMTCloseResult holds close location analysis for multiple days.

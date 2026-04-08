@@ -16,37 +16,37 @@ import (
 // StorageDeps holds all storage layer dependencies initialized by InitializeStorage.
 // This struct centralizes repository access and database handles for clean DI.
 type StorageDeps struct {
-	DB              *storage.DB
-	EventRepo       *storage.EventRepo
-	COTRepo         *storage.COTRepo
-	PrefsRepo       *storage.PrefsRepo
-	NewsRepo        *storage.NewsRepo
-	CacheRepo       *storage.CacheRepo
-	UserRepo        *storage.UserRepo
-	PriceRepo       *storage.PriceRepo
-	SignalRepo      *storage.SignalRepo
-	ImpactRepo      *storage.ImpactRepo
-	DailyPriceRepo  *storage.DailyPriceRepo
-	IntradayRepo    *storage.IntradayRepo
-	FeedbackRepo    *storage.FeedbackRepo
-	FREDRepo        *storage.FREDRepo
-	MemoryRepo      *storage.MemoryRepo
+	DB               *storage.DB
+	EventRepo        *storage.EventRepo
+	COTRepo          *storage.COTRepo
+	PrefsRepo        *storage.PrefsRepo
+	NewsRepo         *storage.NewsRepo
+	CacheRepo        *storage.CacheRepo
+	UserRepo         *storage.UserRepo
+	PriceRepo        *storage.PriceRepo
+	SignalRepo       *storage.SignalRepo
+	ImpactRepo       *storage.ImpactRepo
+	DailyPriceRepo   *storage.DailyPriceRepo
+	IntradayRepo     *storage.IntradayRepo
+	FeedbackRepo     *storage.FeedbackRepo
+	FREDRepo         *storage.FREDRepo
+	MemoryRepo       *storage.MemoryRepo
 	ConversationRepo *storage.ConversationRepo
 }
 
 // StorageConfig holds configuration parameters for storage initialization.
 type StorageConfig struct {
-	DataDir           string
-	ChatHistoryLimit  int
-	ChatHistoryTTL    time.Duration
-	MemoryTTL         time.Duration
+	DataDir          string
+	ChatHistoryLimit int
+	ChatHistoryTTL   time.Duration
+	MemoryTTL        time.Duration
 }
 
 // DefaultStorageConfig returns sensible defaults for storage configuration.
 func DefaultStorageConfig(dataDir string) StorageConfig {
 	return StorageConfig{
 		DataDir:          dataDir,
-		ChatHistoryLimit: 50, // Default conversation history limit
+		ChatHistoryLimit: 50,                  // Default conversation history limit
 		ChatHistoryTTL:   24 * time.Hour * 30, // 30 days
 		MemoryTTL:        24 * time.Hour * 30, // 30 days
 	}

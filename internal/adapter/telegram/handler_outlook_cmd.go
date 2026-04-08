@@ -13,15 +13,15 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/service/bis"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
-	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
 	"github.com/arkcode369/ark-intelligent/internal/service/macro"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
 	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
-	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 

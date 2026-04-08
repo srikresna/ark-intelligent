@@ -127,22 +127,22 @@ func computeStats(signals []domain.PersistedSignal, label string) *domain.Backte
 
 	// Accumulators
 	var (
-		wins1W, wins2W, wins4W       int
-		eval1W, eval2W, eval4W       int
-		sumReturn1W, sumReturn2W     float64
-		sumReturn4W                  float64
-		sumWinReturn1W               float64
-		sumLossReturn1W              float64
-		winCount1W, lossCount1W      int
-		sumConfidenceEval            float64 // BUG-H2 fix: only count evaluated signals
-		sumConfidenceAll             float64 // for reference (all signals including pending)
-		highStrengthWins, highTotal  int
-		lowStrengthWins, lowTotal    int
-		weeklyReturns                []float64
-		winReturns1W                 []float64
-		lossReturns1W                []float64
-		brierConfidences             []float64 // raw confidences for Brier score
-		brierOutcomes                []bool    // outcomes for Brier score
+		wins1W, wins2W, wins4W      int
+		eval1W, eval2W, eval4W      int
+		sumReturn1W, sumReturn2W    float64
+		sumReturn4W                 float64
+		sumWinReturn1W              float64
+		sumLossReturn1W             float64
+		winCount1W, lossCount1W     int
+		sumConfidenceEval           float64 // BUG-H2 fix: only count evaluated signals
+		sumConfidenceAll            float64 // for reference (all signals including pending)
+		highStrengthWins, highTotal int
+		lowStrengthWins, lowTotal   int
+		weeklyReturns               []float64
+		winReturns1W                []float64
+		lossReturns1W               []float64
+		brierConfidences            []float64 // raw confidences for Brier score
+		brierOutcomes               []bool    // outcomes for Brier score
 	)
 
 	for _, s := range signals {

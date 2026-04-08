@@ -13,23 +13,23 @@ type ExchangeFlow struct {
 
 // ActiveAddressMetric holds daily active address and tx count.
 type ActiveAddressMetric struct {
-	Date           time.Time
+	Date            time.Time
 	ActiveAddresses int64
-	TxCount        int64
+	TxCount         int64
 }
 
 // AssetOnChainSummary holds computed on-chain metrics for an asset.
 type AssetOnChainSummary struct {
 	Asset              string
 	Flows              []ExchangeFlow
-	NetFlow7D          float64   // sum of net flows over last 7 days
-	NetFlow30D         float64   // sum of net flows over last 30 days
-	ConsecutiveOutflow int       // consecutive days of net outflow (accumulation)
-	LargeInflowSpike   bool      // single-day inflow > 2x avg
-	FlowTrend          string    // "ACCUMULATION" | "DISTRIBUTION" | "NEUTRAL"
-	ActiveAddresses    int64     // latest active address count
-	ActiveAddrChange7D float64   // % change in active addresses over 7 days
-	TxCount            int64     // latest tx count
+	NetFlow7D          float64 // sum of net flows over last 7 days
+	NetFlow30D         float64 // sum of net flows over last 30 days
+	ConsecutiveOutflow int     // consecutive days of net outflow (accumulation)
+	LargeInflowSpike   bool    // single-day inflow > 2x avg
+	FlowTrend          string  // "ACCUMULATION" | "DISTRIBUTION" | "NEUTRAL"
+	ActiveAddresses    int64   // latest active address count
+	ActiveAddrChange7D float64 // % change in active addresses over 7 days
+	TxCount            int64   // latest tx count
 	FetchedAt          time.Time
 	Available          bool
 }
@@ -43,20 +43,20 @@ type OnChainReport struct {
 
 // BTCNetworkHealth holds BTC network metrics from Blockchain.com API.
 type BTCNetworkHealth struct {
-	HashRate          float64   // TH/s — current network hash rate
-	HashRate7DAvg     float64   // TH/s — 7-day average
-	HashRateChange    float64   // % change over 7 days
-	MempoolBytes      int64     // current mempool size in bytes
-	MempoolTxCount    int64     // pending transactions in mempool
-	TotalFeesBTC      float64   // total fees in BTC (last 24h)
-	AvgFeeBTC         float64   // average fee per tx (BTC)
-	FeeSpike          bool      // fee > 2x 30-day average
-	Difficulty        float64   // current mining difficulty
-	DifficultyChange  float64   // last difficulty adjustment %
-	MarketPriceUSD    float64   // BTC/USD price from Blockchain.com
-	NTx24H            int64     // transactions count last 24h
-	MinerCapitulation bool      // hash rate dropped >10% over 7 days
-	MempoolCongested  bool      // mempool > 100MB
+	HashRate          float64 // TH/s — current network hash rate
+	HashRate7DAvg     float64 // TH/s — 7-day average
+	HashRateChange    float64 // % change over 7 days
+	MempoolBytes      int64   // current mempool size in bytes
+	MempoolTxCount    int64   // pending transactions in mempool
+	TotalFeesBTC      float64 // total fees in BTC (last 24h)
+	AvgFeeBTC         float64 // average fee per tx (BTC)
+	FeeSpike          bool    // fee > 2x 30-day average
+	Difficulty        float64 // current mining difficulty
+	DifficultyChange  float64 // last difficulty adjustment %
+	MarketPriceUSD    float64 // BTC/USD price from Blockchain.com
+	NTx24H            int64   // transactions count last 24h
+	MinerCapitulation bool    // hash rate dropped >10% over 7 days
+	MempoolCongested  bool    // mempool > 100MB
 	FetchedAt         time.Time
 	Available         bool
 }

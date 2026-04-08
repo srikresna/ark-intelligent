@@ -38,14 +38,13 @@ func IsValidClaudeModel(m ClaudeModelID) bool {
 	return false
 }
 
-
 // OutputMode controls the verbosity of bot output.
 type OutputMode string
 
 const (
-	OutputCompact  OutputMode = "compact"
-	OutputFull     OutputMode = "full"
-	OutputMinimal  OutputMode = "minimal"
+	OutputCompact OutputMode = "compact"
+	OutputFull    OutputMode = "full"
+	OutputMinimal OutputMode = "minimal"
 )
 
 // NextOutputMode cycles: compact -> full -> minimal -> compact.
@@ -90,10 +89,10 @@ type UserPrefs struct {
 	ClaudeModel ClaudeModelID `json:"claude_model,omitempty"`
 
 	// Broadcast & UI state
-	ChatID         string `json:"chat_id"`         // Telegram chat ID (set on /start, used for push alerts)
-	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
-	CalendarView   string     `json:"calendar_view"`   // Last used view: "day", "week", "month"
-	OutputMode     OutputMode `json:"output_mode,omitempty"` // "compact" (default), "full", or "minimal"
+	ChatID         string     `json:"chat_id"`                 // Telegram chat ID (set on /start, used for push alerts)
+	CalendarFilter string     `json:"calendar_filter"`         // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
+	CalendarView   string     `json:"calendar_view"`           // Last used view: "day", "week", "month"
+	OutputMode     OutputMode `json:"output_mode,omitempty"`   // "compact" (default), "full", or "minimal"
 	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
 
 	// DefaultTimeframe stores the user-preferred timeframe (e.g. "daily", "4h").
@@ -215,9 +214,9 @@ func ResolveDefaultTimeframe(pref string) string {
 
 // PairAlert defines alert criteria for a specific currency pair.
 type PairAlert struct {
-	Currency        string  `json:"currency"`          // "EUR", "GBP", etc.
-	ConvictionDelta float64 `json:"conviction_delta"`  // Alert if conviction changes by this amount (0 = any change)
-	BiasFlip        bool    `json:"bias_flip"`         // Alert on bullish↔bearish flip
+	Currency        string  `json:"currency"`         // "EUR", "GBP", etc.
+	ConvictionDelta float64 `json:"conviction_delta"` // Alert if conviction changes by this amount (0 = any change)
+	BiasFlip        bool    `json:"bias_flip"`        // Alert on bullish↔bearish flip
 	Enabled         bool    `json:"enabled"`
 }
 
@@ -242,10 +241,10 @@ func IsValidAlertCurrency(c string) bool {
 
 // Known alert type keys for per-type granularity.
 const (
-	AlertTypeCOTRelease  = "cot_release"
-	AlertTypeFREDRegime  = "fred_regime"
-	AlertTypeSignalStrong = "signal_strong"
-	AlertTypeNewsHigh    = "news_high"
+	AlertTypeCOTRelease    = "cot_release"
+	AlertTypeFREDRegime    = "fred_regime"
+	AlertTypeSignalStrong  = "signal_strong"
+	AlertTypeNewsHigh      = "news_high"
 	AlertTypeConcentration = "concentration"
 )
 
@@ -305,4 +304,3 @@ func (p UserPrefs) IsInQuietHours(wibHour int) bool {
 	// Overnight range (e.g., 23:00-07:00)
 	return wibHour >= start || wibHour < end
 }
-

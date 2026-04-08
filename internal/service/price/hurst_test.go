@@ -51,9 +51,9 @@ func TestComputeHurstExponent_MeanRevertingSeries(t *testing.T) {
 
 func TestComputeHurstExponent_ClassificationValid(t *testing.T) {
 	testCases := []struct {
-		name           string
-		expectedH      float64
-		expectedClass  string
+		name          string
+		expectedH     float64
+		expectedClass string
 	}{
 		{"Mean Reverting", 0.3, "MEAN_REVERTING"},
 		{"Random Walk", 0.5, "RANDOM_WALK"},
@@ -159,10 +159,10 @@ func TestHurstRegimeContext_Structure(t *testing.T) {
 	}
 
 	hurst := &HurstResult{
-		H:             0.7,
+		H:              0.7,
 		Classification: "TRENDING",
-		Confidence:    0.2,
-		RSquared:      0.85,
+		Confidence:     0.2,
+		RSquared:       0.85,
 	}
 
 	ctx := &HurstRegimeContext{
@@ -188,7 +188,7 @@ func generateRandomPricesHurst(n int) []domain.PriceRecord {
 	for i := n - 1; i >= 0; i-- {
 		prices[i] = domain.PriceRecord{Close: price}
 		// Random walk
-		ret := (float64(i%7)-3) * vol * 0.5 // Some pattern
+		ret := (float64(i%7) - 3) * vol * 0.5 // Some pattern
 		price *= (1 + ret)
 	}
 	return prices

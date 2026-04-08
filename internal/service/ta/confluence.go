@@ -13,12 +13,12 @@ import (
 // ConfluenceResult aggregates normalised signals from all available indicators
 // into a single directional score with a letter grade.
 type ConfluenceResult struct {
-	Score           float64    // -100 to +100
-	Grade           string     // "A", "B", "C", "D", "F"
-	Direction       string     // "BULLISH", "BEARISH", "NEUTRAL"
-	BullishCount    int        // number of bullish indicators
-	BearishCount    int        // number of bearish indicators
-	NeutralCount    int        // number of neutral indicators
+	Score           float64 // -100 to +100
+	Grade           string  // "A", "B", "C", "D", "F"
+	Direction       string  // "BULLISH", "BEARISH", "NEUTRAL"
+	BullishCount    int     // number of bullish indicators
+	BearishCount    int     // number of bearish indicators
+	NeutralCount    int     // number of neutral indicators
 	TotalIndicators int
 	Signals         []TASignal // individual indicator signals
 	Summary         string     // human-readable summary
@@ -38,25 +38,25 @@ type indicatorWeight struct {
 // Categories: Trend (40%), Momentum (35%), Volume (15%), Volatility (10%).
 var defaultWeights = map[string]indicatorWeight{
 	// Trend (40%)
-	"EMA_RIBBON":  {category: "trend", weight: 0.15},
-	"SUPERTREND":  {category: "trend", weight: 0.10},
-	"ICHIMOKU":    {category: "trend", weight: 0.10},
-	"ADX":         {category: "trend", weight: 0.05},
+	"EMA_RIBBON": {category: "trend", weight: 0.15},
+	"SUPERTREND": {category: "trend", weight: 0.10},
+	"ICHIMOKU":   {category: "trend", weight: 0.10},
+	"ADX":        {category: "trend", weight: 0.05},
 	// Momentum (35%)
-	"RSI":         {category: "momentum", weight: 0.10},
-	"MACD":        {category: "momentum", weight: 0.12},
-	"STOCHASTIC":  {category: "momentum", weight: 0.08},
-	"CCI":         {category: "momentum", weight: 0.05},
+	"RSI":        {category: "momentum", weight: 0.10},
+	"MACD":       {category: "momentum", weight: 0.12},
+	"STOCHASTIC": {category: "momentum", weight: 0.08},
+	"CCI":        {category: "momentum", weight: 0.05},
 	// Volume (15%)
-	"OBV":         {category: "volume", weight: 0.06},
-	"MFI":         {category: "volume", weight: 0.05},
-	"DELTA":       {category: "volume", weight: 0.04}, // tick-rule estimated delta
+	"OBV":   {category: "volume", weight: 0.06},
+	"MFI":   {category: "volume", weight: 0.05},
+	"DELTA": {category: "volume", weight: 0.04}, // tick-rule estimated delta
 	// Volatility (10%)
-	"BOLLINGER":   {category: "volatility", weight: 0.04},
-	"WILLIAMS_R":  {category: "volatility", weight: 0.03},
-	"VWAP":        {category: "volatility", weight: 0.03}, // price position vs VWAP
+	"BOLLINGER":  {category: "volatility", weight: 0.04},
+	"WILLIAMS_R": {category: "volatility", weight: 0.03},
+	"VWAP":       {category: "volatility", weight: 0.03}, // price position vs VWAP
 	// Structure (SMC) — additional signal, does not replace existing categories
-	"SMC":          {category: "trend", weight: 0.15},
+	"SMC": {category: "trend", weight: 0.15},
 }
 
 // ---------------------------------------------------------------------------
@@ -407,8 +407,8 @@ func CalcConfluence(snap *IndicatorSnapshot) *ConfluenceResult {
 	}
 
 	// Compute category totals for redistribution
-	catTotal := map[string]float64{}   // sum of default weights per category
-	catAvail := map[string]float64{}   // sum of available weights per category
+	catTotal := map[string]float64{} // sum of default weights per category
+	catAvail := map[string]float64{} // sum of available weights per category
 	for name, iw := range defaultWeights {
 		catTotal[iw.category] += iw.weight
 		if _, ok := raw[name]; ok {

@@ -28,7 +28,7 @@ func TestStatsCalculator_ComputeAll_ZeroEvaluatedSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	// With 0 evaluated signals, win rates should be 0
 	assert.Equal(t, 0.0, stats.WinRate1W)
 	assert.Equal(t, 0.0, stats.WinRate2W)
@@ -48,7 +48,7 @@ func TestStatsCalculator_ComputeByContract_ZeroSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	// With 0 signals, should return empty stats
 	assert.Equal(t, 0, stats.TotalSignals)
 	assert.Equal(t, 0.0, stats.WinRate1W)
@@ -64,7 +64,7 @@ func TestStatsCalculator_ComputeBySignalType_ZeroSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	// With 0 signals, should return empty stats
 	assert.Equal(t, 0, stats.TotalSignals)
 	assert.Equal(t, 0.0, stats.WinRate1W)
@@ -131,7 +131,7 @@ func TestStatsCalculator_ComputeAll_WithSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	assert.Equal(t, 3, stats.TotalSignals)
 	assert.Equal(t, "ALL", stats.GroupLabel)
 	// 2 wins out of 3
@@ -167,7 +167,7 @@ func TestStatsCalculator_ComputeByContract_WithSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	assert.Equal(t, 2, stats.TotalSignals)
 	assert.Equal(t, 100.0, stats.WinRate1W) // 2 wins out of 2
 }
@@ -201,7 +201,7 @@ func TestStatsCalculator_ComputeBySignalType_WithSignals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	assert.Equal(t, 2, stats.TotalSignals)
 	assert.Equal(t, 50.0, stats.WinRate1W) // 1 win out of 2
 }
@@ -220,14 +220,14 @@ func TestStatsCalculator_ComputeAllByContract_Grouping(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	
+
 	assert.Len(t, result, 2)
-	
+
 	eurStats, ok := result["EUR"]
 	require.True(t, ok)
 	assert.Equal(t, 2, eurStats.TotalSignals)
 	assert.Equal(t, 100.0, eurStats.WinRate1W)
-	
+
 	gbpStats, ok := result["GBP"]
 	require.True(t, ok)
 	assert.Equal(t, 1, gbpStats.TotalSignals)
@@ -248,14 +248,14 @@ func TestStatsCalculator_ComputeAllBySignalType_Grouping(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	
+
 	assert.Len(t, result, 2)
-	
+
 	smStats, ok := result["SMART_MONEY"]
 	require.True(t, ok)
 	assert.Equal(t, 2, smStats.TotalSignals)
 	assert.Equal(t, 50.0, smStats.WinRate1W)
-	
+
 	cotStats, ok := result["COT"]
 	require.True(t, ok)
 	assert.Equal(t, 1, cotStats.TotalSignals)
@@ -274,7 +274,7 @@ func TestStatsCalculator_ComputeByContract_NonExistent(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	assert.Equal(t, 0, stats.TotalSignals)
 	assert.Equal(t, 0.0, stats.WinRate1W)
 }
@@ -291,7 +291,7 @@ func TestStatsCalculator_ComputeBySignalType_NonExistent(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	
+
 	assert.Equal(t, 0, stats.TotalSignals)
 	assert.Equal(t, 0.0, stats.WinRate1W)
 }

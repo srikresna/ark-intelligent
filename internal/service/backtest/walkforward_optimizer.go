@@ -52,7 +52,7 @@ type WFOResult struct {
 	// Improvement over static weights
 	StaticOOSWinRate   float64 `json:"static_oos_win_rate"`   // OOS win rate with static V3 weights
 	AdaptiveOOSWinRate float64 `json:"adaptive_oos_win_rate"` // OOS win rate with adaptive weights
-	Improvement        float64 `json:"improvement"`            // Adaptive - Static (pp)
+	Improvement        float64 `json:"improvement"`           // Adaptive - Static (pp)
 
 	Recommendation string `json:"recommendation"`
 }
@@ -65,10 +65,10 @@ type WFOWindowResult struct {
 	TestEnd    time.Time          `json:"test_end"`
 	TrainCount int                `json:"train_count"`
 	TestCount  int                `json:"test_count"`
-	Weights    map[string]float64 `json:"weights"`     // Optimized weights from train
+	Weights    map[string]float64 `json:"weights"`      // Optimized weights from train
 	OOSWinRate float64            `json:"oos_win_rate"` // Out-of-sample win rate (%)
 	OOSReturn  float64            `json:"oos_return"`   // Average out-of-sample return
-	Regime     string             `json:"regime"`        // Dominant regime in train window
+	Regime     string             `json:"regime"`       // Dominant regime in train window
 }
 
 // WalkForwardOptimizer performs rolling weight optimization.

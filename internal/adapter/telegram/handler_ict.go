@@ -13,8 +13,8 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
-	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 

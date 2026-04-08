@@ -56,13 +56,13 @@ type SkewResult struct {
 	ExpirySkews []SkewMetrics
 
 	// Aggregate put/call IV ratio across nearest liquid expiry
-	AggregatePCRatio   float64
-	PCRatioPercentile  float64 // 0–100, based on recent history
-	PCRatioSignal      string  // "BEARISH" | "BULLISH" | "NEUTRAL"
+	AggregatePCRatio  float64
+	PCRatioPercentile float64 // 0–100, based on recent history
+	PCRatioSignal     string  // "BEARISH" | "BULLISH" | "NEUTRAL"
 
 	// ATM IV term structure slope (annualised change per DTE)
-	TermSlopePerDTE    float64
-	TermSlopeSignal    string // "CONTANGO" | "BACKWARDATION" | "FLAT"
+	TermSlopePerDTE float64
+	TermSlopeSignal string // "CONTANGO" | "BACKWARDATION" | "FLAT"
 
 	// Detected skew flips
 	Alerts []SkewAlert

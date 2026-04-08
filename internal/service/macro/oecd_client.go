@@ -55,11 +55,11 @@ var oecdFXCountries = map[string]string{
 
 // CLIDataPoint holds a single CLI reading for a country+month.
 type CLIDataPoint struct {
-	Country   string  // ISO3 code e.g. "USA"
-	Name      string  // Display name e.g. "🇺🇸 US"
-	Period    string  // YYYY-MM
-	Value     float64 // CLI index (100 = long-term trend)
-	Momentum  float64 // month-over-month change
+	Country  string  // ISO3 code e.g. "USA"
+	Name     string  // Display name e.g. "🇺🇸 US"
+	Period   string  // YYYY-MM
+	Value    float64 // CLI index (100 = long-term trend)
+	Momentum float64 // month-over-month change
 }
 
 // OECDCLIData holds the full CLI dataset for forex-relevant countries.

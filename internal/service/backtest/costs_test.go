@@ -102,8 +102,8 @@ func TestComputeCostAnalysis_SkipsPending(t *testing.T) {
 // TestComputeCostAnalysis_WinsAndLosses verifies basic aggregation.
 func TestComputeCostAnalysis_WinsAndLosses(t *testing.T) {
 	signals := []domain.PersistedSignal{
-		{Currency: "EUR", Outcome1W: domain.OutcomeWin, Return1W: 0.5},  // 0.5% win, cost = 0.02%
-		{Currency: "EUR", Outcome1W: domain.OutcomeWin, Return1W: 0.8},  // 0.8% win
+		{Currency: "EUR", Outcome1W: domain.OutcomeWin, Return1W: 0.5},   // 0.5% win, cost = 0.02%
+		{Currency: "EUR", Outcome1W: domain.OutcomeWin, Return1W: 0.8},   // 0.8% win
 		{Currency: "EUR", Outcome1W: domain.OutcomeLoss, Return1W: -0.3}, // 0.3% loss
 	}
 	result := ComputeCostAnalysis(signals, "test")
@@ -146,14 +146,14 @@ func TestClampConfidence(t *testing.T) {
 		in   float64
 		want float64
 	}{
-		{50.0, 50.0},   // in range — unchanged
-		{0.0, 5.0},     // below min → clamped to 5
-		{-10.0, 5.0},   // well below → 5
-		{100.0, 98.0},  // above max → 98
-		{150.0, 98.0},  // well above → 98
-		{5.0, 5.0},     // exactly at min
-		{98.0, 98.0},   // exactly at max
-		{97.9, 97.9},   // just below max — unchanged
+		{50.0, 50.0},  // in range — unchanged
+		{0.0, 5.0},    // below min → clamped to 5
+		{-10.0, 5.0},  // well below → 5
+		{100.0, 98.0}, // above max → 98
+		{150.0, 98.0}, // well above → 98
+		{5.0, 5.0},    // exactly at min
+		{98.0, 98.0},  // exactly at max
+		{97.9, 97.9},  // just below max — unchanged
 	}
 	for _, tt := range tests {
 		got := clampConfidence(tt.in)
@@ -166,15 +166,15 @@ func TestClampConfidence(t *testing.T) {
 // TestComputeTrendAdjustment_FullBullishAlignment expects large positive adjustment.
 func TestComputeTrendAdjustment_FullBullishAlignment(t *testing.T) {
 	dc := &domain.DailyPriceContext{
-		DailyTrend:  "UP",
-		DMA20:       1.1,
-		DMA50:       1.05,
-		DMA200:      1.00,
+		DailyTrend:   "UP",
+		DMA20:        1.1,
+		DMA50:        1.05,
+		DMA200:       1.00,
 		CurrentPrice: 1.15,
-		AboveDMA20:  true,
-		Momentum5D:  1.0, // > 0.3 → +3
-		ConsecDays:  4,
-		ConsecDir:   "UP",
+		AboveDMA20:   true,
+		Momentum5D:   1.0, // > 0.3 → +3
+		ConsecDays:   4,
+		ConsecDir:    "UP",
 	}
 	adj := computeTrendAdjustment(dc, true)
 	// +5 (daily trend) +7 (MA aligned: bullish) +3 (AboveDMA20) +3 (momentum) +2 (streak) = 20

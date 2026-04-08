@@ -13,21 +13,21 @@ import (
 // SmartMoneyAccuracy holds per-contract correlation between smart money
 // position changes and subsequent price moves.
 type SmartMoneyAccuracy struct {
-	ContractCode string
-	Currency     string
-	TotalWeeks   int     // Weeks with both COT + price data
-	Correct1W    int     // Weeks where net change direction matched price at +1W
-	Correct2W    int
-	Correct4W    int
-	Accuracy1W   float64 // Correct1W / TotalWeeks * 100
-	Accuracy2W   float64
-	Accuracy4W   float64
+	ContractCode          string
+	Currency              string
+	TotalWeeks            int // Weeks with both COT + price data
+	Correct1W             int // Weeks where net change direction matched price at +1W
+	Correct2W             int
+	Correct4W             int
+	Accuracy1W            float64 // Correct1W / TotalWeeks * 100
+	Accuracy2W            float64
+	Accuracy4W            float64
 	AvgReturnWhenFollow1W float64 // Avg % return when following smart money direction at 1W
 	AvgReturnWhenFollow4W float64
-	Correlation  float64 // Pearson correlation: net change vs 1W price change
-	BestHorizon  string  // "1W", "2W", or "4W"
-	BestAccuracy float64
-	Edge         string  // "YES", "NO", "INSUFFICIENT"
+	Correlation           float64 // Pearson correlation: net change vs 1W price change
+	BestHorizon           string  // "1W", "2W", or "4W"
+	BestAccuracy          float64
+	Edge                  string // "YES", "NO", "INSUFFICIENT"
 }
 
 // SmartMoneyAnalyzer computes smart money predictive accuracy per contract.

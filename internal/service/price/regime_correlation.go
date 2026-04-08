@@ -30,28 +30,28 @@ const (
 
 // RegimeCorrelationMatrix holds correlation matrices split by regime.
 type RegimeCorrelationMatrix struct {
-	CurrentRegime RegimeTag                            `json:"current_regime"`
-	Overall       *domain.CorrelationMatrix            `json:"overall"`
+	CurrentRegime RegimeTag                               `json:"current_regime"`
+	Overall       *domain.CorrelationMatrix               `json:"overall"`
 	PerRegime     map[RegimeTag]*domain.CorrelationMatrix `json:"per_regime"`
-	Divergences   []RegimeCorrelationDivergence        `json:"divergences,omitempty"`
-	SampleCounts  map[RegimeTag]int                    `json:"sample_counts"` // bars per regime
+	Divergences   []RegimeCorrelationDivergence           `json:"divergences,omitempty"`
+	SampleCounts  map[RegimeTag]int                       `json:"sample_counts"` // bars per regime
 }
 
 // RegimeCorrelationDivergence flags when the current-regime correlation
 // diverges significantly from the overall (unconditional) correlation.
 type RegimeCorrelationDivergence struct {
-	CurrencyA     string    `json:"currency_a"`
-	CurrencyB     string    `json:"currency_b"`
-	OverallCorr   float64   `json:"overall_corr"`
-	RegimeCorr    float64   `json:"regime_corr"`
-	Regime        RegimeTag `json:"regime"`
-	Delta         float64   `json:"delta"`
-	Significance  string    `json:"significance"` // "HIGH", "MEDIUM"
+	CurrencyA    string    `json:"currency_a"`
+	CurrencyB    string    `json:"currency_b"`
+	OverallCorr  float64   `json:"overall_corr"`
+	RegimeCorr   float64   `json:"regime_corr"`
+	Regime       RegimeTag `json:"regime"`
+	Delta        float64   `json:"delta"`
+	Significance string    `json:"significance"` // "HIGH", "MEDIUM"
 }
 
 // taggedReturn holds a single daily return with its regime label.
 type taggedReturn struct {
-	ret   float64
+	ret    float64
 	regime RegimeTag
 }
 

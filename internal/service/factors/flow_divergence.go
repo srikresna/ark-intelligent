@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	flowShortWindow    = 20
-	flowLongWindow     = 60
-	flowMinPoints      = 15
-	flowMaxLag         = 5
-	flowCacheTTL       = 4 * time.Hour
+	flowShortWindow     = 20
+	flowLongWindow      = 60
+	flowMinPoints       = 15
+	flowMaxLag          = 5
+	flowCacheTTL        = 4 * time.Hour
 	flowFetchMultiplier = 2
 )
 
@@ -38,7 +38,7 @@ var flowLog = logger.Component("flow_divergence")
 type FlowPair struct {
 	CurrencyA   string
 	CurrencyB   string
-	Direction   int    // +1 = normally positive corr, -1 = normally inverse
+	Direction   int // +1 = normally positive corr, -1 = normally inverse
 	Label       string
 	Implication string
 }
@@ -82,7 +82,7 @@ var standardFlowPairs = []FlowPair{
 
 // LeadLagResult describes which asset leads the other.
 type LeadLagResult struct {
-	BestOffset int     // negative = A leads B, positive = B leads A, 0 = simultaneous
+	BestOffset int // negative = A leads B, positive = B leads A, 0 = simultaneous
 	BestCorr   float64
 	LeadAsset  string
 }
@@ -95,8 +95,8 @@ type PairDivergence struct {
 	BaselineStd  float64
 	DivergenceZ  float64
 	LeadLag      LeadLagResult
-	IsDiverging  bool   // |DivergenceZ| > 2.0
-	IsStrong     bool   // |DivergenceZ| > 3.0
+	IsDiverging  bool // |DivergenceZ| > 2.0
+	IsStrong     bool // |DivergenceZ| > 3.0
 	Insufficient bool
 	AlertText    string
 }
@@ -297,14 +297,14 @@ func computeLeadLag(serA, serB []float64, labelA, labelB string, maxLag int) Lea
 			if n-1-lag < flowShortWindow {
 				continue
 			}
-			a = serA[lag : n]
+			a = serA[lag:n]
 			b = serB[0 : n-lag]
 		case offset > 0:
 			if n-1-offset < flowShortWindow {
 				continue
 			}
 			a = serA[0 : n-offset]
-			b = serB[offset : n]
+			b = serB[offset:n]
 		default:
 			a = serA[n-flowShortWindow:]
 			b = serB[n-flowShortWindow:]

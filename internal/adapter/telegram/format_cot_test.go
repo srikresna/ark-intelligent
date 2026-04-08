@@ -18,18 +18,18 @@ import (
 func TestFormatCOTRaw_Disaggregated(t *testing.T) {
 	f := NewFormatter()
 	record := domain.COTRecord{
-		ContractCode: "088691",
-		ContractName: "GOLD",
-		ReportDate:   time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		OpenInterest: 450000,
-		ManagedMoneyLong: 150000,
-		ManagedMoneyShort: 25000,
-		ProdMercLong: 50000,
-		ProdMercShort: 200000,
-		SwapDealerLong: 25000,
-		SwapDealerShort: 50000,
-		TotalTradersDisag: 250,
-		MMoneyLongTraders: 120,
+		ContractCode:       "088691",
+		ContractName:       "GOLD",
+		ReportDate:         time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		OpenInterest:       450000,
+		ManagedMoneyLong:   150000,
+		ManagedMoneyShort:  25000,
+		ProdMercLong:       50000,
+		ProdMercShort:      200000,
+		SwapDealerLong:     25000,
+		SwapDealerShort:    50000,
+		TotalTradersDisag:  250,
+		MMoneyLongTraders:  120,
 		MMoneyShortTraders: 45,
 	}
 
@@ -48,18 +48,18 @@ func TestFormatCOTRaw_Disaggregated(t *testing.T) {
 func TestFormatCOTRaw_TFF(t *testing.T) {
 	f := NewFormatter()
 	record := domain.COTRecord{
-		ContractCode: "099741",
-		ContractName: "EURO FX",
-		ReportDate:   time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		OpenInterest: 800000,
-		LevFundLong: 150000,
-		LevFundShort: 80000,
-		AssetMgrLong: 120000,
-		AssetMgrShort: 30000,
-		DealerLong: 50000,
-		DealerShort: 100000,
-		TotalTraders: 180,
-		LevFundLongTraders: 65,
+		ContractCode:        "099741",
+		ContractName:        "EURO FX",
+		ReportDate:          time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		OpenInterest:        800000,
+		LevFundLong:         150000,
+		LevFundShort:        80000,
+		AssetMgrLong:        120000,
+		AssetMgrShort:       30000,
+		DealerLong:          50000,
+		DealerShort:         100000,
+		TotalTraders:        180,
+		LevFundLongTraders:  65,
 		LevFundShortTraders: 40,
 	}
 
@@ -93,13 +93,13 @@ func TestFormatCOTRaw_EmptyRecord(t *testing.T) {
 func TestFormatCOTRaw_SmallSpecs(t *testing.T) {
 	f := NewFormatter()
 	record := domain.COTRecord{
-		ContractCode: "088691",
-		ContractName: "GOLD",
-		ReportDate:   time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		OpenInterest: 450000,
-		SmallLong:    50000,
-		SmallShort:   35000,
-		ManagedMoneyLong: 150000,
+		ContractCode:      "088691",
+		ContractName:      "GOLD",
+		ReportDate:        time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		OpenInterest:      450000,
+		SmallLong:         50000,
+		SmallShort:        35000,
+		ManagedMoneyLong:  150000,
 		ManagedMoneyShort: 25000,
 	}
 
@@ -133,13 +133,13 @@ func TestFormatRankingWithConviction_WithData(t *testing.T) {
 	f := NewFormatter()
 	analyses := []domain.COTAnalysis{
 		{
-			Contract: domain.COTContract{Code: "099741", Currency: "EUR"},
-			COTIndex: 75.0,
+			Contract:       domain.COTContract{Code: "099741", Currency: "EUR"},
+			COTIndex:       75.0,
 			SentimentScore: 65.0,
 		},
 		{
-			Contract: domain.COTContract{Code: "096742", Currency: "GBP"},
-			COTIndex: 45.0,
+			Contract:       domain.COTContract{Code: "096742", Currency: "GBP"},
+			COTIndex:       45.0,
 			SentimentScore: 30.0,
 		},
 	}
@@ -163,11 +163,11 @@ func TestFormatRankingWithConviction_ThinMarketAlert(t *testing.T) {
 	f := NewFormatter()
 	analyses := []domain.COTAnalysis{
 		{
-			Contract: domain.COTContract{Code: "099741", Currency: "EUR"},
-			COTIndex: 75.0,
-			SentimentScore: 65.0,
+			Contract:        domain.COTContract{Code: "099741", Currency: "EUR"},
+			COTIndex:        75.0,
+			SentimentScore:  65.0,
 			ThinMarketAlert: true,
-			ThinMarketDesc: "Low liquidity period",
+			ThinMarketDesc:  "Low liquidity period",
 		},
 	}
 	convictions := []cot.ConvictionScore{
@@ -206,9 +206,9 @@ func TestFormatRankingWithConviction_WithRegime(t *testing.T) {
 func TestFormatConvictionBlock_StrongBuy(t *testing.T) {
 	f := NewFormatter()
 	cs := cot.ConvictionScore{
-		Score: 80.0,
+		Score:     80.0,
 		Direction: "LONG",
-		Label: "Strong Buy",
+		Label:     "Strong Buy",
 	}
 
 	out := f.FormatConvictionBlock(cs)
@@ -220,9 +220,9 @@ func TestFormatConvictionBlock_StrongBuy(t *testing.T) {
 func TestFormatConvictionBlock_StrongSell(t *testing.T) {
 	f := NewFormatter()
 	cs := cot.ConvictionScore{
-		Score: 85.0,
+		Score:     85.0,
 		Direction: "SHORT",
-		Label: "Strong Sell",
+		Label:     "Strong Sell",
 	}
 
 	out := f.FormatConvictionBlock(cs)
@@ -234,9 +234,9 @@ func TestFormatConvictionBlock_StrongSell(t *testing.T) {
 func TestFormatConvictionBlock_Neutral(t *testing.T) {
 	f := NewFormatter()
 	cs := cot.ConvictionScore{
-		Score: 45.0,
+		Score:     45.0,
 		Direction: "NEUTRAL",
-		Label: "Neutral",
+		Label:     "Neutral",
 	}
 
 	out := f.FormatConvictionBlock(cs)
@@ -248,15 +248,15 @@ func TestFormatConvictionBlock_Neutral(t *testing.T) {
 func TestFormatConvictionBlock_WithComponents(t *testing.T) {
 	f := NewFormatter()
 	cs := cot.ConvictionScore{
-		Score: 70.0,
-		Direction: "LONG",
-		Label: "Buy",
-		COTBias: "BULLISH",
-		FREDRegime: "GOLDILOCKS",
-		Version: 3,
-		COTComponent: 25,
-		MacroComponent: 20,
-		PriceComponent: 15,
+		Score:             70.0,
+		Direction:         "LONG",
+		Label:             "Buy",
+		COTBias:           "BULLISH",
+		FREDRegime:        "GOLDILOCKS",
+		Version:           3,
+		COTComponent:      25,
+		MacroComponent:    20,
+		PriceComponent:    15,
 		CalendarComponent: 10,
 	}
 
@@ -568,7 +568,7 @@ func TestFormatStrengthRanking_WithData(t *testing.T) {
 			Divergence:    false,
 		},
 		{
-			Currency:       "GBP",
+			Currency:      "GBP",
 			PriceScore:    45.2,
 			COTScore:      80.1,
 			CombinedScore: 62.6,
@@ -590,7 +590,7 @@ func TestFormatStrengthRanking_WithDivergence(t *testing.T) {
 	f := NewFormatter()
 	strengths := []pricesvc.CurrencyStrength{
 		{
-			Currency:       "GBP",
+			Currency:      "GBP",
 			PriceScore:    45.2,
 			COTScore:      80.1,
 			CombinedScore: 62.6,
@@ -690,16 +690,16 @@ func TestFormatCOTShareText_Bullish(t *testing.T) {
 	f := NewFormatter()
 	a := domain.COTAnalysis{
 		Contract: domain.COTContract{
-			Code: "099741",
-			Name: "EURO FX",
+			Code:     "099741",
+			Name:     "EURO FX",
 			Currency: "EUR",
 		},
-		ReportDate:  time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		NetPosition: 50000,
-		COTIndex:    75.5,
-		NetChange:   3000,
+		ReportDate:       time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		NetPosition:      50000,
+		COTIndex:         75.5,
+		NetChange:        3000,
 		SpeculatorSignal: "BULLISH",
-		SpecMomentum4W: 2500,
+		SpecMomentum4W:   2500,
 	}
 
 	out := f.FormatCOTShareText(a)
@@ -715,14 +715,14 @@ func TestFormatCOTShareText_Bearish(t *testing.T) {
 	f := NewFormatter()
 	a := domain.COTAnalysis{
 		Contract: domain.COTContract{
-			Code: "096742",
-			Name: "BRITISH POUND",
+			Code:     "096742",
+			Name:     "BRITISH POUND",
 			Currency: "GBP",
 		},
-		ReportDate:  time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		NetPosition: -45000,
-		COTIndex:    22.0,
-		NetChange:   -2500,
+		ReportDate:       time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		NetPosition:      -45000,
+		COTIndex:         22.0,
+		NetChange:        -2500,
 		SpeculatorSignal: "BEARISH",
 	}
 
@@ -736,14 +736,14 @@ func TestFormatCOTShareText_Neutral(t *testing.T) {
 	f := NewFormatter()
 	a := domain.COTAnalysis{
 		Contract: domain.COTContract{
-			Code: "097741",
-			Name: "JAPANESE YEN",
+			Code:     "097741",
+			Name:     "JAPANESE YEN",
 			Currency: "JPY",
 		},
-		ReportDate:  time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		NetPosition: 0,
-		COTIndex:    50.0,
-		NetChange:   0,
+		ReportDate:       time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		NetPosition:      0,
+		COTIndex:         50.0,
+		NetChange:        0,
 		SpeculatorSignal: "NEUTRAL",
 	}
 
@@ -761,32 +761,32 @@ func TestFormatCOTDetail_AllAlerts(t *testing.T) {
 	f := NewFormatter()
 	a := domain.COTAnalysis{
 		Contract: domain.COTContract{
-			Code: "088691",
-			Name: "GOLD",
-			Currency: "GOLD",
+			Code:       "088691",
+			Name:       "GOLD",
+			Currency:   "GOLD",
 			ReportType: "DISAGGREGATED",
 		},
-		ReportDate:  time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
-		COTIndex:    85.0,
-		NetPosition: 120000,
-		NetChange:   8000,
-		AssetMgrAlert: true,
-		AssetMgrZScore: 2.5,
-		ThinMarketAlert: true,
-		ThinMarketDesc: "Holiday trading period",
-		SmartDumbDivergence: true,
-		CommExtremeBull: true,
-		CommExtremeBear: false,
-		CategoryDivergence: true,
+		ReportDate:             time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+		COTIndex:               85.0,
+		NetPosition:            120000,
+		NetChange:              8000,
+		AssetMgrAlert:          true,
+		AssetMgrZScore:         2.5,
+		ThinMarketAlert:        true,
+		ThinMarketDesc:         "Holiday trading period",
+		SmartDumbDivergence:    true,
+		CommExtremeBull:        true,
+		CommExtremeBear:        false,
+		CategoryDivergence:     true,
 		CategoryDivergenceDesc: "Managed Money vs SwapDealer divergence",
-		DealerAlert: true,
-		LevFundAlert: true,
-		ManagedMoneyAlert: true,
-		SwapDealerAlert: false,
-		DealerZScore: 2.3,
-		LevFundZScore: -2.1,
-		ManagedMoneyZScore: 2.8,
-		SwapDealerZScore: 0.5,
+		DealerAlert:            true,
+		LevFundAlert:           true,
+		ManagedMoneyAlert:      true,
+		SwapDealerAlert:        false,
+		DealerZScore:           2.3,
+		LevFundZScore:          -2.1,
+		ManagedMoneyZScore:     2.8,
+		SwapDealerZScore:       0.5,
 	}
 
 	out := f.FormatCOTDetail(a)
@@ -807,8 +807,8 @@ func TestFormatCOTOverview_WithConviction(t *testing.T) {
 	analyses := []domain.COTAnalysis{
 		{
 			Contract: domain.COTContract{
-				Code: "099741",
-				Name: "EURO FX",
+				Code:     "099741",
+				Name:     "EURO FX",
 				Currency: "EUR",
 			},
 			COTIndex:    75.0,
@@ -819,8 +819,8 @@ func TestFormatCOTOverview_WithConviction(t *testing.T) {
 	}
 	convictions := []cot.ConvictionScore{
 		{
-			Currency: "EUR",
-			Score:    72.0,
+			Currency:  "EUR",
+			Score:     72.0,
 			Direction: "LONG",
 		},
 	}

@@ -13,9 +13,9 @@ type PersistedSignal struct {
 	ContractCode string  `json:"contract_code"`
 	Currency     string  `json:"currency"`
 	SignalType   string  `json:"signal_type"` // e.g. "SMART_MONEY"
-	Direction    string  `json:"direction"`    // "BULLISH" or "BEARISH"
-	Strength     int     `json:"strength"`     // 1-5
-	Confidence   float64 `json:"confidence"`   // 0-100
+	Direction    string  `json:"direction"`   // "BULLISH" or "BEARISH"
+	Strength     int     `json:"strength"`    // 1-5
+	Confidence   float64 `json:"confidence"`  // 0-100
 	Description  string  `json:"description"`
 
 	// Timing
@@ -24,7 +24,7 @@ type PersistedSignal struct {
 
 	// Price at detection
 	EntryPrice float64 `json:"entry_price"` // Close price on detection week
-	Inverse    bool    `json:"inverse"`      // Whether pair is inverse (USD/JPY etc.)
+	Inverse    bool    `json:"inverse"`     // Whether pair is inverse (USD/JPY etc.)
 
 	// Context at detection (for later analysis)
 	SentimentScore  float64 `json:"sentiment_score,omitempty"`
@@ -138,15 +138,15 @@ type BacktestStats struct {
 	WeeklyReturns []float64 `json:"weekly_returns,omitempty"` // Individual 1W returns for computation
 
 	// Optimal holding period
-	BestPeriod  string  `json:"best_period"`  // "1W", "2W", "4W"
+	BestPeriod  string  `json:"best_period"` // "1W", "2W", "4W"
 	BestWinRate float64 `json:"best_win_rate"`
 
 	// Confidence calibration
-	AvgConfidence     float64 `json:"avg_confidence"`      // Average stated confidence (0-100)
-	ActualAccuracy    float64 `json:"actual_accuracy"`     // Actual win rate at best period
-	CalibrationError  float64 `json:"calibration_error"`   // |confidence - accuracy|
-	BrierScore        float64 `json:"brier_score"`         // Mean squared error of calibrated predictions (0=perfect, <0.25=good)
-	CalibrationMethod string  `json:"calibration_method"`  // "Platt" or "WinRate"
+	AvgConfidence     float64 `json:"avg_confidence"`     // Average stated confidence (0-100)
+	ActualAccuracy    float64 `json:"actual_accuracy"`    // Actual win rate at best period
+	CalibrationError  float64 `json:"calibration_error"`  // |confidence - accuracy|
+	BrierScore        float64 `json:"brier_score"`        // Mean squared error of calibrated predictions (0=perfect, <0.25=good)
+	CalibrationMethod string  `json:"calibration_method"` // "Platt" or "WinRate"
 
 	// Strength breakdown
 	HighStrengthWinRate float64 `json:"high_strength_win_rate"` // Strength 4-5
@@ -155,10 +155,10 @@ type BacktestStats struct {
 	LowStrengthCount    int     `json:"low_strength_count"`
 
 	// Statistical significance
-	WinRatePValue              float64    `json:"win_rate_p_value"`              // Binomial test p-value (win rate > 50%)
-	ReturnTStat                float64    `json:"return_t_stat"`                 // One-sample t-test statistic (returns > 0)
-	ReturnPValue               float64    `json:"return_p_value"`                // Two-tailed p-value for return t-test
-	WinRateCI                  [2]float64 `json:"win_rate_ci"`                   // 95% CI for win rate (percentage points)
-	IsStatisticallySignificant bool       `json:"is_statistically_significant"`  // WinRatePValue < 0.05
-	MinSamplesNeeded           int        `json:"min_samples_needed"`            // Min samples for ±5% precision at 95% CI
+	WinRatePValue              float64    `json:"win_rate_p_value"`             // Binomial test p-value (win rate > 50%)
+	ReturnTStat                float64    `json:"return_t_stat"`                // One-sample t-test statistic (returns > 0)
+	ReturnPValue               float64    `json:"return_p_value"`               // Two-tailed p-value for return t-test
+	WinRateCI                  [2]float64 `json:"win_rate_ci"`                  // 95% CI for win rate (percentage points)
+	IsStatisticallySignificant bool       `json:"is_statistically_significant"` // WinRatePValue < 0.05
+	MinSamplesNeeded           int        `json:"min_samples_needed"`           // Min samples for ±5% precision at 95% CI
 }

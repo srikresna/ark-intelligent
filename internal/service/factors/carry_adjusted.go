@@ -3,11 +3,13 @@ package factors
 // scoreCarryAdjusted computes a carry-adjusted momentum score.
 //
 // Logic:
-//   rawMom = cross-sectional momentum score
-//   carry = CarryBps (FX rate differential) or FundingRate (crypto perpetual)
+//
+//	rawMom = cross-sectional momentum score
+//	carry = CarryBps (FX rate differential) or FundingRate (crypto perpetual)
 //
 // The carry adjusts expected return from holding the position:
-//   carryAdj = rawMom + alpha * normalizedCarry
+//
+//	carryAdj = rawMom + alpha * normalizedCarry
 //
 // carryBps is in basis points per year.
 // For FX: positive means the asset currency earns more than USD (favorable for long).

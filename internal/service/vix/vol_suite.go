@@ -37,10 +37,10 @@ type VolSuite struct {
 	VIX9D30Ratio float64 // VIX9D/VIX — <1 normal, >1 = near-term event priced
 
 	// Analysis
-	TailRisk    string // "NORMAL", "ELEVATED", "EXTREME"
-	SKEWVIXPercentile float64 // Historical percentile of current SKEW/VIX ratio (0-100)
-	SKEWPercentile    float64 // Historical percentile of current SKEW level (0-100)
-	Divergences []string // detected vol divergences
+	TailRisk          string   // "NORMAL", "ELEVATED", "EXTREME"
+	SKEWVIXPercentile float64  // Historical percentile of current SKEW/VIX ratio (0-100)
+	SKEWPercentile    float64  // Historical percentile of current SKEW level (0-100)
+	Divergences       []string // detected vol divergences
 
 	// Cross-asset vol dashboard result (percentiles + regime)
 	CrossVol *CrossVolResult // nil if not computed

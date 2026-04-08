@@ -34,27 +34,27 @@ const (
 // knownStrategyGroups maps individual signal types to a high-level group.
 // Signals not listed here are left ungrouped (use their raw SignalType name).
 var knownStrategyGroups = map[string]string{ //nolint:gochecknoglobals
-	"SMART_MONEY":        "COT",
+	"SMART_MONEY":         "COT",
 	"EXTREME_POSITIONING": "COT",
-	"DIVERGENCE":         "COT",
-	"MOMENTUM_SHIFT":     "COT",
-	"CONCENTRATION":      "COT",
-	"CROWD_CONTRARIAN":   "COT",
-	"THIN_MARKET":        "COT",
+	"DIVERGENCE":          "COT",
+	"MOMENTUM_SHIFT":      "COT",
+	"CONCENTRATION":       "COT",
+	"CROWD_CONTRARIAN":    "COT",
+	"THIN_MARKET":         "COT",
 }
 
 // StrategyMetrics holds per-strategy performance metrics.
 type StrategyMetrics struct {
-	Name         string    `json:"name"`           // Display name (e.g. "COT", "SMART_MONEY")
-	SignalTypes  []string  `json:"signal_types"`   // Constituent signal types
-	SignalCount  int       `json:"signal_count"`   // Total signals evaluated
-	WinRate      float64   `json:"win_rate"`       // 1W win rate (0-100%)
-	AvgReturn    float64   `json:"avg_return"`     // Average 1W return (%)
-	Sharpe       float64   `json:"sharpe"`         // Annualized Sharpe
-	MaxDrawdown  float64   `json:"max_drawdown"`   // Max peak-to-trough (%)
-	ProfitFactor float64   `json:"profit_factor"`  // Sum(wins) / Sum(losses)
-	Volatility   float64   `json:"volatility"`     // Weekly return std dev (%)
-	Weekly       []float64 `json:"-"`              // Weekly returns (used for correlation)
+	Name         string    `json:"name"`          // Display name (e.g. "COT", "SMART_MONEY")
+	SignalTypes  []string  `json:"signal_types"`  // Constituent signal types
+	SignalCount  int       `json:"signal_count"`  // Total signals evaluated
+	WinRate      float64   `json:"win_rate"`      // 1W win rate (0-100%)
+	AvgReturn    float64   `json:"avg_return"`    // Average 1W return (%)
+	Sharpe       float64   `json:"sharpe"`        // Annualized Sharpe
+	MaxDrawdown  float64   `json:"max_drawdown"`  // Max peak-to-trough (%)
+	ProfitFactor float64   `json:"profit_factor"` // Sum(wins) / Sum(losses)
+	Volatility   float64   `json:"volatility"`    // Weekly return std dev (%)
+	Weekly       []float64 `json:"-"`             // Weekly returns (used for correlation)
 }
 
 // StrategyCorrelation holds pairwise strategy return correlations.
@@ -66,22 +66,22 @@ type StrategyCorrelation struct {
 
 // PortfolioComposition defines a weighted portfolio of strategies.
 type PortfolioComposition struct {
-	Name               string             `json:"name"`                // e.g. "Equal-Weight"
-	Weights            map[string]float64 `json:"weights"`             // strategy → weight (sums to 1.0)
-	CombinedSharpe     float64            `json:"combined_sharpe"`
-	CombinedMaxDD      float64            `json:"combined_max_dd"`
-	DiversificationRatio float64          `json:"diversification_ratio"` // weighted avg vol / portfolio vol
+	Name                 string             `json:"name"`    // e.g. "Equal-Weight"
+	Weights              map[string]float64 `json:"weights"` // strategy → weight (sums to 1.0)
+	CombinedSharpe       float64            `json:"combined_sharpe"`
+	CombinedMaxDD        float64            `json:"combined_max_dd"`
+	DiversificationRatio float64            `json:"diversification_ratio"` // weighted avg vol / portfolio vol
 }
 
 // MultiStrategyResult is the top-level output of StrategyComposer.
 type MultiStrategyResult struct {
-	Strategies    []StrategyMetrics     `json:"strategies"`
-	Correlations  []StrategyCorrelation `json:"correlations"`
+	Strategies    []StrategyMetrics      `json:"strategies"`
+	Correlations  []StrategyCorrelation  `json:"correlations"`
 	Portfolios    []PortfolioComposition `json:"portfolios"`
-	BestStrategy  string                `json:"best_strategy"`   // by Sharpe
-	BestSharpe    float64               `json:"best_sharpe"`
-	WorstStrategy string                `json:"worst_strategy"`  // by Sharpe
-	WorstSharpe   float64               `json:"worst_sharpe"`
+	BestStrategy  string                 `json:"best_strategy"` // by Sharpe
+	BestSharpe    float64                `json:"best_sharpe"`
+	WorstStrategy string                 `json:"worst_strategy"` // by Sharpe
+	WorstSharpe   float64                `json:"worst_sharpe"`
 }
 
 // StrategyComposer runs multi-strategy analysis.

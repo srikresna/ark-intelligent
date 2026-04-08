@@ -159,24 +159,24 @@ func generateCOTRecords(weeks int) []domain.COTRecord {
 		dealerShort := 110000 + 25000*math.Sin(cycle*math.Pi) // Inverse of lev fund
 
 		records[i] = domain.COTRecord{
-			ContractCode: testContract,
-			ContractName: "Euro FX",
-			ReportDate:   date,
-			OpenInterest: 600000 + 10000*math.Sin(float64(i)*0.2),
-			DealerLong:   dealerLong,
-			DealerShort:  dealerShort,
-			LevFundLong:  levFundLong,
-			LevFundShort: levFundShort,
-			AssetMgrLong: 50000,
+			ContractCode:  testContract,
+			ContractName:  "Euro FX",
+			ReportDate:    date,
+			OpenInterest:  600000 + 10000*math.Sin(float64(i)*0.2),
+			DealerLong:    dealerLong,
+			DealerShort:   dealerShort,
+			LevFundLong:   levFundLong,
+			LevFundShort:  levFundShort,
+			AssetMgrLong:  50000,
 			AssetMgrShort: 45000,
-			SmallLong:    30000,
-			SmallShort:   25000,
-			OtherLong:    20000,
-			OtherShort:   18000,
-			Top4Long:     45,
-			Top4Short:    40,
-			Top8Long:     65,
-			Top8Short:    60,
+			SmallLong:     30000,
+			SmallShort:    25000,
+			OtherLong:     20000,
+			OtherShort:    18000,
+			Top4Long:      45,
+			Top4Short:     40,
+			Top8Long:      65,
+			Top8Short:     60,
 			// WoW changes to trigger smart money signals
 			DealerLongChg:   -5000 * math.Sin(cycle*math.Pi),
 			DealerShortChg:  5000 * math.Sin(cycle*math.Pi),
@@ -206,7 +206,7 @@ func generateCOTAnalyses(weeks int) []domain.COTAnalysis {
 
 		cycle := float64(i) / 13.0
 		cotIndex := 50 + 45*math.Sin(cycle*math.Pi)     // Ranges 5..95
-		cotIndexComm := 50 - 45*math.Sin(cycle*math.Pi)  // Inverse of spec
+		cotIndexComm := 50 - 45*math.Sin(cycle*math.Pi) // Inverse of spec
 
 		analyses[i] = domain.COTAnalysis{
 			Contract:   contract,
@@ -265,7 +265,7 @@ func generateCOTAnalyses(weeks int) []domain.COTAnalysis {
 			ShortTermBias:  "BULLISH",
 			CrowdingIndex:  40 + 40*math.Sin(cycle*math.Pi), // Sometimes > 70
 			SentimentScore: 60,
-			SignalStrength:  domain.SignalStrong,
+			SignalStrength: domain.SignalStrong,
 
 			// Institutional
 			AssetMgrZScore: 1.5 * math.Sin(cycle*math.Pi),

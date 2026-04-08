@@ -29,16 +29,16 @@ func TestDescribeContentBlocks(t *testing.T) {
 		{
 			name: "mixed zero-value and image",
 			blocks: []ports.ContentBlock{
-				{},                    // zero-value — should be skipped
-				{Type: "image"},       // valid image block
+				{},              // zero-value — should be skipped
+				{Type: "image"}, // valid image block
 			},
 			want: "[Image]",
 		},
 		{
 			name: "mixed zero-value and document with filename",
 			blocks: []ports.ContentBlock{
-				{},                                           // zero-value
-				{Type: "document", FileName: "report.pdf"},  // valid document
+				{}, // zero-value
+				{Type: "document", FileName: "report.pdf"}, // valid document
 			},
 			want: "[Document: report.pdf]",
 		},
@@ -90,9 +90,9 @@ func TestDescribeContentBlocks(t *testing.T) {
 func TestExtractClaudeContentZeroValueBlocks(t *testing.T) {
 	resp := &claudeResponse{
 		Content: []claudeContentBlock{
-			{},                              // zero-value block — Type == ""
-			{Type: "text", Text: "hello"},   // valid text block
-			{},                              // another zero-value block
+			{},                            // zero-value block — Type == ""
+			{Type: "text", Text: "hello"}, // valid text block
+			{},                            // another zero-value block
 		},
 		StopReason: "end_turn",
 		Model:      "claude-test",

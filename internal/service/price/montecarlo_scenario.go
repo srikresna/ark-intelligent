@@ -44,18 +44,18 @@ var regimeDrift = map[string]float64{
 
 // ScenarioResult holds the output of a Monte Carlo scenario simulation.
 type ScenarioResult struct {
-	Symbol       string              `json:"symbol"`
-	CurrentPrice float64             `json:"current_price"`
-	HorizonDays  int                 `json:"horizon_days"`
-	NumPaths     int                 `json:"num_paths"`
-	Percentiles  []PricePercentile   `json:"percentiles"`
-	VaR95        float64             `json:"var_95"`         // 5th percentile loss (%)
-	VaR99        float64             `json:"var_99"`         // 1st percentile loss (%)
-	CVaR95       float64             `json:"cvar_95"`        // Expected shortfall below VaR95
-	MeanReturn   float64             `json:"mean_return"`    // Mean return across all paths (%)
-	Regime       string              `json:"regime"`         // Current HMM regime used
-	VolEstimate  float64             `json:"vol_estimate"`   // GARCH current vol (annualised)
-	GeneratedAt  time.Time           `json:"generated_at"`
+	Symbol       string            `json:"symbol"`
+	CurrentPrice float64           `json:"current_price"`
+	HorizonDays  int               `json:"horizon_days"`
+	NumPaths     int               `json:"num_paths"`
+	Percentiles  []PricePercentile `json:"percentiles"`
+	VaR95        float64           `json:"var_95"`       // 5th percentile loss (%)
+	VaR99        float64           `json:"var_99"`       // 1st percentile loss (%)
+	CVaR95       float64           `json:"cvar_95"`      // Expected shortfall below VaR95
+	MeanReturn   float64           `json:"mean_return"`  // Mean return across all paths (%)
+	Regime       string            `json:"regime"`       // Current HMM regime used
+	VolEstimate  float64           `json:"vol_estimate"` // GARCH current vol (annualised)
+	GeneratedAt  time.Time         `json:"generated_at"`
 }
 
 // PricePercentile holds a price level at a given percentile.

@@ -226,7 +226,7 @@ func CalcZones(snap *IndicatorSnapshot, confluence *ConfluenceResult) *ZoneResul
 		RiskReward2: rr2,
 		Confidence:  confidence,
 		Reasoning:   reasoning,
-		Valid:        valid,
+		Valid:       valid,
 	}
 }
 

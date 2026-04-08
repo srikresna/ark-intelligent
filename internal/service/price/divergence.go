@@ -6,13 +6,13 @@ import (
 
 // PriceCOTDivergence represents a detected divergence between price trend and COT positioning.
 type PriceCOTDivergence struct {
-	ContractCode string `json:"contract_code"`
-	Currency     string `json:"currency"`
-	PriceTrend   string `json:"price_trend"`   // "UP", "DOWN", "FLAT"
-	COTDirection string `json:"cot_direction"` // "BULLISH", "BEARISH", "NEUTRAL"
+	ContractCode string  `json:"contract_code"`
+	Currency     string  `json:"currency"`
+	PriceTrend   string  `json:"price_trend"`   // "UP", "DOWN", "FLAT"
+	COTDirection string  `json:"cot_direction"` // "BULLISH", "BEARISH", "NEUTRAL"
 	COTIndex     float64 `json:"cot_index"`
-	Description  string `json:"description"`
-	Severity     string `json:"severity"` // "HIGH", "MEDIUM", "LOW"
+	Description  string  `json:"description"`
+	Severity     string  `json:"severity"` // "HIGH", "MEDIUM", "LOW"
 }
 
 // DetectPriceCOTDivergences flags contracts where the 4-week price trend

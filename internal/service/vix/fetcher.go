@@ -136,9 +136,9 @@ func fetchSingleIndexCSV(ctx context.Context, client *http.Client, url string) (
 
 // vxRow holds parsed data for a single VX futures contract row.
 type vxRow struct {
-	symbol  string
-	settle  float64
-	expiry  time.Time // parsed from symbol
+	symbol string
+	settle float64
+	expiry time.Time // parsed from symbol
 }
 
 // fetchVXFutures parses VX_EOD.csv and populates M1/M2/M3 settle prices.

@@ -33,14 +33,14 @@ type IVPoint struct {
 
 // ExpirySlice holds IV analytics for a single expiry date.
 type ExpirySlice struct {
-	Expiry       time.Time
-	DTE          int     // days to expiry
-	ATMIV        float64 // ATM implied vol (average of calls+puts near moneyness=1)
-	PutWingIV    float64 // average IV of OTM puts (moneyness 0.85–0.95)
-	CallWingIV   float64 // average IV of OTM calls (moneyness 1.05–1.15)
-	Skew25Delta  float64 // PutWingIV - CallWingIV (positive = put skew / fear)
-	SmileLabel   string  // "PUT_SKEW" | "CALL_SKEW" | "FLAT"
-	PointCount   int
+	Expiry      time.Time
+	DTE         int     // days to expiry
+	ATMIV       float64 // ATM implied vol (average of calls+puts near moneyness=1)
+	PutWingIV   float64 // average IV of OTM puts (moneyness 0.85–0.95)
+	CallWingIV  float64 // average IV of OTM calls (moneyness 1.05–1.15)
+	Skew25Delta float64 // PutWingIV - CallWingIV (positive = put skew / fear)
+	SmileLabel  string  // "PUT_SKEW" | "CALL_SKEW" | "FLAT"
+	PointCount  int
 }
 
 // IVSurfaceResult is the complete IV analytics output for one asset.
@@ -59,7 +59,7 @@ type IVSurfaceResult struct {
 
 	// Overall market signal derived from skew and term structure.
 	MarketSignal string // "FEAR" | "GREED" | "NEUTRAL"
-	SignalReason  string
+	SignalReason string
 
 	// Raw IV points (filtered to those with valid MarkIV > 0).
 	Points []IVPoint

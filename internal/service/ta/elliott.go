@@ -28,12 +28,12 @@ type WaveCandidate struct {
 
 // ElliottResult holds the output of an Elliott Wave analysis run.
 type ElliottResult struct {
-	Swings             []SwingPoint    // detected swing points (max 20 most recent)
-	PossibleWavePosition string        // "W1","W2","W3","W4","W5","WA","WB","WC","UNCLEAR"
-	WaveCandidates     []WaveCandidate // candidate wave segments from most recent swings
-	RulesViolated      []string        // Elliott rules that are violated
-	Confidence         int             // 0-100: likelihood the wave count is correct
-	Bias               string          // "BULLISH", "BEARISH", "NEUTRAL"
+	Swings               []SwingPoint    // detected swing points (max 20 most recent)
+	PossibleWavePosition string          // "W1","W2","W3","W4","W5","WA","WB","WC","UNCLEAR"
+	WaveCandidates       []WaveCandidate // candidate wave segments from most recent swings
+	RulesViolated        []string        // Elliott rules that are violated
+	Confidence           int             // 0-100: likelihood the wave count is correct
+	Bias                 string          // "BULLISH", "BEARISH", "NEUTRAL"
 }
 
 // ---------------------------------------------------------------------------

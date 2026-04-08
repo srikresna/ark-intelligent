@@ -2,12 +2,12 @@ package telegram
 
 import (
 	"fmt"
-	"math"
-	"sort"
-	"strings"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"math"
+	"sort"
+	"strings"
 )
 
 // FormatBacktestStats formats a single BacktestStats into Telegram HTML.

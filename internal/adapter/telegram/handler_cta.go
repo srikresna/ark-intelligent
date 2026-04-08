@@ -13,8 +13,8 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
-	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
 // CTAServices — dependencies for the /cta command

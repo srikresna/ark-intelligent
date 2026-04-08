@@ -29,9 +29,9 @@ type conversationMeta struct {
 
 // ConversationRepo implements ports.ConversationRepository using BadgerDB.
 type ConversationRepo struct {
-	db       *badger.DB
-	maxMsgs  int
-	ttl      time.Duration
+	db      *badger.DB
+	maxMsgs int
+	ttl     time.Duration
 }
 
 // NewConversationRepo creates a new ConversationRepo.

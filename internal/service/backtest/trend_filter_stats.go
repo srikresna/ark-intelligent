@@ -11,18 +11,18 @@ import (
 // TrendFilterStats holds aggregate statistics on the daily trend filter's impact.
 type TrendFilterStats struct {
 	TotalSignals       int     `json:"total_signals"`
-	FilteredSignals    int     `json:"filtered_signals"`    // Signals that had adjustment
-	AvgAdjustment      float64 `json:"avg_adjustment"`      // Mean adjustment applied
-	AvgRawConfidence   float64 `json:"avg_raw_confidence"`  // Before filter
+	FilteredSignals    int     `json:"filtered_signals"`     // Signals that had adjustment
+	AvgAdjustment      float64 `json:"avg_adjustment"`       // Mean adjustment applied
+	AvgRawConfidence   float64 `json:"avg_raw_confidence"`   // Before filter
 	AvgFinalConfidence float64 `json:"avg_final_confidence"` // After filter
 
 	// Performance comparison: trend-aligned vs trend-opposed
-	AlignedCount      int     `json:"aligned_count"`       // Signals where adj > 0
-	AlignedWinRate1W  float64 `json:"aligned_win_rate_1w"` // Win rate of aligned signals
-	OpposedCount      int     `json:"opposed_count"`       // Signals where adj < 0
-	OpposedWinRate1W  float64 `json:"opposed_win_rate_1w"` // Win rate of opposed signals
-	NeutralCount      int     `json:"neutral_count"`       // Signals where adj == 0
-	NeutralWinRate1W  float64 `json:"neutral_win_rate_1w"` // Win rate of neutral signals
+	AlignedCount     int     `json:"aligned_count"`       // Signals where adj > 0
+	AlignedWinRate1W float64 `json:"aligned_win_rate_1w"` // Win rate of aligned signals
+	OpposedCount     int     `json:"opposed_count"`       // Signals where adj < 0
+	OpposedWinRate1W float64 `json:"opposed_win_rate_1w"` // Win rate of opposed signals
+	NeutralCount     int     `json:"neutral_count"`       // Signals where adj == 0
+	NeutralWinRate1W float64 `json:"neutral_win_rate_1w"` // Win rate of neutral signals
 
 	// By daily trend direction
 	ByDailyTrend map[string]*TrendBucket `json:"by_daily_trend"`
@@ -35,10 +35,10 @@ type TrendFilterStats struct {
 
 // TrendBucket holds stats for a specific daily trend direction.
 type TrendBucket struct {
-	Trend    string  `json:"trend"`
-	Count    int     `json:"count"`
-	WinRate  float64 `json:"win_rate"`
-	AvgAdj   float64 `json:"avg_adj"`
+	Trend   string  `json:"trend"`
+	Count   int     `json:"count"`
+	WinRate float64 `json:"win_rate"`
+	AvgAdj  float64 `json:"avg_adj"`
 }
 
 // TrendFilterAnalyzer computes statistics on the daily trend filter's effectiveness.
@@ -63,11 +63,11 @@ func (a *TrendFilterAnalyzer) Analyze(ctx context.Context) (*TrendFilterStats, e
 	}
 
 	var (
-		sumAdj, sumRaw, sumFinal float64
+		sumAdj, sumRaw, sumFinal              float64
 		alignedWins, opposedWins, neutralWins int
-		evaluated1W                            int
-		totalWins1W                            int
-		strongBoostCount, strongBoostWins      int
+		evaluated1W                           int
+		totalWins1W                           int
+		strongBoostCount, strongBoostWins     int
 	)
 
 	for _, sig := range signals {

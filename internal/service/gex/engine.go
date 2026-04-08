@@ -270,15 +270,15 @@ func (e *Engine) Analyze(ctx context.Context, symbol string) (*GEXResult, error)
 	lowLiq := len(strikes) < 20
 
 	result := &GEXResult{
-		Symbol:      sym,
-		SpotPrice:   spot,
-		TotalGEX:    totalGEX,
+		Symbol:       sym,
+		SpotPrice:    spot,
+		TotalGEX:     totalGEX,
 		GEXFlipLevel: flipLevel,
-		Levels:      nearStrikes,
-		KeyLevels:   keys,
-		GammaWall:   gwall,
-		PutWall:     pwall,
-		MaxPain:     maxPain,
+		Levels:       nearStrikes,
+		KeyLevels:    keys,
+		GammaWall:    gwall,
+		PutWall:      pwall,
+		MaxPain:      maxPain,
 		Regime:       regime,
 		Implication:  impl,
 		LowLiquidity: lowLiq,

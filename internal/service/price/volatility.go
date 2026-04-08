@@ -20,11 +20,11 @@ const (
 // VolatilityContext holds ATR-based volatility metrics for a contract.
 type VolatilityContext struct {
 	ATR20W               float64 `json:"atr_20w"`               // 20-week Average True Range
-	NormalizedATR        float64 `json:"normalized_atr"`         // ATR / Close * 100 (percentage)
-	AvgATR4W             float64 `json:"avg_atr_4w"`             // 4-week average of weekly ATR
-	Regime               string  `json:"regime"`                 // EXPANDING, CONTRACTING, NORMAL
-	WeeklyRange          float64 `json:"weekly_range"`           // Latest week (High-Low)/Close %
-	ConfidenceMultiplier float64 `json:"confidence_multiplier"`  // Applied to signal confidence
+	NormalizedATR        float64 `json:"normalized_atr"`        // ATR / Close * 100 (percentage)
+	AvgATR4W             float64 `json:"avg_atr_4w"`            // 4-week average of weekly ATR
+	Regime               string  `json:"regime"`                // EXPANDING, CONTRACTING, NORMAL
+	WeeklyRange          float64 `json:"weekly_range"`          // Latest week (High-Low)/Close %
+	ConfidenceMultiplier float64 `json:"confidence_multiplier"` // Applied to signal confidence
 }
 
 // ComputeATR calculates the Average True Range from weekly OHLC price records.

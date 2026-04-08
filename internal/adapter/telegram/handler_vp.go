@@ -2,10 +2,10 @@ package telegram
 
 import (
 	"bytes"
-	"github.com/arkcode369/ark-intelligent/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"os"
 	"os/exec"

@@ -273,7 +273,7 @@ func (r *SignalRepo) SignalExists(ctx context.Context, contractCode string, repo
 	key := signalKey(domain.PersistedSignal{
 		ContractCode: contractCode,
 		ReportDate:   reportDate,
-		SignalType:    signalType,
+		SignalType:   signalType,
 	})
 
 	var exists bool

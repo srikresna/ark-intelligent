@@ -222,7 +222,7 @@ func TestFlowTopDivergences_SortedDesc(t *testing.T) {
 		{IsDiverging: true, DivergenceZ: -4.0},
 		{IsDiverging: true, DivergenceZ: 3.1},
 		{IsDiverging: false, DivergenceZ: 1.0}, // should be excluded
-		{Insufficient: true},                    // should be excluded
+		{Insufficient: true},                   // should be excluded
 	}
 	top := flowTopDivergences(pairs)
 	if len(top) != 3 {

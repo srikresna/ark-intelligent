@@ -57,17 +57,17 @@ var snbDimensionID = map[string]string{
 
 // SNBData holds the latest SNB balance sheet snapshot.
 type SNBData struct {
-	FetchedAt     time.Time
-	PublishedAt   time.Time // when SNB published this data
-	LatestDate    time.Time // most recent monthly observation
-	PreviousDate  time.Time // prior month
+	FetchedAt    time.Time
+	PublishedAt  time.Time // when SNB published this data
+	LatestDate   time.Time // most recent monthly observation
+	PreviousDate time.Time // prior month
 
 	// Values in CHF millions (latest month)
-	FXReserves      float64 // "D" — foreign currency investments
-	GoldHoldings    float64 // "GFG"
-	SightDeposits   float64 // "GB" — domestic bank deposits (SNB policy tool)
-	Banknotes       float64 // "N"
-	TotalAssets     float64 // "T0"
+	FXReserves    float64 // "D" — foreign currency investments
+	GoldHoldings  float64 // "GFG"
+	SightDeposits float64 // "GB" — domestic bank deposits (SNB policy tool)
+	Banknotes     float64 // "N"
+	TotalAssets   float64 // "T0"
 
 	// Month-over-month changes (CHF millions)
 	FXReservesMoM    float64
@@ -347,22 +347,22 @@ func buildSNBData(records []snbRecord, publishedAt time.Time) (*SNBData, error) 
 	}
 
 	return &SNBData{
-		FetchedAt:           time.Now(),
-		PublishedAt:         publishedAt,
-		LatestDate:          latestDate,
-		PreviousDate:        prevDate,
-		FXReserves:          fxLatest,
-		GoldHoldings:        goldLatest,
-		SightDeposits:       gbLatest,
-		Banknotes:           bkLatest,
-		TotalAssets:         t0Latest,
-		FXReservesMoM:       fxMoM,
-		GoldHoldingsMoM:     goldMoM,
-		SightDepositsMoM:    gbMoM,
-		TotalAssetsMoM:      t0MoM,
+		FetchedAt:            time.Now(),
+		PublishedAt:          publishedAt,
+		LatestDate:           latestDate,
+		PreviousDate:         prevDate,
+		FXReserves:           fxLatest,
+		GoldHoldings:         goldLatest,
+		SightDeposits:        gbLatest,
+		Banknotes:            bkLatest,
+		TotalAssets:          t0Latest,
+		FXReservesMoM:        fxMoM,
+		GoldHoldingsMoM:      goldMoM,
+		SightDepositsMoM:     gbMoM,
+		TotalAssetsMoM:       t0MoM,
 		IsLikelyIntervention: isIntervention,
-		InterventionDir:     interventionDir,
-		AlertMessage:        alertMsg,
+		InterventionDir:      interventionDir,
+		AlertMessage:         alertMsg,
 	}, nil
 }
 

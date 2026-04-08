@@ -32,12 +32,14 @@ type RegimeResult struct {
 // Risk FX:     AUD, NZD, CAD, GBP
 //
 // safehavenScore semantics:
-//   positive → safe havens bullish (risk-off)
-//   negative → safe havens bearish (risk-on)
+//
+//	positive → safe havens bullish (risk-off)
+//	negative → safe havens bearish (risk-on)
 //
 // riskFXScore semantics:
-//   positive → risk FX bullish (risk-on)
-//   negative → risk FX bearish (risk-off)
+//
+//	positive → risk FX bullish (risk-on)
+//	negative → risk FX bearish (risk-off)
 func DetectRegime(analyses []domain.COTAnalysis) RegimeResult {
 	safehavenScore := 0.0
 	riskFXScore := 0.0

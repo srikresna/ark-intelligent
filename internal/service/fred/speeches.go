@@ -32,12 +32,12 @@ var speechLog = log.With().Str("component", "fed-speeches").Logger()
 
 // FedSpeech represents a single Federal Reserve speech or statement.
 type FedSpeech struct {
-	Title     string    // Speech title
-	Speaker   string    // Speaker name (e.g., "Jerome H. Powell")
-	Date      time.Time // Speech date (UTC)
-	Topics    []string  // Extracted keyword topics: "inflation", "rates", "employment"
-	URL       string    // Original URL on federalreserve.gov
-	Tone      string    // "HAWKISH", "DOVISH", "NEUTRAL"
+	Title   string    // Speech title
+	Speaker string    // Speaker name (e.g., "Jerome H. Powell")
+	Date    time.Time // Speech date (UTC)
+	Topics  []string  // Extracted keyword topics: "inflation", "rates", "employment"
+	URL     string    // Original URL on federalreserve.gov
+	Tone    string    // "HAWKISH", "DOVISH", "NEUTRAL"
 }
 
 // FedSpeechData is the output of FetchRecentSpeeches.
@@ -119,22 +119,22 @@ func classifyTone(title string) string {
 func extractTopics(title string) []string {
 	lower := strings.ToLower(title)
 	topicMap := map[string]string{
-		"inflation":   "inflation",
-		"employment":  "employment",
-		"rate":        "rates",
-		"interest":    "rates",
-		"economic":    "economy",
-		"gdp":         "growth",
-		"growth":      "growth",
-		"financial":   "financial stability",
-		"stability":   "financial stability",
-		"banking":     "banking",
-		"digital":     "digital assets",
-		"crypto":      "digital assets",
-		"payment":     "payments",
-		"climate":     "climate risk",
+		"inflation":     "inflation",
+		"employment":    "employment",
+		"rate":          "rates",
+		"interest":      "rates",
+		"economic":      "economy",
+		"gdp":           "growth",
+		"growth":        "growth",
+		"financial":     "financial stability",
+		"stability":     "financial stability",
+		"banking":       "banking",
+		"digital":       "digital assets",
+		"crypto":        "digital assets",
+		"payment":       "payments",
+		"climate":       "climate risk",
 		"balance sheet": "balance sheet",
-		"quantitative": "QE/QT",
+		"quantitative":  "QE/QT",
 	}
 	seen := map[string]bool{}
 	var topics []string

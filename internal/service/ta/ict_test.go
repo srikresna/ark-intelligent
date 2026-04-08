@@ -58,7 +58,7 @@ func TestFVGBullish(t *testing.T) {
 	// Bullish FVG: bars[2].High < bars[0].Low
 	now := baseTime()
 	bars := []OHLCV{
-		makeBar(now, 110, 115, 108, 112, 1000),    // bars[0] newest — Low=108 > bars[2].High=105
+		makeBar(now, 110, 115, 108, 112, 1000),                   // bars[0] newest — Low=108 > bars[2].High=105
 		makeBar(now.Add(-1*time.Hour), 104, 107, 102, 106, 1000), // bars[1] middle
 		makeBar(now.Add(-2*time.Hour), 98, 105, 96, 103, 1000),   // bars[2] oldest — High=105
 	}

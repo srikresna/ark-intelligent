@@ -28,21 +28,21 @@ import (
 
 // HurstResult holds the output of a Hurst exponent estimation.
 type HurstResult struct {
-	H             float64 `json:"h"`              // Hurst exponent (0-1)
-	Classification string `json:"classification"` // "MEAN_REVERTING", "RANDOM_WALK", "TRENDING"
-	Confidence    float64 `json:"confidence"`     // How far from 0.5 (strength of signal)
-	RSquared      float64 `json:"r_squared"`      // Goodness of fit of log-log regression
-	SampleSize    int     `json:"sample_size"`     // Number of observations used
-	Description   string  `json:"description"`     // Human-readable interpretation
+	H              float64 `json:"h"`              // Hurst exponent (0-1)
+	Classification string  `json:"classification"` // "MEAN_REVERTING", "RANDOM_WALK", "TRENDING"
+	Confidence     float64 `json:"confidence"`     // How far from 0.5 (strength of signal)
+	RSquared       float64 `json:"r_squared"`      // Goodness of fit of log-log regression
+	SampleSize     int     `json:"sample_size"`    // Number of observations used
+	Description    string  `json:"description"`    // Human-readable interpretation
 }
 
 // HurstRegimeContext extends PriceRegime with Hurst-based classification.
 type HurstRegimeContext struct {
 	*PriceRegime
 	Hurst              *HurstResult `json:"hurst,omitempty"`
-	HurstRegime        string       `json:"hurst_regime"`         // "TRENDING", "RANGING", "RANDOM"
-	RegimeAgreement    bool         `json:"regime_agreement"`     // ADX and Hurst agree
-	CombinedConfidence float64      `json:"combined_confidence"`  // Confidence in regime classification
+	HurstRegime        string       `json:"hurst_regime"`        // "TRENDING", "RANGING", "RANDOM"
+	RegimeAgreement    bool         `json:"regime_agreement"`    // ADX and Hurst agree
+	CombinedConfidence float64      `json:"combined_confidence"` // Confidence in regime classification
 }
 
 // ComputeHurstExponent estimates the Hurst exponent from price records

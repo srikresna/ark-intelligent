@@ -7,10 +7,10 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
-	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 )
 
 // SignalExistenceChecker is the subset of SignalRepository needed for dedup.

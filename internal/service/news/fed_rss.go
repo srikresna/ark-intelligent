@@ -19,7 +19,7 @@ var fedLog = logger.Component("fed-rss")
 
 // Fed RSS feed URLs (free, no API key required).
 const (
-	FedSpeechesURL = "https://www.federalreserve.gov/feeds/speeches.xml"
+	FedSpeechesURL  = "https://www.federalreserve.gov/feeds/speeches.xml"
 	FedFOMCPressURL = "https://www.federalreserve.gov/feeds/press_monetary.xml"
 )
 
@@ -59,16 +59,16 @@ type rssItem struct {
 var votingMembers = map[string]bool{
 	"powell":    true, // Chair
 	"jefferson": true, // Vice Chair
-	"barr":     true, // Vice Chair Supervision
-	"waller":   true, // Governor
-	"cook":     true, // Governor
-	"kugler":   true, // Governor
-	"bowman":   true, // Governor
+	"barr":      true, // Vice Chair Supervision
+	"waller":    true, // Governor
+	"cook":      true, // Governor
+	"kugler":    true, // Governor
+	"bowman":    true, // Governor
 	// 2026 rotating voters (update annually):
-	"bostic":    true, // Atlanta
-	"collins":   true, // Boston
-	"musalem":   true, // St. Louis
-	"hammack":   true, // Cleveland
+	"bostic":  true, // Atlanta
+	"collins": true, // Boston
+	"musalem": true, // St. Louis
+	"hammack": true, // Cleveland
 }
 
 // FetchFedSpeeches fetches and parses the Fed speeches RSS feed.
@@ -150,9 +150,10 @@ func fetchFedRSS(ctx context.Context, url, defaultCategory string) ([]FedSpeech,
 }
 
 // parseSpeaker extracts the speaker name from a title like:
-//   "Barr, Brief Remarks on the Economic Outlook" → "Barr"
-//   "Chair Powell, Press Conference" → "Powell"
-//   "Vice Chair Jefferson, Speech at..." → "Jefferson"
+//
+//	"Barr, Brief Remarks on the Economic Outlook" → "Barr"
+//	"Chair Powell, Press Conference" → "Powell"
+//	"Vice Chair Jefferson, Speech at..." → "Jefferson"
 func parseSpeaker(title string) string {
 	// Remove common prefixes
 	t := title

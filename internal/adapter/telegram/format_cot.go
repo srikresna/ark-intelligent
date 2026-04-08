@@ -2,22 +2,22 @@ package telegram
 
 import (
 	"fmt"
-	"math"
-	"sort"
-	"strings"
-	"time"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
-	"github.com/arkcode369/ark-intelligent/pkg/format"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
+	"github.com/arkcode369/ark-intelligent/pkg/format"
+	"math"
+	"sort"
+	"strings"
+	"time"
 )
 
 type cotGroup struct {
-	Header    string
-	Emoji     string
-	Codes     []string // contract codes in preferred order
+	Header string
+	Emoji  string
+	Codes  []string // contract codes in preferred order
 }
 
 var cotGroups = []cotGroup{
@@ -1114,7 +1114,8 @@ func buildBestPairs(entries []rankEntry) []string {
 // pairDirection returns "LONG" if the favored currency is the base (first) in
 // the pair, or "SHORT" if the favored currency ended up as the quote (second).
 // Example: favored=USD, pair=AUDUSD → base is AUD (not favored) → SHORT AUDUSD.
-//          favored=EUR, pair=EURUSD → base is EUR (favored)     → LONG EURUSD.
+//
+//	favored=EUR, pair=EURUSD → base is EUR (favored)     → LONG EURUSD.
 func pairDirection(pairName, favoredCurrency string) string {
 	if strings.HasPrefix(pairName, favoredCurrency) {
 		return "LONG"

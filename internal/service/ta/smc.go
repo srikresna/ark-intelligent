@@ -46,15 +46,15 @@ type LiqRange struct {
 
 // SMCResult holds the complete Smart Money Concepts analysis.
 type SMCResult struct {
-	Structure    MarketStructure  // current overall structure
-	RecentBOS    []StructureEvent // last 5 BOS events, newest first
-	RecentCHOCH  []StructureEvent // last 3 CHOCH events, newest first
-	PremiumZone  float64          // level above which is premium
-	DiscountZone float64          // level below which is discount
-	Equilibrium  float64          // 50% of last significant swing
-	CurrentZone  string           // "PREMIUM", "DISCOUNT", "EQUILIBRIUM"
-	InternalLiq  []LiqRange       // internal liquidity pools
-	Trend        string           // "BULLISH", "BEARISH", "RANGING"
+	Structure     MarketStructure  // current overall structure
+	RecentBOS     []StructureEvent // last 5 BOS events, newest first
+	RecentCHOCH   []StructureEvent // last 3 CHOCH events, newest first
+	PremiumZone   float64          // level above which is premium
+	DiscountZone  float64          // level below which is discount
+	Equilibrium   float64          // 50% of last significant swing
+	CurrentZone   string           // "PREMIUM", "DISCOUNT", "EQUILIBRIUM"
+	InternalLiq   []LiqRange       // internal liquidity pools
+	Trend         string           // "BULLISH", "BEARISH", "RANGING"
 	LastSwingHigh float64
 	LastSwingLow  float64
 }
@@ -64,8 +64,8 @@ type SMCResult struct {
 // ---------------------------------------------------------------------------
 
 type swingPoint struct {
-	idx   int     // index in oldest-first working array
-	price float64 // swing high or low price
+	idx    int     // index in oldest-first working array
+	price  float64 // swing high or low price
 	isHigh bool
 }
 
@@ -153,10 +153,10 @@ func CalcSMC(bars []OHLCV, atr float64) *SMCResult {
 	// -----------------------------------------------------------------------
 	// State: track last swing high and low, current structure
 	type structureState struct {
-		structure  MarketStructure
-		lastHigh   float64
+		structure   MarketStructure
+		lastHigh    float64
 		lastHighIdx int
-		lastLow    float64
+		lastLow     float64
 		lastLowIdx  int
 	}
 
@@ -169,7 +169,10 @@ func CalcSMC(bars []OHLCV, atr float64) *SMCResult {
 	}
 
 	// Track recent swing highs and lows for HH/HL/LH/LL detection
-	type swing struct{ price float64; idx int }
+	type swing struct {
+		price float64
+		idx   int
+	}
 	var recentHighs []swing
 	var recentLows []swing
 
@@ -298,7 +301,7 @@ func CalcSMC(bars []OHLCV, atr float64) *SMCResult {
 
 	swingRange := lastSigHigh - lastSigLow
 	equilibrium := lastSigLow + swingRange*0.5
-	premiumZone := lastSigLow + swingRange*0.618 // golden pocket upper
+	premiumZone := lastSigLow + swingRange*0.618  // golden pocket upper
 	discountZone := lastSigLow + swingRange*0.382 // golden pocket lower
 
 	// Classify current price zone

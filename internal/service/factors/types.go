@@ -8,21 +8,21 @@ import "time"
 
 // AssetProfile bundles all inputs required to score a single asset.
 type AssetProfile struct {
-	ContractCode string  // CFTC code or synthetic code
-	Currency     string  // Display ticker, e.g. "EUR", "XAU"
-	Name         string  // Human-readable, e.g. "Euro FX"
-	ReportType   string  // "TFF" or "DISAGGREGATED"
-	IsCrypto     bool    // true → use Bybit/CoinGecko carry data
-	IsInverse    bool    // true → price is quoted inversely vs USD
+	ContractCode string // CFTC code or synthetic code
+	Currency     string // Display ticker, e.g. "EUR", "XAU"
+	Name         string // Human-readable, e.g. "Euro FX"
+	ReportType   string // "TFF" or "DISAGGREGATED"
+	IsCrypto     bool   // true → use Bybit/CoinGecko carry data
+	IsInverse    bool   // true → price is quoted inversely vs USD
 
 	// Daily price series (newest first), at least 200 bars preferred.
 	DailyCloses []float64 // close prices, index 0 = most recent
 
 	// COT Positioning — latest values
-	COTIndex        float64 // 0-100, commercial positioning percentile
-	SmartMoneyNet   float64 // levered fund or managed money net
-	CrowdingIndex   float64 // from domain.COTAnalysis.CrowdingIndex
-	SpecMomentum4W  float64 // 4-week spec momentum
+	COTIndex       float64 // 0-100, commercial positioning percentile
+	SmartMoneyNet  float64 // levered fund or managed money net
+	CrowdingIndex  float64 // from domain.COTAnalysis.CrowdingIndex
+	SpecMomentum4W float64 // 4-week spec momentum
 
 	// Rate differential (carry proxy) — carry of holding long position.
 	// For FX: rate difference vs USD (positive = carry favorable for long).
@@ -38,18 +38,19 @@ type AssetProfile struct {
 
 // FactorScores holds the normalized score [-1,+1] for each factor.
 type FactorScores struct {
-	Momentum        float64 // cross-sectional price momentum
-	TrendQuality    float64 // ADX/Hurst/MA alignment quality
-	CarryAdjusted   float64 // momentum adjusted for carry cost
-	LowVol          float64 // low-vol efficiency (inverted vol / Sharpe proxy)
+	Momentum         float64 // cross-sectional price momentum
+	TrendQuality     float64 // ADX/Hurst/MA alignment quality
+	CarryAdjusted    float64 // momentum adjusted for carry cost
+	LowVol           float64 // low-vol efficiency (inverted vol / Sharpe proxy)
 	ResidualReversal float64 // mean-reversion signal from OLS residual
-	Crowding        float64 // crowding risk (negative = crowded = avoid)
+	Crowding         float64 // crowding risk (negative = crowded = avoid)
 }
 
 // Combined returns the weighted composite score.
 // Weights sum to 1.0 and are tuned for systematic macro:
-//   momentum=0.30, trendQuality=0.20, carryAdjusted=0.20,
-//   lowVol=0.10, residualReversal=0.10, crowding=0.10 (penalty)
+//
+//	momentum=0.30, trendQuality=0.20, carryAdjusted=0.20,
+//	lowVol=0.10, residualReversal=0.10, crowding=0.10 (penalty)
 func (f FactorScores) Combined(w Weights) float64 {
 	return w.Momentum*f.Momentum +
 		w.TrendQuality*f.TrendQuality +
@@ -61,23 +62,23 @@ func (f FactorScores) Combined(w Weights) float64 {
 
 // Weights holds factor combination weights. Must sum to ~1.0.
 type Weights struct {
-	Momentum        float64
-	TrendQuality    float64
-	CarryAdjusted   float64
-	LowVol          float64
+	Momentum         float64
+	TrendQuality     float64
+	CarryAdjusted    float64
+	LowVol           float64
 	ResidualReversal float64
-	Crowding        float64
+	Crowding         float64
 }
 
 // DefaultWeights returns the production default weights.
 func DefaultWeights() Weights {
 	return Weights{
-		Momentum:        0.30,
-		TrendQuality:    0.20,
-		CarryAdjusted:   0.20,
-		LowVol:          0.10,
+		Momentum:         0.30,
+		TrendQuality:     0.20,
+		CarryAdjusted:    0.20,
+		LowVol:           0.10,
 		ResidualReversal: 0.10,
-		Crowding:        0.10,
+		Crowding:         0.10,
 	}
 }
 
@@ -91,24 +92,24 @@ type RankedAsset struct {
 	Currency     string
 	Name         string
 
-	Scores       FactorScores
-	CompositeScore float64  // Combined() output, [-1, +1]
-	Rank         int        // 1 = best (highest composite), ascending
-	Quartile     int        // 1 (top 25%) to 4 (bottom 25%)
+	Scores         FactorScores
+	CompositeScore float64 // Combined() output, [-1, +1]
+	Rank           int     // 1 = best (highest composite), ascending
+	Quartile       int     // 1 (top 25%) to 4 (bottom 25%)
 
-	Signal       Signal
-	UpdatedAt    time.Time
+	Signal    Signal
+	UpdatedAt time.Time
 }
 
 // Signal is the actionable directional bias derived from composite score.
 type Signal string
 
 const (
-	SignalStrongLong   Signal = "STRONG_LONG"
-	SignalLong         Signal = "LONG"
-	SignalNeutral      Signal = "NEUTRAL"
-	SignalShort        Signal = "SHORT"
-	SignalStrongShort  Signal = "STRONG_SHORT"
+	SignalStrongLong  Signal = "STRONG_LONG"
+	SignalLong        Signal = "LONG"
+	SignalNeutral     Signal = "NEUTRAL"
+	SignalShort       Signal = "SHORT"
+	SignalStrongShort Signal = "STRONG_SHORT"
 )
 
 // CompositeToSignal maps a composite score to a signal.
@@ -133,7 +134,7 @@ func CompositeToSignal(score float64) Signal {
 
 // RankingResult is the full output from the Factor Engine for one computation cycle.
 type RankingResult struct {
-	Assets    []RankedAsset // sorted by Rank (ascending)
+	Assets     []RankedAsset // sorted by Rank (ascending)
 	ComputedAt time.Time
 	AssetCount int
 }
