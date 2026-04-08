@@ -1,5 +1,5 @@
 # ===========================================================================
-# ARK Intelligence v3 — Multi-stage Docker build
+# ARK Intelligence v4 — Multi-stage Docker build
 # Stage 1: Build Go binary with CGO disabled (static linking)
 # Stage 2: Minimal Alpine runtime with ca-certs and timezone data
 # ===========================================================================
@@ -22,7 +22,7 @@ RUN go mod tidy && go mod download
 
 # Build static binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-s -w -X main.version=3.0.0" \
+    -ldflags="-s -w -X main.version=4.0.0" \
     -trimpath \
     -o /build/ark-intelligent \
     ./cmd/bot

@@ -629,7 +629,7 @@ func (h *Handler) cmdStatus(ctx context.Context, chatID string, userID int64, ar
 <b>Services:</b>
 <code>AI Engine:  %s</code>
 
-<b>Version:</b> v3.0.0`,
+<b>Version:</b> v4.0.0`,
 		now.Format("15:04:05"),
 		len(cotAnalyses),
 		aiStatus,
