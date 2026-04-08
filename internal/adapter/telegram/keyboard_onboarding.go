@@ -78,8 +78,8 @@ var RoleConfigs = map[string]RoleConfig{
 				Content: "<b>/backtest</b> menguji strategi trading dengan data historis.\n\n<b>/accuracy</b> melihat statistik akurasi sinyal sistem.\n\nGunakan untuk validasi edge trading sebelum live execution.",
 			},
 			{
-				Title:   "⚡ Langkah 3: Alpha Engine",
-				Content: "Selamat! Kamu sudah siap menggunakan fitur pro ARK Intelligence.\n\nEksplorasi /alpha, /gex, /elliott, dan /wyckoff untuk edge kompetitif.\n\n💡 <i>Tip: Setup /setalert untuk notifikasi real-time pada event penting.</i>",
+				Title:   "⚡ Langkah 3: Radar Engine",
+				Content: "Selamat! Kamu sudah siap menggunakan fitur pro ARK Intelligence.\n\nEksplorasi /radar, /gex, /elliott, dan /wyckoff untuk edge kompetitif.\n\n💡 <i>Tip: Setup /setalert untuk notifikasi real-time pada event penting.</i>",
 			},
 		},
 	},
@@ -207,7 +207,7 @@ func (kb *KeyboardBuilder) StarterKitMenu(level string) ports.InlineKeyboard {
 		return ports.InlineKeyboard{
 			Rows: [][]ports.InlineButton{
 				{
-					{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
+					{Text: "⚡ Radar Engine", CallbackData: "alpha:back"},
 					{Text: "🦅 AI Outlook", CallbackData: "out:unified"},
 				},
 				{

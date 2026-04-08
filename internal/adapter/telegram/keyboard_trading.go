@@ -470,7 +470,7 @@ func (kb *KeyboardBuilder) VPSymbolMenu() ports.InlineKeyboard {
 // Alpha Keyboards
 // ---------------------------------------------------------------------------
 
-// AlphaMenu builds the inline keyboard for the unified /alpha dashboard.
+// AlphaMenu builds the inline keyboard for the unified /radar dashboard.
 func (kb *KeyboardBuilder) AlphaMenu() ports.InlineKeyboard {
 	return ports.InlineKeyboard{
 		Rows: [][]ports.InlineButton{

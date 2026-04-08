@@ -94,7 +94,7 @@ type Handler struct {
 	// May be nil — all alpha commands degrade gracefully.
 	alpha *AlphaServices
 
-	// alphaCache stores per-chat alpha state with TTL for unified /alpha dashboard.
+	// alphaCache stores per-chat alpha state with TTL for unified /radar dashboard.
 	// Initialized by WithAlpha; nil if alpha services are not configured.
 	alphaCache *alphaStateCache
 

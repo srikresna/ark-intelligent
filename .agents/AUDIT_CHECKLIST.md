@@ -36,7 +36,7 @@
 - [ ] `/levels` - Support/resistance levels
 - [ ] `/seasonal` - Seasonal patterns
 - [ ] `/backtest` - Strategy backtesting
-- [ ] `/alpha` - Alpha signals
+- [ ] `/radar` - Radar signal dashboard
 - [ ] `/quant` - Quantitative analysis
 - [ ] `/cta` - CTA positioning
 - [ ] `/vp` - Volume profile

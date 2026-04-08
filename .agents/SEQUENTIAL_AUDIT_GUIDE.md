@@ -133,7 +133,7 @@ ls .agents/tasks/pending/
    Untuk cycle ini, kamu perlu **manual test di Telegram bot**:
    ```bash
    # Test commands:
-   /start, /outlook, /cot, /calendar, /bias, /alpha
+   /start, /outlook, /cot, /calendar, /bias, /radar
    ```
 
 2. **Auto-Verify Only for Code Checks**

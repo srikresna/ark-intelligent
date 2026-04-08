@@ -15,8 +15,8 @@ var knownCmdActions = []string{
 	"bias", "macro", "rank", "calendar", "accuracy", "sentiment",
 	"seasonal", "backtest", "price", "levels", "carry", "regime",
 	"corr", "intraday", "garch", "hurst", "factors", "wfopt",
-	"quant", "vp", "cot", "cta", "alpha", "gex",
-	"impact", "outlook", "intermarket", "playbook", "transition",
+	"quant", "vp", "cot", "cta", "radar", "gex",
+	"impact", "outlook", "intermarket", "bias", "transition",
 	"cryptoalpha", "session",
 }
 

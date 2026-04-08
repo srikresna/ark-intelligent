@@ -51,7 +51,7 @@ func (kb *KeyboardBuilder) MainMenu(pins []string) ports.InlineKeyboard {
 			{Text: "🎯 Accuracy", CallbackData: "cmd:accuracy"},
 		},
 		[]ports.InlineButton{
-			{Text: "⚡ Alpha Engine", CallbackData: "alpha:back"},
+			{Text: "⚡ Radar Engine", CallbackData: "alpha:back"},
 		},
 		[]ports.InlineButton{
 			{Text: "🔬 Quant", CallbackData: "cmd:quant"},

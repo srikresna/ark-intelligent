@@ -24,7 +24,7 @@ var validPinCommands = map[string]bool{
 	"quant":       true,
 	"cta":         true,
 	"vp":          true,
-	"alpha":       true,
+	"radar":       true,
 	"gex":         true,
 	"sentiment":   true,
 	"seasonal":    true,

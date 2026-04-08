@@ -38,7 +38,7 @@ func TestUserFriendlyError_Network(t *testing.T) {
 }
 
 func TestUserFriendlyError_RateLimit(t *testing.T) {
-	msg := userFriendlyError(errors.New("429 too many requests"), "alpha")
+	msg := userFriendlyError(errors.New("429 too many requests"), "radar")
 	if !strings.Contains(msg, "Batas request") {
 		t.Errorf("expected rate limit message, got %q", msg)
 	}
@@ -190,7 +190,7 @@ func TestCallbackFriendlyError_AllUnder200Chars(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionExpiredMessage_ContainsCommand(t *testing.T) {
-	commands := []string{"cta", "ict", "quant", "smc", "vp", "alpha", "wyckoff"}
+	commands := []string{"cta", "ict", "quant", "smc", "vp", "radar", "wyckoff"}
 	for _, cmd := range commands {
 		msg := sessionExpiredMessage(cmd)
 		if !strings.Contains(msg, "/"+cmd) {

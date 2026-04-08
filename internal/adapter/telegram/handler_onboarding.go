@@ -178,7 +178,7 @@ func (h *Handler) executeDeepLinkCommand(ctx context.Context, chatID string, use
 		return h.cmdQuant(ctx, chatID, userID, args)
 	case "vp":
 		return h.cmdVP(ctx, chatID, userID, args)
-	case "alpha":
+	case "alpha", "radar":
 		return h.cmdAlpha(ctx, chatID, userID, args)
 	case "gex":
 		return h.cmdGEX(ctx, chatID, userID, args)
@@ -361,8 +361,8 @@ Ini menu kamu — klik untuk mulai:`
 
 <b>🎓 3 Langkah Memulai:</b>
 
-<b>1️⃣ Alpha Engine</b>
-Ketik <code>/alpha</code> — factor ranking + playbook + risk dashboard
+<b>1️⃣ Radar Engine</b>
+Ketik <code>/radar</code> — factor ranking + signal intensity + risk dashboard
 
 <b>2️⃣ Volume Profile</b>
 Ketik <code>/vp EUR</code> — 10 mode VP termasuk AMT institutional-grade
@@ -458,9 +458,9 @@ func (h *Handler) sendHelpSubCategory(ctx context.Context, chatID string, userID
 /onchain — On-chain exchange flows (BTC, ETH)`
 
 	case "research":
-		text = `🔬 <b>Research &amp; Alpha Commands</b>
+		text = `🔬 <b>Research &amp; Signal Commands</b>
 
-/alpha — Dashboard lengkap (factor + playbook + risk)
+/radar — Dashboard lengkap (factor + signal intensity + risk)
 /cta — Classical TA dashboard · <code>/cta EUR</code> · <code>/cta EUR 4h</code>
 /ctabt — Backtest Classical TA · <code>/ctabt EUR</code> · <code>/ctabt EUR 4h</code>
 /quant — Econometric analysis · <code>/quant EUR</code> · <code>/quant XAU 4h</code>

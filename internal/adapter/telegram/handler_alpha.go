@@ -55,7 +55,7 @@ type AssetProfileBuilder interface {
 }
 
 // ---------------------------------------------------------------------------
-// alphaState — cached computation results for the unified /alpha dashboard
+// alphaState — cached computation results for the unified /radar dashboard
 // ---------------------------------------------------------------------------
 
 // alphaState caches all computed data for the unified alpha dashboard.
@@ -279,7 +279,7 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
 
 	case action == "rankx":
-		txt := alphaExplainHeader("📈 RankX Leaderboard",
+		txt := alphaExplainHeader("📈 Factor Leaderboard",
 			"Ranking ringkas — atas = kandidat long, bawah = kandidat short.")
 		txt += formatRankX(state.ranking)
 		kb := h.kb.AlphaDetailMenu()
@@ -554,12 +554,12 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 
 // ---------------------------------------------------------------------------
 // /playbook — REMOVED: merged into /bias (see handler_cot_cmd.go formatUnifiedBias)
-// formatPlaybook is kept for the /alpha dashboard callback sub-view.
+// formatPlaybook is kept for the /radar dashboard callback sub-view.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // /rankx — REMOVED: merged into /rank (see handler_cot_cmd.go formatRankFactorSection)
-// formatRankX is kept for the /alpha dashboard callback sub-view.
+// formatRankX is kept for the /radar dashboard callback sub-view.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -605,7 +605,7 @@ func (h *Handler) cmdSignalIntensity(ctx context.Context, chatID string, _ int64
 // ---------------------------------------------------------------------------
 
 // cmdRankX — REMOVED: merged into /rank. Handler kept as comment for reference.
-// formatRankX is still used by the /alpha dashboard callback.
+// formatRankX is still used by the /radar dashboard callback.
 
 // ---------------------------------------------------------------------------
 // /transition — regime transition warning
@@ -843,7 +843,7 @@ func heatAdviceIndonesian(h strategy.HeatLevel) string {
 func formatHeat(heat strategy.PortfolioHeat) string {
 	emoji := alphaHeatEmoji(heat.HeatLevel)
 	advice := heatAdviceIndonesian(heat.HeatLevel)
-	return fmt.Sprintf(`<b>🌡️ Portfolio Heat</b>
+	return fmt.Sprintf(`<b>📡 Signal Intensity</b>
 
 Level: %s <b>%s</b>
 Posisi Aktif: %d
@@ -994,7 +994,7 @@ func formatRankX(result *factors.RankingResult) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("<b>📈 RankX Leaderboard</b>\n")
+	sb.WriteString("<b>📈 Factor Leaderboard</b>\n")
 	sb.WriteString("<i>Atas = kandidat long (beli), bawah = kandidat short (jual)</i>\n\n")
 	sb.WriteString("<b>🟢 Kandidat Long:</b>\n")
 	for i, a := range top {

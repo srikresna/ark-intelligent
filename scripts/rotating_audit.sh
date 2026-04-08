@@ -374,7 +374,7 @@ if [ "$FOCUS" = "feature-logic" ] || [ "$FOCUS" = "comprehensive" ]; then
     echo "" >> "$REPORT_FILE"
     echo "**Manual Test Required:**" >> "$REPORT_FILE"
     echo "⚠️  All features above require manual testing in Telegram bot" >> "$REPORT_FILE"
-    echo "Run: /outlook, /cot, /calendar, /bias, /alpha and verify outputs" >> "$REPORT_FILE"
+    echo "Run: /outlook, /cot, /calendar, /bias, /radar and verify outputs" >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
 fi
 
