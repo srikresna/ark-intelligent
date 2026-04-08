@@ -51,12 +51,20 @@ Level: %s
 <b>Starter Kit:</b>
 %s
 
-Pilih command atau ketik /help untuk melihat semua command.`,
+<i>Ketik /help untuk semua command atau pilih menu di bawah:</i>`,
 			roleConfig.Name,
 			formatStarterKit(roleConfig.StarterKit),
 		)
 
-		_, err := h.bot.SendWithKeyboard(ctx, chatID, welcomeBack, h.kb.StarterKitMenu(prefs.ExperienceLevel))
+		// Add "Lihat Semua Command" button to starter kit keyboard
+		kb := h.kb.StarterKitMenu(prefs.ExperienceLevel)
+		// Add home button row at bottom for easy navigation
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "📋 Lihat Semua Command", CallbackData: "cmd:help"},
+			{Text: "🏠 Menu Utama", CallbackData: "nav:home"},
+		})
+
+		_, err := h.bot.SendWithKeyboard(ctx, chatID, welcomeBack, kb)
 		return err
 	}
 

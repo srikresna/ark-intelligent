@@ -141,6 +141,33 @@ func CacheAge() time.Duration {
 	return time.Since(cachedSentiment.FetchedAt)
 }
 
+// GetStaleCache returns the cached SentimentData even if expired, for fallback display.
+// Returns (data, true) if any cached data exists, (nil, false) otherwise.
+func GetStaleCache() (*SentimentData, bool) {
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
+	if cachedSentiment == nil {
+		// Try BadgerDB as last resort
+		if badgerDB != nil {
+			if data := loadFromBadger(badgerDB); data != nil {
+				return data, true
+			}
+		}
+		return nil, false
+	}
+	return cachedSentiment, true
+}
+
+// IsCacheStale returns true if cache exists but is expired.
+func IsCacheStale() bool {
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
+	if cachedSentiment == nil {
+		return false
+	}
+	return time.Now().After(cacheExpiry)
+}
+
 // ---------------------------------------------------------------------------
 // BadgerDB helpers
 // ---------------------------------------------------------------------------
