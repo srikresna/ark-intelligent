@@ -247,12 +247,22 @@ func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64,
 
 	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
 	if err != nil {
-		h.editUserError(ctx, chatID, loadID, err, "ivol")
+		log.Error().Err(err).Str("symbol", sym).Msg("IV Surface analysis failed")
+		errHTML := FormatError(err, "/ivol")
+		kb := CreateErrorKeyboard("ivol")
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
 		return nil
 	}
 
 	html := FormatIVSurface(result)
 	kb := ivolKeyboard(sym)
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+	})
 
 	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
 		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
@@ -297,21 +307,37 @@ func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID i
 		log.Warn().Str("data", data).Msg("malformed IVol callback data")
 		return nil
 	}
+	action := parts[1]
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
 		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for IV Surface.", sym))
 	}
-	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
-	if err != nil {
-		log.Error().Err(err).Str("symbol", sym).Msg("IV Surface analysis failed")
-		errHTML := fmt.Sprintf("⚠️ <b>IV Surface failed for %s</b>\n\n<i>Data source may be temporarily unavailable. Try again later.</i>", sym)
+
+	switch action {
+	case "sym", "refresh":
+		result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
+		if err != nil {
+			log.Error().Err(err).Str("symbol", sym).Msg("IV Surface analysis failed")
+			errHTML := FormatError(err, "/ivol")
+			kb := CreateErrorKeyboard("ivol")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+			})
+			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+			return nil
+		}
+		html := FormatIVSurface(result)
 		kb := ivolKeyboard(sym)
-		_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
-		return nil
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+		})
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		helpText := getContextualHelp("ivol")
+		helpKb := getHelpKeyboard("ivol")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
 	}
-	html := FormatIVSurface(result)
-	kb := ivolKeyboard(sym)
-	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -353,12 +379,22 @@ func (h *Handler) cmdSkew(ctx context.Context, chatID string, userID int64, args
 
 	result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
 	if err != nil {
-		h.editUserError(ctx, chatID, loadID, err, "skew")
+		log.Error().Err(err).Str("symbol", sym).Msg("Skew analysis failed")
+		errHTML := FormatError(err, "/skew")
+		kb := CreateErrorKeyboard("skew")
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
 		return nil
 	}
 
 	html := FormatSkewResult(result)
 	kb := skewKeyboard(sym)
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+	})
 	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
 		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
 		return sendErr
@@ -402,19 +438,35 @@ func (h *Handler) handleSkewCallback(ctx context.Context, chatID string, msgID i
 		log.Warn().Str("data", data).Msg("malformed Skew callback data")
 		return nil
 	}
+	action := parts[1]
 	sym := strings.ToUpper(parts[2])
 	if _, ok := validGEXSymbols[sym]; !ok {
 		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for Skew analysis.", sym))
 	}
-	result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
-	if err != nil {
-		log.Error().Err(err).Str("symbol", sym).Msg("Skew analysis failed")
-		errHTML := fmt.Sprintf("⚠️ <b>Skew analysis failed for %s</b>\n\n<i>Data source may be temporarily unavailable. Try again later.</i>", sym)
+
+	switch action {
+	case "sym", "refresh":
+		result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
+		if err != nil {
+			log.Error().Err(err).Str("symbol", sym).Msg("Skew analysis failed")
+			errHTML := FormatError(err, "/skew")
+			kb := CreateErrorKeyboard("skew")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+			})
+			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+			return nil
+		}
+		html := FormatSkewResult(result)
 		kb := skewKeyboard(sym)
-		_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
-		return nil
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+		})
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		helpText := getContextualHelp("skew")
+		helpKb := getHelpKeyboard("skew")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
 	}
-	html := FormatSkewResult(result)
-	kb := skewKeyboard(sym)
-	return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	return nil
 }
