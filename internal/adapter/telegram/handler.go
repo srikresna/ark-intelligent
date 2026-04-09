@@ -319,6 +319,9 @@ func NewHandler(d HandlerDeps) *Handler {
 	d.Bot.RegisterCallback("imp:", h.cbImpact)
 	d.Bot.RegisterCallback("nav:", h.cbNav)
 	d.Bot.RegisterCallback("help:", h.cbHelp)
+	d.Bot.RegisterCallback("gex:", h.handleGEXCallback)
+	d.Bot.RegisterCallback("ivol:", h.handleIVolCallback)
+	d.Bot.RegisterCallback("skew:", h.handleSkewCallback)
 	d.Bot.RegisterCallback("setalert:", h.cbSetAlert) // Per-pair alert management keyboard
 	d.Bot.RegisterCallback("share:", h.cbShare)
 	d.Bot.RegisterCallback("adm_cf:", h.cbAdminConfirm)

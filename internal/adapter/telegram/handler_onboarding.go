@@ -601,6 +601,60 @@ func (h *Handler) cbHelp(ctx context.Context, chatID string, msgID int, userID i
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, header, kb)
 	}
 
+	// Check if it's a contextual help request (e.g., "help:gex", "help:cta")
+	if topic, ok := helpTopics[action]; ok {
+		// Show contextual help for specific topic
+		helpText := fmt.Sprintf("<b>❓ %s</b>\n\n%s", topic.Title, topic.Description)
+		if len(topic.Examples) > 0 {
+			helpText += "\n<b>📝 Contoh:</b>\n"
+			for _, ex := range topic.Examples {
+				helpText += fmt.Sprintf("• %s\n", ex)
+			}
+		}
+		if len(topic.Related) > 0 {
+			helpText += "\n<b>🔗 Terkait:</b>\n"
+			for _, rel := range topic.Related {
+				helpText += fmt.Sprintf("• /%s\n", rel)
+			}
+		}
+		helpText += "\n<i>Tap tombol untuk kembali atau mencoba contoh</i>"
+		
+		helpKb := ports.InlineKeyboard{
+			Rows: [][]ports.InlineButton{
+				{
+					{Text: "✅ Got it", CallbackData: "help:back"},
+					{Text: "📝 Coba Contoh", CallbackData: fmt.Sprintf("help:try:%s", action)},
+				},
+				{
+					{Text: "🏠 Home", CallbackData: "nav:home"},
+				},
+			},
+		}
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
+	}
+
+	// Check for "try" action
+	if strings.HasPrefix(action, "try:") {
+		topic := strings.TrimPrefix(action, "try:")
+		if topic == "gex" {
+			return h.cmdGEX(ctx, chatID, userID, "BTC")
+		}
+		if topic == "cot" {
+			return h.cmdCOT(ctx, chatID, userID, "EUR")
+		}
+		if topic == "cta" {
+			return h.cmdCTA(ctx, chatID, userID, "EUR")
+		}
+		if topic == "quant" {
+			return h.cmdQuant(ctx, chatID, userID, "EUR")
+		}
+		if topic == "vix" {
+			return h.cmdVix(ctx, chatID, userID, "")
+		}
+		// Default: show help
+		return h.sendHelpSubCategory(ctx, chatID, userID, action, msgID)
+	}
+
 	return h.sendHelpSubCategory(ctx, chatID, userID, action, msgID)
 }
 

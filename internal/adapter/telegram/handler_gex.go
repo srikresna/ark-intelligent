@@ -96,13 +96,25 @@ func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args 
 	// Run analysis
 	result, err := h.gex.Engine.Analyze(ctx, sym)
 	if err != nil {
-		h.editUserError(ctx, chatID, loadID, err, "gex")
+		log.Error().Err(err).Str("symbol", sym).Msg("GEX analysis failed")
+		errHTML := FormatError(err, "/gex")
+		kb := CreateErrorKeyboard("gex")
+		// Add contextual help
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
 		return nil
 	}
 
 	// Format and send result with navigation keyboard
 	html := FormatGEXResult(result)
 	kb := gexKeyboard(sym)
+
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+	})
 
 	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
 		// Fallback: send as new message
@@ -131,7 +143,7 @@ func gexKeyboard(currentSym string) ports.InlineKeyboard {
 	}
 	rows = append(rows, symbolRow)
 
-	// Refresh button
+	// Refresh and navigation
 	rows = append(rows, []ports.InlineButton{
 		{Text: "🔄 Refresh", CallbackData: "gex:refresh:" + currentSym},
 		{Text: "🔀 Skew", CallbackData: "skew:sym:" + currentSym},
@@ -173,16 +185,25 @@ func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID in
 		result, err := h.gex.Engine.Analyze(ctx, sym)
 		if err != nil {
 			log.Error().Err(err).Str("symbol", sym).Msg("GEX analysis failed")
-			errHTML := fmt.Sprintf("⚠️ <b>GEX analysis failed for %s</b>\n\n"+
-				"<i>Error: %v</i>\n\n"+
-				"Data source may be temporarily unavailable. Try again in a few minutes.", sym, err)
-			kb := gexKeyboard(sym)
+			errHTML := FormatError(err, "/gex")
+			kb := CreateErrorKeyboard("gex")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+			})
 			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
 			return nil
 		}
 		html := FormatGEXResult(result)
 		kb := gexKeyboard(sym)
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+		})
 		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		// Show contextual help
+		helpText := getContextualHelp("gex")
+		helpKb := getHelpKeyboard("gex")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
 	}
 	return nil
 }
