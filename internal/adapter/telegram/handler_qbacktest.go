@@ -64,8 +64,64 @@ func (h *Handler) cmdQBacktest(ctx context.Context, chatID string, userID int64,
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	analyzer := NewQuantBacktestAnalyzer(h.quant)
-	stats, err := analyzer.Analyze(ctxWithTimeout, symbol, model)
+	// Use simple backtest (no Python dependency) for fast results
+	analyzer := NewSimpleQuantBacktestAnalyzer(h.quant)
+	
+	// For single model, use simple analyzer
+	var stats *QuantBacktestStats
+	
+	if model != "" {
+		// Single model - use simple analyzer
+		simpleResult, err := analyzer.Analyze(ctxWithTimeout, symbol, model)
+		if err != nil {
+			if loadingID > 0 {
+				_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+			}
+			h.sendUserError(ctx, chatID, err, "qbacktest")
+			return nil
+		}
+		
+		// Convert simple result to full stats format
+		stats = &QuantBacktestStats{
+			Symbol:    symbol,
+			Timeframe: "daily",
+			TotalBars: simpleResult.TotalBars,
+			Config:    DefaultBacktestConfig(),
+		}
+		
+		// Create single model result
+		fullResult := QuantBacktestResult{
+			Model:        simpleResult.Model,
+			Symbol:       simpleResult.Symbol,
+			Timeframe:    "daily",
+			TotalSignals: simpleResult.SignalCount,
+			Evaluated:    simpleResult.SignalCount,
+			WinRate4W:    simpleResult.WinRate,
+			AvgReturn4W:  simpleResult.AvgReturn,
+			SharpeRatio:  simpleResult.Sharpe,
+			MaxDrawdown:  simpleResult.MaxDD,
+			ProfitFactor: 1.0, // Placeholder
+			SampleSize:   simpleResult.SignalCount,
+			Confidence:   simpleResult.Confidence,
+			Config:       DefaultBacktestConfig(),
+		}
+		stats.Models = []QuantBacktestResult{fullResult}
+	} else {
+		// All models - would need to run multiple simple analyses
+		// For now, just show a message to pick one model
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
+		_, err := h.bot.SendHTML(ctx, chatID, 
+			"⚡ <b>Quick Backtest Available</b>\n\n"+
+				"Due to complexity, full multi-model backtest requires Python engine.\n\n"+
+				"<b>Try single model for instant results:</b>\n"+
+				"<code>/qbacktest EUR stats</code>\n"+
+				"<code>/qbacktest EUR garch</code>\n"+
+				"<code>/qbacktest EUR regime</code>\n\n"+
+				"Or use <code>/backtest</code> for COT signal backtests.")
+		return nil
+	}
 	
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
