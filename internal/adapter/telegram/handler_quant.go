@@ -102,6 +102,7 @@ func (h *Handler) WithQuant(q *QuantServices) *Handler {
 	if q != nil {
 		h.quantCache = newQuantStateCache()
 		h.registerQuantCommands()
+		h.registerQuantBacktestCommands()
 	}
 	return h
 }

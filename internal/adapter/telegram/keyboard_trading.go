@@ -645,3 +645,49 @@ func (kb *KeyboardBuilder) BacktestBackRow() ports.InlineKeyboard {
 		},
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Quant Backtest Keyboards
+// ---------------------------------------------------------------------------
+
+// QBacktestMenu builds the quant backtest result navigation keyboard.
+func (kb *KeyboardBuilder) QBacktestMenu() ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "🔬 Quant Dashboard", CallbackData: "quant:"},
+				{Text: "🏠 Home", CallbackData: "nav:home"},
+			},
+		},
+	}
+}
+
+// QuantBacktestModelMenu builds model selection for quant backtest.
+func (kb *KeyboardBuilder) QuantBacktestModelMenu(symbol string) ports.InlineKeyboard {
+	return ports.InlineKeyboard{
+		Rows: [][]ports.InlineButton{
+			{
+				{Text: "📊 Stats", CallbackData: "qbacktest:model:stats"},
+				{Text: "📉 GARCH", CallbackData: "qbacktest:model:garch"},
+				{Text: "🔗 Correlation", CallbackData: "qbacktest:model:correlation"},
+			},
+			{
+				{Text: "🎭 Regime", CallbackData: "qbacktest:model:regime"},
+				{Text: "🔄 Mean Revert", CallbackData: "qbacktest:model:meanrevert"},
+				{Text: "⚡ Granger", CallbackData: "qbacktest:model:granger"},
+			},
+			{
+				{Text: "🔗 Cointegration", CallbackData: "qbacktest:model:cointegration"},
+				{Text: "🧬 PCA", CallbackData: "qbacktest:model:pca"},
+				{Text: "🌐 VAR", CallbackData: "qbacktest:model:var"},
+			},
+			{
+				{Text: "⚠️ Risk", CallbackData: "qbacktest:model:risk"},
+				{Text: "📋 All Models", CallbackData: "qbacktest:model:"},
+			},
+			{
+				{Text: "🔙 Back", CallbackData: "qbacktest:back"},
+			},
+		},
+	}
+}
