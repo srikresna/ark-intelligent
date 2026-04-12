@@ -163,12 +163,12 @@ func TestDetectExtreme(t *testing.T) {
 	revertingBearHistory := buildRevertingHistory(95.0, 92.0, "TFF")
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		history []domain.COTRecord
-		wantNil bool
-		wantDir string
-		wantStr int
+		history  []domain.COTRecord
+		wantNil  bool
+		wantDir  string
+		wantStr  int
 	}{
 		{
 			name: "extreme_bull_reverting_with_z_confirm",
@@ -356,11 +356,11 @@ func TestDetectDivergence(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		history []domain.COTRecord
-		wantNil bool
-		wantDir string
+		history  []domain.COTRecord
+		wantNil  bool
+		wantDir  string
 	}{
 		{
 			name: "divergence_bullish_comm_buying",
@@ -469,30 +469,30 @@ func TestDetectMomentumShift(t *testing.T) {
 	// Momentum(4) = 0 - 20000 = -20000 (negative prevMom)
 
 	historyFlipBearish := []domain.COTRecord{
-		{LevFundLong: 80000, LevFundShort: 100000},  // [0]
-		{LevFundLong: 115000, LevFundShort: 80000},  // [1] net=35000
-		{LevFundLong: 110000, LevFundShort: 80000},  // [2] net=30000
-		{LevFundLong: 108000, LevFundShort: 80000},  // [3] net=28000
-		{LevFundLong: 105000, LevFundShort: 80000},  // [4] net=25000
-		{LevFundLong: 100000, LevFundShort: 80000},  // [5] net=20000
+		{LevFundLong: 80000, LevFundShort: 100000}, // [0]
+		{LevFundLong: 115000, LevFundShort: 80000}, // [1] net=35000
+		{LevFundLong: 110000, LevFundShort: 80000}, // [2] net=30000
+		{LevFundLong: 108000, LevFundShort: 80000}, // [3] net=28000
+		{LevFundLong: 105000, LevFundShort: 80000}, // [4] net=25000
+		{LevFundLong: 100000, LevFundShort: 80000}, // [5] net=20000
 	}
 	// prevNets: [35000, 30000, 28000, 25000, 20000] → reversed: [20000, 25000, 28000, 30000, 35000]
 	// Momentum(4) = 35000 - 20000 = 15000 (positive prevMom)
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		history []domain.COTRecord
-		wantNil bool
-		wantDir string
+		history  []domain.COTRecord
+		wantNil  bool
+		wantDir  string
 	}{
 		{
 			name: "bullish_momentum_flip",
 			analysis: domain.COTAnalysis{
-				Contract:        baseContract("TFF"),
-				SpecMomentum4W:  5000,  // positive (flipped from negative prevMom)
-				SpecMomentum8W:  3000,  // same sign as 4W → confirms
-				OpenInterest:    200000, // magnitude check: |5000-(-20000)|=25000, 25000/200000*100=12.5% > 1%
+				Contract:       baseContract("TFF"),
+				SpecMomentum4W: 5000,   // positive (flipped from negative prevMom)
+				SpecMomentum8W: 3000,   // same sign as 4W → confirms
+				OpenInterest:   200000, // magnitude check: |5000-(-20000)|=25000, 25000/200000*100=12.5% > 1%
 			},
 			history: historyFlipBullish,
 			wantNil: false,
@@ -501,10 +501,10 @@ func TestDetectMomentumShift(t *testing.T) {
 		{
 			name: "bearish_momentum_flip",
 			analysis: domain.COTAnalysis{
-				Contract:        baseContract("TFF"),
-				SpecMomentum4W:  -5000, // negative (flipped from positive prevMom)
-				SpecMomentum8W:  -3000, // same sign → confirms
-				OpenInterest:    200000,
+				Contract:       baseContract("TFF"),
+				SpecMomentum4W: -5000, // negative (flipped from positive prevMom)
+				SpecMomentum8W: -3000, // same sign → confirms
+				OpenInterest:   200000,
 			},
 			history: historyFlipBearish,
 			wantNil: false,
@@ -524,10 +524,10 @@ func TestDetectMomentumShift(t *testing.T) {
 		{
 			name: "no_signal_8w_disagrees",
 			analysis: domain.COTAnalysis{
-				Contract:        baseContract("TFF"),
-				SpecMomentum4W:  5000,  // positive
-				SpecMomentum8W:  -3000, // negative → disagrees with 4W
-				OpenInterest:    200000,
+				Contract:       baseContract("TFF"),
+				SpecMomentum4W: 5000,  // positive
+				SpecMomentum8W: -3000, // negative → disagrees with 4W
+				OpenInterest:   200000,
 			},
 			history: historyFlipBullish,
 			wantNil: true,
@@ -586,11 +586,11 @@ func TestDetectConcentration(t *testing.T) {
 	sd := NewSignalDetector()
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		wantNil bool
-		wantDir string
-		wantStr int
+		wantNil  bool
+		wantDir  string
+		wantStr  int
 	}{
 		{
 			// Top4LongPct > Top4ShortPct → concentrated longs → BEARISH (unwind risk)
@@ -675,11 +675,11 @@ func TestDetectCrowdContrarian(t *testing.T) {
 	sd := NewSignalDetector()
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		wantNil bool
-		wantDir string
-		wantStr int
+		wantNil  bool
+		wantDir  string
+		wantStr  int
 	}{
 		{
 			// Large specs crowded long (NetPosition > 0) → contrarian BEARISH
@@ -773,11 +773,11 @@ func TestDetectThinMarket(t *testing.T) {
 	sd := NewSignalDetector()
 
 	tests := []struct {
-		name    string
+		name     string
 		analysis domain.COTAnalysis
-		wantNil bool
-		wantDir string
-		wantStr int
+		wantNil  bool
+		wantDir  string
+		wantStr  int
 	}{
 		{
 			// TFF: DealerShortTraders=8 < 10 → thin shorts → BULLISH (squeeze risk)
@@ -831,12 +831,12 @@ func TestDetectThinMarket(t *testing.T) {
 			// No signal: all trader counts >= 10
 			name: "no_signal_all_thick",
 			analysis: domain.COTAnalysis{
-				Contract:           baseContract("TFF"),
-				ThinMarketAlert:    true,
-				ThinMarketDesc:     "some desc",
-				TotalTraders:       50,
-				DealerShortTraders: 15,
-				LevFundLongTraders: 20,
+				Contract:            baseContract("TFF"),
+				ThinMarketAlert:     true,
+				ThinMarketDesc:      "some desc",
+				TotalTraders:        50,
+				DealerShortTraders:  15,
+				LevFundLongTraders:  20,
 				LevFundShortTraders: 15,
 			},
 			wantNil: true,
@@ -931,11 +931,11 @@ func TestDetectAll_MultipleSignals(t *testing.T) {
 	// CrowdContrarian: CrowdingIndex >= 70 + NetPosition set.
 	a := domain.COTAnalysis{
 		Contract:      baseContract("TFF"),
-		COTIndexComm:  15,          // triggers SmartMoney (< 20)
+		COTIndexComm:  15, // triggers SmartMoney (< 20)
 		CommNetChange: 8000,
-		OpenInterest:  200000,      // changePct = 4% > 2%
-		CrowdingIndex: 80,          // triggers CrowdContrarian
-		NetPosition:   -3000,       // BULLISH contrarian
+		OpenInterest:  200000, // changePct = 4% > 2%
+		CrowdingIndex: 80,     // triggers CrowdContrarian
+		NetPosition:   -3000,  // BULLISH contrarian
 	}
 
 	signals := sd.DetectAll([]domain.COTAnalysis{a}, nil)

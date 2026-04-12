@@ -216,8 +216,8 @@ func TestHurst_Audit_MeanRevertingSignal(t *testing.T) {
 
 	for i := 299; i >= 0; i-- {
 		prices[i] = domain.PriceRecord{
-			Date: now.AddDate(0, 0, -(299-i)),
-			Close: price, High: price*1.005, Low: price*0.995, Open: price,
+			Date:  now.AddDate(0, 0, -(299 - i)),
+			Close: price, High: price * 1.005, Low: price * 0.995, Open: price,
 		}
 		noise := rng.NormFloat64() * 0.5
 		price += reversion*(meanLevel-price) + noise
@@ -305,7 +305,7 @@ func TestHMM_Audit_StateLabelsValid(t *testing.T) {
 		t.Fatalf("HMM failed: %v", err)
 	}
 
-	validStates := map[string]bool{HMMRiskOn: true, HMMRiskOff: true, HMMCrisis: true}
+	validStates := map[string]bool{HMMRiskOn: true, HMMRiskOff: true, HMMCrisis: true, HMMTrending: true}
 	if !validStates[result.CurrentState] {
 		t.Errorf("Invalid current state: %s", result.CurrentState)
 	}
@@ -325,15 +325,15 @@ func TestHMM_Audit_ProbabilitiesSumToOne(t *testing.T) {
 	}
 
 	// State probabilities should sum to ~1
-	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2]
+	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2] + result.StateProbabilities[3]
 	if math.Abs(probSum-1.0) > 0.01 {
 		t.Errorf("State probabilities don't sum to 1: %v (sum=%f)",
 			result.StateProbabilities, probSum)
 	}
 
 	// Transition matrix rows should sum to ~1
-	for i := 0; i < 3; i++ {
-		rowSum := result.TransitionMatrix[i][0] + result.TransitionMatrix[i][1] + result.TransitionMatrix[i][2]
+	for i := 0; i < 4; i++ {
+		rowSum := result.TransitionMatrix[i][0] + result.TransitionMatrix[i][1] + result.TransitionMatrix[i][2] + result.TransitionMatrix[i][3]
 		if math.Abs(rowSum-1.0) > 0.01 {
 			t.Errorf("Transition matrix row %d doesn't sum to 1: sum=%f", i, rowSum)
 		}
@@ -381,11 +381,12 @@ func TestHMM_Audit_DiscretizationDistribution(t *testing.T) {
 
 func TestHMM_Audit_TransitionWarningLogic(t *testing.T) {
 	// Test warning when a different state is becoming likely
-	probs := [3]float64{0.60, 0.25, 0.15}
-	A := [3][3]float64{
-		{0.50, 0.30, 0.20}, // Likely shift from RiskOn
-		{0.10, 0.80, 0.10},
-		{0.05, 0.20, 0.75},
+	probs := [4]float64{0.60, 0.25, 0.15, 0.0}
+	A := [4][4]float64{
+		{0.50, 0.30, 0.20, 0.0}, // Likely shift from RiskOn
+		{0.10, 0.80, 0.10, 0.0},
+		{0.05, 0.20, 0.75, 0.0},
+		{0.0, 0.0, 0.0, 1.0},
 	}
 
 	warning := detectTransitionWarning(0, probs, A)
@@ -437,12 +438,12 @@ func TestPearsonCorrelation_Audit_SymmetryProperty(t *testing.T) {
 }
 
 func TestPearsonCorrelation_Audit_DifferentLengths(t *testing.T) {
-	x := []float64{1, 2, 3, 4, 5}
-	y := []float64{2, 4, 6} // shorter
+	x := []float64{1, 2, 3, 4, 5, 6, 7}
+	y := []float64{2, 4, 6, 8, 10} // shorter but >= 5
 	r := pearsonCorrelation(x, y)
-	// Should use min(len(x), len(y)) = 3
+	// Should use min(len(x), len(y)) = 5
 	if math.IsNaN(r) {
-		t.Error("NaN from different-length inputs")
+		t.Error("NaN from different-length inputs with >= 5 points")
 	}
 }
 

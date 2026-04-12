@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("bybit")
@@ -51,7 +53,7 @@ func NewClient(apiKey, apiSecret, restBase string) *Client {
 		base = defaultRestBase
 	}
 	return &Client{
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: httpclient.NewClient(defaultTimeout),
 		apiKey:     apiKey,
 		apiSecret:  apiSecret,
 		restBase:   base,
@@ -72,37 +74,39 @@ func (c *Client) getPublic(ctx context.Context, path string, params url.Values) 
 		fullURL += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: build request: %w", err)
+		}
+		req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: http: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: http: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("bybit: read body: %w", err)
-	}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("bybit: read body: %w", err)
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bybit: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("bybit: HTTP %d: %s", resp.StatusCode, truncate(string(body), 200))
+		}
 
-	// Check Bybit retCode
-	var check struct {
-		RetCode int    `json:"retCode"`
-		RetMsg  string `json:"retMsg"`
-	}
-	if err := json.Unmarshal(body, &check); err == nil && check.RetCode != 0 {
-		return nil, fmt.Errorf("bybit: retCode=%d msg=%s", check.RetCode, check.RetMsg)
-	}
+		// Check Bybit retCode
+		var check struct {
+			RetCode int    `json:"retCode"`
+			RetMsg  string `json:"retMsg"`
+		}
+		if err := json.Unmarshal(body, &check); err == nil && check.RetCode != 0 {
+			return nil, fmt.Errorf("bybit: retCode=%d msg=%s", check.RetCode, check.RetMsg)
+		}
 
-	return body, nil
+		return body, nil
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -161,16 +165,40 @@ func (c *Client) GetOrderbook(ctx context.Context, category, symbol string, limi
 		if len(b) < 2 {
 			continue
 		}
-		p, _ := strconv.ParseFloat(b[0], 64)
-		q, _ := strconv.ParseFloat(b[1], 64)
+		p, errP := strconv.ParseFloat(b[0], 64)
+		q, errQ := strconv.ParseFloat(b[1], 64)
+		if errP != nil {
+			log.Warn().Str("raw_price", b[0]).Msg("orderbook bid: parse price failed, skipping level")
+			continue
+		}
+		if errQ != nil {
+			log.Warn().Str("raw_qty", b[1]).Msg("orderbook bid: parse qty failed, skipping level")
+			continue
+		}
+		if p == 0 || q == 0 {
+			log.Warn().Float64("price", p).Float64("qty", q).Msg("orderbook bid: zero price or qty, skipping level")
+			continue
+		}
 		ob.Bids = append(ob.Bids, OrderbookLevel{Price: p, Quantity: q})
 	}
 	for _, a := range resp.Result.A {
 		if len(a) < 2 {
 			continue
 		}
-		p, _ := strconv.ParseFloat(a[0], 64)
-		q, _ := strconv.ParseFloat(a[1], 64)
+		p, errP := strconv.ParseFloat(a[0], 64)
+		q, errQ := strconv.ParseFloat(a[1], 64)
+		if errP != nil {
+			log.Warn().Str("raw_price", a[0]).Msg("orderbook ask: parse price failed, skipping level")
+			continue
+		}
+		if errQ != nil {
+			log.Warn().Str("raw_qty", a[1]).Msg("orderbook ask: parse qty failed, skipping level")
+			continue
+		}
+		if p == 0 || q == 0 {
+			log.Warn().Float64("price", p).Float64("qty", q).Msg("orderbook ask: zero price or qty, skipping level")
+			continue
+		}
 		ob.Asks = append(ob.Asks, OrderbookLevel{Price: p, Quantity: q})
 	}
 	return ob, nil
@@ -220,9 +248,25 @@ func (c *Client) GetRecentTrades(ctx context.Context, category, symbol string, l
 
 	trades := make([]Trade, 0, len(resp.Result.List))
 	for _, t := range resp.Result.List {
-		p, _ := strconv.ParseFloat(t.Price, 64)
-		q, _ := strconv.ParseFloat(t.Size, 64)
-		ts, _ := strconv.ParseInt(t.Time, 10, 64)
+		p, errP := strconv.ParseFloat(t.Price, 64)
+		if errP != nil {
+			log.Warn().Str("raw_price", t.Price).Str("symbol", t.Symbol).Msg("trade: parse price failed, skipping entry")
+			continue
+		}
+		if p == 0 {
+			log.Warn().Str("symbol", t.Symbol).Msg("trade: zero price, skipping entry")
+			continue
+		}
+		q, errQ := strconv.ParseFloat(t.Size, 64)
+		if errQ != nil {
+			log.Warn().Str("raw_qty", t.Size).Str("symbol", t.Symbol).Msg("trade: parse qty failed, skipping entry")
+			continue
+		}
+		ts, errTs := strconv.ParseInt(t.Time, 10, 64)
+		if errTs != nil {
+			log.Warn().Str("raw_time", t.Time).Str("symbol", t.Symbol).Msg("trade: parse timestamp failed, skipping entry")
+			continue
+		}
 		trades = append(trades, Trade{
 			Symbol:     t.Symbol,
 			Price:      p,
@@ -300,8 +344,20 @@ func (c *Client) GetTicker(ctx context.Context, category, symbol string) (*Ticke
 	}
 	t := resp.Result.List[0]
 
-	toF := func(s string) float64 { v, _ := strconv.ParseFloat(s, 64); return v }
-	toI := func(s string) int64 { v, _ := strconv.ParseInt(s, 10, 64); return v }
+	toF := func(s string) float64 {
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil && s != "" {
+			log.Warn().Str("value", s).Err(err).Msg("bybit ticker: float parse failed")
+		}
+		return v
+	}
+	toI := func(s string) int64 {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil && s != "" {
+			log.Warn().Str("value", s).Err(err).Msg("bybit ticker: int parse failed")
+		}
+		return v
+	}
 
 	return &Ticker{
 		Symbol:            t.Symbol,
@@ -367,8 +423,20 @@ func (c *Client) GetKline(ctx context.Context, category, symbol, interval string
 		if len(row) < 7 {
 			continue
 		}
-		toF := func(s string) float64 { v, _ := strconv.ParseFloat(s, 64); return v }
-		toI := func(s string) int64 { v, _ := strconv.ParseInt(s, 10, 64); return v }
+		toF := func(s string) float64 {
+			v, err := strconv.ParseFloat(s, 64)
+			if err != nil && s != "" {
+				log.Warn().Str("value", s).Err(err).Msg("bybit kline: float parse failed")
+			}
+			return v
+		}
+		toI := func(s string) int64 {
+			v, err := strconv.ParseInt(s, 10, 64)
+			if err != nil && s != "" {
+				log.Warn().Str("value", s).Err(err).Msg("bybit kline: int parse failed")
+			}
+			return v
+		}
 		klines = append(klines, Kline{
 			StartTime: toI(row[0]),
 			Open:      toF(row[1]),
@@ -424,9 +492,21 @@ func (c *Client) GetLongShortRatio(ctx context.Context, category, symbol, period
 
 	ratios := make([]LongShortRatio, 0, len(resp.Result.List))
 	for _, r := range resp.Result.List {
-		buy, _ := strconv.ParseFloat(r.BuyRatio, 64)
-		sell, _ := strconv.ParseFloat(r.SellRatio, 64)
-		ts, _ := strconv.ParseInt(r.Timestamp, 10, 64)
+		buy, errB := strconv.ParseFloat(r.BuyRatio, 64)
+		if errB != nil {
+			log.Warn().Str("raw_buy_ratio", r.BuyRatio).Str("symbol", r.Symbol).Msg("long-short: parse buyRatio failed, skipping entry")
+			continue
+		}
+		sell, errS := strconv.ParseFloat(r.SellRatio, 64)
+		if errS != nil {
+			log.Warn().Str("raw_sell_ratio", r.SellRatio).Str("symbol", r.Symbol).Msg("long-short: parse sellRatio failed, skipping entry")
+			continue
+		}
+		ts, errTs := strconv.ParseInt(r.Timestamp, 10, 64)
+		if errTs != nil {
+			log.Warn().Str("raw_timestamp", r.Timestamp).Str("symbol", r.Symbol).Msg("long-short: parse timestamp failed, skipping entry")
+			continue
+		}
 		ratios = append(ratios, LongShortRatio{
 			Symbol:    r.Symbol,
 			BuyRatio:  buy,
@@ -477,8 +557,16 @@ func (c *Client) GetOpenInterestHistory(ctx context.Context, category, symbol, i
 
 	data := make([]OIData, 0, len(resp.Result.List))
 	for _, r := range resp.Result.List {
-		oi, _ := strconv.ParseFloat(r.OpenInterest, 64)
-		ts, _ := strconv.ParseInt(r.Timestamp, 10, 64)
+		oi, errOI := strconv.ParseFloat(r.OpenInterest, 64)
+		if errOI != nil {
+			log.Warn().Str("raw_oi", r.OpenInterest).Str("symbol", resp.Result.Symbol).Msg("open-interest: parse openInterest failed, skipping entry")
+			continue
+		}
+		ts, errTs := strconv.ParseInt(r.Timestamp, 10, 64)
+		if errTs != nil {
+			log.Warn().Str("raw_timestamp", r.Timestamp).Str("symbol", resp.Result.Symbol).Msg("open-interest: parse timestamp failed, skipping entry")
+			continue
+		}
 		data = append(data, OIData{
 			Symbol:       resp.Result.Symbol,
 			OpenInterest: oi,
@@ -486,6 +574,149 @@ func (c *Client) GetOpenInterestHistory(ctx context.Context, category, symbol, i
 		})
 	}
 	return data, nil
+}
+
+// ---------------------------------------------------------------------------
+// Funding Rate History
+// ---------------------------------------------------------------------------
+
+// FundingRate holds one funding rate settlement record.
+type FundingRate struct {
+	Symbol               string
+	FundingRate          float64
+	FundingRateTimestamp int64 // Unix ms
+}
+
+// FundingRateStats holds computed funding rate statistics.
+type FundingRateStats struct {
+	Symbol     string
+	Current    float64
+	Avg7D      float64
+	Avg30D     float64
+	Max30D     float64
+	Min30D     float64
+	Regime     string  // "POSITIVE_BIAS", "NEGATIVE_BIAS", "NEUTRAL"
+	Percentile float64 // percentile of current rate in 30d history (0-100)
+	History    []FundingRate
+}
+
+// GetFundingHistory fetches historical funding rate settlements.
+// category: "linear" for USDT perpetuals
+// symbol: e.g. "BTCUSDT"
+// limit: max 200
+func (c *Client) GetFundingHistory(ctx context.Context, category, symbol string, limit int) ([]FundingRate, error) {
+	params := url.Values{
+		"category": {category},
+		"symbol":   {symbol},
+		"limit":    {strconv.Itoa(limit)},
+	}
+	body, err := c.getPublic(ctx, "/v5/market/funding/history", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Result struct {
+			List []struct {
+				Symbol               string `json:"symbol"`
+				FundingRate          string `json:"fundingRate"`
+				FundingRateTimestamp string `json:"fundingRateTimestamp"`
+			} `json:"list"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("bybit: parse funding history: %w", err)
+	}
+
+	rates := make([]FundingRate, 0, len(resp.Result.List))
+	for _, r := range resp.Result.List {
+		rate, errR := strconv.ParseFloat(r.FundingRate, 64)
+		if errR != nil {
+			log.Warn().Str("raw_rate", r.FundingRate).Str("symbol", r.Symbol).
+				Msg("funding-history: parse rate failed, skipping entry")
+			continue
+		}
+		ts, errTs := strconv.ParseInt(r.FundingRateTimestamp, 10, 64)
+		if errTs != nil {
+			log.Warn().Str("raw_ts", r.FundingRateTimestamp).Str("symbol", r.Symbol).
+				Msg("funding-history: parse timestamp failed, skipping entry")
+			continue
+		}
+		rates = append(rates, FundingRate{
+			Symbol:               r.Symbol,
+			FundingRate:          rate,
+			FundingRateTimestamp: ts,
+		})
+	}
+	return rates, nil
+}
+
+// ComputeFundingStats computes funding rate statistics from historical data.
+// It calculates current rate, 7d/30d averages, min/max, regime, and percentile.
+func ComputeFundingStats(symbol string, rates []FundingRate) *FundingRateStats {
+	if len(rates) == 0 {
+		return &FundingRateStats{Symbol: symbol, Regime: "NEUTRAL"}
+	}
+
+	stats := &FundingRateStats{
+		Symbol:  symbol,
+		Current: rates[0].FundingRate, // newest first from Bybit
+		History: rates,
+	}
+
+	// Bybit settles funding 3x/day (every 8h)
+	// 7d = 21 settlements, 30d = 90 settlements
+	n7d := 21
+	n30d := 90
+	if n7d > len(rates) {
+		n7d = len(rates)
+	}
+	if n30d > len(rates) {
+		n30d = len(rates)
+	}
+
+	// 7-day average
+	sum7 := 0.0
+	for _, r := range rates[:n7d] {
+		sum7 += r.FundingRate
+	}
+	stats.Avg7D = sum7 / float64(n7d)
+
+	// 30-day average, min, max
+	sum30 := 0.0
+	stats.Max30D = rates[0].FundingRate
+	stats.Min30D = rates[0].FundingRate
+	for _, r := range rates[:n30d] {
+		sum30 += r.FundingRate
+		if r.FundingRate > stats.Max30D {
+			stats.Max30D = r.FundingRate
+		}
+		if r.FundingRate < stats.Min30D {
+			stats.Min30D = r.FundingRate
+		}
+	}
+	stats.Avg30D = sum30 / float64(n30d)
+
+	// Percentile: what % of 30d rates are below current
+	below := 0
+	for _, r := range rates[:n30d] {
+		if r.FundingRate < stats.Current {
+			below++
+		}
+	}
+	stats.Percentile = float64(below) / float64(n30d) * 100
+
+	// Regime classification
+	switch {
+	case stats.Avg7D > 0.0003: // > 3bps avg = strong positive bias
+		stats.Regime = "POSITIVE_BIAS"
+	case stats.Avg7D < -0.0001: // < -1bps avg = negative bias
+		stats.Regime = "NEGATIVE_BIAS"
+	default:
+		stats.Regime = "NEUTRAL"
+	}
+
+	return stats
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +747,6 @@ func truncate(s string, n int) string {
 // Ensure unexported helpers are referenced to avoid "declared and not used" errors.
 // sign and nowMs are reserved for future private endpoint use.
 var (
-	_ = log
 	_ = defaultRecvWindow
 )
 

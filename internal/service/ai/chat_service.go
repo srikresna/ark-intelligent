@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
@@ -64,10 +65,11 @@ func (cs *ChatService) SetOwnerNotify(fn OwnerNotifyFunc) {
 // contentBlocks is non-nil when the message contains media (images, documents).
 // onProgress is an optional callback for reporting status updates during tool round-trips.
 // preferredModel is the user's model preference: "gemini" uses Gemini as primary, anything else uses Claude.
+// showTokenInfo, when true, appends a compact token usage summary to Claude responses.
 // claudeModelOverride (optional variadic) specifies the exact Claude model variant (e.g. "claude-sonnet-4-5").
 // Thread-safe — passed via ChatRequest.OverrideModel, not shared state mutation.
 // Returns the assistant's response text.
-func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text string, role domain.UserRole, contentBlocks []ports.ContentBlock, onProgress func(string), preferredModel string, claudeModelOverride ...string) (string, error) {
+func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text string, role domain.UserRole, contentBlocks []ports.ContentBlock, onProgress func(string), preferredModel string, showTokenInfo bool, claudeModelOverride ...string) (string, error) {
 	// 1. Load conversation history (last 20 messages for context window)
 	history, err := cs.convRepo.GetHistory(ctx, userID, 20)
 	if err != nil {
@@ -82,6 +84,9 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 	if effectiveText == "" && len(contentBlocks) > 0 {
 		// Try to extract text from content blocks
 		for _, b := range contentBlocks {
+			if b.Type == "" {
+				continue // skip zero-value blocks
+			}
 			if b.Type == "text" && b.Text != "" {
 				effectiveText = b.Text
 				break
@@ -122,12 +127,12 @@ func (cs *ChatService) HandleMessage(ctx context.Context, userID int64, text str
 	if preferredModel == "gemini" {
 		return cs.handleGeminiPrimary(ctx, userID, systemPrompt, effectiveText, onProgress)
 	}
-	return cs.handleClaudePrimary(ctx, userID, messages, systemPrompt, tools, effectiveText, onProgress, modelOverride)
+	return cs.handleClaudePrimary(ctx, userID, messages, systemPrompt, tools, effectiveText, onProgress, showTokenInfo, modelOverride)
 }
 
 // handleClaudePrimary tries Claude first, then Gemini fallback, then template.
 // modelOverride, if non-empty, overrides the server-default Claude model for this request only.
-func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, messages []ports.ChatMessage, systemPrompt string, tools []ports.ServerTool, effectiveText string, onProgress func(string), modelOverride string) (string, error) {
+func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, messages []ports.ChatMessage, systemPrompt string, tools []ports.ServerTool, effectiveText string, onProgress func(string), showTokenInfo bool, modelOverride string) (string, error) {
 	req := ports.ChatRequest{
 		UserID:        userID,
 		Messages:      messages,
@@ -154,7 +159,13 @@ func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, me
 		}
 
 		logEvent.Msg("Claude response")
-		return resp.Content, nil
+
+		content := resp.Content
+		if showTokenInfo {
+			content += fmt.Sprintf("\n\n<i>📊 Tokens: %d+%d | Cache: %d</i>",
+				resp.InputTokens, resp.OutputTokens, resp.CacheReadTokens)
+		}
+		return content, nil
 	}
 
 	// Claude failed — log and attempt Gemini fallback
@@ -170,7 +181,8 @@ func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, me
 		geminiResp, geminiErr := cs.gemini.GenerateWithSystem(ctx, systemPrompt, effectiveText)
 		if geminiErr == nil && geminiResp != "" {
 			fallbackResponse := fmt.Sprintf(
-				"<i>[⚠️ Claude endpoint unreachable — response via Gemini fallback]</i>\n\n%s",
+				"<i>⚠️ Claude sedang tidak tersedia. Response ini dari model alternatif (Gemini).\n"+
+					"Kualitas mungkin berbeda. Coba lagi dalam 5-10 menit untuk Claude.</i>\n\n%s",
 				geminiResp,
 			)
 			cs.saveConversation(ctx, userID, effectiveText, geminiResp)
@@ -292,13 +304,17 @@ func templateFallback() string {
 }
 
 // notifyOwner sends a notification to the bot owner if the callback is set.
-// Non-blocking — fires in a goroutine with a detached context so the
-// notification survives even if the request context is cancelled.
-func (cs *ChatService) notifyOwner(_ context.Context, html string) {
+// Non-blocking — fires in a goroutine with a timeout context to prevent
+// goroutine leaks if the notification callback hangs.
+func (cs *ChatService) notifyOwner(parentCtx context.Context, html string) {
 	if cs.ownerNotify == nil {
 		return
 	}
-	go cs.ownerNotify(context.Background(), html)
+	go func() {
+		ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
+		defer cancel()
+		cs.ownerNotify(ctx, html)
+	}()
 }
 
 // truncateErr returns a truncated error string (max 150 chars) safe for Telegram HTML.
@@ -320,6 +336,9 @@ func truncateErr(err error) string {
 func describeContentBlocks(blocks []ports.ContentBlock) string {
 	var parts []string
 	for _, b := range blocks {
+		if b.Type == "" {
+			continue // skip zero-value blocks
+		}
 		switch b.Type {
 		case "image":
 			parts = append(parts, "[Image]")

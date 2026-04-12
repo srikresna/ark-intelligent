@@ -8,11 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	"github.com/arkcode369/ark-intelligent/internal/service/cot"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/saferun"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
 )
 
@@ -25,6 +27,14 @@ type AlertFilterFunc func(ctx context.Context, userID int64, prefsCurrencies, pr
 
 // FREDAlertCheckFunc checks if a user should receive FRED alerts (Free tier excluded).
 type FREDAlertCheckFunc func(ctx context.Context, userID int64) bool
+
+// AlertGateFunc checks whether an alert should be delivered for the given prefs and alert type.
+// Returns (ok bool, reason string). nil → always deliver.
+type AlertGateFunc func(prefs domain.UserPrefs, alertType string) (bool, string)
+
+// RecordDeliveryFunc increments the daily alert counter after a successful send.
+// nil → no-op.
+type RecordDeliveryFunc func(ctx context.Context, chatID string)
 
 // Scheduler manages background pulling of economic data and dispatching alerts.
 type Scheduler struct {
@@ -60,9 +70,21 @@ type Scheduler struct {
 	// When set, all broadcast loops explicitly skip banned users.
 	isBanned func(ctx context.Context, userID int64) bool
 
+	// alertGate enforces quiet hours, per-alert-type toggles, and daily caps (TASK-202).
+	// May be nil (no gate — all alerts delivered).
+	alertGate AlertGateFunc
+
+	// recordDelivery increments the daily alert counter after a successful send (TASK-202).
+	// May be nil (no counting).
+	recordDelivery RecordDeliveryFunc
+
 	// impactRecorder captures price impact after event releases.
 	// May be nil — impact recording disabled if price data unavailable.
 	impactRecorder *ImpactRecorder
+
+	// latestFedSpeeches caches the most recent Fed speeches for AI context.
+	latestFedMu       sync.RWMutex
+	latestFedSpeeches []FedSpeech
 }
 
 // NewScheduler creates a new background scheduler.
@@ -106,24 +128,38 @@ func (s *Scheduler) SetImpactRecorder(recorder *ImpactRecorder) {
 	s.impactRecorder = recorder
 }
 
+// SetAlertGateFunc sets the alert gate callback (TASK-202).
+// The gate enforces quiet hours, per-alert-type toggles, and daily caps.
+func (s *Scheduler) SetAlertGateFunc(fn AlertGateFunc) {
+	s.alertGate = fn
+}
+
+// SetRecordDeliveryFunc sets the callback to increment daily alert counters (TASK-202).
+func (s *Scheduler) SetRecordDeliveryFunc(fn RecordDeliveryFunc) {
+	s.recordDelivery = fn
+}
+
 // Start begins the background monitoring loop.
 func (s *Scheduler) Start(ctx context.Context) {
 	schedLog.Info().Msg("starting background monitors")
 
 	// 0. Initial Sync (Run once on startup if empty)
-	go s.runInitialSync(ctx)
+	saferun.Go(ctx, "news-initial-sync", schedLog, func() { s.runInitialSync(ctx) })
 
 	// 1. Weekly Sync Monitor (Runs every Sunday at 23:00 WIB)
-	go s.runWeeklySyncLoop(ctx)
+	saferun.Go(ctx, "news-weekly-sync", schedLog, func() { s.runWeeklySyncLoop(ctx) })
 
 	// 2. Daily Morning Reminder Monitor (Runs every day at 06:00 WIB)
-	go s.runDailyReminderLoop(ctx)
+	saferun.Go(ctx, "news-daily-reminder", schedLog, func() { s.runDailyReminderLoop(ctx) })
 
 	// 3. Micro-Scrape Trigger (Evaluated every minute — picks up actuals after release)
-	go s.runMicroScrapeLoop(ctx)
+	saferun.Go(ctx, "news-micro-scrape", schedLog, func() { s.runMicroScrapeLoop(ctx) })
 
 	// 4. Pre-Event Reminder (Evaluated every minute — sends alerts X mins before event)
-	go s.runPreEventReminderLoop(ctx)
+	saferun.Go(ctx, "news-pre-event-reminder", schedLog, func() { s.runPreEventReminderLoop(ctx) })
+
+	// 5. Fed Speeches & FOMC Press RSS Monitor (every 30 minutes)
+	saferun.Go(ctx, "fed-rss-monitor", schedLog, func() { s.runFedRSSLoop(ctx) })
 }
 
 // ---------------------------------------------------------------------------
@@ -131,12 +167,6 @@ func (s *Scheduler) Start(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runWeeklySyncLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -168,12 +198,6 @@ func (s *Scheduler) runWeeklySyncLoop(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runDailyReminderLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runDailyReminderLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -273,7 +297,7 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 		if lowCount > 0 {
 			html += fmt.Sprintf("🟡 Low Impact: %d events\n", lowCount)
 		}
-		if firstMatch != nil {
+		if firstMatch != nil && !firstMatch.TimeWIB.IsZero() {
 			html += fmt.Sprintf("\nPertama: %s WIB — %s %s",
 				firstMatch.TimeWIB.Format("15:04"), firstMatch.Currency, firstMatch.Event)
 		}
@@ -284,10 +308,19 @@ func (s *Scheduler) broadcastDailyReminder(ctx context.Context, now time.Time) {
 			html += "\n\n" + stormWarning
 		}
 
+		// TASK-202: Check quiet hours, alert type, and daily cap before sending.
+		if s.alertGate != nil {
+			if ok, _ := s.alertGate(prefs, domain.AlertTypeNewsHigh); !ok {
+				continue
+			}
+		}
+
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send daily reminder")
+		} else if s.recordDelivery != nil {
+			s.recordDelivery(ctx, prefs.ChatID)
 		}
-		time.Sleep(50 * time.Millisecond) // Avoid Telegram flood
+		time.Sleep(config.TelegramFloodDelay) // Avoid Telegram flood
 	}
 }
 
@@ -386,12 +419,6 @@ func buildVolatilePairs(currencySet map[string]bool) []string {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runPreEventReminderLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runPreEventReminderLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -430,6 +457,11 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 	for _, e := range events {
 		if e.Actual != "" {
 			continue // Already released
+		}
+
+		if e.TimeWIB.IsZero() {
+			schedLog.Warn().Str("event", e.Event).Str("currency", e.Currency).Msg("skipping event with zero TimeWIB")
+			continue
 		}
 
 		minsUntil := int(e.TimeWIB.Sub(now).Minutes())
@@ -485,10 +517,19 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 				html += fmt.Sprintf("📊 Forecast: %s | Prev: %s\n", e.Forecast, e.Previous)
 			}
 
+			// TASK-202: Check quiet hours, alert type, and daily cap before sending.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate(prefs, domain.AlertTypeNewsHigh); !ok {
+					continue
+				}
+			}
+
 			if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 				schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send pre-event alert")
+			} else if s.recordDelivery != nil {
+				s.recordDelivery(ctx, prefs.ChatID)
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(config.TelegramFloodDelay)
 		}
 	}
 }
@@ -498,12 +539,6 @@ func (s *Scheduler) evaluatePreEventReminders(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runMicroScrapeLoop(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runMicroScrapeLoop")
-		}
-	}()
-
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -535,6 +570,11 @@ func (s *Scheduler) evaluatePendingScrapes(ctx context.Context) {
 	triggerScrape := false
 	for _, e := range events {
 		if e.Actual != "" {
+			continue
+		}
+
+		if e.TimeWIB.IsZero() {
+			schedLog.Warn().Str("event", e.Event).Str("currency", e.Currency).Msg("skipping micro-scrape event with zero TimeWIB")
 			continue
 		}
 
@@ -671,16 +711,17 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		}
 	}
 
-	// Record price impact for the Event Impact Database (non-blocking)
+	// Record price impact for the Event Impact Database (non-blocking).
+	// Use context.Background() so a scheduler ctx cancellation (restart/shutdown)
+	// does not prevent past-horizon impact records from being persisted.
 	if s.impactRecorder != nil && hasActual {
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					schedLog.Error().Interface("panic", r).Str("event", ev.Event).Msg("PANIC in RecordImpact goroutine")
-				}
-			}()
-			s.impactRecorder.RecordImpact(ctx, ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
-		}()
+		saferun.Go(ctx, "record-impact-"+ev.Event, schedLog, func() {
+			// Use a detached context with timeout so shutdown does not cancel
+			// in-flight impact recording, but goroutine cannot hang forever.
+			recordCtx, recordCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer recordCancel()
+			s.impactRecorder.RecordImpact(recordCtx, ev, ev.SurpriseScore, []string{"15m", "30m", "1h", "4h"})
+		})
 	}
 
 	for userID, prefs := range activeUsers {
@@ -720,7 +761,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 		if _, sendErr := s.messenger.SendHTML(ctx, prefs.ChatID, html); sendErr != nil {
 			schedLog.Error().Int64("user_id", userID).Err(sendErr).Msg("failed to send release alert")
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(config.TelegramFloodDelay)
 	}
 
 	// Real-time conviction update — recompute and broadcast when surprise is significant
@@ -762,7 +803,7 @@ func (s *Scheduler) onNewRelease(ctx context.Context, ev domain.NewsEvent) {
 						}
 						if len(effCur) == 0 || containsStr(effCur, ev.Currency) {
 							_, _ = s.messenger.SendHTML(ctx, prefs.ChatID, convHTML)
-							time.Sleep(50 * time.Millisecond)
+							time.Sleep(config.TelegramFloodDelay)
 						}
 					}
 				}
@@ -1029,12 +1070,6 @@ func (s *Scheduler) GetSurpriseSigma(currency string) float64 {
 // ---------------------------------------------------------------------------
 
 func (s *Scheduler) runInitialSync(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			schedLog.Error().Interface("panic", r).Msg("PANIC in runInitialSync")
-		}
-	}()
-
 	now := timeutil.NowWIB()
 	dateStr := now.Format("20060102")
 

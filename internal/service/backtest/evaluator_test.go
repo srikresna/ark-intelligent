@@ -19,12 +19,12 @@ func TestBuildHistoryWindow(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		target     time.Time
-		maxWeeks   int
-		wantLen    int
-		wantFirst  time.Time // first record in window (oldest)
-		wantLast   time.Time // last record in window (most recent)
+		name      string
+		target    time.Time
+		maxWeeks  int
+		wantLen   int
+		wantFirst time.Time // first record in window (oldest)
+		wantLast  time.Time // last record in window (most recent)
 	}{
 		{
 			"full window from middle",
@@ -159,9 +159,9 @@ func TestComputeStatsMixedEvaluation(t *testing.T) {
 // differ when signals have different ages.
 func TestComputeStatsPerHorizonCounts(t *testing.T) {
 	signals := []domain.PersistedSignal{
-		makeSignal("BULLISH", 4, 70, 0.5, 1.2, 2.1),    // all 3 horizons
-		makeSignal("BULLISH", 3, 60, -0.3, 0.8, 0),       // 1W+2W only (4W return=0 → no outcome)
-		makeSignal("BEARISH", 5, 80, -0.7, 0, 0),          // 1W only
+		makeSignal("BULLISH", 4, 70, 0.5, 1.2, 2.1), // all 3 horizons
+		makeSignal("BULLISH", 3, 60, -0.3, 0.8, 0),  // 1W+2W only (4W return=0 → no outcome)
+		makeSignal("BEARISH", 5, 80, -0.7, 0, 0),    // 1W only
 	}
 
 	stats := computeStats(signals, "HORIZONS")

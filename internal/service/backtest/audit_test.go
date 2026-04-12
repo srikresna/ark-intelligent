@@ -43,7 +43,7 @@ func TestLogistic_Audit_PredictWithMismatchedWeights(t *testing.T) {
 }
 
 func TestLogistic_Audit_PredictWithCorrectWeights(t *testing.T) {
-	features := []float64{1.0} // 1 feature
+	features := []float64{1.0}     // 1 feature
 	weights := []float64{0.0, 2.0} // bias=0, w1=2
 	// z = 0 + 2*1 = 2, sigmoid(2) ≈ 0.8808
 	prob := logisticPredict(features, weights)
@@ -56,14 +56,14 @@ func TestLogistic_Audit_PredictWithCorrectWeights(t *testing.T) {
 func TestLogistic_Audit_FeatureExtractionBounds(t *testing.T) {
 	// Test that features are properly normalized to expected ranges
 	signal := &domain.PersistedSignal{
-		Strength:       5, // max
-		RawConfidence:  100,
-		COTIndex:       100,
-		SentimentScore: 1.0,
+		Strength:        5, // max
+		RawConfidence:   100,
+		COTIndex:        100,
+		SentimentScore:  1.0,
 		ConvictionScore: 100,
-		Direction:      "BULLISH",
-		DailyTrend:     "UP",
-		FREDRegime:     "EXPANSION",
+		Direction:       "BULLISH",
+		DailyTrend:      "UP",
+		FREDRegime:      "EXPANSION",
 	}
 
 	features := extractFeatures(signal)
@@ -75,14 +75,14 @@ func TestLogistic_Audit_FeatureExtractionBounds(t *testing.T) {
 
 	// Test minimum values
 	signalMin := &domain.PersistedSignal{
-		Strength:       1,
-		RawConfidence:  0,
-		COTIndex:       0,
-		SentimentScore: -1.0,
+		Strength:        1,
+		RawConfidence:   0,
+		COTIndex:        0,
+		SentimentScore:  -1.0,
 		ConvictionScore: 0,
-		Direction:      "BEARISH",
-		DailyTrend:     "DOWN",
-		FREDRegime:     "RECESSION",
+		Direction:       "BEARISH",
+		DailyTrend:      "DOWN",
+		FREDRegime:      "RECESSION",
 	}
 
 	featuresMin := extractFeatures(signalMin)

@@ -44,7 +44,10 @@ func signalAllPrefix() []byte {
 // --- SignalRepository interface implementation ---
 
 // SaveSignals persists a batch of signal snapshots.
-func (r *SignalRepo) SaveSignals(_ context.Context, signals []domain.PersistedSignal) error {
+func (r *SignalRepo) SaveSignals(ctx context.Context, signals []domain.PersistedSignal) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if len(signals) == 0 {
 		return nil
 	}
@@ -71,7 +74,10 @@ func (r *SignalRepo) SaveSignals(_ context.Context, signals []domain.PersistedSi
 
 // GetSignalsByContract retrieves all persisted signals for a contract.
 // Ordered newest-first by report date.
-func (r *SignalRepo) GetSignalsByContract(_ context.Context, contractCode string) ([]domain.PersistedSignal, error) {
+func (r *SignalRepo) GetSignalsByContract(ctx context.Context, contractCode string) ([]domain.PersistedSignal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	prefix := signalContractPrefix(contractCode)
 	signals, err := r.scanSignals(prefix)
 	if err != nil {
@@ -82,7 +88,10 @@ func (r *SignalRepo) GetSignalsByContract(_ context.Context, contractCode string
 }
 
 // GetSignalsByType retrieves all persisted signals of a given type across all contracts.
-func (r *SignalRepo) GetSignalsByType(_ context.Context, signalType string) ([]domain.PersistedSignal, error) {
+func (r *SignalRepo) GetSignalsByType(ctx context.Context, signalType string) ([]domain.PersistedSignal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	all, err := r.scanSignals(signalAllPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get signals by type %s: %w", signalType, err)
@@ -99,7 +108,10 @@ func (r *SignalRepo) GetSignalsByType(_ context.Context, signalType string) ([]d
 }
 
 // GetAllSignals retrieves all persisted signals.
-func (r *SignalRepo) GetAllSignals(_ context.Context) ([]domain.PersistedSignal, error) {
+func (r *SignalRepo) GetAllSignals(ctx context.Context) ([]domain.PersistedSignal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	signals, err := r.scanSignals(signalAllPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get all signals: %w", err)
@@ -111,7 +123,10 @@ func (r *SignalRepo) GetAllSignals(_ context.Context) ([]domain.PersistedSignal,
 // GetPendingSignals retrieves signals that need outcome evaluation.
 // A signal is pending if any horizon (1W/2W/4W) still needs evaluation
 // and enough time has passed since the report date for that horizon.
-func (r *SignalRepo) GetPendingSignals(_ context.Context) ([]domain.PersistedSignal, error) {
+func (r *SignalRepo) GetPendingSignals(ctx context.Context) ([]domain.PersistedSignal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	all, err := r.scanSignals(signalAllPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get pending signals: %w", err)
@@ -132,7 +147,10 @@ func (r *SignalRepo) GetPendingSignals(_ context.Context) ([]domain.PersistedSig
 }
 
 // UpdateSignal overwrites a single persisted signal.
-func (r *SignalRepo) UpdateSignal(_ context.Context, signal domain.PersistedSignal) error {
+func (r *SignalRepo) UpdateSignal(ctx context.Context, signal domain.PersistedSignal) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	data, err := json.Marshal(&signal)
 	if err != nil {
 		return fmt.Errorf("marshal signal update: %w", err)
@@ -190,7 +208,10 @@ func reverseSignals(s []domain.PersistedSignal) {
 // PurgeInvalidSignals deletes signals that have EntryPrice == 0.
 // These are leftovers from an older bootstrap that didn't check entry prices.
 // Returns the number of signals deleted.
-func (r *SignalRepo) PurgeInvalidSignals(_ context.Context) (int, error) {
+func (r *SignalRepo) PurgeInvalidSignals(ctx context.Context) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	all, err := r.scanSignals(signalAllPrefix())
 	if err != nil {
 		return 0, fmt.Errorf("scan signals for purge: %w", err)
@@ -223,7 +244,10 @@ func (r *SignalRepo) PurgeInvalidSignals(_ context.Context) (int, error) {
 }
 
 // GetRecentSignals retrieves all signals detected within the last N days, newest-first.
-func (r *SignalRepo) GetRecentSignals(_ context.Context, days int) ([]domain.PersistedSignal, error) {
+func (r *SignalRepo) GetRecentSignals(ctx context.Context, days int) ([]domain.PersistedSignal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	all, err := r.scanSignals(signalAllPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get recent signals: %w", err)
@@ -242,11 +266,14 @@ func (r *SignalRepo) GetRecentSignals(_ context.Context, days int) ([]domain.Per
 
 // SignalExists checks if a signal with the given key already exists.
 // Used by the bootstrapper to avoid duplicate inserts.
-func (r *SignalRepo) SignalExists(_ context.Context, contractCode string, reportDate time.Time, signalType string) (bool, error) {
+func (r *SignalRepo) SignalExists(ctx context.Context, contractCode string, reportDate time.Time, signalType string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	key := signalKey(domain.PersistedSignal{
 		ContractCode: contractCode,
 		ReportDate:   reportDate,
-		SignalType:    signalType,
+		SignalType:   signalType,
 	})
 
 	var exists bool

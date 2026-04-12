@@ -11,8 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -33,7 +36,7 @@ type Fetcher struct {
 // NewFetcher creates a COT fetcher with modern CFTC endpoints.
 func NewFetcher() *Fetcher {
 	return &Fetcher{
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: httpclient.New(httpclient.WithTimeout(60 * time.Second)),
 		endpoints: map[string]string{
 			"TFF":           "https://publicreporting.cftc.gov/resource/yw9f-hn96.json", // TFF Combined
 			"DISAGGREGATED": "https://publicreporting.cftc.gov/resource/kh3c-gbw2.json", // Disaggregated Combined
@@ -68,7 +71,7 @@ func (f *Fetcher) FetchLatest(ctx context.Context, contracts []domain.COTContrac
 	})
 
 	if sErr != nil && cErr != nil {
-		return nil, fmt.Errorf("both Socrata (%v) and CSV (%v) failed", sErr, cErr)
+		return nil, errs.Wrapf(errs.ErrUpstream, "both Socrata (%v) and CSV (%v) failed", sErr, cErr)
 	}
 
 	if sErr != nil {
@@ -120,7 +123,7 @@ func getLatestDate(records []domain.COTRecord) time.Time {
 func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract, weeks int) ([]domain.COTRecord, error) {
 	url, ok := f.endpoints[contract.ReportType]
 	if !ok {
-		return nil, fmt.Errorf("no endpoint for report type %s", contract.ReportType)
+		return nil, errs.Wrapf(errs.ErrNotFound, "no endpoint for report type %s", contract.ReportType)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -143,7 +146,7 @@ func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("socrata history: status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "socrata history: status %d", resp.StatusCode)
 	}
 
 	var raw []domain.SocrataRecord
@@ -153,7 +156,11 @@ func (f *Fetcher) FetchHistory(ctx context.Context, contract domain.COTContract,
 
 	records := make([]domain.COTRecord, 0, len(raw))
 	for _, sr := range raw {
-		records = append(records, socrataToRecord(sr, contract))
+		rec := socrataToRecord(sr, contract)
+		if rec.ReportDate.IsZero() {
+			continue // socrataToRecord already logged the warning
+		}
+		records = append(records, rec)
 	}
 
 	return records, nil
@@ -171,7 +178,7 @@ func (f *Fetcher) FetchAllHistory(ctx context.Context, contracts []domain.COTCon
 		}
 		allRecords = append(allRecords, history...)
 		// Stagger requests to avoid Socrata rate limits
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(config.COTFetchDelay)
 	}
 	return allRecords, nil
 }
@@ -185,7 +192,7 @@ func (f *Fetcher) fetchFromSocrata(ctx context.Context, contracts []domain.COTCo
 	}
 
 	var allRecords []domain.COTRecord
-	var errs []error
+	var fetchErrs []error
 
 	for reportType, reportContracts := range byReport {
 		url, ok := f.endpoints[reportType]
@@ -196,14 +203,14 @@ func (f *Fetcher) fetchFromSocrata(ctx context.Context, contracts []domain.COTCo
 
 		records, err := f.fetchReport(ctx, url, reportContracts)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", reportType, err))
+			fetchErrs = append(fetchErrs, fmt.Errorf("%s: %w", reportType, err))
 			continue
 		}
 		allRecords = append(allRecords, records...)
 	}
 
-	if len(allRecords) == 0 && len(errs) > 0 {
-		return nil, fmt.Errorf("all socrata reports failed: %v", errs)
+	if len(allRecords) == 0 && len(fetchErrs) > 0 {
+		return nil, errs.Wrapf(errs.ErrUpstream, "all socrata reports failed: %v", fetchErrs)
 	}
 
 	return allRecords, nil
@@ -236,7 +243,7 @@ func (f *Fetcher) fetchReport(ctx context.Context, url string, contracts []domai
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "status %d", resp.StatusCode)
 	}
 
 	var raw []domain.SocrataRecord
@@ -256,8 +263,12 @@ func (f *Fetcher) fetchReport(ctx context.Context, url string, contracts []domai
 		if !ok || seen[sr.ContractCode] {
 			continue
 		}
+		rec := socrataToRecord(sr, contract)
+		if rec.ReportDate.IsZero() {
+			continue // socrataToRecord already logged the warning
+		}
 		seen[sr.ContractCode] = true
-		records = append(records, socrataToRecord(sr, contract))
+		records = append(records, rec)
 	}
 
 	if len(records) > 0 {
@@ -287,7 +298,7 @@ func (f *Fetcher) fetchFromCSV(ctx context.Context, contracts []domain.COTContra
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("csv status %d", resp.StatusCode)
+		return nil, errs.Wrapf(errs.ErrUpstream, "csv status %d", resp.StatusCode)
 	}
 
 	reader := csv.NewReader(resp.Body)
@@ -345,6 +356,14 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 	if reportDate.IsZero() && len(sr.ReportDate) >= 10 {
 		reportDate, _ = time.Parse("2006-01-02", sr.ReportDate[:10])
 	}
+	// Guard: unrecognized date format → skip record to prevent zero-date corruption
+	if reportDate.IsZero() {
+		fetchLog.Warn().
+			Str("contract", contract.Code).
+			Str("raw_date", sr.ReportDate).
+			Msg("cot/fetcher: socrataToRecord: unrecognized date format, skipping record")
+		return domain.COTRecord{}
+	}
 
 	rec := domain.COTRecord{
 		ContractCode: contract.Code,
@@ -394,8 +413,8 @@ func socrataToRecord(sr domain.SocrataRecord, contract domain.COTContract) domai
 
 		// DISAGG spread
 		ManagedMoneySpread: socrataFloat(sr.MMoneyPositionsSpread),
-		ProdMercSpread:    socrataFloat(sr.ProdMercPositionsSpread),
-		SwapDealerSpread:  socrataFloat(sr.SwapPositionsSpread),
+		ProdMercSpread:     socrataFloat(sr.ProdMercPositionsSpread),
+		SwapDealerSpread:   socrataFloat(sr.SwapPositionsSpread),
 
 		// DISAGG WoW changes
 		ProdMercLongChg:      socrataFloat(sr.ChangeProdMercLong),

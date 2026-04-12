@@ -16,13 +16,13 @@ const (
 
 // RiskContext holds current VIX and S&P 500 snapshot for confidence adjustment.
 type RiskContext struct {
-	VIXLevel      float64    `json:"vix_level"`       // Latest VIX close
-	VIX4WAvg      float64    `json:"vix_4w_avg"`      // 4-week VIX average (baseline)
-	VIXTrend      string     `json:"vix_trend"`       // "RISING", "FALLING", "STABLE"
-	SPXWeeklyChg  float64    `json:"spx_weekly_chg"`  // S&P 500 weekly % change
-	SPXMonthlyChg float64    `json:"spx_monthly_chg"` // S&P 500 4-week % change
-	SPXAboveMA4W  bool       `json:"spx_above_ma4w"`  // Risk-on if true
-	Regime             RiskRegime `json:"regime"`                // Classified risk regime
+	VIXLevel           float64    `json:"vix_level"`            // Latest VIX close
+	VIX4WAvg           float64    `json:"vix_4w_avg"`           // 4-week VIX average (baseline)
+	VIXTrend           string     `json:"vix_trend"`            // "RISING", "FALLING", "STABLE"
+	SPXWeeklyChg       float64    `json:"spx_weekly_chg"`       // S&P 500 weekly % change
+	SPXMonthlyChg      float64    `json:"spx_monthly_chg"`      // S&P 500 4-week % change
+	SPXAboveMA4W       bool       `json:"spx_above_ma4w"`       // Risk-on if true
+	Regime             RiskRegime `json:"regime"`               // Classified risk regime
 	TermStructureSlope float64    `json:"term_structure_slope"` // VIX / VIX3M ratio (>1 = backwardation)
 	IsBackwardation    bool       `json:"is_backwardation"`     // true when VIX > VIX3M
 }

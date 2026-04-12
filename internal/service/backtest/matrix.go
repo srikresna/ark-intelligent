@@ -17,11 +17,11 @@ type MatrixCell struct {
 
 // CondMatrix holds the full conditional performance matrix.
 type CondMatrix struct {
-	Cells       map[string]map[string]*MatrixCell `json:"cells"` // [signalType][regime]
-	BestCombo   string                            `json:"best_combo"`
-	BestWinRate float64                           `json:"best_win_rate"`
-	WorstCombo  string                            `json:"worst_combo"`
-	WorstWinRate float64                          `json:"worst_win_rate"`
+	Cells        map[string]map[string]*MatrixCell `json:"cells"` // [signalType][regime]
+	BestCombo    string                            `json:"best_combo"`
+	BestWinRate  float64                           `json:"best_win_rate"`
+	WorstCombo   string                            `json:"worst_combo"`
+	WorstWinRate float64                           `json:"worst_win_rate"`
 }
 
 // MatrixAnalyzer builds a conditional performance matrix across signal types and regimes.

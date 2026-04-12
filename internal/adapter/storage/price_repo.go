@@ -34,7 +34,10 @@ func pricePrefix(contractCode string) []byte {
 // --- PriceRepository interface implementation ---
 
 // SavePrices stores a batch of weekly price records.
-func (r *PriceRepo) SavePrices(_ context.Context, records []domain.PriceRecord) error {
+func (r *PriceRepo) SavePrices(ctx context.Context, records []domain.PriceRecord) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if len(records) == 0 {
 		return nil
 	}
@@ -60,7 +63,10 @@ func (r *PriceRepo) SavePrices(_ context.Context, records []domain.PriceRecord) 
 }
 
 // GetLatest returns the most recent price record for a contract.
-func (r *PriceRepo) GetLatest(_ context.Context, contractCode string) (*domain.PriceRecord, error) {
+func (r *PriceRepo) GetLatest(ctx context.Context, contractCode string) (*domain.PriceRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var record *domain.PriceRecord
 
 	prefix := pricePrefix(contractCode)
@@ -101,7 +107,10 @@ func (r *PriceRepo) GetLatest(_ context.Context, contractCode string) (*domain.P
 
 // GetHistory returns price records for a contract over N weeks.
 // Returns records in reverse chronological order (newest first).
-func (r *PriceRepo) GetHistory(_ context.Context, contractCode string, weeks int) ([]domain.PriceRecord, error) {
+func (r *PriceRepo) GetHistory(ctx context.Context, contractCode string, weeks int) ([]domain.PriceRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var records []domain.PriceRecord
 
 	cutoff := time.Now().AddDate(0, 0, -weeks*7).Format("20060102")
@@ -148,7 +157,10 @@ func (r *PriceRepo) GetHistory(_ context.Context, contractCode string, weeks int
 // GetPriceAt retrieves the price record closest to the given date,
 // searching both forward (up to 7 days) and backward (up to 7 days).
 // Returns nil if no record is found within 7 days in either direction.
-func (r *PriceRepo) GetPriceAt(_ context.Context, contractCode string, date time.Time) (*domain.PriceRecord, error) {
+func (r *PriceRepo) GetPriceAt(ctx context.Context, contractCode string, date time.Time) (*domain.PriceRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var record *domain.PriceRecord
 
 	prefix := pricePrefix(contractCode)

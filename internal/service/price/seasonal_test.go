@@ -167,11 +167,11 @@ func TestFindRegimeAtDate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		year int
+		name  string
+		year  int
 		month int
-		day  int
-		want string
+		day   int
+		want  string
 	}{
 		{"exact match", 2024, 3, 11, "DISINFLATIONARY"},
 		{"close to March", 2024, 3, 15, "DISINFLATIONARY"},
@@ -256,10 +256,10 @@ func TestComputeConfluence_AllAligned(t *testing.T) {
 	p := &SeasonalPattern{
 		CurrentMonth: 3,
 		RegimeStats: &RegimeMonthStats{
-			DriverAlignment: "SUPPORTIVE",
-			RegimeName:      "DISINFLATIONARY",
+			DriverAlignment:   "SUPPORTIVE",
+			RegimeName:        "DISINFLATIONARY",
 			PrimaryFREDDriver: "test",
-			SampleSize:      3,
+			SampleSize:        3,
 		},
 		COTAlignment: &COTAlignmentResult{
 			CurrentAligned: true,
@@ -298,8 +298,8 @@ func TestComputeConfluence_NoneAligned(t *testing.T) {
 	p := &SeasonalPattern{
 		CurrentMonth: 3,
 		RegimeStats: &RegimeMonthStats{
-			DriverAlignment: "HEADWIND",
-			RegimeName:      "INFLATIONARY",
+			DriverAlignment:   "HEADWIND",
+			RegimeName:        "INFLATIONARY",
 			PrimaryFREDDriver: "test",
 		},
 		COTAlignment: &COTAlignmentResult{
@@ -307,7 +307,7 @@ func TestComputeConfluence_NoneAligned(t *testing.T) {
 			CurrentCOTBias: "BEARISH",
 		},
 		EventDensity: &EventDensityResult{
-			Rating: "HIGH",
+			Rating:    "HIGH",
 			KeyEvents: "FOMC, NFP",
 		},
 		CrossAsset: &CrossAssetResult{

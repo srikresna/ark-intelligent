@@ -38,6 +38,39 @@ func IsValidClaudeModel(m ClaudeModelID) bool {
 	return false
 }
 
+// OutputMode controls the verbosity of bot output.
+type OutputMode string
+
+const (
+	OutputCompact OutputMode = "compact"
+	OutputFull    OutputMode = "full"
+	OutputMinimal OutputMode = "minimal"
+)
+
+// NextOutputMode cycles: compact -> full -> minimal -> compact.
+func NextOutputMode(m OutputMode) OutputMode {
+	switch m {
+	case OutputCompact:
+		return OutputFull
+	case OutputFull:
+		return OutputMinimal
+	default:
+		return OutputCompact
+	}
+}
+
+// OutputModeLabel returns a display label for the mode.
+func OutputModeLabel(m OutputMode) string {
+	switch m {
+	case OutputFull:
+		return "Full Detail \U0001f4d6"
+	case OutputMinimal:
+		return "Minimal \u26a1"
+	default:
+		return "Compact \U0001f4ca"
+	}
+}
+
 // UserPrefs stores per-user notification preferences.
 type UserPrefs struct {
 	AlertMinutes     []int    `json:"alert_minutes"`      // Minutes before event to alert (e.g., [60, 15, 5])
@@ -56,9 +89,64 @@ type UserPrefs struct {
 	ClaudeModel ClaudeModelID `json:"claude_model,omitempty"`
 
 	// Broadcast & UI state
-	ChatID         string `json:"chat_id"`         // Telegram chat ID (set on /start, used for push alerts)
-	CalendarFilter string `json:"calendar_filter"` // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
-	CalendarView   string `json:"calendar_view"`   // Last used view: "day", "week", "month"
+	ChatID         string     `json:"chat_id"`                 // Telegram chat ID (set on /start, used for push alerts)
+	CalendarFilter string     `json:"calendar_filter"`         // Last used calendar filter: "all", "high", "med", "cur:USD", etc.
+	CalendarView   string     `json:"calendar_view"`           // Last used view: "day", "week", "month"
+	OutputMode     OutputMode `json:"output_mode,omitempty"`   // "compact" (default), "full", or "minimal"
+	LastCurrency   string     `json:"last_currency,omitempty"` // Last viewed currency (e.g. "EUR", "USD")
+
+	// DefaultTimeframe stores the user-preferred timeframe (e.g. "daily", "4h").
+	DefaultTimeframe string `json:"default_timeframe,omitempty"`
+
+	// PinnedCommands stores user-customized pinned command shortcuts.
+	PinnedCommands []string `json:"pinned_commands,omitempty"`
+
+	// ExperienceLevel: user's self-reported trading experience.
+	// "beginner", "intermediate", "pro", or "" (not set yet → trigger onboarding).
+	ExperienceLevel string `json:"experience_level,omitempty"`
+
+	// MobileMode collapses wide tables into sparkline + one-liner summaries.
+	// Optimised for narrow screens (320px mobile).
+	MobileMode bool `json:"mobile_mode,omitempty"`
+
+	// PairAlerts defines per-currency alert configurations for granular COT alerts.
+	PairAlerts []PairAlert `json:"pair_alerts,omitempty"`
+
+	// OnboardingStep tracks the user's progress through the guided onboarding flow.
+	// 0=not started, 1=role chosen, 2=first command run, 3=settings opened, 4=second feature explored.
+	OnboardingStep int `json:"onboarding_step,omitempty"`
+
+	// OnboardingDismissed is true when the user has skipped/dismissed the onboarding guide.
+	OnboardingDismissed bool `json:"onboarding_dismissed,omitempty"`
+
+	// OnboardingFirstFeature records the feature group of the first analysis command
+	// so step 4 requires exploring a *different* feature.
+	OnboardingFirstFeature string `json:"onboarding_first_feature,omitempty"`
+
+	// ReferrerID stores the user ID of whoever referred this user via deep link.
+	// Set when /start is invoked with ?start=ref_<userID>.
+	ReferrerID int64 `json:"referrer_id,omitempty"`
+
+	// ReferredAt is when the referral was recorded.
+	ReferredAt string `json:"referred_at,omitempty"`
+
+	// Quiet Hours — DND window (hours in WIB, 0-23).
+	QuietHoursEnabled bool `json:"quiet_hours_enabled,omitempty"`
+	QuietHoursStart   int  `json:"quiet_hours_start,omitempty"` // 0-23 WIB
+	QuietHoursEnd     int  `json:"quiet_hours_end,omitempty"`   // 0-23 WIB
+
+	// AlertTypes is a per-alert-type toggle map.
+	// Known keys: "cot_release", "fred_regime", "signal_strong", "news_high", "concentration".
+	// nil map or missing key → enabled (opt-out model).
+	AlertTypes map[string]bool `json:"alert_types,omitempty"`
+
+	// MaxAlertsPerDay caps daily alert delivery. 0 = unlimited.
+	MaxAlertsPerDay int `json:"max_alerts_per_day,omitempty"`
+
+	// ShowTokenInfo appends token usage stats to each AI chat response.
+	// Format: "📊 Tokens: {input}+{output} | Cache: {cache}".
+	// Default false (off for casual users; power users can enable via /settings).
+	ShowTokenInfo bool `json:"show_token_info,omitempty"`
 }
 
 // DefaultPrefs returns the default user preferences.
@@ -75,4 +163,144 @@ func DefaultPrefs() UserPrefs {
 		CalendarFilter:   "all",
 		CalendarView:     "day",
 	}
+}
+
+// ValidTimeframes returns the list of valid analysis timeframes.
+func ValidTimeframes() []string {
+	return []string{"daily", "4h", "1h", "30m", "15m", "weekly"}
+}
+
+// IsValidTimeframe returns true if the timeframe string is recognized.
+func IsValidTimeframe(tf string) bool {
+	for _, v := range ValidTimeframes() {
+		if v == tf {
+			return true
+		}
+	}
+	return false
+}
+
+// TimeframeLabel returns a human-friendly label for the timeframe.
+func TimeframeLabel(tf string) string {
+	switch tf {
+	case "weekly":
+		return "Weekly"
+	case "daily":
+		return "Daily"
+	case "4h":
+		return "4H"
+	case "1h":
+		return "1H"
+	case "30m":
+		return "30m"
+	case "15m":
+		return "15m"
+	default:
+		return "Daily"
+	}
+}
+
+// ResolveDefaultTimeframe returns the user preference or "daily" if empty/invalid.
+func ResolveDefaultTimeframe(pref string) string {
+	if pref != "" && IsValidTimeframe(pref) {
+		return pref
+	}
+	return "daily"
+}
+
+// ---------------------------------------------------------------------------
+// Per-Pair Alert Configuration (TASK-052)
+// ---------------------------------------------------------------------------
+
+// PairAlert defines alert criteria for a specific currency pair.
+type PairAlert struct {
+	Currency        string  `json:"currency"`         // "EUR", "GBP", etc.
+	ConvictionDelta float64 `json:"conviction_delta"` // Alert if conviction changes by this amount (0 = any change)
+	BiasFlip        bool    `json:"bias_flip"`        // Alert on bullish↔bearish flip
+	Enabled         bool    `json:"enabled"`
+}
+
+// ValidAlertCurrencies returns the list of currencies that support per-pair alerts.
+func ValidAlertCurrencies() []string {
+	return []string{"EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "USD"}
+}
+
+// IsValidAlertCurrency returns true if the currency supports per-pair alerts.
+func IsValidAlertCurrency(c string) bool {
+	for _, v := range ValidAlertCurrencies() {
+		if v == c {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// Alert Type Keys (TASK-202)
+// ---------------------------------------------------------------------------
+
+// Known alert type keys for per-type granularity.
+const (
+	AlertTypeCOTRelease    = "cot_release"
+	AlertTypeFREDRegime    = "fred_regime"
+	AlertTypeSignalStrong  = "signal_strong"
+	AlertTypeNewsHigh      = "news_high"
+	AlertTypeConcentration = "concentration"
+)
+
+// ValidAlertTypes returns all known alert type keys.
+func ValidAlertTypes() []string {
+	return []string{
+		AlertTypeCOTRelease,
+		AlertTypeFREDRegime,
+		AlertTypeSignalStrong,
+		AlertTypeNewsHigh,
+		AlertTypeConcentration,
+	}
+}
+
+// AlertTypeLabel returns a human-friendly label for the alert type key.
+func AlertTypeLabel(key string) string {
+	switch key {
+	case AlertTypeCOTRelease:
+		return "📊 COT Release"
+	case AlertTypeFREDRegime:
+		return "🏛 FRED Macro"
+	case AlertTypeSignalStrong:
+		return "📡 Strong Signal"
+	case AlertTypeNewsHigh:
+		return "📰 High-Impact News"
+	case AlertTypeConcentration:
+		return "🎯 Concentration"
+	default:
+		return key
+	}
+}
+
+// IsAlertTypeEnabled checks if a specific alert type is enabled for the user.
+// nil map or missing key → enabled (opt-out model).
+func (p UserPrefs) IsAlertTypeEnabled(alertType string) bool {
+	if p.AlertTypes == nil {
+		return true
+	}
+	enabled, exists := p.AlertTypes[alertType]
+	if !exists {
+		return true // opt-out: missing key = enabled
+	}
+	return enabled
+}
+
+// IsInQuietHours returns true if the given WIB hour falls within the quiet window.
+// Handles overnight ranges (e.g., 23:00 → 07:00).
+func (p UserPrefs) IsInQuietHours(wibHour int) bool {
+	if !p.QuietHoursEnabled {
+		return false
+	}
+	start, end := p.QuietHoursStart, p.QuietHoursEnd
+	if start <= end {
+		// Same-day range (e.g., 01:00-07:00)
+		return wibHour >= start && wibHour < end
+	}
+	// Overnight range (e.g., 23:00-07:00)
+	return wibHour >= start || wibHour < end
 }

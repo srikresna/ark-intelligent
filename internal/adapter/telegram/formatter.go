@@ -2,9 +2,9 @@ package telegram
 
 import (
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"strconv"
 	"strings"
-	"github.com/arkcode369/ark-intelligent/internal/domain"
 )
 
 // <b>, <i>, <code>, <pre>, <a>, <s>, <u>, <tg-spoiler>
@@ -32,9 +32,10 @@ func parseNumeric(s string) *float64 {
 // CPI miss, trade deficit) show the correct color for the currency.
 //
 // impactDirection semantics (MQL5):
-//   0 = neutral/unknown  → fall back to raw numeric comparison
-//   1 = higher actual is bullish for the currency (e.g. NFP, GDP)
-//   2 = higher actual is bearish for the currency (e.g. Unemployment Claims, CPI when above target)
+//
+//	0 = neutral/unknown  → fall back to raw numeric comparison
+//	1 = higher actual is bullish for the currency (e.g. NFP, GDP)
+//	2 = higher actual is bearish for the currency (e.g. Unemployment Claims, CPI when above target)
 func directionArrow(actual, forecast string, impactDirection ...int) string {
 	if actual == "" || forecast == "" {
 		return "⚪ Pending"
@@ -155,7 +156,7 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 	}
 
 	// Experience level display
-	levelDisplay = "Belum diset"
+	levelDisplay := "Belum diset"
 	switch prefs.ExperienceLevel {
 	case "beginner":
 		levelDisplay = "🌱 Pemula"
@@ -168,9 +169,8 @@ func (f *Formatter) FormatSettings(prefs domain.UserPrefs) string {
 
 	b.WriteString("\n<i>Use the buttons below to adjust preferences</i>")
 
-	return b.String()
+	return truncateMsg(b.String())
 }
-
 
 // FormatAlertManagement formats the alert management sub-menu display (TASK-202).
 func (f *Formatter) FormatAlertManagement(prefs domain.UserPrefs) string {
@@ -206,7 +206,7 @@ func (f *Formatter) FormatAlertManagement(prefs domain.UserPrefs) string {
 
 	b.WriteString("\n<i>Use the buttons below to adjust alert preferences</i>")
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // formatProgressBar creates a text-based progress bar for COT Index.
@@ -248,18 +248,18 @@ func contractCodeToFriendly(code string) string {
 		string(domain.ContractSilver): "SILVER",
 		string(domain.ContractCopper): "COPPER",
 		string(domain.ContractOil):    "OIL",
-		"022651": "ULSD",
-		"111659": "RBOB",
-		"043602": "BOND10",
-		"020601": "BOND30",
-		"044601": "BOND5",
-		"042601": "BOND2",
-		"13874A": "SPX",
+		"022651":                      "ULSD",
+		"111659":                      "RBOB",
+		"043602":                      "BOND10",
+		"020601":                      "BOND30",
+		"044601":                      "BOND5",
+		"042601":                      "BOND2",
+		"13874A":                      "SPX",
 		string(domain.ContractNasdaq): "NDX",
-		"124601": "DJI",
-		"239742": "RUT",
+		"124601":                      "DJI",
+		"239742":                      "RUT",
 		string(domain.ContractBTC):    "BTC",
-		"146021": "ETH",
+		"146021":                      "ETH",
 	}
 	if friendly, ok := m[code]; ok {
 		return friendly
@@ -337,6 +337,16 @@ func truncateStr(s string, maxLen int) string {
 	return s[:maxLen-2] + ".."
 }
 
+// truncateMsg ensures a Telegram message does not exceed the 4096-character limit.
+// If truncated, appends a notice so the user knows the output was clipped.
+func truncateMsg(s string) string {
+	const limit = 4000 // leave some margin below Telegram's 4096
+	if len(s) <= limit {
+		return s
+	}
+	return s[:limit] + "\n\n<i>… (output truncated)</i>"
+}
+
 // FormatTrackedEvents formats a list of tracked event names for the /impact help message.
 func (f *Formatter) FormatTrackedEvents(events []string) string {
 	var b strings.Builder
@@ -348,7 +358,7 @@ func (f *Formatter) FormatTrackedEvents(events []string) string {
 		b.WriteString("No events tracked yet. Impact data builds automatically\n")
 		b.WriteString("after each economic release with price data available.\n\n")
 		b.WriteString("Usage: <code>/impact NFP</code> or <code>/impact CPI</code>")
-		return b.String()
+		return truncateMsg(b.String())
 	}
 
 	b.WriteString("<b>Tracked Events:</b>\n")
@@ -362,7 +372,7 @@ func (f *Formatter) FormatTrackedEvents(events []string) string {
 
 	b.WriteString("\nUsage: <code>/impact Event Name</code>\n")
 	b.WriteString("Example: <code>/impact Non-Farm Employment Change</code>")
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // FormatRegimeOverlayHeader formats a one-line regime overlay header for embedding
@@ -372,5 +382,5 @@ func (f *Formatter) FormatRegimeOverlayHeader(overlay interface{ HeaderLine() st
 	if overlay == nil {
 		return ""
 	}
-	return overlay.HeaderLine() + "\n"
+	return truncateMsg(overlay.HeaderLine() + "\n")
 }

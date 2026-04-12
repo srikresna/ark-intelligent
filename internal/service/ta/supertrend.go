@@ -18,8 +18,8 @@ import "math"
 // - If prev SuperTrend == prev Final Lower and Close < current Final Lower → SuperTrend = Final Upper (flip to DOWN)
 // - Otherwise maintain previous direction.
 type SuperTrendResult struct {
-	Value           float64  // Current SuperTrend value
-	Direction       string   // "UP" (bullish) or "DOWN" (bearish)
+	Value           float64   // Current SuperTrend value
+	Direction       string    // "UP" (bullish) or "DOWN" (bearish)
 	Series          []float64 // Full SuperTrend series (newest-first)
 	DirectionSeries []string  // Full direction series (newest-first)
 }

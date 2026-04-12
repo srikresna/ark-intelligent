@@ -52,8 +52,8 @@ func StartOfWeek(t time.Time) time.Time {
 }
 
 // EndOfWeekWIB returns the Sunday 23:59:59 of the week containing t in WIB.
-func EndOfWeekWIB() time.Time {
-	monday := StartOfWeekWIB(NowWIB())
+func EndOfWeekWIB(t time.Time) time.Time {
+	monday := StartOfWeekWIB(t)
 	sunday := monday.AddDate(0, 0, 6)
 	return time.Date(sunday.Year(), sunday.Month(), sunday.Day(), 23, 59, 59, 0, WIB)
 }

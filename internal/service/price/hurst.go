@@ -28,21 +28,21 @@ import (
 
 // HurstResult holds the output of a Hurst exponent estimation.
 type HurstResult struct {
-	H             float64 `json:"h"`              // Hurst exponent (0-1)
-	Classification string `json:"classification"` // "MEAN_REVERTING", "RANDOM_WALK", "TRENDING"
-	Confidence    float64 `json:"confidence"`     // How far from 0.5 (strength of signal)
-	RSquared      float64 `json:"r_squared"`      // Goodness of fit of log-log regression
-	SampleSize    int     `json:"sample_size"`     // Number of observations used
-	Description   string  `json:"description"`     // Human-readable interpretation
+	H              float64 `json:"h"`              // Hurst exponent (0-1)
+	Classification string  `json:"classification"` // "MEAN_REVERTING", "RANDOM_WALK", "TRENDING"
+	Confidence     float64 `json:"confidence"`     // How far from 0.5 (strength of signal)
+	RSquared       float64 `json:"r_squared"`      // Goodness of fit of log-log regression
+	SampleSize     int     `json:"sample_size"`    // Number of observations used
+	Description    string  `json:"description"`    // Human-readable interpretation
 }
 
 // HurstRegimeContext extends PriceRegime with Hurst-based classification.
 type HurstRegimeContext struct {
 	*PriceRegime
 	Hurst              *HurstResult `json:"hurst,omitempty"`
-	HurstRegime        string       `json:"hurst_regime"`         // "TRENDING", "RANGING", "RANDOM"
-	RegimeAgreement    bool         `json:"regime_agreement"`     // ADX and Hurst agree
-	CombinedConfidence float64      `json:"combined_confidence"`  // Confidence in regime classification
+	HurstRegime        string       `json:"hurst_regime"`        // "TRENDING", "RANGING", "RANDOM"
+	RegimeAgreement    bool         `json:"regime_agreement"`    // ADX and Hurst agree
+	CombinedConfidence float64      `json:"combined_confidence"` // Confidence in regime classification
 }
 
 // ComputeHurstExponent estimates the Hurst exponent from price records
@@ -124,6 +124,14 @@ func computeHurstFromReturns(returns []float64) (*HurstResult, error) {
 
 	// OLS regression: log(R/S) = H * log(n) + c
 	h, _, r2 := simpleLinearRegression(logN, logRS)
+
+	// Guard NaN/Inf from OLS (e.g. degenerate input)
+	if math.IsNaN(h) || math.IsInf(h, 0) {
+		h = 0.5
+	}
+	if math.IsNaN(r2) || math.IsInf(r2, 0) {
+		r2 = 0
+	}
 
 	// Clamp H to reasonable range
 	rawH := h

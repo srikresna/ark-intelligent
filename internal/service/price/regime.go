@@ -22,10 +22,10 @@ const (
 type PriceRegime struct {
 	ContractCode  string  `json:"contract_code"`
 	Currency      string  `json:"currency"`
-	Regime        string  `json:"regime"`          // "TRENDING", "RANGING", "CRISIS"
-	ADX           float64 `json:"adx"`             // Approximated ADX value
-	TrendStrength float64 `json:"trend_strength"`  // 0-100
-	Description   string  `json:"description"`     // Human-readable
+	Regime        string  `json:"regime"`         // "TRENDING", "RANGING", "CRISIS"
+	ADX           float64 `json:"adx"`            // Approximated ADX value
+	TrendStrength float64 `json:"trend_strength"` // 0-100
+	Description   string  `json:"description"`    // Human-readable
 }
 
 // ClassifyPriceRegime determines whether a contract is TRENDING, RANGING, or in CRISIS

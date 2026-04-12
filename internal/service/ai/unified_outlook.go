@@ -6,9 +6,19 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
+	"github.com/arkcode369/ark-intelligent/internal/service/fed"
 	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
+	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
+	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
@@ -23,12 +33,61 @@ type UnifiedOutlookData struct {
 	MacroComposites    *domain.MacroComposites
 	PriceContexts      map[string]*domain.PriceContext
 	DailyPriceContexts map[string]*domain.DailyPriceContext
-	RiskContext         *domain.RiskContext
+	RiskContext        *domain.RiskContext
 	SentimentData      *sentiment.SentimentData
 	SeasonalData       map[string]*pricesvc.SeasonalPattern
 	BacktestStats      *domain.BacktestStats
 	CurrencyStrength   []pricesvc.CurrencyStrength
-	Language           string
+	WorldBankData      *worldbank.WorldBankData
+	BISData            *bis.BISData
+	DeFiLlamaTVL       *defillama.TVLSummary
+	IMFData            *imf.IMFWEOData
+	FedWatchData       *fed.FedWatchData
+	EurostatData       *macro.EurostatData
+	FedSpeeches        *fred.FedSpeechData // Recent Fed speeches (scraper via Firecrawl)
+	// ICTContexts holds ICT/SMC structure analysis for major symbols (H4 timeframe).
+	// Key = symbol (e.g. "EURUSD"), Value = ICTResult. May be nil if ICT not configured.
+	ICTContexts map[string]*ictsvc.ICTResult
+	// GEXResults holds Gamma Exposure analysis for crypto assets (Deribit options data).
+	// Key = symbol (e.g. "BTC", "ETH"), Value = GEXResult. May be nil if GEX not configured.
+	GEXResults map[string]*gexsvc.GEXResult
+	// WyckoffContexts holds Wyckoff structure analysis for major symbols (Daily timeframe).
+	// Only includes results with Confidence != "LOW".
+	// Key = symbol (e.g. "EURUSD"), Value = WyckoffResult.
+	WyckoffContexts map[string]*wyckoffsvc.WyckoffResult
+	// MicrostructureData holds Bybit orderbook/flow microstructure signals for crypto.
+	// Typically BTC and ETH. May be nil if alpha services not configured.
+	MicrostructureData []*microstructure.Signal
+	// EIAData holds EIA weekly energy inventory data (crude, gasoline, distillate).
+	// May be nil if EIA_API_KEY is not configured.
+	EIAData  *pricesvc.EIASeasonalData
+	Language string
+}
+
+// buildEIASummary returns a one-line EIA crude oil inventory summary with 4-week trend.
+func buildEIASummary(eiaData *pricesvc.EIASeasonalData) string {
+	if eiaData == nil || len(eiaData.CrudeInventory) == 0 {
+		return ""
+	}
+	latest := eiaData.CrudeInventory[0].Value
+	var weeklyChanges []float64
+	for i := 1; i < len(eiaData.CrudeInventory) && i < 5; i++ {
+		weeklyChanges = append(weeklyChanges, eiaData.CrudeInventory[i-1].Value-eiaData.CrudeInventory[i].Value)
+	}
+	avg := 0.0
+	for _, v := range weeklyChanges {
+		avg += v
+	}
+	if len(weeklyChanges) > 0 {
+		avg /= float64(len(weeklyChanges))
+	}
+	trend := "FLAT"
+	if avg > 1.0 {
+		trend = "BUILD"
+	} else if avg < -1.0 {
+		trend = "DRAW"
+	}
+	return fmt.Sprintf("Crude: %.1fMbbl (4wk avg Δ%.1fMbbl/wk → %s)", latest, avg, trend)
 }
 
 // BuildUnifiedOutlookPrompt builds a comprehensive prompt that fuses ALL
@@ -186,6 +245,19 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString("\n")
 		}
 
+		// Fed Dot Plot (SEP projections)
+		if m.FedDotMedian > 0 {
+			b.WriteString(fmt.Sprintf("Fed Dot Plot: Median=%.2f%% | High=%.2f%% | Low=%.2f%%\n", m.FedDotMedian, m.FedDotHigh, m.FedDotLow))
+			if m.SOFR > 0 {
+				gap := (m.SOFR - m.FedDotMedian) * 100
+				direction := "hawkish"
+				if gap < 0 {
+					direction = "dovish"
+				}
+				b.WriteString(fmt.Sprintf("Dots vs SOFR Gap: %+.0fbps (market %s vs Fed)\n", gap, direction))
+			}
+		}
+
 		// Financial stress
 		b.WriteString(fmt.Sprintf("NFCI: %.3f %s (%s)\n", m.NFCI, m.NFCITrend.Arrow(), regime.FinStress))
 
@@ -219,11 +291,81 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 				m.FedBalSheet/1_000, m.FedBalSheetTrend.Arrow(), regime.FedBalance))
 		}
 
+		// Treasury General Account (TGA)
+		if m.TGABalance > 0 {
+			b.WriteString(fmt.Sprintf("TGA Balance: $%.0fB %s (%s)\n",
+				m.TGABalance, m.TGABalanceTrend.Arrow(), regime.TGALabel))
+		}
+
+		// Net Liquidity Regime
+		if m.LiquidityRegime != "" {
+			b.WriteString(fmt.Sprintf("Net Liquidity: %s (%s)\n", m.LiquidityRegime, regime.LiquidityLabel))
+		}
+
 		// USD
 		if m.DXY > 0 {
 			b.WriteString(fmt.Sprintf("DXY: %.1f (%s)\n", m.DXY, regime.USDStrength))
 		}
 		b.WriteString(fmt.Sprintf("Implied Bias: %s\n", regime.Bias))
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section X: CME FedWatch Implied Rate Probabilities
+	// -----------------------------------------------------------------------
+	if data.FedWatchData != nil && data.FedWatchData.Available {
+		b.WriteString(fmt.Sprintf("=== %d. CME FEDWATCH IMPLIED PROBABILITIES ===\n", section))
+		section++
+		fw := data.FedWatchData
+		b.WriteString(fmt.Sprintf("Next FOMC Meeting: %s\n", fw.NextMeetingDate))
+		b.WriteString(fmt.Sprintf("Probabilities: Hold=%.1f%% Cut25=%.1f%% Cut50+=%.1f%% Hike25=%.1f%%\n",
+			fw.HoldProbability, fw.Cut25Probability, fw.Cut50Probability, fw.Hike25Probability))
+		if fw.ImpliedYearEndRate > 0 {
+			b.WriteString(fmt.Sprintf("Market-Implied Year-End Rate: %.2f%%\n", fw.ImpliedYearEndRate))
+		}
+		if fw.MeetingCount > 0 {
+			b.WriteString(fmt.Sprintf("Remaining FOMC Meetings (to Dec): %d\n", fw.MeetingCount))
+		}
+		b.WriteString(fmt.Sprintf("Dominant Outcome: %s\n", fed.DominantOutcome(fw)))
+		b.WriteString("This is what the market is PRICING — discrepancies between FedWatch and actual Fed rhetoric create USD trade opportunities.\n")
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section X: Fed Speeches & Communication
+	// -----------------------------------------------------------------------
+	if data.FedSpeeches != nil && data.FedSpeeches.Available && len(data.FedSpeeches.Speeches) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. FED COMMUNICATION (Last %d Speeches) ===\n", section, len(data.FedSpeeches.Speeches)))
+		section++
+		hawkCount, dovishCount := 0, 0
+		for _, s := range data.FedSpeeches.Speeches {
+			dateStr := ""
+			if !s.Date.IsZero() {
+				dateStr = s.Date.Format("2006-01-02") + " "
+			}
+			speakerStr := ""
+			if s.Speaker != "" {
+				speakerStr = s.Speaker + ": "
+			}
+			b.WriteString(fmt.Sprintf("[%s%s%s] — Tone: %s", dateStr, speakerStr, s.Title, s.Tone))
+			if len(s.Topics) > 0 {
+				b.WriteString(fmt.Sprintf(" (Topics: %s)", strings.Join(s.Topics, ", ")))
+			}
+			b.WriteString("\n")
+			switch s.Tone {
+			case "HAWKISH":
+				hawkCount++
+			case "DOVISH":
+				dovishCount++
+			}
+		}
+		overallStance := "NEUTRAL"
+		if hawkCount > dovishCount {
+			overallStance = fmt.Sprintf("HAWKISH (%.0f%% hawkish signals)", float64(hawkCount)/float64(len(data.FedSpeeches.Speeches))*100)
+		} else if dovishCount > hawkCount {
+			overallStance = fmt.Sprintf("DOVISH (%.0f%% dovish signals)", float64(dovishCount)/float64(len(data.FedSpeeches.Speeches))*100)
+		}
+		b.WriteString(fmt.Sprintf("→ Overall Fed stance: %s\n", overallStance))
 		b.WriteString("\n")
 	}
 
@@ -243,6 +385,10 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		b.WriteString(fmt.Sprintf("Sentiment Composite: %+.0f (%s)\n", comp.SentimentComposite, comp.SentimentLabel))
 		if comp.VIXTermRegime != "" && comp.VIXTermRegime != "N/A" {
 			b.WriteString(fmt.Sprintf("VIX Term Structure: %s (ratio: %.3f)\n", comp.VIXTermRegime, comp.VIXTermRatio))
+		}
+		if comp.AdvDecRatio > 0 || comp.NetNewHighs != 0 {
+			b.WriteString(fmt.Sprintf("NYSE Breadth: Adv/Dec=%.2f (%s) | Net New Highs=%.0f\n",
+				comp.AdvDecRatio, breadthLabel(comp.AdvDecRatio), comp.NetNewHighs))
 		}
 		b.WriteString(fmt.Sprintf("Country Scores: US=%+.0f EZ=%+.0f UK=%+.0f JP=%+.0f AU=%+.0f CA=%+.0f NZ=%+.0f\n",
 			comp.USScore, comp.EZScore, comp.UKScore, comp.JPScore, comp.AUScore, comp.CAScore, comp.NZScore))
@@ -273,12 +419,57 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 			b.WriteString(fmt.Sprintf("=== %d. MARKET SENTIMENT ===\n", section))
 			section++
 			b.WriteString(fmt.Sprintf("CNN Fear & Greed: %.0f/100 (%s)\n", sd.CNNFearGreed, sd.CNNFearGreedLabel))
+			if sd.CryptoFearGreedAvailable {
+				b.WriteString(fmt.Sprintf("Crypto Fear & Greed: %.0f/100 (%s)\n", sd.CryptoFearGreed, sd.CryptoFearGreedLabel))
+			}
 			if sd.AAIIAvailable {
 				b.WriteString(fmt.Sprintf("AAII: Bull=%.1f%% Bear=%.1f%% Neutral=%.1f%% (B/B Ratio=%.2f)\n",
 					sd.AAIIBullish, sd.AAIIBearish, sd.AAIINeutral, sd.AAIIBullBear))
 			}
+			if sd.PutCallAvailable {
+				b.WriteString(fmt.Sprintf("CBOE P/C: Total=%.2f", sd.PutCallTotal))
+				if sd.PutCallEquity > 0 {
+					b.WriteString(fmt.Sprintf(" Equity=%.2f", sd.PutCallEquity))
+				}
+				if sd.PutCallIndex > 0 {
+					b.WriteString(fmt.Sprintf(" Index=%.2f", sd.PutCallIndex))
+				}
+				if sd.PutCallSignal != "" {
+					b.WriteString(fmt.Sprintf(" Signal=%s", sd.PutCallSignal))
+				}
+				b.WriteString("\n")
+			}
+			if sd.MyfxbookAvailable && len(sd.MyfxbookPairs) > 0 {
+				b.WriteString("Retail Positioning (Myfxbook — contrarian indicator):\n")
+				for _, mp := range sd.MyfxbookPairs {
+					b.WriteString(fmt.Sprintf("  %s: Retail %.0f%% Long / %.0f%% Short → %s\n", mp.Symbol, mp.LongPct, mp.ShortPct, mp.Signal))
+				}
+			}
+			if sd.InsiderClusters != nil && sd.InsiderClusters.Available {
+				ic := sd.InsiderClusters
+				insiderSignal := "NORMAL insider activity"
+				if ic.ClusterBuyCount > 50 {
+					insiderSignal = "ELEVATED insider buying → risk-on signal"
+				} else if ic.ClusterBuyCount < 20 {
+					insiderSignal = "LOW insider buying → caution / risk-off lean"
+				}
+				b.WriteString(fmt.Sprintf("Insider Clusters (OpenInsider): %d cluster buys (total $%.0fM) — %s\n",
+					ic.ClusterBuyCount, ic.TotalValueUSD/1e6, insiderSignal))
+			}
 			b.WriteString("\n")
 		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: DeFi TVL (DeFiLlama)
+	// -----------------------------------------------------------------------
+	if data.DeFiLlamaTVL != nil && data.DeFiLlamaTVL.Available {
+		vl := data.DeFiLlamaTVL
+		b.WriteString(fmt.Sprintf("=== %d. DEFI TVL (DeFiLlama) ===\n", section))
+		section++
+		b.WriteString(fmt.Sprintf("Total DeFi TVL: %s (%+.1f%% 7d, %+.1f%% 30d) — %s\n",
+			defillama.FormatTVLBillions(vl.Current), vl.Change7D, vl.Change30D, vl.Trend))
+		b.WriteString("\n")
 	}
 
 	// -----------------------------------------------------------------------
@@ -325,7 +516,7 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 	if data.BacktestStats != nil && data.BacktestStats.Evaluated > 0 {
 		bs := data.BacktestStats
 		b.WriteString(fmt.Sprintf("=== %d. SIGNAL ACCURACY CONTEXT ===\n", section))
-		section++ //nolint:ineffassign // section may be used in future extensions
+		section++
 		b.WriteString(fmt.Sprintf("Historical signals: %d evaluated\n", bs.Evaluated))
 		b.WriteString(fmt.Sprintf("Win rates: 1W=%.0f%% 2W=%.0f%% 4W=%.0f%%\n", bs.WinRate1W, bs.WinRate2W, bs.WinRate4W))
 		b.WriteString(fmt.Sprintf("Best holding period: %s (%.0f%% win rate)\n", bs.BestPeriod, bs.BestWinRate))
@@ -334,6 +525,278 @@ func BuildUnifiedOutlookPrompt(data UnifiedOutlookData) string {
 		}
 		b.WriteString("NOTE: Weight your conviction based on historical accuracy. High-strength signals have proven more reliable.\n")
 		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 10: Cross-Country Macro Fundamentals (World Bank)
+	// -----------------------------------------------------------------------
+	if data.WorldBankData != nil {
+		available := make([]worldbank.CountryMacro, 0, len(data.WorldBankData.Countries))
+		for _, c := range data.WorldBankData.Countries {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. CROSS-COUNTRY MACRO FUNDAMENTALS (World Bank, Annual) ===\n", section))
+			section++ //nolint:ineffassign // section may be used in future extensions
+			b.WriteString(fmt.Sprintf("%-6s  %6s  %12s  %8s  %4s\n",
+				"CCY", "GDP%", "CA(USDbn)", "CPI%", "Year"))
+			b.WriteString(strings.Repeat("-", 46) + "\n")
+			for _, c := range available {
+				caSign := "+"
+				if c.CurrentAccount < 0 {
+					caSign = ""
+				}
+				b.WriteString(fmt.Sprintf("%-6s  %+6.2f  %s%11.1f  %+8.2f  %4d\n",
+					c.Currency, c.GDPGrowth, caSign, c.CurrentAccount, c.CPIInflation, c.Year))
+			}
+			b.WriteString("\n")
+			b.WriteString("NOTE: Use differentials for fundamental FX bias:\n")
+			b.WriteString("  - Higher GDP growth differential → currency structural tailwind\n")
+			b.WriteString("  - Current Account surplus → structural currency demand\n")
+			b.WriteString("  - Lower inflation → PPP-based currency strength over time\n")
+			b.WriteString("\n")
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: IMF WEO Forecasts (Forward-Looking)
+	// -----------------------------------------------------------------------
+	if data.IMFData != nil && data.IMFData.Available {
+		available := make([]imf.IMFCountryData, 0, len(data.IMFData.Countries))
+		for _, c := range data.IMFData.Countries {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. IMF WEO FORECASTS (Forward-Looking) ===\n", section))
+			section++
+			yr := available[0].ForecastYear
+			b.WriteString(fmt.Sprintf("%-6s  %6s  %6s  %8s  %8s\n",
+				"CCY", fmt.Sprintf("GDP%d", yr), fmt.Sprintf("GDP%d", yr+1), fmt.Sprintf("CPI%d", yr), fmt.Sprintf("CA%%GDP")))
+			b.WriteString(strings.Repeat("-", 40) + "\n")
+			var highGDP, lowGDP string
+			var highV, lowV float64
+			first := true
+			for _, c := range available {
+				b.WriteString(fmt.Sprintf("%-6s  %+6.2f  %+6.2f  %+8.2f  %+8.2f\n",
+					c.Currency, c.GDPGrowth, c.GDPGrowthNext, c.Inflation, c.CurrentAccount))
+				if first || c.GDPGrowth > highV {
+					highV = c.GDPGrowth
+					highGDP = c.Currency
+				}
+				if first || c.GDPGrowth < lowV {
+					lowV = c.GDPGrowth
+					lowGDP = c.Currency
+				}
+				first = false
+			}
+			b.WriteString(fmt.Sprintf("→ Highest growth: %s (%+.1f%%) | Lowest: %s (%+.1f%%)\n",
+				highGDP, highV, lowGDP, lowV))
+			b.WriteString("\n")
+			b.WriteString("NOTE: IMF forecasts reflect forward expectations, not historical outcomes.\n")
+			b.WriteString("  - Higher GDP forecast → structural tailwind for currency\n")
+			b.WriteString("  - Higher CPI forecast → potential for hawkish central bank policy\n")
+			b.WriteString("  - CA surplus → net capital inflow, currency demand\n")
+			b.WriteString("\n")
+		}
+	}
+	// -----------------------------------------------------------------------
+	// Section 11: Currency Valuation — BIS REER/NEER
+	// -----------------------------------------------------------------------
+	if data.BISData != nil {
+		available := make([]bis.REERData, 0, len(data.BISData.Currencies))
+		for _, c := range data.BISData.Currencies {
+			if c.Available {
+				available = append(available, c)
+			}
+		}
+		if len(available) > 0 {
+			b.WriteString(fmt.Sprintf("=== %d. CURRENCY VALUATION — BIS REER/NEER (Monthly, Broad Basket) ===\n", section))
+			section++ //nolint:ineffassign // section may be used in future extensions
+			b.WriteString("Index base = 2020. LT Avg = 5-year rolling average. Deviation = (REER/LTAvg - 1)%%.\n")
+			b.WriteString(fmt.Sprintf("%-6s  %7s  %7s  %7s  %8s  %12s  %s\n",
+				"CCY", "REER", "NEER", "LTAvg", "Dev%", "Signal", "AsOf"))
+			b.WriteString(strings.Repeat("-", 62) + "\n")
+			for _, c := range available {
+				devStr := fmt.Sprintf("%+.1f%%", c.Deviation)
+				b.WriteString(fmt.Sprintf("%-6s  %7.1f  %7.1f  %7.1f  %8s  %12s  %s\n",
+					c.Currency, c.REER, c.NEER, c.LTAvg, devStr, c.Signal, c.AsOf))
+			}
+			b.WriteString("\n")
+			b.WriteString("NOTE: Use BIS REER for structural FX valuation bias:\n")
+			b.WriteString("  - OVERVALUED REER → structural headwind; risk of mean-reversion lower\n")
+			b.WriteString("  - UNDERVALUED REER → structural tailwind; currency has room to appreciate\n")
+			b.WriteString("  - FAIR (within ±5%) → valuation neutral; momentum/flow dominates\n")
+			b.WriteString("  - Central banks (BIS, IMF) watch REER for FX intervention thresholds\n")
+			b.WriteString("\n")
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Section 12: IMF WEO Forward-Looking Forecasts
+	// -----------------------------------------------------------------------
+	if data.IMFData != nil && data.IMFData.Available {
+		section++ //nolint:ineffassign // used if more sections follow
+		b.WriteString(fmt.Sprintf("=== %d. IMF WEO FORWARD-LOOKING FORECASTS ===\n", section))
+		b.WriteString("Source: IMF World Economic Outlook DataMapper (forward-looking, updated 2×/year)\n")
+		b.WriteString("Columns: Currency | GDP Growth (forecast)% | GDP Growth (next yr)% | CPI Inflation% | Current Account (%GDP)\n\n")
+		for _, c := range data.IMFData.Countries {
+			if !c.Available {
+				continue
+			}
+			b.WriteString(fmt.Sprintf("  %-3s: GDP=%+.1f%%/%+.1f%% CPI=%.1f%% CA=%+.1f%%GDP\n",
+				c.Currency, c.GDPGrowth, c.GDPGrowthNext, c.Inflation, c.CurrentAccount))
+		}
+		b.WriteString("\n")
+		if insight := imf.BuildPromptSection(data.IMFData); insight != "" {
+			// Extract just the insight line (2nd line)
+			lines := strings.Split(strings.TrimSpace(insight), "\n")
+			for _, l := range lines {
+				if strings.HasPrefix(l, "→") {
+					b.WriteString(l + "\n")
+				}
+			}
+		}
+		b.WriteString("\nNOTE: IMF forecasts reflect structural macro divergence:\n")
+		b.WriteString("  - Higher GDP growth → currency structural tailwind vs lower-growth peers\n")
+		b.WriteString("  - Current account surplus → persistent currency demand, structural support\n")
+		b.WriteString("  - These are FORWARD LOOKING (unlike World Bank historical data above)\n")
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Eurostat EU Macro Indicators
+	// -----------------------------------------------------------------------
+	if data.EurostatData != nil && !data.EurostatData.IsZero() {
+		section++ //nolint:ineffassign // section may be used in future extensions
+		b.WriteString(fmt.Sprintf("=== %d. EUROSTAT EU ECONOMY ===\n", section))
+		b.WriteString("Source: Eurostat (European Commission) — official EU statistics\n")
+		eu := data.EurostatData
+		if eu.HICPHeadline != 0 {
+			b.WriteString(fmt.Sprintf("EU HICP Inflation (YoY): %.1f%% headline", eu.HICPHeadline))
+			if eu.HICPCore != 0 {
+				b.WriteString(fmt.Sprintf(", %.1f%% core", eu.HICPCore))
+			}
+			if !eu.HICPDate.IsZero() {
+				b.WriteString(fmt.Sprintf(" (%s)", eu.HICPDate.Format("Jan 2006")))
+			}
+			b.WriteString("\n")
+		}
+		if eu.UnempRate != 0 {
+			b.WriteString(fmt.Sprintf("EU Unemployment Rate (SA): %.1f%%", eu.UnempRate))
+			if !eu.UnempDate.IsZero() {
+				b.WriteString(fmt.Sprintf(" (%s)", eu.UnempDate.Format("Jan 2006")))
+			}
+			b.WriteString("\n")
+		}
+		if eu.GDPGrowth != 0 {
+			b.WriteString(fmt.Sprintf("EU GDP Growth (QoQ, SA): %+.1f%%", eu.GDPGrowth))
+			if !eu.GDPDate.IsZero() {
+				q := (eu.GDPDate.Month()-1)/3 + 1
+				b.WriteString(fmt.Sprintf(" (Q%d %d)", q, eu.GDPDate.Year()))
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("NOTE: EU data is critical for EUR pair analysis. Compare with US data (FRED) above for rate differential.\n")
+		b.WriteString("  - EU inflation above 2%% → ECB hawkish = EUR supportive\n")
+		b.WriteString("  - EU unemployment falling → tight labor = ECB less likely to cut\n")
+		b.WriteString("  - EU GDP positive → growth supports EUR vs weaker-growth currencies\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: ICT/SMC Market Structure (H4 timeframe)
+	// -----------------------------------------------------------------------
+	if len(data.ICTContexts) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. ICT/SMC MARKET STRUCTURE (H4) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for sym, r := range data.ICTContexts {
+			fvgCount := len(r.FVGZones)
+			obCount := 0
+			for _, ob := range r.OrderBlocks {
+				if !ob.Broken {
+					obCount++
+				}
+			}
+			sweepCount := len(r.Sweeps)
+			b.WriteString(fmt.Sprintf("%s: Bias=%s | UnmitigatedFVG=%d | ActiveOB=%d | Sweeps=%d | Killzone=%s\n",
+				sym, r.Bias, fvgCount, obCount, sweepCount, r.Killzone))
+			// Find last BOS and last CHoCH from structure events.
+			lastBOS, lastCHoCH := "", ""
+			for _, se := range r.Structure {
+				switch se.Type {
+				case "BOS":
+					lastBOS = se.Direction
+				case "CHOCH":
+					lastCHoCH = se.Direction
+				}
+			}
+			if lastBOS != "" || lastCHoCH != "" {
+				b.WriteString(fmt.Sprintf("  Structure: LastBOS=%s LastCHoCH=%s\n", lastBOS, lastCHoCH))
+			}
+		}
+		b.WriteString("NOTE: ICT/SMC data is H4. Use for identifying premium/discount zones and PD Arrays.\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Gamma Exposure — Options Flow (Deribit)
+	// -----------------------------------------------------------------------
+	if len(data.GEXResults) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. GAMMA EXPOSURE — OPTIONS FLOW (Deribit) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for sym, r := range data.GEXResults {
+			b.WriteString(fmt.Sprintf("%s @ $%.0f: Regime=%s | TotalGEX=%.2fM | Flip=$%.0f | GWall=$%.0f | PWall=$%.0f | MaxPain=$%.0f\n",
+				sym, r.SpotPrice, r.Regime,
+				r.TotalGEX/1e6, r.GEXFlipLevel,
+				r.GammaWall, r.PutWall, r.MaxPain))
+		}
+		b.WriteString("NOTE: POSITIVE_GEX = dealer hedging dampens moves (mean-reversion). " +
+			"NEGATIVE_GEX = dealer hedging amplifies moves (trending). " +
+			"GEX Flip Level = key price where regime switches.\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Wyckoff Structure Analysis (Daily timeframe)
+	// -----------------------------------------------------------------------
+	if len(data.WyckoffContexts) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. WYCKOFF STRUCTURE ANALYSIS (Daily) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for sym, r := range data.WyckoffContexts {
+			b.WriteString(fmt.Sprintf("%s: %s Phase=%s Confidence=%s\n",
+				sym, r.Schematic, r.CurrentPhase, r.Confidence))
+			if r.Summary != "" {
+				b.WriteString(fmt.Sprintf("  %s\n", r.Summary))
+			}
+		}
+		b.WriteString("NOTE: Wyckoff Accumulation Phase C/D (Spring/SOS) → bullish structural setup. " +
+			"Distribution Phase C/D (UTAD/SOW) → bearish structural setup.\n\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: Microstructure (Bybit Orderbook + Flow)
+	// -----------------------------------------------------------------------
+	if len(data.MicrostructureData) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. MICROSTRUCTURE (Bybit Orderbook + Flow) ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		for _, sig := range data.MicrostructureData {
+			b.WriteString(fmt.Sprintf("%s: Bias=%s Strength=%.0f%% BidAskImbalance=%.2f TakerBuyRatio=%.0f%% OI_Δ%.1f%% Funding=%.4f%%\n",
+				sig.Symbol, sig.Bias, sig.Strength*100,
+				sig.BidAskImbalance, sig.TakerBuyRatio*100,
+				sig.OIChange, sig.FundingRate*100))
+		}
+		b.WriteString("\n")
+	}
+
+	// -----------------------------------------------------------------------
+	// Section: EIA Energy Data
+	// -----------------------------------------------------------------------
+	if data.EIAData != nil && len(data.EIAData.CrudeInventory) > 0 {
+		b.WriteString(fmt.Sprintf("=== %d. EIA ENERGY DATA ===\n", section))
+		section++ //nolint:ineffassign // section may be used in future extensions
+		b.WriteString(buildEIASummary(data.EIAData))
+		b.WriteString("\n(Relevant for USDCAD, AUDUSD, USDNOK analysis)\n\n")
 	}
 
 	// -----------------------------------------------------------------------
@@ -428,4 +891,18 @@ func writeDailyPriceContextLine(b *strings.Builder, label string, dc *domain.Dai
 	}
 	line += fmt.Sprintf(" | Mom5D: %+.2f%%", dc.Momentum5D)
 	b.WriteString(line + "\n")
+}
+
+// breadthLabel returns a human-readable NYSE breadth label based on Adv/Dec ratio.
+func breadthLabel(ratio float64) string {
+	switch {
+	case ratio >= 1.5:
+		return "STRONG_BREADTH"
+	case ratio >= 1.0:
+		return "POSITIVE"
+	case ratio >= 0.7:
+		return "MIXED"
+	default:
+		return "NEGATIVE_BREADTH"
+	}
 }

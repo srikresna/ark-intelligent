@@ -1,9 +1,11 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"os"
 	"os/exec"
@@ -48,7 +50,7 @@ func newVPStateCache() *vpStateCache {
 	return &vpStateCache{store: make(map[string]*vpState)}
 }
 
-const vpStateTTL = 30 * time.Minute
+var vpStateTTL = config.VPStateTTL
 
 func (c *vpStateCache) get(chatID string) *vpState {
 	c.mu.Lock()
@@ -80,6 +82,7 @@ func (h *Handler) WithVP(svc VPServices) {
 	h.vpCache = newVPStateCache()
 	h.bot.RegisterCommand("/vp", h.cmdVP)
 	h.bot.RegisterCallback("vp:", h.handleVPCallback)
+	h.registerAuctionCommand()
 }
 
 // ---------------------------------------------------------------------------
@@ -88,8 +91,8 @@ func (h *Handler) WithVP(svc VPServices) {
 
 func (h *Handler) cmdVP(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.vp == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "VP engine tidak tersedia.")
-		return err
+		h.sendUserError(ctx, chatID, fmt.Errorf("VP engine not available"), "vp")
+		return nil
 	}
 
 	parts := strings.Fields(strings.TrimSpace(strings.ToUpper(args)))
@@ -128,21 +131,29 @@ Pilih aset:`, h.kb.VPSymbolMenu())
 		return err
 	}
 
-	// Send "computing..." placeholder
-	msgID, _ := h.bot.SendHTML(ctx, chatID,
-		fmt.Sprintf("⏳ Menghitung Volume Profile <b>%s</b> (%s)...",
-			html.EscapeString(mapping.Currency), timeframe))
+	// Multi-step progress indicator
+	sym := html.EscapeString(mapping.Currency)
+	prog := NewProgress(h.bot, chatID, []string{
+		fmt.Sprintf("⏳ Fetching volume data for <b>%s</b> (%s)...", sym, timeframe),
+		fmt.Sprintf("🔄 Computing Volume Profile for <b>%s</b>...", sym),
+		fmt.Sprintf("📊 Building profile levels for <b>%s</b>...", sym),
+	})
+	msgID := prog.Start(ctx)
 
 	state, err := h.computeVPState(ctx, mapping, timeframe)
 	if err != nil {
-		errMsg := fmt.Sprintf("❌ Error: %s", html.EscapeString(err.Error()))
+		// Stop progress without deleting — reuse message for error display.
+		prog.StopNoDelete()
 		if msgID > 0 {
-			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
+			h.editUserError(ctx, chatID, msgID, err, "vp")
+		} else {
+			h.sendUserError(ctx, chatID, err, "vp")
 		}
-		_, sendErr := h.bot.SendHTML(ctx, chatID, errMsg)
-		return sendErr
+		return nil
 	}
 
+	// Stop progress without deleting — vpRunMode edits the message with the result.
+	prog.StopNoDelete()
 	h.vpCache.set(chatID, state)
 	return h.vpRunMode(ctx, chatID, msgID, state, "profile")
 }
@@ -173,7 +184,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state, err := h.computeVPState(ctx, mapping, timeframe)
 		if err != nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+				userFriendlyError(err, "vp"), h.kb.VPMenu())
 		}
 		h.vpCache.set(chatID, state)
 		return h.vpRunMode(ctx, chatID, msgID, state, "profile")
@@ -185,7 +196,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		if newTF != state.timeframe {
 			mapping := domain.FindPriceMappingByCurrency(state.currency)
@@ -195,7 +206,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 			newState, err := h.computeVPState(ctx, mapping, newTF)
 			if err != nil {
 				return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-					fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+					userFriendlyError(err, "vp"), h.kb.VPMenu())
 			}
 			h.vpCache.set(chatID, newState)
 			state = newState
@@ -207,7 +218,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		summary := fmt.Sprintf("📊 <b>Volume Profile: %s — %s</b>\n\nPilih mode analisis:",
 			html.EscapeString(state.symbol), state.timeframe)
@@ -218,7 +229,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		mapping := domain.FindPriceMappingByCurrency(state.currency)
 		if mapping == nil {
@@ -227,7 +238,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		newState, err := h.computeVPState(ctx, mapping, state.timeframe)
 		if err != nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				fmt.Sprintf("❌ %s", html.EscapeString(err.Error())), h.kb.VPMenu())
+				userFriendlyError(err, "vp"), h.kb.VPMenu())
 		}
 		h.vpCache.set(chatID, newState)
 		return h.vpRunMode(ctx, chatID, msgID, newState, "profile")
@@ -243,7 +254,7 @@ func (h *Handler) handleVPCallback(ctx context.Context, chatID string, msgID int
 		state := h.vpCache.get(chatID)
 		if state == nil {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID,
-				"⏰ Session expired — ketik /vp lagi.", h.kb.VPMenu())
+				sessionExpiredMessage("vp"), h.kb.VPMenu())
 		}
 		return h.vpRunMode(ctx, chatID, msgID, state, action)
 	}
@@ -260,6 +271,9 @@ func (h *Handler) computeVPState(ctx context.Context, mapping *domain.PriceSymbo
 	barsByTF := make(map[string][]ta.OHLCV)
 
 	// Daily bars always fetched
+	if h.vp.DailyPriceRepo == nil {
+		return nil, fmt.Errorf("daily price data not configured")
+	}
 	dailyRecords, err := h.vp.DailyPriceRepo.GetDailyHistory(ctx, code, 500)
 	if err != nil || len(dailyRecords) < 20 {
 		return nil, fmt.Errorf("insufficient daily data for %s (%d bars)", mapping.Currency, len(dailyRecords))
@@ -331,12 +345,12 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 		return result
 	}
 
-	input := map[string]interface{}{
+	input := map[string]any{
 		"mode":      mode,
 		"symbol":    state.symbol,
 		"timeframe": tf,
 		"bars":      toBars(bars),
-		"params":    map[string]interface{}{},
+		"params":    map[string]any{},
 	}
 
 	// For multi-TF modes, include all other TF bars
@@ -351,9 +365,9 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 		input["all_tf_bars"] = allTF
 	}
 
-	result, err := h.runVPEngine(input)
+	result, err := h.runVPEngine(ctx, input)
 	if err != nil {
-		errMsg := fmt.Sprintf("❌ VP error: %s", html.EscapeString(err.Error()))
+		errMsg := userFriendlyError(err, "vp")
 		if msgID > 0 {
 			return h.bot.EditWithKeyboard(ctx, chatID, msgID, errMsg, h.kb.VPMenu())
 		}
@@ -367,20 +381,31 @@ func (h *Handler) vpRunMode(ctx context.Context, chatID string, msgID int, state
 	}
 
 	// Send chart photo
+	chartSent := false
 	if result.ChartPath != "" {
 		chartData, readErr := os.ReadFile(result.ChartPath)
 		if readErr == nil && len(chartData) > 0 {
 			caption := fmt.Sprintf("📊 VP %s — %s — %s",
 				strings.ToUpper(mode), html.EscapeString(state.symbol), tf)
 			_, _ = h.bot.SendPhoto(ctx, chatID, chartData, caption)
+			chartSent = true
+			_ = os.Remove(result.ChartPath)
+		} else {
+			if readErr != nil {
+				log.Error().Err(readErr).Str("symbol", state.symbol).Str("timeframe", tf).Str("mode", mode).Msg("VP chart read failed, falling back to text")
+			}
 			_ = os.Remove(result.ChartPath)
 		}
 	}
 
-	// Send text with keyboard
+	// Send text with keyboard — prepend chart failure notice if chart was expected but not sent
 	textToSend := result.TextOutput
 	if textToSend == "" {
 		textToSend = fmt.Sprintf("📊 Volume Profile: %s — %s\n(No output)", state.symbol, tf)
+	}
+	if result.ChartPath != "" && !chartSent {
+		fallbackNotice := "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n"
+		textToSend = fallbackNotice + textToSend
 	}
 	_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, textToSend, h.kb.VPMenu())
 	return sendErr
@@ -400,7 +425,16 @@ type vpEngineResult struct {
 	ChartPath  string          `json:"chart_path"`
 }
 
-func (h *Handler) runVPEngine(input map[string]interface{}) (*vpEngineResult, error) {
+func (h *Handler) runVPEngine(ctx context.Context, input map[string]any) (result *vpEngineResult, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// This panic is caught by handleUpdate's outer recovery too,
+			// but logging here gives more specific context.
+			log.Error().
+				Interface("panic", r).
+				Msg("panic in runVPEngine — subprocess may have failed")
+		}
+	}()
 	ts := time.Now().UnixNano()
 	inputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_in_%d.json", ts))
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("vp_out_%d.json", ts))
@@ -408,6 +442,11 @@ func (h *Handler) runVPEngine(input map[string]interface{}) (*vpEngineResult, er
 
 	defer os.Remove(inputPath)
 	defer os.Remove(outputPath)
+	defer func() {
+		if err != nil {
+			os.Remove(chartPath)
+		}
+	}()
 
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
@@ -417,50 +456,71 @@ func (h *Handler) runVPEngine(input map[string]interface{}) (*vpEngineResult, er
 		return nil, fmt.Errorf("write input: %w", err)
 	}
 
-	scriptPath := findVPScript()
-	cmdCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	scriptPath, findErr := findVPScript()
+	if findErr != nil {
+		err = findErr
+		return
+	}
+	cmdCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(), "MPLBACKEND=Agg")
 
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("VP engine failed: %w", err)
+	if err = cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Msg("VP engine subprocess failed")
+		err = fmt.Errorf("VP engine failed: %w", err)
+		return
 	}
 
 	resultJSON, err := os.ReadFile(outputPath)
 	if err != nil {
-		return nil, fmt.Errorf("read output: %w", err)
+		err = fmt.Errorf("read output: %w", err)
+		return
 	}
 
-	var result vpEngineResult
-	if err := json.Unmarshal(resultJSON, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal output: %w", err)
+	var res vpEngineResult
+	if err = json.Unmarshal(resultJSON, &res); err != nil {
+		err = fmt.Errorf("unmarshal output: %w", err)
+		return
 	}
 
-	if !result.Success {
-		return &result, fmt.Errorf("%s", result.Error)
+	if !res.Success {
+		err = fmt.Errorf("%s", res.Error)
+		result = &res
+		return
 	}
 
-	if _, statErr := os.Stat(chartPath); statErr == nil {
-		result.ChartPath = chartPath
+	if fi, statErr := os.Stat(chartPath); statErr == nil {
+		if fi.Size() > 0 {
+			res.ChartPath = chartPath // caller owns cleanup
+		} else {
+			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
+			os.Remove(chartPath)
+		}
 	}
 
-	return &result, nil
+	result = &res
+	return
 }
 
 // findVPScript locates the vp_engine.py script.
-func findVPScript() string {
+func findVPScript() (string, error) {
 	candidates := []string{
 		"scripts/vp_engine.py",
 		"../scripts/vp_engine.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/vp_engine.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "vp_engine.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
-			return c
+			return c, nil
 		}
 	}
-	return "scripts/vp_engine.py"
+	return "", fmt.Errorf("vp_engine.py not found (searched: %v)", candidates)
 }

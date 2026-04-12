@@ -10,25 +10,27 @@ import (
 
 // MacroRegime holds the classified macro environment and bias.
 type MacroRegime struct {
-	Name         string // e.g., "DISINFLATIONARY", "INFLATIONARY", "STRESS", "STAGFLATION"
-	YieldCurve   string // human-readable yield curve label (2Y-10Y)
-	Yield3M10Y   string // human-readable 3M-10Y spread label
-	Yield2Y30Y   string // human-readable 2Y-30Y spread label
-	Inflation    string // human-readable inflation label
-	M2Label      string // M2 YoY growth label
-	FinStress    string // human-readable financial stress label
-	Labor        string // human-readable labor market label
-	SahmLabel    string // Sahm Rule label
-	SahmAlert    bool   // true if Sahm Rule is triggered (≥0.5)
-	MonPolicy    string // monetary policy stance label
-	SOFRLabel    string // SOFR vs IORB spread label
-	Growth       string // growth trajectory label
-	USDStrength  string // USD index label
-	FedBalance   string // Fed balance sheet QT/QE status
-	RecessionRisk string // "LOW", "ELEVATED", "HIGH — SAHM TRIGGERED"
-	Bias         string // directional bias e.g., "USD BEARISH bias, Gold BULLISH"
-	Description  string // narrative explanation
-	Score        int    // composite risk score 0-100 (higher = more risk-off)
+	Name           string // e.g., "DISINFLATIONARY", "INFLATIONARY", "STRESS", "STAGFLATION"
+	YieldCurve     string // human-readable yield curve label (2Y-10Y)
+	Yield3M10Y     string // human-readable 3M-10Y spread label
+	Yield2Y30Y     string // human-readable 2Y-30Y spread label
+	Inflation      string // human-readable inflation label
+	M2Label        string // M2 YoY growth label
+	FinStress      string // human-readable financial stress label
+	Labor          string // human-readable labor market label
+	SahmLabel      string // Sahm Rule label
+	SahmAlert      bool   // true if Sahm Rule is triggered (≥0.5)
+	MonPolicy      string // monetary policy stance label
+	SOFRLabel      string // SOFR vs IORB spread label
+	Growth         string // growth trajectory label
+	USDStrength    string // USD index label
+	FedBalance     string // Fed balance sheet QT/QE status
+	TGALabel       string // TGA balance status label
+	LiquidityLabel string // Net liquidity regime label
+	RecessionRisk  string // "LOW", "ELEVATED", "HIGH — SAHM TRIGGERED"
+	Bias           string // directional bias e.g., "USD BEARISH bias, Gold BULLISH"
+	Description    string // narrative explanation
+	Score          int    // composite risk score 0-100 (higher = more risk-off)
 }
 
 // TradingImplication represents a structured per-asset trading signal derived from macro regime.
@@ -42,6 +44,14 @@ type TradingImplication struct {
 // ClassifyMacroRegime derives a macro regime and trading bias from FRED data.
 // Uses a multi-factor scoring system across 9 dimensions.
 func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites) MacroRegime {
+	if data == nil {
+		return MacroRegime{
+			Name:        "UNKNOWN",
+			YieldCurve:  "N/A",
+			Bias:        "NEUTRAL",
+			Description: "Insufficient data for regime classification",
+		}
+	}
 	r := MacroRegime{}
 	riskScore := 0 // accumulates bearish/risk-off pressure
 
@@ -437,6 +447,35 @@ func ClassifyMacroRegime(data *MacroData, composites ...*domain.MacroComposites)
 		}
 	} else {
 		r.FedBalance = "N/A"
+	}
+
+	// --- 10. Treasury General Account (TGA) ---
+	if data.TGABalance > 0 {
+		tgaDir := data.TGABalanceTrend.Arrow()
+		switch data.TGABalanceTrend.Direction {
+		case "UP":
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Rising (Liquidity Drain) 🔴", data.TGABalance, tgaDir)
+			riskScore += 3
+		case "DOWN":
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Falling (Liquidity Inject) 🟢", data.TGABalance, tgaDir)
+		default:
+			r.TGALabel = fmt.Sprintf("$%.0fB %s Stable", data.TGABalance, tgaDir)
+		}
+	} else {
+		r.TGALabel = "N/A"
+	}
+
+	// --- 11. Net Liquidity Regime ---
+	if data.LiquidityRegime != "" {
+		switch data.LiquidityRegime {
+		case "EASY":
+			r.LiquidityLabel = "💧 EASY — TGA drawdown + declining RRP + expanding Fed BS"
+		case "TIGHT":
+			r.LiquidityLabel = "🏜️ TIGHT — TGA rising + high RRP + QT"
+			riskScore += 5
+		default:
+			r.LiquidityLabel = "⚖️ NEUTRAL — mixed liquidity signals"
+		}
 	}
 
 	// --- Recession Risk Classification ---

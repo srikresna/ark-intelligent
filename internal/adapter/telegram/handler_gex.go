@@ -1,0 +1,472 @@
+package telegram
+
+// handler_gex.go — /gex and /ivol commands: Gamma Exposure + IV Surface via Deribit public API.
+//   /gex [SYMBOL]   — e.g. /gex BTC  (default: BTC)
+//   /ivol [SYMBOL]  — e.g. /ivol BTC (default: BTC)
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/arkcode369/ark-intelligent/internal/ports"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+)
+
+// ---------------------------------------------------------------------------
+// GEXServices — dependencies for the /gex command
+// ---------------------------------------------------------------------------
+
+// GEXServices holds the dependencies needed by the /gex handler.
+type GEXServices struct {
+	Engine *gexsvc.Engine
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+
+// WithGEX injects GEXServices into the handler and registers the /gex command
+// and its inline keyboard callbacks.
+func (h *Handler) WithGEX(svc *GEXServices) *Handler {
+	h.gex = svc
+	if svc != nil {
+		h.bot.RegisterCommand("/gex", h.cmdGEX)
+		h.bot.RegisterCallback("gex:", h.handleGEXCallback)
+		h.bot.RegisterCommand("/ivol", h.cmdIVSurface)
+		h.bot.RegisterCallback("ivol:", h.handleIVolCallback)
+		h.bot.RegisterCommand("/skew", h.cmdSkew)
+		h.bot.RegisterCallback("skew:", h.handleSkewCallback)
+	}
+	return h
+}
+
+// ---------------------------------------------------------------------------
+// /gex — Main command
+// ---------------------------------------------------------------------------
+
+// validGEXSymbols lists the crypto symbols supported by Deribit options.
+var validGEXSymbols = map[string]struct{}{
+	"BTC":  {},
+	"ETH":  {},
+	"SOL":  {},
+	"AVAX": {},
+	"XRP":  {},
+}
+
+// cmdGEX handles the /gex [SYMBOL] command.
+func (h *Handler) cmdGEX(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.gex == nil {
+		h.sendUserError(ctx, chatID, fmt.Errorf("GEX engine not available"), "gex")
+		return nil
+	}
+
+	// Parse symbol from args (default: BTC)
+	sym := "BTC"
+	if parts := strings.Fields(args); len(parts) > 0 {
+		sym = strings.ToUpper(strings.TrimSpace(parts[0]))
+	}
+
+	// Validate symbol
+	if _, ok := validGEXSymbols[sym]; !ok {
+		keys := make([]string, 0, len(validGEXSymbols))
+		for k := range validGEXSymbols {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
+				"Tersedia: <code>%s</code>\n\n"+
+				"Contoh: <code>/gex BTC</code>, <code>/gex SOL</code>",
+			sym, strings.Join(keys, "</code>, <code>"),
+		))
+		return err
+	}
+
+	// Show loading indicator
+	loadingMsg := fmt.Sprintf("⏳ Fetching GEX data for <b>%s</b> from Deribit...\n"+
+		"<i>This may take 10–30 seconds (fetching option Greeks)</i>", sym)
+	loadID, err := h.bot.SendLoading(ctx, chatID, loadingMsg)
+	if err != nil {
+		return fmt.Errorf("gex: send loading: %w", err)
+	}
+
+	// Run analysis
+	result, err := h.gex.Engine.Analyze(ctx, sym)
+	if err != nil {
+		log.Error().Err(err).Str("symbol", sym).Msg("GEX analysis failed")
+		errHTML := FormatError(err, "/gex")
+		kb := CreateErrorKeyboard("gex")
+		// Add contextual help
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
+		return nil
+	}
+
+	// Format and send result with navigation keyboard
+	html := FormatGEXResult(result)
+	kb := gexKeyboard(sym)
+
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+	})
+
+	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
+		// Fallback: send as new message
+		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+		return sendErr
+	}
+	return nil
+}
+
+// gexKeyboard builds the inline keyboard for the /gex response.
+func gexKeyboard(currentSym string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	// Symbol switcher
+	symbols := []string{"BTC", "ETH", "SOL", "XRP", "AVAX"}
+	var symbolRow []ports.InlineButton
+	for _, s := range symbols {
+		label := s
+		if s == currentSym {
+			label = "● " + s
+		}
+		symbolRow = append(symbolRow, ports.InlineButton{
+			Text:         label,
+			CallbackData: "gex:sym:" + s,
+		})
+	}
+	rows = append(rows, symbolRow)
+
+	// Refresh and navigation
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔄 Refresh", CallbackData: "gex:refresh:" + currentSym},
+		{Text: "🔀 Skew", CallbackData: "skew:sym:" + currentSym},
+	})
+
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// ---------------------------------------------------------------------------
+// Callback handler
+// ---------------------------------------------------------------------------
+
+// handleGEXCallback handles /gex inline keyboard presses.
+// data format: "gex:<action>:<symbol>"  e.g. "gex:sym:ETH", "gex:refresh:BTC"
+func (h *Handler) handleGEXCallback(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	if h.gex == nil {
+		return nil
+	}
+
+	// data: "gex:sym:BTC" | "gex:refresh:BTC"
+	parts := strings.SplitN(data, ":", 3)
+	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed GEX callback data")
+		return nil
+	}
+	action := parts[1]
+	sym := strings.ToUpper(parts[2])
+
+	if _, ok := validGEXSymbols[sym]; !ok {
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for GEX analysis.", sym))
+	}
+
+	switch action {
+	case "sym", "refresh":
+		// Add timeout to prevent hanging
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		result, err := h.gex.Engine.Analyze(ctx, sym)
+		if err != nil {
+			log.Error().Err(err).Str("symbol", sym).Msg("GEX analysis failed")
+			errHTML := FormatError(err, "/gex")
+			kb := CreateErrorKeyboard("gex")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+			})
+			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+			return nil
+		}
+		html := FormatGEXResult(result)
+		kb := gexKeyboard(sym)
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu GEX?", CallbackData: "help:gex"},
+		})
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		// Show contextual help
+		helpText := getContextualHelp("gex")
+		helpKb := getHelpKeyboard("gex")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// /ivol — IV Surface command
+// ---------------------------------------------------------------------------
+
+// cmdIVSurface handles the /ivol [SYMBOL] command.
+func (h *Handler) cmdIVSurface(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.gex == nil {
+		h.sendUserError(ctx, chatID, fmt.Errorf("IV Surface engine not available"), "ivol")
+		return nil
+	}
+
+	sym := "BTC"
+	if parts := strings.Fields(args); len(parts) > 0 {
+		sym = strings.ToUpper(strings.TrimSpace(parts[0]))
+	}
+
+	if _, ok := validGEXSymbols[sym]; !ok {
+		keys := make([]string, 0, len(validGEXSymbols))
+		for k := range validGEXSymbols {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
+				"Tersedia: <code>%s</code>\n\n"+
+				"Contoh: <code>/ivol BTC</code>, <code>/ivol ETH</code>",
+			sym, strings.Join(keys, "</code>, <code>"),
+		))
+		return err
+	}
+
+	loadID, err := h.bot.SendLoading(ctx, chatID,
+		fmt.Sprintf("⏳ Fetching IV Surface for <b>%s</b> from Deribit...\n<i>Analysing implied volatility across all strikes and expiries</i>", sym))
+	if err != nil {
+		return fmt.Errorf("ivol: send loading: %w", err)
+	}
+
+	result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
+	if err != nil {
+		log.Error().Err(err).Str("symbol", sym).Msg("IV Surface analysis failed")
+		errHTML := FormatError(err, "/ivol")
+		kb := CreateErrorKeyboard("ivol")
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
+		return nil
+	}
+
+	html := FormatIVSurface(result)
+	kb := ivolKeyboard(sym)
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+	})
+
+	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
+		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+		return sendErr
+	}
+	return nil
+}
+
+// ivolKeyboard builds the inline keyboard for the /ivol response.
+func ivolKeyboard(currentSym string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	symbols := []string{"BTC", "ETH", "SOL", "XRP", "AVAX"}
+	var symRow []ports.InlineButton
+	for _, s := range symbols {
+		label := s
+		if s == currentSym {
+			label = "● " + s
+		}
+		symRow = append(symRow, ports.InlineButton{
+			Text:         label,
+			CallbackData: "ivol:sym:" + s,
+		})
+	}
+	rows = append(rows, symRow)
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔄 Refresh", CallbackData: "ivol:refresh:" + currentSym},
+		{Text: "🔀 Skew", CallbackData: "skew:sym:" + currentSym},
+		{Text: "📊 GEX", CallbackData: "gex:sym:" + currentSym},
+	})
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// handleIVolCallback handles /ivol inline keyboard presses.
+// data format: "ivol:<action>:<symbol>"
+func (h *Handler) handleIVolCallback(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	if h.gex == nil {
+		return nil
+	}
+	parts := strings.SplitN(data, ":", 3)
+	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed IVol callback data")
+		return nil
+	}
+	action := parts[1]
+	sym := strings.ToUpper(parts[2])
+	if _, ok := validGEXSymbols[sym]; !ok {
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for IV Surface.", sym))
+	}
+
+	switch action {
+	case "sym", "refresh":
+		result, err := h.gex.Engine.AnalyzeIVSurface(ctx, sym)
+		if err != nil {
+			log.Error().Err(err).Str("symbol", sym).Msg("IV Surface analysis failed")
+			errHTML := FormatError(err, "/ivol")
+			kb := CreateErrorKeyboard("ivol")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+			})
+			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+			return nil
+		}
+		html := FormatIVSurface(result)
+		kb := ivolKeyboard(sym)
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Surface?", CallbackData: "help:ivol"},
+		})
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		helpText := getContextualHelp("ivol")
+		helpKb := getHelpKeyboard("ivol")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// /skew — IV Skew / Smile Analysis command
+// ---------------------------------------------------------------------------
+
+// cmdSkew handles the /skew [SYMBOL] command.
+func (h *Handler) cmdSkew(ctx context.Context, chatID string, userID int64, args string) error {
+	if h.gex == nil {
+		h.sendUserError(ctx, chatID, fmt.Errorf("Skew Analysis engine not available"), "skew")
+		return nil
+	}
+
+	sym := "BTC"
+	if parts := strings.Fields(args); len(parts) > 0 {
+		sym = strings.ToUpper(strings.TrimSpace(parts[0]))
+	}
+
+	if _, ok := validGEXSymbols[sym]; !ok {
+		keys := make([]string, 0, len(validGEXSymbols))
+		for k := range validGEXSymbols {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+			"⚠️ Symbol <code>%s</code> tidak didukung.\n"+
+				"Tersedia: <code>%s</code>\n\n"+
+				"Contoh: <code>/skew BTC</code>, <code>/skew ETH</code>",
+			sym, strings.Join(keys, "</code>, <code>"),
+		))
+		return err
+	}
+
+	loadID, err := h.bot.SendLoading(ctx, chatID,
+		fmt.Sprintf("⏳ Analysing IV Skew for <b>%s</b>...\n<i>Computing smile curves, put/call ratio, flip detection</i>", sym))
+	if err != nil {
+		return fmt.Errorf("skew: send loading: %w", err)
+	}
+
+	result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
+	if err != nil {
+		log.Error().Err(err).Str("symbol", sym).Msg("Skew analysis failed")
+		errHTML := FormatError(err, "/skew")
+		kb := CreateErrorKeyboard("skew")
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+		})
+		_ = h.bot.EditWithKeyboard(ctx, chatID, loadID, errHTML, kb)
+		return nil
+	}
+
+	html := FormatSkewResult(result)
+	kb := skewKeyboard(sym)
+	// Add contextual help button
+	kb.Rows = append(kb.Rows, []ports.InlineButton{
+		{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+	})
+	if err := h.bot.EditWithKeyboard(ctx, chatID, loadID, html, kb); err != nil {
+		_, sendErr := h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+		return sendErr
+	}
+	return nil
+}
+
+// skewKeyboard builds the inline keyboard for the /skew response.
+func skewKeyboard(currentSym string) ports.InlineKeyboard {
+	var rows [][]ports.InlineButton
+
+	symbols := []string{"BTC", "ETH", "SOL", "XRP", "AVAX"}
+	var symRow []ports.InlineButton
+	for _, s := range symbols {
+		label := s
+		if s == currentSym {
+			label = "● " + s
+		}
+		symRow = append(symRow, ports.InlineButton{
+			Text:         label,
+			CallbackData: "skew:sym:" + s,
+		})
+	}
+	rows = append(rows, symRow)
+	rows = append(rows, []ports.InlineButton{
+		{Text: "🔄 Refresh", CallbackData: "skew:refresh:" + currentSym},
+		{Text: "📈 IV Surface", CallbackData: "ivol:sym:" + currentSym},
+		{Text: "📊 GEX", CallbackData: "gex:sym:" + currentSym},
+	})
+	return ports.InlineKeyboard{Rows: rows}
+}
+
+// handleSkewCallback handles /skew inline keyboard presses.
+// data format: "skew:<action>:<symbol>"
+func (h *Handler) handleSkewCallback(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	if h.gex == nil {
+		return nil
+	}
+	parts := strings.SplitN(data, ":", 3)
+	if len(parts) < 3 {
+		log.Warn().Str("data", data).Msg("malformed Skew callback data")
+		return nil
+	}
+	action := parts[1]
+	sym := strings.ToUpper(parts[2])
+	if _, ok := validGEXSymbols[sym]; !ok {
+		return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("⚠️ Symbol <b>%s</b> is not supported for Skew analysis.", sym))
+	}
+
+	switch action {
+	case "sym", "refresh":
+		result, err := h.gex.Engine.AnalyzeSkew(ctx, sym)
+		if err != nil {
+			log.Error().Err(err).Str("symbol", sym).Msg("Skew analysis failed")
+			errHTML := FormatError(err, "/skew")
+			kb := CreateErrorKeyboard("skew")
+			kb.Rows = append(kb.Rows, []ports.InlineButton{
+				{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+			})
+			_ = h.bot.EditWithKeyboard(ctx, chatID, msgID, errHTML, kb)
+			return nil
+		}
+		html := FormatSkewResult(result)
+		kb := skewKeyboard(sym)
+		kb.Rows = append(kb.Rows, []ports.InlineButton{
+			{Text: "❓ Apa itu IV Skew?", CallbackData: "help:skew"},
+		})
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, html, kb)
+	case "help":
+		helpText := getContextualHelp("skew")
+		helpKb := getHelpKeyboard("skew")
+		return h.bot.EditWithKeyboard(ctx, chatID, msgID, helpText, helpKb)
+	}
+	return nil
+}

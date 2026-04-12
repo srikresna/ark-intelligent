@@ -293,4 +293,3 @@ func (ip *Interpreter) fallbackWeeklyOutlook(data WeeklyOutlookData) string {
 func formatResponse(header, content string) string {
 	return fmt.Sprintf("=== %s ===\n\n%s", header, sanitizeTelegramHTML(content))
 }
-

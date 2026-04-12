@@ -48,9 +48,9 @@ func TestComputeStatsEmpty(t *testing.T) {
 func TestComputeStatsWinRates(t *testing.T) {
 	signals := []domain.PersistedSignal{
 		makeSignal("BULLISH", 4, 70, 0.5, 1.2, 2.1),    // 1W win, 2W win, 4W win
-		makeSignal("BULLISH", 3, 60, -0.3, 0.8, 1.5),    // 1W loss, 2W win, 4W win
-		makeSignal("BEARISH", 5, 80, -0.7, -1.1, -2.3),  // 1W win (bearish+neg), 2W win, 4W win
-		makeSignal("BEARISH", 2, 50, 0.2, 0.5, -0.8),    // 1W loss, 2W loss (bearish+pos=loss), 4W win
+		makeSignal("BULLISH", 3, 60, -0.3, 0.8, 1.5),   // 1W loss, 2W win, 4W win
+		makeSignal("BEARISH", 5, 80, -0.7, -1.1, -2.3), // 1W win (bearish+neg), 2W win, 4W win
+		makeSignal("BEARISH", 2, 50, 0.2, 0.5, -0.8),   // 1W loss, 2W loss (bearish+pos=loss), 4W win
 	}
 
 	stats := computeStats(signals, "TEST")
@@ -105,10 +105,10 @@ func TestComputeStatsAvgReturns(t *testing.T) {
 func TestComputeStatsStrengthBreakdown(t *testing.T) {
 	signals := []domain.PersistedSignal{
 		makeSignal("BULLISH", 5, 80, 1.0, 0, 0),  // high strength, win
-		makeSignal("BULLISH", 4, 75, -0.5, 0, 0),  // high strength, loss
-		makeSignal("BULLISH", 3, 60, 0.5, 0, 0),   // low strength, win
-		makeSignal("BULLISH", 2, 50, -0.3, 0, 0),  // low strength, loss
-		makeSignal("BULLISH", 1, 40, -0.2, 0, 0),  // low strength, loss
+		makeSignal("BULLISH", 4, 75, -0.5, 0, 0), // high strength, loss
+		makeSignal("BULLISH", 3, 60, 0.5, 0, 0),  // low strength, win
+		makeSignal("BULLISH", 2, 50, -0.3, 0, 0), // low strength, loss
+		makeSignal("BULLISH", 1, 40, -0.2, 0, 0), // low strength, loss
 	}
 
 	stats := computeStats(signals, "TEST")
@@ -166,8 +166,8 @@ func TestComputeStatsCalibration(t *testing.T) {
 func TestComputeStatsWinLossReturns(t *testing.T) {
 	signals := []domain.PersistedSignal{
 		makeSignal("BULLISH", 4, 70, 2.0, 0, 0),  // win
-		makeSignal("BULLISH", 3, 60, 1.0, 0, 0),   // win
-		makeSignal("BULLISH", 3, 60, -0.5, 0, 0),  // loss
+		makeSignal("BULLISH", 3, 60, 1.0, 0, 0),  // win
+		makeSignal("BULLISH", 3, 60, -0.5, 0, 0), // loss
 	}
 
 	stats := computeStats(signals, "TEST")

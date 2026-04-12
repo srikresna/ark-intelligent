@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/ports"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -36,16 +37,14 @@ type ClaudeClient struct {
 // userID is needed for per-user memory isolation.
 type ToolExecutor interface {
 	// Execute processes a tool call and returns the result text.
-	Execute(ctx context.Context, userID int64, toolName string, input map[string]interface{}) string
+	Execute(ctx context.Context, userID int64, toolName string, input map[string]any) string
 }
 
 // NewClaudeClient creates a Claude client targeting the given endpoint.
 func NewClaudeClient(endpoint string, timeout time.Duration, maxTokens int) *ClaudeClient {
 	return &ClaudeClient{
-		endpoint: endpoint,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
+		endpoint:       endpoint,
+		httpClient:     httpclient.NewClient(timeout),
 		model:          "claude-opus-4-6",
 		maxTokens:      maxTokens,
 		thinkingBudget: 2048, // default thinking budget for extended thinking
@@ -76,10 +75,10 @@ func (c *ClaudeClient) SetModel(model string) {
 type claudeRequest struct {
 	Model     string          `json:"model"`
 	MaxTokens int             `json:"max_tokens"`
-	System    interface{}     `json:"system,omitempty"`     // string or []claudeSystemBlock (for cache_control)
+	System    any             `json:"system,omitempty"` // string or []claudeSystemBlock (for cache_control)
 	Messages  []claudeMessage `json:"messages"`
 	Tools     []claudeToolDef `json:"tools,omitempty"`
-	Thinking  *claudeThinking `json:"thinking,omitempty"`   // extended thinking config
+	Thinking  *claudeThinking `json:"thinking,omitempty"` // extended thinking config
 }
 
 // claudeThinking configures extended thinking (chain-of-thought reasoning).
@@ -90,7 +89,7 @@ type claudeThinking struct {
 
 // claudeSystemBlock supports prompt caching via cache_control on system content.
 type claudeSystemBlock struct {
-	Type         string              `json:"type"`                    // "text"
+	Type         string              `json:"type"` // "text"
 	Text         string              `json:"text"`
 	CacheControl *claudeCacheControl `json:"cache_control,omitempty"` // enables prompt caching
 }
@@ -101,16 +100,16 @@ type claudeCacheControl struct {
 }
 
 type claudeMessage struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content"` // string for text-only, []claudeContentInput for multimodal
+	Role    string `json:"role"`
+	Content any    `json:"content"` // string for text-only, []claudeContentInput for multimodal
 }
 
 // claudeContentInput represents a single content block in a multimodal user message.
 type claudeContentInput struct {
-	Type   string              `json:"type"`             // "text", "image", "document"
-	Text   string              `json:"text,omitempty"`   // for type="text"
-	Title  string              `json:"title,omitempty"`  // for type="document" (optional, filename)
-	Source *claudeImageSource  `json:"source,omitempty"` // for type="image" or "document"
+	Type   string             `json:"type"`             // "text", "image", "document"
+	Text   string             `json:"text,omitempty"`   // for type="text"
+	Title  string             `json:"title,omitempty"`  // for type="document" (optional, filename)
+	Source *claudeImageSource `json:"source,omitempty"` // for type="image" or "document"
 }
 
 // claudeImageSource represents the source of an image in a Claude message.
@@ -139,34 +138,34 @@ type claudeResponse struct {
 }
 
 type claudeContentBlock struct {
-	Type      string                 `json:"type"`
-	Text      string                 `json:"text,omitempty"`
-	Thinking  string                 `json:"thinking,omitempty"`  // for type="thinking" (extended thinking)
-	Signature string                 `json:"signature,omitempty"` // thinking block signature
-	Name      string                 `json:"name,omitempty"`      // for tool_use blocks
-	ID        string                 `json:"id,omitempty"`
-	Input     map[string]interface{} `json:"input,omitempty"`     // for tool_use blocks (command args)
-	Citations []claudeCitation       `json:"citations,omitempty"` // document citations
+	Type      string           `json:"type"`
+	Text      string           `json:"text,omitempty"`
+	Thinking  string           `json:"thinking,omitempty"`  // for type="thinking" (extended thinking)
+	Signature string           `json:"signature,omitempty"` // thinking block signature
+	Name      string           `json:"name,omitempty"`      // for tool_use blocks
+	ID        string           `json:"id,omitempty"`
+	Input     map[string]any   `json:"input,omitempty"`     // for tool_use blocks (command args)
+	Citations []claudeCitation `json:"citations,omitempty"` // document citations
 	// tool_result fields (for round-trip messages)
-	ToolUseID string      `json:"tool_use_id,omitempty"` // references a tool_use block
-	Content   interface{} `json:"content,omitempty"`      // tool_result content (string or structured)
+	ToolUseID string `json:"tool_use_id,omitempty"` // references a tool_use block
+	Content   any    `json:"content,omitempty"`     // tool_result content (string or structured)
 }
 
 // claudeCitation represents a citation reference from a Claude response.
 type claudeCitation struct {
-	Type           string `json:"type"`             // "char_location"
-	CitedText      string `json:"cited_text"`       // the cited passage
+	Type           string `json:"type"`       // "char_location"
+	CitedText      string `json:"cited_text"` // the cited passage
 	DocumentIndex  int    `json:"document_index"`
 	StartCharIndex int    `json:"start_char_index"`
 	EndCharIndex   int    `json:"end_char_index"`
 }
 
 type claudeUsage struct {
-	InputTokens              int                `json:"input_tokens"`
-	OutputTokens             int                `json:"output_tokens"`
-	CacheCreationInputTokens int                `json:"cache_creation_input_tokens"`
-	CacheReadInputTokens     int                `json:"cache_read_input_tokens"`
-	ServerToolUse            *claudeToolUsage   `json:"server_tool_use,omitempty"`
+	InputTokens              int              `json:"input_tokens"`
+	OutputTokens             int              `json:"output_tokens"`
+	CacheCreationInputTokens int              `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int              `json:"cache_read_input_tokens"`
+	ServerToolUse            *claudeToolUsage `json:"server_tool_use,omitempty"`
 }
 
 // claudeToolUsage tracks server-side tool invocations.
@@ -218,7 +217,7 @@ func (c *ClaudeClient) Chat(ctx context.Context, req ports.ChatRequest) (*ports.
 	}
 
 	// Build system prompt (with or without prompt caching)
-	var system interface{}
+	var system any
 	if req.SystemPrompt != "" {
 		if c.useCache {
 			system = []claudeSystemBlock{{

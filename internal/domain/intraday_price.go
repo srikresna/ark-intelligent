@@ -26,10 +26,10 @@ type IntradayBar struct {
 
 // IntradayContext holds 4H-granularity price context for a contract.
 type IntradayContext struct {
-	ContractCode string  `json:"contract_code"`
-	Currency     string  `json:"currency"`
-	Interval     string  `json:"interval"` // "4h"
-	CurrentPrice float64 `json:"current_price"`
+	ContractCode string    `json:"contract_code"`
+	Currency     string    `json:"currency"`
+	Interval     string    `json:"interval"` // "4h"
+	CurrentPrice float64   `json:"current_price"`
 	AsOf         time.Time `json:"as_of"` // Timestamp of latest bar
 
 	// Short-term changes
@@ -38,9 +38,9 @@ type IntradayContext struct {
 	Chg24H float64 `json:"chg_24h"` // 6-bar % change (24h)
 
 	// Intraday Moving Averages (period = number of 4H bars)
-	IMA8   float64 `json:"ima_8"`   // 8-bar SMA  (~32h / 1.3 days)
-	IMA21  float64 `json:"ima_21"`  // 21-bar SMA (~3.5 days)
-	IMA55  float64 `json:"ima_55"`  // 55-bar SMA (~9 days)
+	IMA8  float64 `json:"ima_8"`  // 8-bar SMA  (~32h / 1.3 days)
+	IMA21 float64 `json:"ima_21"` // 21-bar SMA (~3.5 days)
+	IMA55 float64 `json:"ima_55"` // 55-bar SMA (~9 days)
 
 	AboveIMA8  bool `json:"above_ima_8"`
 	AboveIMA21 bool `json:"above_ima_21"`

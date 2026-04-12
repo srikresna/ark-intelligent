@@ -36,13 +36,13 @@ type SeasonalPattern struct {
 	CurrentBias  string         // "BULLISH", "BEARISH", "NEUTRAL"
 
 	// Advanced: regime-filtered stats for the current month
-	RegimeStats    *RegimeMonthStats    // nil if regime data unavailable
-	COTAlignment   *COTAlignmentResult  // nil if COT data unavailable
-	EventDensity   *EventDensityResult  // nil if event data unavailable
-	VolContext     *SeasonalVolContext   // nil if insufficient data
-	CrossAsset     *CrossAssetResult    // nil if cross-asset data unavailable
-	EIACtx         *EIAContext          // nil if not an energy asset or EIA unavailable
-	Confluence     *ConfluenceResult    // nil if not enough data for scoring
+	RegimeStats  *RegimeMonthStats   // nil if regime data unavailable
+	COTAlignment *COTAlignmentResult // nil if COT data unavailable
+	EventDensity *EventDensityResult // nil if event data unavailable
+	VolContext   *SeasonalVolContext // nil if insufficient data
+	CrossAsset   *CrossAssetResult   // nil if cross-asset data unavailable
+	EIACtx       *EIAContext         // nil if not an energy asset or EIA unavailable
+	Confluence   *ConfluenceResult   // nil if not enough data for scoring
 }
 
 // MonthStats holds aggregated return statistics for a single calendar month.
@@ -72,31 +72,31 @@ type YearReturn struct {
 
 // RegimeMonthStats holds seasonal stats filtered to the current macro regime.
 type RegimeMonthStats struct {
-	RegimeName  string  // e.g., "DISINFLATIONARY"
-	AvgReturn   float64
-	WinRate     float64
-	SampleSize  int
-	Bias        string
-	Confidence  ConfidenceTier
+	RegimeName        string // e.g., "DISINFLATIONARY"
+	AvgReturn         float64
+	WinRate           float64
+	SampleSize        int
+	Bias              string
+	Confidence        ConfidenceTier
 	PrimaryFREDDriver string // e.g., "Real Yield (10Y-BE5Y): -0.3%"
 	DriverAlignment   string // "SUPPORTIVE", "HEADWIND", "NEUTRAL"
 }
 
 // COTAlignmentResult shows whether COT positioning historically aligns.
 type COTAlignmentResult struct {
-	AlignedYears   int    // years where COT direction matched seasonal direction
-	TotalYears     int    // total years with both seasonal and COT data
+	AlignedYears   int     // years where COT direction matched seasonal direction
+	TotalYears     int     // total years with both seasonal and COT data
 	AlignmentPct   float64 // AlignedYears / TotalYears * 100
-	CurrentAligned bool   // is current COT positioning aligned with seasonal bias?
-	CurrentCOTBias string // "BULLISH", "BEARISH", "NEUTRAL"
-	Interpretation string // e.g., "commercial = contrarian for FX"
+	CurrentAligned bool    // is current COT positioning aligned with seasonal bias?
+	CurrentCOTBias string  // "BULLISH", "BEARISH", "NEUTRAL"
+	Interpretation string  // e.g., "commercial = contrarian for FX"
 }
 
 // EventDensityResult indicates how event-heavy the month typically is.
 type EventDensityResult struct {
-	HighImpactEvents int    // avg high-impact events in this month for this currency
-	Rating           string // "HIGH", "MEDIUM", "LOW"
-	KeyEvents        string // e.g., "FOMC, NFP, ECB"
+	HighImpactEvents int     // avg high-impact events in this month for this currency
+	Rating           string  // "HIGH", "MEDIUM", "LOW"
+	KeyEvents        string  // e.g., "FOMC, NFP, ECB"
 	ReliabilityAdj   float64 // -0.2 to 0 adjustment to confidence (high events = lower reliability)
 }
 
@@ -120,19 +120,19 @@ type CrossAssetResult struct {
 
 // CrossCorrelation describes a seasonal correlation check.
 type CrossCorrelation struct {
-	Asset      string // e.g., "USD", "OIL"
-	Relation   string // e.g., "inverse", "positive"
-	TheirBias  string // "BULLISH", "BEARISH", "NEUTRAL"
-	IsAligned  bool   // does their bias align with expected relation?
+	Asset     string // e.g., "USD", "OIL"
+	Relation  string // e.g., "inverse", "positive"
+	TheirBias string // "BULLISH", "BEARISH", "NEUTRAL"
+	IsAligned bool   // does their bias align with expected relation?
 }
 
 // ConfluenceResult is the final multi-factor seasonal score.
 type ConfluenceResult struct {
-	Score       int    // 0-5 factors aligned
-	MaxScore    int    // max possible (usually 5)
-	Level       string // "HIGH", "MODERATE-HIGH", "MODERATE", "LOW"
-	Factors     []ConfluenceFactor
-	Verdict     string // e.g., "MODERATE CONFIDENCE BULLISH"
+	Score    int    // 0-5 factors aligned
+	MaxScore int    // max possible (usually 5)
+	Level    string // "HIGH", "MODERATE-HIGH", "MODERATE", "LOW"
+	Factors  []ConfluenceFactor
+	Verdict  string // e.g., "MODERATE CONFIDENCE BULLISH"
 }
 
 // ConfluenceFactor describes a single confluence factor.
@@ -144,11 +144,11 @@ type ConfluenceFactor struct {
 
 // EIAContext holds energy-specific seasonal context from EIA data.
 type EIAContext struct {
-	InventoryTrend     string  // "BUILD", "DRAW", "FLAT"
-	AvgWeeklyChange    float64 // avg weekly inventory change in this month (millions bbl)
-	CurrentVs5YrAvg    string  // "ABOVE", "BELOW", "NEAR" 5-year seasonal average
-	RefineryUtil       float64 // avg refinery utilization % in this month
-	Assessment         string  // e.g., "Spring build season confirms bearish seasonal"
+	InventoryTrend  string  // "BUILD", "DRAW", "FLAT"
+	AvgWeeklyChange float64 // avg weekly inventory change in this month (millions bbl)
+	CurrentVs5YrAvg string  // "ABOVE", "BELOW", "NEAR" 5-year seasonal average
+	RefineryUtil    float64 // avg refinery utilization % in this month
+	Assessment      string  // e.g., "Spring build season confirms bearish seasonal"
 }
 
 var monthNames = [12]string{
@@ -362,7 +362,7 @@ func (sa *SeasonalAnalyzer) AnalyzeContract(ctx context.Context, contractCode, c
 
 	// Aggregate per calendar month with full statistics.
 	var (
-		perMonth [12][]float64   // raw returns per month
+		perMonth [12][]float64    // raw returns per month
 		perYear  [12][]YearReturn // year-tagged returns
 	)
 

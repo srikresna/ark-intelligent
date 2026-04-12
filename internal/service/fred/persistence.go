@@ -91,6 +91,9 @@ func (ps *PersistenceService) PersistSnapshot(ctx context.Context, data *MacroDa
 	addObs("SOFR", data.SOFR)
 	addObs("IORB", data.IORB)
 	addObs("FEDFUNDS", data.FedFundsRate)
+	addObs("FEDTARMD", data.FedDotMedian)
+	addObs("FEDTARH", data.FedDotHigh)
+	addObs("FEDTARL", data.FedDotLow)
 
 	// VIX
 	addObs("VIXCLS", data.VIX)
@@ -116,6 +119,7 @@ func (ps *PersistenceService) PersistSnapshot(ctx context.Context, data *MacroDa
 	// M2 & Fed balance
 	addObs("M2SL_YOY", data.M2Growth)
 	addObs("WALCL", data.FedBalSheet)
+	addObs("WDTGAL", data.TGABalance)
 
 	// USD
 	addObs("DTWEXBGS", data.DXY)

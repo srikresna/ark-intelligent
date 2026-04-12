@@ -39,24 +39,24 @@ type LogisticCalibrator struct {
 type LogisticModel struct {
 	Weights     []float64 `json:"weights"`      // Feature weights (including bias at index 0)
 	NumFeatures int       `json:"num_features"` // Number of features (excluding bias)
-	Horizon     string    `json:"horizon"`       // "1W", "2W", or "4W"
-	SampleSize  int       `json:"sample_size"`   // Training set size
-	Converged   bool      `json:"converged"`     // Whether IRLS converged
-	Iterations  int       `json:"iterations"`    // Number of IRLS iterations used
-	TrainAUC    float64   `json:"train_auc"`     // Approximate training AUC
-	BrierScore  float64   `json:"brier_score"`   // Training Brier score
+	Horizon     string    `json:"horizon"`      // "1W", "2W", or "4W"
+	SampleSize  int       `json:"sample_size"`  // Training set size
+	Converged   bool      `json:"converged"`    // Whether IRLS converged
+	Iterations  int       `json:"iterations"`   // Number of IRLS iterations used
+	TrainAUC    float64   `json:"train_auc"`    // Approximate training AUC
+	BrierScore  float64   `json:"brier_score"`  // Training Brier score
 }
 
 // CalibrationResult holds the output of logistic calibration for a signal.
 type CalibrationResult struct {
-	ProbWin1W      float64        `json:"prob_win_1w"`       // P(win) at 1 week
-	ProbWin2W      float64        `json:"prob_win_2w"`       // P(win) at 2 weeks
-	ProbWin4W      float64        `json:"prob_win_4w"`       // P(win) at 4 weeks
-	BestHorizon    string         `json:"best_horizon"`      // Horizon with highest P(win)
-	BestProb       float64        `json:"best_prob"`         // Highest P(win)
-	Calibrated     float64        `json:"calibrated"`        // Calibrated confidence (0-100, at best horizon)
-	Method         string         `json:"method"`            // "LOGISTIC", "PLATT", "WINRATE"
-	Models         []*LogisticModel `json:"models,omitempty"` // The models used
+	ProbWin1W   float64          `json:"prob_win_1w"`      // P(win) at 1 week
+	ProbWin2W   float64          `json:"prob_win_2w"`      // P(win) at 2 weeks
+	ProbWin4W   float64          `json:"prob_win_4w"`      // P(win) at 4 weeks
+	BestHorizon string           `json:"best_horizon"`     // Horizon with highest P(win)
+	BestProb    float64          `json:"best_prob"`        // Highest P(win)
+	Calibrated  float64          `json:"calibrated"`       // Calibrated confidence (0-100, at best horizon)
+	Method      string           `json:"method"`           // "LOGISTIC", "PLATT", "WINRATE"
+	Models      []*LogisticModel `json:"models,omitempty"` // The models used
 }
 
 // NewLogisticCalibrator creates a new calibrator.
@@ -137,13 +137,14 @@ const numFeatures = 7
 // extractFeatures converts a PersistedSignal into a feature vector.
 //
 // Features:
-//   x0: Normalized strength (1-5 → 0.0-1.0, clamped)
-//   x1: Normalized raw confidence (0-100 → 0.0-1.0, clamped)
-//   x2: COT index (0-100 → 0.0-1.0)
-//   x3: Sentiment score (-1 to 1 → 0.0-1.0)
-//   x4: Conviction score (0-100 → 0.0-1.0)
-//   x5: Daily trend alignment (-1, 0, or +1)
-//   x6: FRED regime encoding (-1.0 to +1.0)
+//
+//	x0: Normalized strength (1-5 → 0.0-1.0, clamped)
+//	x1: Normalized raw confidence (0-100 → 0.0-1.0, clamped)
+//	x2: COT index (0-100 → 0.0-1.0)
+//	x3: Sentiment score (-1 to 1 → 0.0-1.0)
+//	x4: Conviction score (0-100 → 0.0-1.0)
+//	x5: Daily trend alignment (-1, 0, or +1)
+//	x6: FRED regime encoding (-1.0 to +1.0)
 func extractFeatures(s *domain.PersistedSignal) []float64 {
 	features := make([]float64, numFeatures)
 

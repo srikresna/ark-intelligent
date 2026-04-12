@@ -46,31 +46,31 @@ type DailyPriceContext struct {
 	CurrentPrice float64 `json:"current_price"`
 
 	// Daily changes
-	DailyChgPct  float64 `json:"daily_chg_pct"`  // 1-day % change
-	WeeklyChgPct float64 `json:"weekly_chg_pct"`  // 5-day % change
+	DailyChgPct   float64 `json:"daily_chg_pct"`   // 1-day % change
+	WeeklyChgPct  float64 `json:"weekly_chg_pct"`  // 5-day % change
 	MonthlyChgPct float64 `json:"monthly_chg_pct"` // 20-day % change
 
 	// Daily Moving Averages
-	DMA20     float64 `json:"dma_20"`       // 20-day SMA
-	DMA50     float64 `json:"dma_50"`       // 50-day SMA
-	DMA200    float64 `json:"dma_200"`      // 200-day SMA
-	AboveDMA20  bool  `json:"above_dma_20"`
-	AboveDMA50  bool  `json:"above_dma_50"`
-	AboveDMA200 bool  `json:"above_dma_200"`
+	DMA20       float64 `json:"dma_20"`  // 20-day SMA
+	DMA50       float64 `json:"dma_50"`  // 50-day SMA
+	DMA200      float64 `json:"dma_200"` // 200-day SMA
+	AboveDMA20  bool    `json:"above_dma_20"`
+	AboveDMA50  bool    `json:"above_dma_50"`
+	AboveDMA200 bool    `json:"above_dma_200"`
 
 	// Daily ATR
-	DailyATR       float64 `json:"daily_atr"`        // 14-day Average True Range
-	NormalizedATR  float64 `json:"normalized_atr"`    // ATR / Close * 100
+	DailyATR      float64 `json:"daily_atr"`      // 14-day Average True Range
+	NormalizedATR float64 `json:"normalized_atr"` // ATR / Close * 100
 
 	// Trend
-	DailyTrend     string `json:"daily_trend"`      // "UP", "DOWN", "FLAT" (5-day)
-	ConsecDays     int    `json:"consec_days"`       // Consecutive up/down days
-	ConsecDir      string `json:"consec_dir"`        // "UP" or "DOWN"
+	DailyTrend string `json:"daily_trend"` // "UP", "DOWN", "FLAT" (5-day)
+	ConsecDays int    `json:"consec_days"` // Consecutive up/down days
+	ConsecDir  string `json:"consec_dir"`  // "UP" or "DOWN"
 
 	// Momentum
-	Momentum5D  float64 `json:"momentum_5d"`   // Rate of change 5-day
-	Momentum10D float64 `json:"momentum_10d"`  // Rate of change 10-day
-	Momentum20D float64 `json:"momentum_20d"`  // Rate of change 20-day
+	Momentum5D  float64 `json:"momentum_5d"`  // Rate of change 5-day
+	Momentum10D float64 `json:"momentum_10d"` // Rate of change 10-day
+	Momentum20D float64 `json:"momentum_20d"` // Rate of change 20-day
 }
 
 // MATrendDaily returns a summary of daily MA alignment.

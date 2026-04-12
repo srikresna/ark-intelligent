@@ -114,7 +114,7 @@ func TestFactorDecomp_Deep_OLSKnownSolution(t *testing.T) {
 	for i := 0; i < n; i++ {
 		x1 := float64(i) / float64(n)
 		x2 := float64(i*i) / float64(n*n) // quadratic, independent of x1 and intercept
-		X[i] = []float64{1.0, x1, x2}      // intercept + 2 features
+		X[i] = []float64{1.0, x1, x2}     // intercept + 2 features
 		y[i] = 5.0 + 2.0*x1 + 3.0*x2
 	}
 

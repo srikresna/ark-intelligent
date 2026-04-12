@@ -108,12 +108,12 @@ func TestFmtRatio(t *testing.T) {
 
 func TestCOTIndexBar(t *testing.T) {
 	tests := []struct {
-		name          string
-		index         float64
-		width         int
-		wantContains  []string
-		wantFilled    int
-		wantDash      int
+		name         string
+		index        float64
+		width        int
+		wantContains []string
+		wantFilled   int
+		wantDash     int
 	}{
 		{"75 pct", 75, 10, []string{"75"}, -1, -1},
 		{"zero", 0, 10, []string{"[", "] 0"}, 0, 10},

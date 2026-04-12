@@ -32,10 +32,10 @@ var factorNames = []string{FactorCOT, FactorStress, FactorFRED, FactorPrice}
 // Calendar is excluded from the regression (not stored on PersistedSignal).
 // The original V3 Calendar weight (15%) is redistributed proportionally.
 var currentV3Weights = map[string]float64{
-	FactorCOT:   29, // 25 / 85 * 100 ≈ 29
+	FactorCOT:    29, // 25 / 85 * 100 ≈ 29
 	FactorStress: 12, // 10 / 85 * 100 ≈ 12
-	FactorFRED:  24, // 20 / 85 * 100 ≈ 24
-	FactorPrice: 35, // 30 / 85 * 100 ≈ 35
+	FactorFRED:   24, // 20 / 85 * 100 ≈ 24
+	FactorPrice:  35, // 30 / 85 * 100 ≈ 35
 }
 
 // WeightResult holds the output of the weight optimization analysis.

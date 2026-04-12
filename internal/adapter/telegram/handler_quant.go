@@ -4,9 +4,11 @@ package telegram
 //   /quant [SYMBOL] [TIMEFRAME]  — Quant dashboard with inline keyboard
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"os"
 	"os/exec"
@@ -28,6 +30,12 @@ type QuantServices struct {
 	DailyPriceRepo pricesvc.DailyPriceStore
 	IntradayRepo   pricesvc.IntradayStore
 	PriceMapping   []domain.PriceSymbolMapping
+	RegimeEngine   RegimeOverlayEngine // optional — nil disables overlay header
+}
+
+// RegimeOverlayEngine is the minimal interface the quant handler needs from the regime package.
+type RegimeOverlayEngine interface {
+	ComputeOverlay(ctx context.Context, contractCode, symbol, timeframe string) (RegimeHeaderProvider, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -35,14 +43,18 @@ type QuantServices struct {
 // ---------------------------------------------------------------------------
 
 type quantState struct {
-	symbol    string
-	currency  string
-	timeframe string
-	bars      map[string][]ta.OHLCV // tf → bars
-	createdAt time.Time
+	symbol        string
+	currency      string
+	timeframe     string
+	contractCode  string
+	bars          map[string][]ta.OHLCV   // tf → bars
+	volCone       *pricesvc.VolCone       // cached vol cone result
+	wyckoff       *pricesvc.WyckoffResult // cached Wyckoff phase analysis
+	regimeOverlay RegimeHeaderProvider    // optional regime overlay header
+	createdAt     time.Time
 }
 
-const quantStateTTL = 30 * time.Minute
+var quantStateTTL = config.QuantStateTTL
 
 // ---------------------------------------------------------------------------
 // quantStateCache
@@ -103,7 +115,10 @@ func (h *Handler) registerQuantCommands() {
 // /quant — Main command
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args string) error {
+func (h *Handler) cmdQuant(ctx context.Context, chatID string, userID int64, args string) error {
+	// Send typing indicator immediately for long-running quant analysis
+	_ = h.bot.SendChatAction(ctx, chatID, "typing")
+
 	if h.quant == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Quant Engine not configured.")
 		return err
@@ -111,6 +126,10 @@ func (h *Handler) cmdQuant(ctx context.Context, chatID string, _ int64, args str
 
 	parts := strings.Fields(strings.ToUpper(strings.TrimSpace(args)))
 	if len(parts) == 0 {
+		// Fallback to last currency if available
+		if lc := h.getLastCurrency(ctx, userID); lc != "" {
+			return h.cmdQuant(ctx, chatID, userID, lc)
+		}
 		// Show symbol selector with description
 		_, err := h.bot.SendWithKeyboard(ctx, chatID,
 			`🔬 <b>Quant Engine — Econometric Analysis</b>
@@ -135,9 +154,13 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 	}
 
 	symbol := parts[0]
-	timeframe := "daily"
+	timeframe := ""
 	if len(parts) > 1 {
 		timeframe = strings.ToLower(parts[1])
+	}
+	if timeframe == "" {
+		prefs, _ := h.prefsRepo.Get(ctx, userID)
+		timeframe = domain.ResolveDefaultTimeframe(prefs.DefaultTimeframe)
 	}
 
 	mapping := domain.FindPriceMappingByCurrency(symbol)
@@ -149,22 +172,29 @@ Pilih aset:`, h.kb.QuantSymbolMenu())
 		return err
 	}
 
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("📊 Computing Quant Analysis for <b>%s</b> (%s)... ⏳", html.EscapeString(mapping.Currency), timeframe))
+	// Save last currency for context carry-over
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
+
+	sym := html.EscapeString(mapping.Currency)
+	prog := NewProgress(h.bot, chatID, []string{
+		fmt.Sprintf("⏳ Fetching market data for <b>%s</b> (%s)...", sym, timeframe),
+		fmt.Sprintf("🔄 Running statistical models for <b>%s</b>...", sym),
+		fmt.Sprintf("📊 Computing quant signals for <b>%s</b>...", sym),
+		fmt.Sprintf("✨ Finalizing analysis for <b>%s</b>...", sym),
+	})
+	prog.Start(ctx)
 
 	state, err := h.computeQuantState(ctx, mapping, timeframe)
 	if err != nil {
-		if loadingID > 0 {
-			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-		}
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		prog.Stop(ctx)
+		h.sendUserError(ctx, chatID, err, "quant")
+		return nil
 	}
 
 	h.quantCache.set(chatID, state)
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
 
-	if loadingID > 0 {
-		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
-	}
+	prog.Stop(ctx)
 
 	// Send dashboard
 	dashboard := h.formatQuantDashboard(state)
@@ -182,6 +212,9 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 	barsByTF := make(map[string][]ta.OHLCV)
 
 	// Fetch daily bars (always needed for most models)
+	if h.quant.DailyPriceRepo == nil {
+		return nil, fmt.Errorf("daily price data not configured")
+	}
 	dailyRecords, err := h.quant.DailyPriceRepo.GetDailyHistory(ctx, code, 500)
 	if err != nil || len(dailyRecords) < 30 {
 		return nil, fmt.Errorf("insufficient daily data for %s (%d bars)", mapping.Currency, len(dailyRecords))
@@ -200,13 +233,31 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 		}
 	}
 
-	return &quantState{
-		symbol:    mapping.Currency,
-		currency:  mapping.Currency,
-		timeframe: timeframe,
-		bars:      barsByTF,
-		createdAt: time.Now(),
-	}, nil
+	// Compute volatility cone (cached in state, TTL via quantStateTTL)
+	volCone := pricesvc.ComputeVolCone(dailyRecords)
+
+	// Wyckoff phase analysis (best-effort, non-blocking)
+	wyckoff := pricesvc.AnalyzeWyckoff(dailyRecords)
+
+	state := &quantState{
+		symbol:       mapping.Currency,
+		currency:     mapping.Currency,
+		timeframe:    timeframe,
+		contractCode: code,
+		bars:         barsByTF,
+		volCone:      volCone,
+		wyckoff:      wyckoff,
+		createdAt:    time.Now(),
+	}
+
+	// Compute regime overlay if engine available (best-effort, non-blocking)
+	if h.quant.RegimeEngine != nil {
+		if overlay, rErr := h.quant.RegimeEngine.ComputeOverlay(ctx, code, mapping.Currency, timeframe); rErr == nil {
+			state.regimeOverlay = overlay
+		}
+	}
+
+	return state, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -214,9 +265,24 @@ func (h *Handler) computeQuantState(ctx context.Context, mapping *domain.PriceSy
 // ---------------------------------------------------------------------------
 
 func (h *Handler) formatQuantDashboard(state *quantState) string {
-	return fmt.Sprintf(`📊 <b>QUANT DASHBOARD: %s</b>
-📅 %s — %s
+	volConeSection := ""
+	if state.volCone != nil {
+		volConeSection = "\n" + h.fmt.FormatVolCone(state.volCone)
+	}
 
+	regimeHeader := ""
+	if state.regimeOverlay != nil {
+		regimeHeader = state.regimeOverlay.HeaderLine() + "\n"
+	}
+
+	wyckoffSection := ""
+	if state.wyckoff != nil {
+		wyckoffSection = "🌊 <b>Wyckoff:</b> " + html.EscapeString(state.wyckoff.Interpretation)
+	}
+
+	return fmt.Sprintf(`%s📊 <b>QUANT DASHBOARD: %s</b>
+📅 %s — %s
+%s
 Pilih model analisis di bawah.
 Setiap model akan menghasilkan chart + analisis detail.
 
@@ -229,10 +295,14 @@ Setiap model akan menghasilkan chart + analisis detail.
 <b>🎭 Advanced:</b>
   HMM Regime Detection
 
+%s
 Klik tombol untuk mulai analisis.`,
+		regimeHeader,
 		html.EscapeString(state.symbol),
 		time.Now().Format("02 Jan 2006"),
 		state.timeframe,
+		volConeSection,
+		wyckoffSection,
 	)
 }
 
@@ -257,7 +327,7 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 	state := h.quantCache.get(chatID)
 	if state == nil {
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-		_, err := h.bot.SendHTML(ctx, chatID, "⏰ Session expired. Gunakan <code>/quant "+html.EscapeString("")+"</code> lagi.")
+		_, err := h.bot.SendHTML(ctx, chatID, sessionExpiredMessage("quant"))
 		return err
 	}
 
@@ -310,13 +380,13 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("⏳ Running %s for <b>%s</b> (%s)...", action, html.EscapeString(state.symbol), state.timeframe))
 
 	// Run quant engine
-	result, err := h.runQuantEngine(state, mode)
+	result, err := h.runQuantEngine(ctx, state, mode)
 	if loadingID > 0 {
 		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 	}
 	if err != nil {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		h.sendUserError(ctx, chatID, err, "quant")
+		return nil
 	}
 
 	kb := h.kb.QuantDetailMenu()
@@ -327,13 +397,18 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 		if readErr == nil && len(chartData) > 0 {
 			shortCaption := fmt.Sprintf("📊 %s — %s — %s", strings.ToUpper(action), html.EscapeString(state.symbol), state.timeframe)
 			_, _ = h.bot.SendPhoto(ctx, chatID, chartData, shortCaption)
+		} else if readErr != nil {
+			log.Warn().Err(readErr).Str("chart_path", result.ChartPath).
+				Str("symbol", state.symbol).Str("timeframe", state.timeframe).
+				Msg("quant: chart file unreadable")
 		}
 		os.Remove(result.ChartPath) // cleanup
 	}
 
-	// Send text
-	if result.TextOutput != "" {
-		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, result.TextOutput, kb)
+	// Send text with chart-failure note if chart was expected but unavailable
+	textOut := result.TextOutput
+	if textOut != "" {
+		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, textOut, kb)
 	} else if !result.Success {
 		_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, "❌ "+html.EscapeString(result.Error), kb)
 	}
@@ -345,13 +420,13 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 // ---------------------------------------------------------------------------
 
 type quantEngineResult struct {
-	Mode       string                 `json:"mode"`
-	Symbol     string                 `json:"symbol"`
-	Success    bool                   `json:"success"`
-	Error      string                 `json:"error"`
-	Result     map[string]interface{} `json:"result"`
-	TextOutput string                 `json:"text_output"`
-	ChartPath  string                 `json:"chart_path"`
+	Mode       string         `json:"mode"`
+	Symbol     string         `json:"symbol"`
+	Success    bool           `json:"success"`
+	Error      string         `json:"error"`
+	Result     map[string]any `json:"result"`
+	TextOutput string         `json:"text_output"`
+	ChartPath  string         `json:"chart_path"`
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +439,7 @@ type quantEngineInput struct {
 	Timeframe  string                       `json:"timeframe"`
 	Bars       []chartBar                   `json:"bars"`
 	MultiAsset map[string][]quantAssetClose `json:"multi_asset,omitempty"`
-	Params     map[string]interface{}       `json:"params,omitempty"`
+	Params     map[string]any               `json:"params,omitempty"`
 }
 
 type quantAssetClose struct {
@@ -376,7 +451,14 @@ type quantAssetClose struct {
 // runQuantEngine — execute Python quant_engine.py
 // ---------------------------------------------------------------------------
 
-func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineResult, error) {
+func (h *Handler) runQuantEngine(ctx context.Context, state *quantState, mode string) (result *quantEngineResult, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().
+				Interface("panic", r).
+				Msg("panic in runQuantEngine — subprocess may have failed")
+		}
+	}()
 	tf := state.timeframe
 	bars, ok := state.bars[tf]
 	if !ok || len(bars) == 0 {
@@ -407,7 +489,7 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 		Symbol:    state.symbol,
 		Timeframe: tf,
 		Bars:      chartBars,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"lookback":         120,
 			"forecast_horizon": 5,
 			"confidence_level": 0.95,
@@ -417,7 +499,7 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	// Multi-asset data for correlation/granger/cointegration/pca/var/full
 	needsMultiAsset := mode == "correlation" || mode == "granger" || mode == "cointegration" || mode == "pca" || mode == "var" || mode == "full"
 	if needsMultiAsset {
-		multiAsset, maErr := h.fetchMultiAssetCloses(state.symbol, tf)
+		multiAsset, maErr := h.fetchMultiAssetCloses(ctx, state.symbol, tf)
 		if maErr == nil && len(multiAsset) > 0 {
 			input.MultiAsset = multiAsset
 		}
@@ -435,51 +517,73 @@ func (h *Handler) runQuantEngine(state *quantState, mode string) (*quantEngineRe
 	outputPath := filepath.Join(tmpDir, fmt.Sprintf("quant_output_%d.json", ts))
 	chartPath := filepath.Join(tmpDir, fmt.Sprintf("quant_chart_%d.png", ts))
 
-	if err := os.WriteFile(inputPath, jsonData, 0644); err != nil {
-		return nil, fmt.Errorf("write quant input: %w", err)
+	if err = os.WriteFile(inputPath, jsonData, 0644); err != nil {
+		err = fmt.Errorf("write quant input: %w", err)
+		return
 	}
 	defer os.Remove(inputPath)
 	defer os.Remove(outputPath)
+	defer func() {
+		if err != nil {
+			os.Remove(chartPath)
+		}
+	}()
 
-	scriptPath := findQuantScript()
-	cmd := exec.CommandContext(context.Background(), "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	scriptPath, findErr := findQuantScript()
+	if findErr != nil {
+		err = findErr
+		return
+	}
 
 	// Timeout: 60s for complex models
-	cmdCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	cmd = exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
-	cmd.Stderr = os.Stderr
+	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath, chartPath)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("quant engine failed: %w", err)
+	if err = cmd.Run(); err != nil {
+		log.Error().Err(err).
+			Str("stderr", stderr.String()).
+			Str("symbol", state.symbol).
+			Str("mode", mode).
+			Msg("quant engine subprocess failed")
+		err = fmt.Errorf("quant engine failed: %w", err)
+		return
 	}
 
 	// Read output
 	outData, err := os.ReadFile(outputPath)
 	if err != nil {
-		return nil, fmt.Errorf("read quant output: %w", err)
+		err = fmt.Errorf("read quant output: %w", err)
+		return
 	}
 
-	var result quantEngineResult
-	if err := json.Unmarshal(outData, &result); err != nil {
-		return nil, fmt.Errorf("parse quant output: %w", err)
+	var res quantEngineResult
+	if err = json.Unmarshal(outData, &res); err != nil {
+		err = fmt.Errorf("parse quant output: %w", err)
+		return
 	}
 
-	// Check if chart was actually generated
-	if _, err := os.Stat(chartPath); err == nil {
-		result.ChartPath = chartPath
+	// Check if chart was actually generated; caller owns cleanup when ChartPath is set.
+	if fi, statErr := os.Stat(chartPath); statErr == nil {
+		if fi.Size() > 0 {
+			res.ChartPath = chartPath
+		} else {
+			log.Warn().Str("chart_path", chartPath).Msg("chart renderer produced 0-byte file, skipping")
+			os.Remove(chartPath)
+		}
 	}
 
-	return &result, nil
+	result = &res
+	return
 }
 
 // ---------------------------------------------------------------------------
 // fetchMultiAssetCloses — get daily closes for all tracked symbols
 // ---------------------------------------------------------------------------
 
-func (h *Handler) fetchMultiAssetCloses(excludeSymbol string, tf string) (map[string][]quantAssetClose, error) {
-	ctx := context.Background()
+func (h *Handler) fetchMultiAssetCloses(ctx context.Context, excludeSymbol string, tf string) (map[string][]quantAssetClose, error) {
 	result := make(map[string][]quantAssetClose)
 
 	// Use ALL tracked symbols from price mappings
@@ -515,16 +619,18 @@ func (h *Handler) fetchMultiAssetCloses(excludeSymbol string, tf string) (map[st
 // findQuantScript locates the quant_engine.py script
 // ---------------------------------------------------------------------------
 
-func findQuantScript() string {
+func findQuantScript() (string, error) {
 	candidates := []string{
 		"scripts/quant_engine.py",
 		"../scripts/quant_engine.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/quant_engine.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "quant_engine.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
-			return c
+			return c, nil
 		}
 	}
-	return "scripts/quant_engine.py"
+	return "", fmt.Errorf("quant_engine.py not found (searched: %v)", candidates)
 }

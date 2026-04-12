@@ -12,6 +12,7 @@ import (
 
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -27,10 +28,8 @@ type MQL5Fetcher struct {
 // NewMQL5Fetcher creates a new MQL5Fetcher.
 func NewMQL5Fetcher() *MQL5Fetcher {
 	return &MQL5Fetcher{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		cb: circuitbreaker.New("mql5", 5, 3*time.Minute),
+		httpClient: httpclient.NewClient(30 * time.Second),
+		cb:         circuitbreaker.New("mql5", 5, 3*time.Minute),
 	}
 }
 
@@ -218,9 +217,13 @@ func (f *MQL5Fetcher) fetchMQL5(ctx context.Context, dateMode, from, to string) 
 		var fetchErr error
 		result, fetchErr = f.doFetchMQL5(ctx, dateMode, from, to)
 		if fetchErr != nil {
-			// Retry once on transient failure
+			// Retry once on transient failure; respect context cancellation during wait
 			log.Warn().Err(fetchErr).Msg("MQL5 fetch failed, retrying in 3s")
-			time.Sleep(3 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(3 * time.Second):
+			}
 			result, fetchErr = f.doFetchMQL5(ctx, dateMode, from, to)
 		}
 		return fetchErr

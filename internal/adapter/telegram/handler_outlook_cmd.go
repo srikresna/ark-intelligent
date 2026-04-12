@@ -1,0 +1,406 @@
+package telegram
+
+// /outlook — AI Weekly Market Outlook
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/arkcode369/ark-intelligent/internal/domain"
+	"github.com/arkcode369/ark-intelligent/internal/ports"
+	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
+	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
+	"github.com/arkcode369/ark-intelligent/internal/service/bis"
+	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	"github.com/arkcode369/ark-intelligent/internal/service/imf"
+	"github.com/arkcode369/ark-intelligent/internal/service/macro"
+	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
+	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/sentiment"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
+	"github.com/arkcode369/ark-intelligent/internal/service/worldbank"
+	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
+	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
+)
+
+// ---------------------------------------------------------------------------
+// /outlook — AI weekly market outlook
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdOutlook(ctx context.Context, chatID string, userID int64, args string) error {
+	// Send typing indicator immediately for long-running AI command
+	_ = h.bot.SendChatAction(ctx, chatID, "typing")
+
+	if h.aiAnalyzer == nil || !h.aiAnalyzer.IsAvailable() {
+		_, err := h.bot.SendHTML(ctx, chatID, "AI outlook is unavailable. Gemini API key not configured.")
+		return err
+	}
+
+	// Per-user AI quota check via middleware
+	if h.middleware != nil {
+		allowed, reason := h.middleware.CheckAIQuota(ctx, userID)
+		if !allowed {
+			_, err := h.bot.SendHTML(ctx, chatID, fmt.Sprintf("⛔ %s", reason))
+			return err
+		}
+
+		// Tiered cooldown check (Owner=0s, Admin=10s, Member/Free=30s)
+		cooldown := h.middleware.GetAICooldown(ctx, userID)
+		if cooldown > 0 && !h.checkAICooldownDynamic(userID, cooldown) {
+			_, err := h.bot.SendHTML(ctx, chatID, "Please wait before requesting another AI analysis.")
+			return err
+		}
+	} else {
+		// Legacy fallback
+		if !h.bot.isOwner(userID) && !h.checkAICooldown(userID) {
+			_, err := h.bot.SendHTML(ctx, chatID, "Please wait before requesting another AI analysis.")
+			return err
+		}
+	}
+
+	return h.generateOutlook(ctx, chatID, userID, 0)
+}
+
+func (h *Handler) cbOutlook(ctx context.Context, chatID string, msgID int, userID int64, data string) error {
+	// AI quota + cooldown check for callback-triggered outlook (same as /outlook command)
+	if h.aiAnalyzer == nil || !h.aiAnalyzer.IsAvailable() {
+		return h.bot.EditMessage(ctx, chatID, msgID, "AI outlook is unavailable.")
+	}
+	if h.middleware != nil {
+		allowed, reason := h.middleware.CheckAIQuota(ctx, userID)
+		if !allowed {
+			return h.bot.EditMessage(ctx, chatID, msgID, fmt.Sprintf("\xe2\x9b\x94 %s", reason))
+		}
+		cooldown := h.middleware.GetAICooldown(ctx, userID)
+		if cooldown > 0 && !h.checkAICooldownDynamic(userID, cooldown) {
+			return h.bot.EditMessage(ctx, chatID, msgID, "Please wait before requesting another AI analysis.")
+		}
+	} else {
+		// Legacy fallback
+		if !h.bot.isOwner(userID) && !h.checkAICooldown(userID) {
+			return h.bot.EditMessage(ctx, chatID, msgID, "Please wait before requesting another AI analysis.")
+		}
+	}
+	return h.generateOutlook(ctx, chatID, userID, msgID)
+}
+
+func (h *Handler) generateOutlook(ctx context.Context, chatID string, userID int64, editMsgID int) error {
+	// Send typing indicator for multi-step data collection process
+	_ = h.bot.SendChatAction(ctx, chatID, "typing")
+
+	prefs, err := h.prefsRepo.Get(ctx, userID)
+	if err != nil {
+		prefs = domain.DefaultPrefs()
+	}
+
+	placeholderID := 0
+	if editMsgID > 0 {
+		_ = h.bot.EditMessage(ctx, chatID, editMsgID, "⏳ Menganalisis... (1/3) Fetching market data...")
+		placeholderID = editMsgID
+	} else {
+		placeholderID, _ = h.bot.SendHTML(ctx, chatID, "⏳ Menganalisis... (1/3) Fetching market data...")
+	}
+
+	now := timeutil.NowWIB()
+
+	// ---------- Collect ALL data sources (best-effort, non-fatal) ----------
+
+	// COT
+	var cotAnalyses []domain.COTAnalysis
+	if h.cotRepo != nil {
+		cotAnalyses, _ = h.cotRepo.GetAllLatestAnalyses(ctx)
+	}
+
+	// News
+	var weekEvts []domain.NewsEvent
+	if h.newsRepo != nil {
+		weekEvts, _ = h.newsRepo.GetByWeek(ctx, now.Format("20060102"))
+	}
+
+	// Update progress: step 2
+	_ = h.bot.SendChatAction(ctx, chatID, "typing")
+	if placeholderID > 0 {
+		_ = h.bot.EditMessage(ctx, chatID, placeholderID, "⏳ Menganalisis... (2/3) Processing macro data & AI analysis...")
+	}
+
+	// FRED Macro
+	macroData, _ := fred.GetCachedOrFetch(ctx)
+	var macroRegime *fred.MacroRegime
+	if macroData != nil {
+		comp := fred.ComputeComposites(macroData)
+		r := fred.ClassifyMacroRegime(macroData, comp)
+		macroRegime = &r
+	}
+
+	// Price contexts
+	var priceCtxs map[string]*domain.PriceContext
+	if h.priceRepo != nil {
+		ctxBuilder := pricesvc.NewContextBuilder(h.priceRepo)
+		if pc, pcErr := ctxBuilder.BuildAll(ctx); pcErr == nil && len(pc) > 0 {
+			priceCtxs = pc
+		}
+	}
+
+	// VIX/SPX risk context
+	var riskCtx *domain.RiskContext
+	if h.priceRepo != nil {
+		riskBuilder := pricesvc.NewRiskContextBuilder(h.priceRepo)
+		riskCtx, _ = riskBuilder.Build(ctx)
+		if riskCtx != nil && macroData != nil {
+			pricesvc.EnrichWithTermStructure(riskCtx, macroData.VIX3M)
+		}
+	}
+
+	// Sentiment (CNN Fear & Greed)
+	sentimentData, _ := sentiment.GetCachedOrFetch(ctx)
+
+	// Seasonal patterns
+	var seasonalData map[string]*pricesvc.SeasonalPattern
+	if h.priceRepo != nil {
+		sa := pricesvc.NewSeasonalAnalyzer(h.priceRepo)
+		if patterns, saErr := sa.Analyze(ctx); saErr == nil && len(patterns) > 0 {
+			seasonalData = make(map[string]*pricesvc.SeasonalPattern, len(patterns))
+			for i := range patterns {
+				seasonalData[patterns[i].ContractCode] = &patterns[i]
+			}
+		}
+	}
+
+	// Currency strength
+	var currencyStrength []pricesvc.CurrencyStrength
+	if len(priceCtxs) > 0 && len(cotAnalyses) > 0 {
+		currencyStrength = pricesvc.ComputeCurrencyStrengthIndex(priceCtxs, cotAnalyses)
+	}
+
+	// Backtest stats
+	var backtestStats *domain.BacktestStats
+	if h.signalRepo != nil {
+		sc := backtestsvc.NewStatsCalculator(h.signalRepo)
+		if stats, bErr := sc.ComputeAll(ctx); bErr == nil {
+			backtestStats = stats
+		}
+	}
+
+	// World Bank cross-country macro fundamentals (graceful degradation on error)
+	wbData, _ := worldbank.GetCachedOrFetch(ctx)
+
+	// BIS REER/NEER currency valuation (graceful degradation on error)
+	bisData, _ := bis.GetCachedOrFetch(ctx)
+
+	// IMF WEO forward-looking forecasts (graceful degradation on error)
+	imfData, _ := imf.GetCachedOrFetch(ctx)
+
+	// Eurostat EU macro data (HICP, unemployment, GDP — graceful degradation on error)
+	eurostatData, _ := macro.GetEurostatData(ctx)
+
+	// Fed speeches — recent FOMC communication (graceful degradation on error)
+	fedSpeeches := fred.FetchRecentSpeeches(ctx)
+
+	// EIA energy inventory data — crude oil, gasoline, distillate (graceful degradation)
+	eiaData, _ := pricesvc.GetCachedOrFetchEIA(ctx)
+
+	// Daily price contexts (for daily technical analysis in outlook)
+	var dailyPriceCtxs map[string]*domain.DailyPriceContext
+	if h.dailyPriceRepo != nil {
+		dailyBuilder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
+		if dpc, dpcErr := dailyBuilder.BuildAll(ctx); dpcErr == nil && len(dpc) > 0 {
+			dailyPriceCtxs = dpc
+		}
+	}
+
+	// ICT/SMC market structure for major symbols (H4, graceful degradation)
+	var ictContexts map[string]*ictsvc.ICTResult
+	if h.ict != nil {
+		ictContexts = make(map[string]*ictsvc.ICTResult, 4)
+		majors := []string{"EURUSD", "GBPUSD", "XAUUSD", "BTCUSD"}
+		for _, sym := range majors {
+			mapping := domain.FindPriceMappingByCurrency(sym)
+			if mapping == nil {
+				continue
+			}
+			result, ictErr := h.computeICTState(ctx, mapping, "4h")
+			if ictErr != nil {
+				continue
+			}
+			ictContexts[sym] = result
+		}
+		if len(ictContexts) == 0 {
+			ictContexts = nil
+		}
+	}
+
+	// GEX (Gamma Exposure) for BTC and ETH via Deribit (graceful degradation)
+	var gexResults map[string]*gexsvc.GEXResult
+	if h.gex != nil {
+		gexResults = make(map[string]*gexsvc.GEXResult, 2)
+		for _, sym := range []string{"BTC", "ETH"} {
+			r, gexErr := h.gex.Engine.Analyze(ctx, sym)
+			if gexErr != nil {
+				continue
+			}
+			gexResults[sym] = r
+		}
+		if len(gexResults) == 0 {
+			gexResults = nil
+		}
+	}
+
+	// Wyckoff structure analysis for major symbols (Daily, graceful degradation)
+	var wyckoffContexts map[string]*wyckoffsvc.WyckoffResult
+	if h.dailyPriceRepo != nil {
+		var wyckoffEngine *wyckoffsvc.Engine
+		if h.wyckoff != nil {
+			wyckoffEngine = h.wyckoff.WyckoffEngine
+		} else {
+			wyckoffEngine = wyckoffsvc.NewEngine()
+		}
+		wyckoffContexts = make(map[string]*wyckoffsvc.WyckoffResult, 3)
+		for _, sym := range []string{"EURUSD", "XAUUSD", "BTCUSD"} {
+			mapping := domain.FindPriceMappingByCurrency(sym)
+			if mapping == nil {
+				continue
+			}
+			records, wErr := h.dailyPriceRepo.GetDailyHistory(ctx, mapping.ContractCode, 200)
+			if wErr != nil || len(records) < 50 {
+				continue
+			}
+			bars := ta.DailyPricesToOHLCV(records)
+			r := wyckoffEngine.Analyze(sym, "daily", bars)
+			if r != nil && r.Confidence != "LOW" {
+				wyckoffContexts[sym] = r
+			}
+		}
+		if len(wyckoffContexts) == 0 {
+			wyckoffContexts = nil
+		}
+	}
+
+	// Microstructure signals for crypto (Bybit orderbook + flow, graceful degradation)
+	var microSignals []*microstructure.Signal
+	if h.alpha != nil && h.alpha.MicroEngine != nil {
+		if results, mErr := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", []string{"BTCUSDT", "ETHUSDT"}); mErr == nil {
+			for _, sig := range results {
+				if sig != nil {
+					microSignals = append(microSignals, sig)
+				}
+			}
+		}
+	}
+
+	// ---------- Build unified data ----------
+	var macroComposites *domain.MacroComposites
+	if macroData != nil {
+		// Merge sentiment data into MacroData before computing composites,
+		// so SentimentComposite includes CNN F&G, AAII, and CBOE P/C.
+		if sentimentData != nil {
+			fred.MergeSentiment(macroData,
+				sentimentData.CNNFearGreed,
+				sentimentData.AAIIBullBear,
+				sentimentData.PutCallTotal,
+				sentimentData.PutCallEquity,
+				sentimentData.PutCallIndex,
+			)
+		}
+		macroComposites = fred.ComputeComposites(macroData)
+	}
+
+	unifiedData := aisvc.UnifiedOutlookData{
+		COTAnalyses:        cotAnalyses,
+		NewsEvents:         weekEvts,
+		MacroData:          macroData,
+		MacroRegime:        macroRegime,
+		MacroComposites:    macroComposites,
+		PriceContexts:      priceCtxs,
+		DailyPriceContexts: dailyPriceCtxs,
+		RiskContext:        riskCtx,
+		SentimentData:      sentimentData,
+		SeasonalData:       seasonalData,
+		BacktestStats:      backtestStats,
+		CurrencyStrength:   currencyStrength,
+		WorldBankData:      wbData,
+		BISData:            bisData,
+		IMFData:            imfData,
+		EurostatData:       eurostatData,
+		FedSpeeches:        fedSpeeches,
+		ICTContexts:        ictContexts,
+		GEXResults:         gexResults,
+		WyckoffContexts:    wyckoffContexts,
+		MicrostructureData: microSignals,
+		EIAData:            eiaData,
+		Language:           prefs.Language,
+	}
+
+	// Update progress: step 3
+	_ = h.bot.SendChatAction(ctx, chatID, "typing")
+	if placeholderID > 0 {
+		_ = h.bot.EditMessage(ctx, chatID, placeholderID, "⏳ Menganalisis... (3/3) Formatting response...")
+	}
+
+	// ---------- Route based on user's PreferredModel setting ----------
+	var result string
+	useClaude := prefs.PreferredModel != "gemini" && h.claudeAnalyzer != nil && h.claudeAnalyzer.IsAvailable()
+
+	if useClaude {
+		// Claude path: multi-phase unified outlook with thinking + web_search
+		modelOverride := ""
+		if prefs.ClaudeModel != "" && domain.IsValidClaudeModel(prefs.ClaudeModel) {
+			modelOverride = string(prefs.ClaudeModel)
+		}
+		analyzer := h.claudeAnalyzer.WithModel(modelOverride)
+		log.Info().
+			Str("model", modelOverride).
+			Int64("user_id", userID).
+			Msg("/outlook unified routed to Claude (multi-phase)")
+		result, err = analyzer.GenerateUnifiedOutlook(ctx, unifiedData)
+
+		// If Claude fails (e.g. Vercel timeout on all phases), fall back to Gemini
+		if err != nil || result == "" {
+			log.Warn().Err(err).Msg("/outlook Claude failed, falling back to Gemini")
+			weeklyData := ports.WeeklyData{
+				COTAnalyses:   cotAnalyses,
+				NewsEvents:    weekEvts,
+				MacroData:     macroData,
+				BacktestStats: backtestStats,
+				PriceContexts: priceCtxs,
+				Language:      prefs.Language,
+			}
+			result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
+		}
+	} else {
+		// Gemini path: direct combined outlook (no web search capability)
+		log.Info().Int64("user_id", userID).Msg("/outlook routed to Gemini")
+		weeklyData := ports.WeeklyData{
+			COTAnalyses:   cotAnalyses,
+			NewsEvents:    weekEvts,
+			MacroData:     macroData,
+			BacktestStats: backtestStats,
+			PriceContexts: priceCtxs,
+			Language:      prefs.Language,
+		}
+		result, err = h.aiAnalyzer.AnalyzeCombinedOutlook(ctx, weeklyData)
+	}
+
+	if err != nil {
+		log.Error().Err(err).Msg("AI generation failed")
+		return h.bot.EditMessage(ctx, chatID, placeholderID, "AI generation failed. Please try again later.")
+	}
+
+	html := h.fmt.FormatWeeklyOutlook(result, now)
+	kb := h.kb.RelatedCommandsKeyboard("outlook", "")
+	kb = AppendFeedbackRow(kb, h.kb, "fb:outlook:latest", h.feedbackEnabled())
+	if editMsgID > 0 {
+		if len(kb.Rows) > 0 {
+			return h.bot.EditWithKeyboard(ctx, chatID, editMsgID, html, kb)
+		}
+		return h.bot.EditMessage(ctx, chatID, editMsgID, html)
+	}
+	_ = h.bot.DeleteMessage(ctx, chatID, placeholderID)
+	if len(kb.Rows) > 0 {
+		_, err = h.bot.SendWithKeyboard(ctx, chatID, html, kb)
+	} else {
+		_, err = h.bot.SendHTML(ctx, chatID, html)
+	}
+	return err
+}

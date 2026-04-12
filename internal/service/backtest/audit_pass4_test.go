@@ -281,15 +281,15 @@ func TestLogistic_AllZeroFeatures(t *testing.T) {
 	signals := make([]domain.PersistedSignal, n)
 	for i := 0; i < n; i++ {
 		signals[i] = domain.PersistedSignal{
-			Strength:       3,    // maps to 0.5
-			Confidence:     50.0, // maps to 0.5
-			COTIndex:       50.0, // maps to 0.5
-			SentimentScore: 0.0,  // maps to 0.5
+			Strength:        3,    // maps to 0.5
+			Confidence:      50.0, // maps to 0.5
+			COTIndex:        50.0, // maps to 0.5
+			SentimentScore:  0.0,  // maps to 0.5
 			ConvictionScore: 50.0, // maps to 0.5
-			DailyTrend:     "FLAT",
-			Direction:      "BULLISH",
-			FREDRegime:     "NORMAL",
-			Outcome1W:      domain.OutcomeWin,
+			DailyTrend:      "FLAT",
+			Direction:       "BULLISH",
+			FREDRegime:      "NORMAL",
+			Outcome1W:       domain.OutcomeWin,
 		}
 		if i%2 == 0 {
 			signals[i].Outcome1W = domain.OutcomeLoss

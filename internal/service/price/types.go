@@ -32,10 +32,10 @@ type twelveDataValue struct {
 // --- Alpha Vantage FX Weekly ---
 
 type avFXWeeklyResponse struct {
-	MetaData   map[string]string                `json:"Meta Data"`
-	TimeSeries map[string]avFXWeeklyOHLC        `json:"Time Series FX (Weekly)"`
-	Note       string                           `json:"Note,omitempty"` // Rate limit message
-	Info       string                           `json:"Information,omitempty"`
+	MetaData   map[string]string         `json:"Meta Data"`
+	TimeSeries map[string]avFXWeeklyOHLC `json:"Time Series FX (Weekly)"`
+	Note       string                    `json:"Note,omitempty"` // Rate limit message
+	Info       string                    `json:"Information,omitempty"`
 }
 
 type avFXWeeklyOHLC struct {
@@ -95,4 +95,3 @@ type yahooError struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 }
-

@@ -173,8 +173,8 @@ func TestScoreComponents(t *testing.T) {
 
 func TestUSDStrengthLabels(t *testing.T) {
 	tests := []struct {
-		dxy      float64
-		wantSub  string
+		dxy     float64
+		wantSub string
 	}{
 		{115, "Very Strong"},
 		{100, "Neutral"},
@@ -193,33 +193,33 @@ func TestUSDStrengthLabels(t *testing.T) {
 
 func TestDeriveBias(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     MacroData
-		wantKW   []string
+		name   string
+		data   MacroData
+		wantKW []string
 	}{
 		{
-			name: "RECESSION + Sahm gives DEFENSIVE bias",
-			data: MacroData{SahmRule: 0.6, CorePCE: 2.0, YieldSpread: 0.5},
+			name:   "RECESSION + Sahm gives DEFENSIVE bias",
+			data:   MacroData{SahmRule: 0.6, CorePCE: 2.0, YieldSpread: 0.5},
 			wantKW: []string{"DEFENSIVE", "Gold BULLISH"},
 		},
 		{
-			name: "RECESSION via GDP gives risk-off bias",
-			data: MacroData{GDPGrowth: -1.0, CorePCE: 2.0},
+			name:   "RECESSION via GDP gives risk-off bias",
+			data:   MacroData{GDPGrowth: -1.0, CorePCE: 2.0},
 			wantKW: []string{"USD MIXED", "Risk FX BEARISH"},
 		},
 		{
-			name: "STRESS gives safe-haven bias",
-			data: MacroData{NFCI: 0.8, CorePCE: 2.0},
+			name:   "STRESS gives safe-haven bias",
+			data:   MacroData{NFCI: 0.8, CorePCE: 2.0},
 			wantKW: []string{"Safe-haven"},
 		},
 		{
-			name: "STAGFLATION gives gold bullish bias",
-			data: MacroData{CorePCE: 4.0, GDPGrowth: 0.5},
+			name:   "STAGFLATION gives gold bullish bias",
+			data:   MacroData{CorePCE: 4.0, GDPGrowth: 0.5},
 			wantKW: []string{"Gold BULLISH", "Equities BEARISH"},
 		},
 		{
-			name: "INFLATIONARY + restrictive policy gives USD BULLISH",
-			data: MacroData{CorePCE: 4.0, FedFundsRate: 5.0, Breakeven5Y: 2.0},
+			name:   "INFLATIONARY + restrictive policy gives USD BULLISH",
+			data:   MacroData{CorePCE: 4.0, FedFundsRate: 5.0, Breakeven5Y: 2.0},
 			wantKW: []string{"USD BULLISH"},
 		},
 		{

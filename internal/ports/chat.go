@@ -10,10 +10,10 @@ import "context"
 // Can be text, image (base64), or document reference.
 type ContentBlock struct {
 	Type      string `json:"type"`                 // "text", "image", "document"
-	Text      string `json:"text,omitempty"`        // for type="text"
-	MediaType string `json:"media_type,omitempty"`  // e.g. "image/jpeg", "application/pdf"
-	Data      string `json:"data,omitempty"`        // base64-encoded data for images
-	FileName  string `json:"file_name,omitempty"`   // original filename for documents
+	Text      string `json:"text,omitempty"`       // for type="text"
+	MediaType string `json:"media_type,omitempty"` // e.g. "image/jpeg", "application/pdf"
+	Data      string `json:"data,omitempty"`       // base64-encoded data for images
+	FileName  string `json:"file_name,omitempty"`  // original filename for documents
 }
 
 // ChatMessage represents a single message in a conversation.
@@ -46,8 +46,8 @@ func (m ChatMessage) GetText() string {
 
 // ServerTool represents an Anthropic server-side tool.
 type ServerTool struct {
-	Type    string `json:"type"`              // e.g. "web_search_20250305"
-	Name    string `json:"name,omitempty"`    // e.g. "web_search"
+	Type    string `json:"type"`               // e.g. "web_search_20250305"
+	Name    string `json:"name,omitempty"`     // e.g. "web_search"
 	MaxUses int    `json:"max_uses,omitempty"` // 0 = unlimited
 }
 

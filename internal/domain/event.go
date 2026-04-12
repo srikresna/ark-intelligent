@@ -250,27 +250,27 @@ type AlertConfig struct {
 // Created after the actual value is published, with follow-up measurements
 // at different time horizons (e.g., 1h, 4h after release).
 type EventImpact struct {
-	EventTitle  string    `json:"event_title"`   // e.g., "Non-Farm Employment Change"
-	Currency    string    `json:"currency"`       // e.g., "USD"
-	SigmaLevel  string   `json:"sigma_level"`    // Bucket: ">+2σ", "+1σ to +2σ", "-1σ to +1σ", "-1σ to -2σ", "<-2σ"
-	PriceBefore float64  `json:"price_before"`   // Price at release time
-	PriceAfter  float64  `json:"price_after"`    // Price at release + TimeHorizon
-	PriceChange float64  `json:"price_change"`   // Change in pips
-	PctChange   float64  `json:"pct_change"`     // Percentage change
-	TimeHorizon string   `json:"time_horizon"`   // "1h" or "4h"
-	Timestamp   time.Time `json:"timestamp"`     // Release timestamp
+	EventTitle  string    `json:"event_title"`  // e.g., "Non-Farm Employment Change"
+	Currency    string    `json:"currency"`     // e.g., "USD"
+	SigmaLevel  string    `json:"sigma_level"`  // Bucket: ">+2σ", "+1σ to +2σ", "-1σ to +1σ", "-1σ to -2σ", "<-2σ"
+	PriceBefore float64   `json:"price_before"` // Price at release time
+	PriceAfter  float64   `json:"price_after"`  // Price at release + TimeHorizon
+	PriceChange float64   `json:"price_change"` // Change in pips
+	PctChange   float64   `json:"pct_change"`   // Percentage change
+	TimeHorizon string    `json:"time_horizon"` // "1h" or "4h"
+	Timestamp   time.Time `json:"timestamp"`    // Release timestamp
 }
 
 // EventImpactSummary aggregates historical impacts for a specific event
 // and sigma bucket, providing average/median statistics.
 type EventImpactSummary struct {
-	EventTitle      string  `json:"event_title"`
-	Currency        string  `json:"currency"`
-	SigmaBucket     string  `json:"sigma_bucket"`      // e.g., ">+2σ", "+1σ to +2σ"
+	EventTitle         string  `json:"event_title"`
+	Currency           string  `json:"currency"`
+	SigmaBucket        string  `json:"sigma_bucket"` // e.g., ">+2σ", "+1σ to +2σ"
 	AvgPriceImpactPips float64 `json:"avg_price_impact_pips"`
-	AvgPctChange    float64 `json:"avg_pct_change"`
-	Occurrences     int     `json:"occurrences"`
-	MedianImpact    float64 `json:"median_impact"`     // Median pips change
+	AvgPctChange       float64 `json:"avg_pct_change"`
+	Occurrences        int     `json:"occurrences"`
+	MedianImpact       float64 `json:"median_impact"` // Median pips change
 }
 
 // SigmaToBucket classifies a sigma value into a human-readable bucket string.

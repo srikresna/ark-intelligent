@@ -55,7 +55,10 @@ func revisionPrefix(currency string) []byte {
 
 // SaveEvents stores a batch of FFEvent records.
 // Uses WriteBatch for efficient bulk inserts.
-func (r *EventRepo) SaveEvents(_ context.Context, events []domain.FFEvent) error {
+func (r *EventRepo) SaveEvents(ctx context.Context, events []domain.FFEvent) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	wb := r.db.NewWriteBatch()
 	defer wb.Cancel()
 
@@ -78,7 +81,10 @@ func (r *EventRepo) SaveEvents(_ context.Context, events []domain.FFEvent) error
 
 // GetEventsByDateRange returns all events within [start, end] inclusive.
 // Iterates day-by-day using prefix scans for each date.
-func (r *EventRepo) GetEventsByDateRange(_ context.Context, start, end time.Time) ([]domain.FFEvent, error) {
+func (r *EventRepo) GetEventsByDateRange(ctx context.Context, start, end time.Time) ([]domain.FFEvent, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var events []domain.FFEvent
 
 	err := r.db.View(func(txn *badger.Txn) error {
@@ -118,7 +124,10 @@ func (r *EventRepo) GetEventsByDateRange(_ context.Context, start, end time.Time
 
 // GetEventHistory returns historical data points for a specific event.
 // Scans evthist:{currency}:{eventName}: prefix in reverse chronological order.
-func (r *EventRepo) GetEventHistory(_ context.Context, eventName, currency string, months int) ([]domain.FFEventDetail, error) {
+func (r *EventRepo) GetEventHistory(ctx context.Context, eventName, currency string, months int) ([]domain.FFEventDetail, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var history []domain.FFEventDetail
 
 	cutoff := time.Now().AddDate(0, -months, 0).Format("20060102")
@@ -163,7 +172,10 @@ func (r *EventRepo) GetEventHistory(_ context.Context, eventName, currency strin
 
 // SaveEventDetails stores historical data points for an event.
 // Uses EventName and Currency from each detail to build the storage key.
-func (r *EventRepo) SaveEventDetails(_ context.Context, details []domain.FFEventDetail) error {
+func (r *EventRepo) SaveEventDetails(ctx context.Context, details []domain.FFEventDetail) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	wb := r.db.NewWriteBatch()
 	defer wb.Cancel()
 
@@ -222,7 +234,10 @@ func (r *EventRepo) GetEventsByCurrency(ctx context.Context, currency string, st
 }
 
 // GetAllRevisions retrieves all revisions within the last N days.
-func (r *EventRepo) GetAllRevisions(_ context.Context, days int) ([]domain.EventRevision, error) {
+func (r *EventRepo) GetAllRevisions(ctx context.Context, days int) ([]domain.EventRevision, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var revisions []domain.EventRevision
 	cutoff := time.Now().AddDate(0, 0, -days).Format("20060102")
 	prefix := []byte("evtrev:")
@@ -262,7 +277,10 @@ func (r *EventRepo) GetAllRevisions(_ context.Context, days int) ([]domain.Event
 }
 
 // SaveRevision stores an event revision record.
-func (r *EventRepo) SaveRevision(_ context.Context, rev domain.EventRevision) error {
+func (r *EventRepo) SaveRevision(ctx context.Context, rev domain.EventRevision) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	data, err := json.Marshal(&rev)
 	if err != nil {
 		return fmt.Errorf("marshal revision: %w", err)
@@ -279,7 +297,10 @@ func (r *EventRepo) SaveRevision(_ context.Context, rev domain.EventRevision) er
 }
 
 // GetRevisions returns all revisions for a currency within the last N days.
-func (r *EventRepo) GetRevisions(_ context.Context, currency string, days int) ([]domain.EventRevision, error) {
+func (r *EventRepo) GetRevisions(ctx context.Context, currency string, days int) ([]domain.EventRevision, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var revisions []domain.EventRevision
 
 	cutoff := time.Now().AddDate(0, 0, -days).Format("20060102")
@@ -322,7 +343,10 @@ func (r *EventRepo) GetRevisions(_ context.Context, currency string, days int) (
 }
 
 // GetEvent retrieves a single event by date and ID.
-func (r *EventRepo) GetEvent(_ context.Context, date time.Time, eventID string) (*domain.FFEvent, error) {
+func (r *EventRepo) GetEvent(ctx context.Context, date time.Time, eventID string) (*domain.FFEvent, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var evt domain.FFEvent
 
 	key := eventKey(date, eventID)
@@ -346,7 +370,10 @@ func (r *EventRepo) GetEvent(_ context.Context, date time.Time, eventID string) 
 
 // DeleteEventsByDate removes all events for a specific date.
 // Used for refresh operations where we re-scrape an entire day.
-func (r *EventRepo) DeleteEventsByDate(_ context.Context, date time.Time) error {
+func (r *EventRepo) DeleteEventsByDate(ctx context.Context, date time.Time) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	prefix := eventPrefix(date)
 
 	return r.db.Update(func(txn *badger.Txn) error {
@@ -368,7 +395,10 @@ func (r *EventRepo) DeleteEventsByDate(_ context.Context, date time.Time) error 
 }
 
 // CountEvents returns the number of events stored for a date range.
-func (r *EventRepo) CountEvents(_ context.Context, start, end time.Time) (int, error) {
+func (r *EventRepo) CountEvents(ctx context.Context, start, end time.Time) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	count := 0
 
 	err := r.db.View(func(txn *badger.Txn) error {

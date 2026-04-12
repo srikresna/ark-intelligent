@@ -13,10 +13,21 @@ import (
 
 // ContextBuilder constructs system prompts for chatbot conversations
 // by injecting live market data when the query is forex-related.
+// FedSpeechSummary is a lightweight summary for AI context injection.
+type FedSpeechSummary struct {
+	Speaker     string
+	Title       string
+	PublishedAt string // formatted date
+}
+
+// FedSpeechProvider returns recent Fed speeches for AI context.
+type FedSpeechProvider func(n int) []FedSpeechSummary
+
 type ContextBuilder struct {
-	cotRepo   ports.COTRepository
-	newsRepo  ports.NewsRepository
-	priceRepo ports.PriceRepository
+	cotRepo           ports.COTRepository
+	newsRepo          ports.NewsRepository
+	priceRepo         ports.PriceRepository
+	fedSpeechProvider FedSpeechProvider
 }
 
 // NewContextBuilder creates a new ContextBuilder.
@@ -31,6 +42,11 @@ func NewContextBuilder(
 		newsRepo:  newsRepo,
 		priceRepo: priceRepo,
 	}
+}
+
+// SetFedSpeechProvider registers a callback that supplies recent Fed speeches.
+func (cb *ContextBuilder) SetFedSpeechProvider(fn FedSpeechProvider) {
+	cb.fedSpeechProvider = fn
 }
 
 // forexKeywords are terms that trigger market data injection into the system prompt.
@@ -159,6 +175,9 @@ func (cb *ContextBuilder) BuildSystemPrompt(ctx context.Context, userMessage str
 	// Inject upcoming calendar events
 	cb.injectCalendarContext(ctx, &b)
 
+	// Inject recent Fed speeches / FOMC releases
+	cb.injectFedSpeechContext(&b)
+
 	return b.String()
 }
 
@@ -244,5 +263,24 @@ func (cb *ContextBuilder) injectCalendarContext(ctx context.Context, b *strings.
 			e.Forecast, e.Previous,
 		))
 		shown++
+	}
+}
+
+// injectFedSpeechContext adds recent Fed speeches/FOMC releases to the prompt.
+func (cb *ContextBuilder) injectFedSpeechContext(b *strings.Builder) {
+	if cb.fedSpeechProvider == nil {
+		return
+	}
+	speeches := cb.fedSpeechProvider(3)
+	if len(speeches) == 0 {
+		return
+	}
+	b.WriteString("\n--- RECENT FED COMMUNICATIONS ---\n")
+	for _, s := range speeches {
+		if s.Speaker != "" {
+			fmt.Fprintf(b, "- %s (%s): %s\n", s.Speaker, s.PublishedAt, s.Title)
+		} else {
+			fmt.Fprintf(b, "- %s: %s\n", s.PublishedAt, s.Title)
+		}
 	}
 }

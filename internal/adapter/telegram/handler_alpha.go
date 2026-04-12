@@ -1,17 +1,22 @@
 package telegram
 
-// handler_alpha.go — Handlers for new factor/strategy/microstructure commands:
-//   /alpha       — unified dashboard with inline keyboard navigation
+// handler_alpha.go — Handlers for factor/strategy/microstructure commands:
+//   /radar       — unified signal radar dashboard
 //   /xfactors    — cross-sectional factor ranking
-//   /playbook    — strategy playbook (top long/short + macro context)
-//   /heat        — portfolio exposure heat
-//   /rankx       — compact rank leaderboard
+//   /intensity   — signal intensity (honest metric, not "portfolio heat")
 //   /transition  — regime transition warning
 //   /cryptoalpha — Bybit microstructure confirmation for top crypto signals
+//
+// REMOVED (merged into existing commands):
+//   /playbook    — merged into /bias (unified directional bias)
+//   /rankx       — merged into /rank (cross-sectional factor section)
+//   /alpha       — renamed to /radar
+//   /heat        — renamed to /intensity
 
 import (
 	"context"
 	"fmt"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"html"
 	"sort"
 	"strings"
@@ -19,8 +24,11 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/service/factors"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/cryptocompare"
+	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/defillama"
 	"github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	"github.com/arkcode369/ark-intelligent/internal/service/strategy"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -47,7 +55,7 @@ type AssetProfileBuilder interface {
 }
 
 // ---------------------------------------------------------------------------
-// alphaState — cached computation results for the unified /alpha dashboard
+// alphaState — cached computation results for the unified /radar dashboard
 // ---------------------------------------------------------------------------
 
 // alphaState caches all computed data for the unified alpha dashboard.
@@ -60,7 +68,7 @@ type alphaState struct {
 	computedAt time.Time
 }
 
-const alphaStateTTL = 60 * time.Second
+var alphaStateTTL = config.AlphaStateTTL
 
 // alphaStateCache stores per-chat alpha state with TTL.
 type alphaStateCache struct {
@@ -111,17 +119,17 @@ func (h *Handler) WithAlpha(a *AlphaServices) *Handler {
 
 // registerAlphaCommands wires the new commands into the bot.
 func (h *Handler) registerAlphaCommands() {
-	// Unified alpha dashboard
-	h.bot.RegisterCommand("/alpha", h.cmdAlpha)
+	// Unified radar dashboard
+	h.bot.RegisterCommand("/radar", h.cmdAlpha)
 	h.bot.RegisterCallback("alpha:", h.handleAlphaCallback)
 
-	// Legacy individual commands (backward compatible)
+	// Individual commands
 	h.bot.RegisterCommand("/xfactors", h.cmdXFactors)
-	h.bot.RegisterCommand("/playbook", h.cmdPlaybook)
-	h.bot.RegisterCommand("/heat", h.cmdHeat)
-	h.bot.RegisterCommand("/rankx", h.cmdRankX)
 	h.bot.RegisterCommand("/transition", h.cmdTransition)
 	h.bot.RegisterCommand("/cryptoalpha", h.cmdCryptoAlpha)
+
+	// Signal intensity (renamed from /heat — honest about what it measures)
+	h.bot.RegisterCommand("/intensity", h.cmdSignalIntensity)
 }
 
 // ---------------------------------------------------------------------------
@@ -177,20 +185,30 @@ func (h *Handler) computeAlphaState(ctx context.Context) (*alphaState, error) {
 
 func (h *Handler) cmdAlpha(ctx context.Context, chatID string, _ int64, _ string) error {
 	if h.alpha == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Alpha Engine not configured.")
+		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Radar not configured.")
 		return err
 	}
 
+	loadID, _ := h.bot.SendLoading(ctx, chatID, "📡 Memindai sinyal... ⏳")
+
 	state, err := h.computeAlphaState(ctx)
 	if err != nil {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ "+html.EscapeString(err.Error()))
-		return err2
+		if loadID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadID)
+		}
+		h.sendUserError(ctx, chatID, err, "alpha")
+		return nil
+	}
+
+	if loadID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadID)
 	}
 
 	h.alphaCache.set(chatID, state)
 
 	summary := formatAlphaSummary(state)
 	kb := h.kb.AlphaMenu()
+	kb = AppendFeedbackRow(kb, h.kb, "fb:alpha:summary", h.feedbackEnabled())
 	_, err = h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
@@ -206,7 +224,8 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		var err error
 		state, err = h.computeAlphaState(ctx)
 		if err != nil {
-			return h.bot.EditMessage(ctx, chatID, msgID, "❌ "+html.EscapeString(err.Error()))
+			h.editUserError(ctx, chatID, msgID, err, "alpha")
+			return nil
 		}
 		h.alphaCache.set(chatID, state)
 	}
@@ -222,7 +241,8 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		// Force recompute
 		newState, err := h.computeAlphaState(ctx)
 		if err != nil {
-			return h.bot.EditMessage(ctx, chatID, msgID, "❌ "+html.EscapeString(err.Error()))
+			h.editUserError(ctx, chatID, msgID, err, "alpha")
+			return nil
 		}
 		h.alphaCache.set(chatID, newState)
 		summary := formatAlphaSummary(newState)
@@ -248,18 +268,18 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
 
 	case action == "heat":
-		txt := alphaExplainHeader("🌡️ Portfolio Heat",
-			"Mengukur total eksposur portfolio. COLD = aman untuk tambah posisi, OVERHEAT = kurangi posisi.")
+		txt := alphaExplainHeader("📡 Signal Intensity",
+			"Mengukur seberapa banyak sinyal kuat yang aktif dari algoritma. Ini BUKAN pengukuran posisi portfolio Anda.")
 		if state.playbook != nil {
-			txt += formatHeat(state.playbook.Heat)
+			txt += formatSignalIntensity(state.playbook.Heat)
 		} else {
-			txt += "⚠️ No heat data."
+			txt += "⚠️ No signal data."
 		}
 		kb := h.kb.AlphaDetailMenu()
 		return h.bot.EditWithKeyboardChunked(ctx, chatID, msgID, txt, kb)
 
 	case action == "rankx":
-		txt := alphaExplainHeader("📈 RankX Leaderboard",
+		txt := alphaExplainHeader("📈 Factor Leaderboard",
 			"Ranking ringkas — atas = kandidat long, bawah = kandidat short.")
 		txt += formatRankX(state.ranking)
 		kb := h.kb.AlphaDetailMenu()
@@ -273,10 +293,12 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		} else {
 			// Fallback: compute directly
 			macroRegime := ""
+			var tProb float64
+			var tFrom, tTo string
 			if h.alpha.ProfileBuilder != nil {
 				macroRegime = h.alpha.ProfileBuilder.GetMacroRegime(ctx)
+				tProb, tFrom, tTo = h.alpha.ProfileBuilder.GetTransitionProb(ctx)
 			}
-			tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
 			tw := strategy.TransitionWarning{
 				IsActive:    tProb > 0.50,
 				FromRegime:  tFrom,
@@ -293,7 +315,7 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 		txt := alphaExplainHeader("⚡ Crypto Microstructure Alpha",
 			"Analisis microstructure dari orderbook dan funding rate. Konfirmasi = sinyal searah dengan flow.")
 		if len(state.crypto) > 0 {
-			txt += formatCryptoAlpha(state.crypto, state.cryptoSyms)
+			txt += formatCryptoAlpha(state.crypto, state.cryptoSyms, nil)
 		} else {
 			txt += "⚠️ No microstructure data available."
 		}
@@ -312,11 +334,11 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 				"Analisis microstructure dari orderbook dan funding rate. Konfirmasi = sinyal searah dengan flow.")
 			// Try from cache first
 			if sig, ok := state.crypto[sym]; ok {
-				txt += formatCryptoAlpha(map[string]*microstructure.Signal{sym: sig}, []string{sym})
+				txt += formatCryptoAlpha(map[string]*microstructure.Signal{sym: sig}, []string{sym}, nil)
 			} else if h.alpha.MicroEngine != nil {
 				// Fetch single symbol
 				results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", []string{sym})
-				txt += formatCryptoAlpha(results, []string{sym})
+				txt += formatCryptoAlpha(results, []string{sym}, nil)
 			} else {
 				txt += "⚠️ No data for " + sym
 			}
@@ -335,7 +357,7 @@ func (h *Handler) handleAlphaCallback(ctx context.Context, chatID string, msgID 
 func formatAlphaSummary(state *alphaState) string {
 	var sb strings.Builder
 
-	sb.WriteString("<b>⚡ Alpha Engine Dashboard</b>\n")
+	sb.WriteString("<b>📡 Radar — Signal Dashboard</b>\n")
 	sb.WriteString(fmt.Sprintf("📅 <i>%s UTC</i>\n\n", state.computedAt.UTC().Format("02 Jan 2006 15:04")))
 
 	// Regime & stability assessment
@@ -393,24 +415,24 @@ func formatAlphaSummary(state *alphaState) string {
 	// Warnings
 	var warnings []string
 
-	// Portfolio heat
+	// Signal intensity (renamed from portfolio heat)
 	if state.playbook != nil {
 		heat := state.playbook.Heat
 		heatEmoji := alphaHeatEmoji(heat.HeatLevel)
 		var heatAdvice string
 		switch heat.HeatLevel {
 		case strategy.HeatCold:
-			heatAdvice = "aman untuk tambah posisi baru"
+			heatAdvice = "sedikit sinyal kuat aktif"
 		case strategy.HeatWarm:
-			heatAdvice = "masih aman tapi jangan terlalu agresif"
+			heatAdvice = "beberapa peluang terdeteksi"
 		case strategy.HeatHot:
-			heatAdvice = "hati-hati, kurangi agresivitas"
+			heatAdvice = "banyak sinyal kuat, pilih yang terbaik"
 		case strategy.HeatOverheat:
-			heatAdvice = "KURANGI POSISI segera!"
+			heatAdvice = "sangat banyak sinyal, fokus top picks"
 		default:
-			heatAdvice = "evaluasi eksposur"
+			heatAdvice = "evaluasi kondisi"
 		}
-		warnings = append(warnings, fmt.Sprintf("Portfolio heat: %s %s — %s",
+		warnings = append(warnings, fmt.Sprintf("Signal intensity: %s %s — %s",
 			string(heat.HeatLevel), heatEmoji, heatAdvice))
 
 		// Transition warning
@@ -514,65 +536,52 @@ func (h *Handler) cmdXFactors(ctx context.Context, chatID string, _ int64, _ str
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📊 Menghitung Factor Ranking... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build asset profiles: "+alphaErr(err))
-		return err2
+		h.sendUserError(ctx, chatID, err, "alpha")
+		return nil
 	}
 
 	result := h.alpha.FactorEngine.Rank(profiles)
-	_, err = h.bot.SendHTML(ctx, chatID, formatFactorRanking(result))
+	kb := h.kb.AlphaDetailMenu()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatFactorRanking(result), kb)
 	return err
 }
 
 // ---------------------------------------------------------------------------
-// /playbook — strategy playbook
+// /playbook — REMOVED: merged into /bias (see handler_cot_cmd.go formatUnifiedBias)
+// formatPlaybook is kept for the /radar dashboard callback sub-view.
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdPlaybook(ctx context.Context, chatID string, _ int64, _ string) error {
+// ---------------------------------------------------------------------------
+// /rankx — REMOVED: merged into /rank (see handler_cot_cmd.go formatRankFactorSection)
+// formatRankX is kept for the /radar dashboard callback sub-view.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// /intensity — signal intensity (renamed from /heat)
+// Measures how many strong algorithmic signals exist right now,
+// NOT actual portfolio exposure (bot has no position data).
+// ---------------------------------------------------------------------------
+
+func (h *Handler) cmdSignalIntensity(ctx context.Context, chatID string, _ int64, _ string) error {
 	if h.alpha == nil || h.alpha.StrategyEngine == nil || h.alpha.ProfileBuilder == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Strategy Engine not configured.")
 		return err
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📡 Menghitung Signal Intensity... ⏳")
 	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
-	}
-
-	ranking := h.alpha.FactorEngine.Rank(profiles)
-	tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
-
-	in := strategy.Input{
-		Ranking:        ranking,
-		MacroRegime:    h.alpha.ProfileBuilder.GetMacroRegime(ctx),
-		COTBias:        h.alpha.ProfileBuilder.GetCOTBias(ctx),
-		VolRegime:      h.alpha.ProfileBuilder.GetVolRegime(ctx),
-		CarryBps:       h.alpha.ProfileBuilder.GetCarryBps(ctx),
-		TransitionProb: tProb,
-		TransitionFrom: tFrom,
-		TransitionTo:   tTo,
-	}
-	result := h.alpha.StrategyEngine.Generate(in)
-	_, err = h.bot.SendHTML(ctx, chatID, formatPlaybook(result))
-	return err
-}
-
-// ---------------------------------------------------------------------------
-// /heat — portfolio heat
-// ---------------------------------------------------------------------------
-
-func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string) error {
-	if h.alpha == nil || h.alpha.StrategyEngine == nil || h.alpha.ProfileBuilder == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Strategy Engine not configured.")
-		return err
-	}
-
-	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
-	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
+		h.sendUserError(ctx, chatID, err, "alpha")
+		return nil
 	}
 	ranking := h.alpha.FactorEngine.Rank(profiles)
 	tProb, tFrom, tTo := h.alpha.ProfileBuilder.GetTransitionProb(ctx)
@@ -586,7 +595,8 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 		TransitionFrom: tFrom,
 		TransitionTo:   tTo,
 	})
-	_, err = h.bot.SendHTML(ctx, chatID, formatHeat(result.Heat))
+	kb := h.kb.AlphaDetailMenu()
+	_, err = h.bot.SendWithKeyboard(ctx, chatID, formatSignalIntensity(result.Heat), kb)
 	return err
 }
 
@@ -594,21 +604,8 @@ func (h *Handler) cmdHeat(ctx context.Context, chatID string, _ int64, _ string)
 // /rankx — compact rank leaderboard
 // ---------------------------------------------------------------------------
 
-func (h *Handler) cmdRankX(ctx context.Context, chatID string, _ int64, _ string) error {
-	if h.alpha == nil || h.alpha.FactorEngine == nil || h.alpha.ProfileBuilder == nil {
-		_, err := h.bot.SendHTML(ctx, chatID, "⚙️ Factor Engine not configured.")
-		return err
-	}
-
-	profiles, err := h.alpha.ProfileBuilder.BuildProfiles(ctx)
-	if err != nil || len(profiles) == 0 {
-		_, err2 := h.bot.SendHTML(ctx, chatID, "❌ Could not build profiles: "+alphaErr(err))
-		return err2
-	}
-	result := h.alpha.FactorEngine.Rank(profiles)
-	_, err = h.bot.SendHTML(ctx, chatID, formatRankX(result))
-	return err
-}
+// cmdRankX — REMOVED: merged into /rank. Handler kept as comment for reference.
+// formatRankX is still used by the /radar dashboard callback.
 
 // ---------------------------------------------------------------------------
 // /transition — regime transition warning
@@ -638,8 +635,9 @@ func (h *Handler) cmdTransition(ctx context.Context, chatID string, _ int64, _ s
 				TransitionFrom: tFrom,
 				TransitionTo:   tTo,
 			})
-			_, err2 := h.bot.SendHTML(ctx, chatID, formatTransition(result.Transition, macroRegime))
-			return err2
+			kb := h.kb.AlphaDetailMenu()
+			_, _ = h.bot.SendWithKeyboard(ctx, chatID, formatTransition(result.Transition, macroRegime), kb)
+			return nil
 		}
 	}
 
@@ -651,7 +649,8 @@ func (h *Handler) cmdTransition(ctx context.Context, chatID string, _ int64, _ s
 		Probability: tProb,
 		DetectedAt:  time.Now(),
 	}
-	_, err := h.bot.SendHTML(ctx, chatID, formatTransition(tw, macroRegime))
+	kb := h.kb.AlphaDetailMenu()
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, formatTransition(tw, macroRegime), kb)
 	return err
 }
 
@@ -674,8 +673,17 @@ func (h *Handler) cmdCryptoAlpha(ctx context.Context, chatID string, _ int64, ar
 		symbols = []string{custom}
 	}
 
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "⚡ Menganalisis Crypto Microstructure... ⏳")
 	results, _ := h.alpha.MicroEngine.AnalyzeMultiple(ctx, "linear", symbols)
-	_, err := h.bot.SendHTML(ctx, chatID, formatCryptoAlpha(results, symbols))
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
+	tvl := defillama.GetCachedOrFetch(ctx)
+	exVol := cryptocompare.GetCachedOrFetch(ctx)
+	out := formatCryptoAlpha(results, symbols, tvl)
+	out += cryptocompare.FormatExchangeVolumeSection(exVol)
+	kb := h.kb.AlphaCryptoDetailMenu()
+	_, err := h.bot.SendWithKeyboard(ctx, chatID, out, kb)
 	return err
 }
 
@@ -689,7 +697,7 @@ func formatFactorRanking(result *factors.RankingResult) string {
 	}
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("<b>📊 Factor Ranking</b> — %d aset\n", result.AssetCount))
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 
 	for _, a := range result.Assets {
 		emoji := alphaSignalEmoji(string(a.Signal))
@@ -736,7 +744,7 @@ func formatPlaybook(result *strategy.PlaybookResult) string {
 		sb.WriteString(fmt.Sprintf("Regime: <b>%s</b> — <i>%s</i>\n",
 			html.EscapeString(result.MacroRegime), regimeDesc))
 	}
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 
 	if result.Transition.IsActive {
 		sb.WriteString(fmt.Sprintf("⚠️ <b>TRANSISI:</b> %s → %s (%.0f%% prob)\n",
@@ -835,7 +843,7 @@ func heatAdviceIndonesian(h strategy.HeatLevel) string {
 func formatHeat(heat strategy.PortfolioHeat) string {
 	emoji := alphaHeatEmoji(heat.HeatLevel)
 	advice := heatAdviceIndonesian(heat.HeatLevel)
-	return fmt.Sprintf(`<b>🌡️ Portfolio Heat</b>
+	return fmt.Sprintf(`<b>📡 Signal Intensity</b>
 
 Level: %s <b>%s</b>
 Posisi Aktif: %d
@@ -854,7 +862,111 @@ Total: %.0f%%
 		heat.NetExposure,
 		heat.TotalExposure*100,
 		advice,
-		heat.UpdatedAt.UTC().Format("02 Jan 15:04"))
+		fmtutil.FormatDateTimeUTC(heat.UpdatedAt))
+}
+
+// formatSignalIntensity renders signal intensity — honestly named version of "heat".
+// Measures how many strong algorithmic signals are active, NOT actual portfolio exposure.
+func formatSignalIntensity(heat strategy.PortfolioHeat) string {
+	emoji := alphaHeatEmoji(heat.HeatLevel)
+	var advice string
+	switch heat.HeatLevel {
+	case strategy.HeatCold:
+		advice = "Sedikit sinyal kuat — pasar kurang jelas arahnya"
+	case strategy.HeatWarm:
+		advice = "Beberapa peluang terdeteksi — evaluasi entry"
+	case strategy.HeatHot:
+		advice = "Banyak sinyal kuat aktif — pilih yang conviction tertinggi"
+	case strategy.HeatOverheat:
+		advice = "Sangat banyak sinyal — fokus pada top picks saja, jangan serakah"
+	default:
+		advice = "Evaluasi kondisi market"
+	}
+	return fmt.Sprintf(`<b>📡 Signal Intensity</b>
+<i>ℹ️ Mengukur seberapa banyak sinyal trading kuat yang aktif saat ini dari algoritma. Ini BUKAN pengukuran posisi portfolio Anda.</i>
+
+Level: %s <b>%s</b>
+Sinyal Aktif: %d
+Long Signals:  %.2f
+Short Signals: %.2f
+Net Direction: %+.2f
+Intensitas: %.0f%%
+
+<i>%s</i>
+
+<i>%s UTC</i>`,
+		emoji, heat.HeatLevel,
+		heat.ActiveTrades,
+		heat.LongExposure,
+		heat.ShortExposure,
+		heat.NetExposure,
+		heat.TotalExposure*100,
+		advice,
+		fmtutil.FormatDateTimeUTC(heat.UpdatedAt))
+}
+
+// formatRiskParity renders a risk-parity sizing analysis for Telegram HTML.
+func formatRiskParity(rp *strategy.RiskParityResult) string {
+	if rp == nil {
+		return ""
+	}
+
+	adviceEmoji := "⚖️"
+	switch rp.Recommendation {
+	case strategy.SizingScaleDown:
+		adviceEmoji = "🔻"
+	case strategy.SizingScaleUp:
+		adviceEmoji = "🔺"
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("<b>⚖️ Risk Parity Sizing</b>\n\n"+
+		"%s Rekomendasi: <b>%s</b>\n"+
+		"Heat Total: <b>%.1f%%</b> / %.1f%% maks\n"+
+		"Kelly: %.1f%% (½K: %.1f%%)\n",
+		adviceEmoji, rp.Recommendation,
+		rp.TotalHeatPct, rp.MaxHeatPct,
+		rp.KellyFraction*100, rp.HalfKelly*100))
+
+	if len(rp.HeatBreakdown) > 0 {
+		sb.WriteString("\n<b>Heat per Posisi:</b>\n")
+		for _, h := range rp.HeatBreakdown {
+			bar := heatBar(h.RiskPct, rp.MaxHeatPct/float64(len(rp.HeatBreakdown)))
+			sb.WriteString(fmt.Sprintf("  %s: $%.0f (%.1f%%) %s\n", h.Symbol, h.RiskAmt, h.RiskPct, bar))
+		}
+	}
+
+	if len(rp.AdjustedPositions) > 0 {
+		sb.WriteString("\n<b>Sizing Adjustment:</b>\n")
+		for _, a := range rp.AdjustedPositions {
+			arrow := "→"
+			if a.ScaleFactor < 0.95 {
+				arrow = "↓"
+			} else if a.ScaleFactor > 1.05 {
+				arrow = "↑"
+			}
+			sb.WriteString(fmt.Sprintf("  %s: %.0f %s %.0f (×%.2f)\n",
+				a.Symbol, a.OriginalSize, arrow, a.RecommendedSize, a.ScaleFactor))
+		}
+	}
+
+	return sb.String()
+}
+
+// heatBar renders a small inline label for heat percentage relative to threshold.
+func heatBar(pct, thresholdPerPos float64) string {
+	if thresholdPerPos <= 0 {
+		return ""
+	}
+	ratio := pct / thresholdPerPos
+	switch {
+	case ratio >= 1.5:
+		return "🔴 High"
+	case ratio >= 1.0:
+		return "🟡 Elevated"
+	default:
+		return "🟢 Normal"
+	}
 }
 
 func formatRankX(result *factors.RankingResult) string {
@@ -882,7 +994,7 @@ func formatRankX(result *factors.RankingResult) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("<b>📈 RankX Leaderboard</b>\n")
+	sb.WriteString("<b>📈 Factor Leaderboard</b>\n")
 	sb.WriteString("<i>Atas = kandidat long (beli), bawah = kandidat short (jual)</i>\n\n")
 	sb.WriteString("<b>🟢 Kandidat Long:</b>\n")
 	for i, a := range top {
@@ -896,7 +1008,7 @@ func formatRankX(result *factors.RankingResult) string {
 				i+1, html.EscapeString(a.Currency), a.CompositeScore, alphaSignalEmoji(string(a.Signal))))
 		}
 	}
-	sb.WriteString(fmt.Sprintf("\n<i>%s UTC</i>", result.ComputedAt.UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("\n<i>%s</i>", fmtutil.FormatDateTimeUTC(result.ComputedAt)))
 	return sb.String()
 }
 
@@ -914,11 +1026,11 @@ Status: ✅ <i>Stabil — tidak ada transisi terdeteksi</i>
 
 <i>Artinya: kondisi ekonomi makro tidak menunjukkan perubahan signifikan. Lanjutkan strategi sesuai regime saat ini.</i>
 
-<i>%s UTC</i>`,
+<i>%s</i>`,
 			html.EscapeString(currentRegime),
 			regimeDesc,
 			tw.Probability*100,
-			time.Now().UTC().Format("02 Jan 15:04"))
+			fmtutil.FormatDateTimeUTC(time.Now()))
 	}
 
 	emoji := "⚠️"
@@ -955,7 +1067,7 @@ Aset Terdampak: %s
 		affected)
 }
 
-func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []string) string {
+func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []string, tvl *defillama.TVLSummary) string {
 	if len(results) == 0 {
 		return "⚠️ Tidak ada data microstructure."
 	}
@@ -966,7 +1078,20 @@ func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []stri
 
 	var sb strings.Builder
 	sb.WriteString("<b>⚡ Crypto Microstructure Alpha</b>\n")
-	sb.WriteString(fmt.Sprintf("<i>%s UTC</i>\n\n", time.Now().UTC().Format("02 Jan 15:04")))
+	sb.WriteString(fmt.Sprintf("<i>%s</i>\n\n", fmtutil.FormatDateTimeUTC(time.Now())))
+
+	// DeFi TVL context from DeFiLlama (graceful skip if unavailable)
+	if tvl != nil && tvl.Available {
+		trendEmoji := "➡️"
+		switch tvl.Trend {
+		case "EXPANDING":
+			trendEmoji = "📈"
+		case "CONTRACTING":
+			trendEmoji = "📉"
+		}
+		sb.WriteString(fmt.Sprintf("🏗️ DeFi TVL: %s (%+.1f%% 7d) — %s %s\n\n",
+			defillama.FormatTVLBillions(tvl.Current), tvl.Change7D, tvl.Trend, trendEmoji))
+	}
 
 	for _, sym := range sorted {
 		sig, ok := results[sym]
@@ -983,10 +1108,29 @@ func formatCryptoAlpha(results map[string]*microstructure.Signal, symbols []stri
 		sb.WriteString(fmt.Sprintf("  OB Imbalance: %+.2f | Taker Buy: %.0f%%\n",
 			sig.BidAskImbalance, sig.TakerBuyRatio*100))
 		if sig.OIChange != 0 {
-			sb.WriteString(fmt.Sprintf("  OI Change: %+.1f%% | LS Ratio: %.2f\n",
-				sig.OIChange, sig.LongShortRatio))
+			divTag := ""
+			if sig.DeltaDivergence {
+				divTag = " ⚠️ DIVERGENCE"
+			}
+			sb.WriteString(fmt.Sprintf("  OI Change: %+.1f%%%s | LS Ratio: %.2f\n",
+				sig.OIChange, divTag, sig.LongShortRatio))
 		}
-		if sig.FundingRate != 0 {
+		if sig.LargeTradePresence > 0 {
+			absTag := ""
+			if sig.AbsorptionScore > 0.4 {
+				absTag = fmt.Sprintf(" | Absorpsi: %.0f%%", sig.AbsorptionScore*100)
+			}
+			sb.WriteString(fmt.Sprintf("  Large Trade: %.1f%%%s\n", sig.LargeTradePresence, absTag))
+		}
+		if sig.FundingStats != nil {
+			fs := sig.FundingStats
+			sb.WriteString(fmt.Sprintf("  Funding: %+.4f%% (7d avg: %+.4f%%)\n",
+				fs.Current*100, fs.Avg7D*100))
+			sb.WriteString(fmt.Sprintf("  30d: avg %+.4f%% | min %+.4f%% | max %+.4f%%\n",
+				fs.Avg30D*100, fs.Min30D*100, fs.Max30D*100))
+			sb.WriteString(fmt.Sprintf("  Regime: %s (pctl: %.0f%%)\n",
+				fs.Regime, fs.Percentile))
+		} else if sig.FundingRate != 0 {
 			sb.WriteString(fmt.Sprintf("  Funding: %+.4f%%\n", sig.FundingRate*100))
 		}
 		sb.WriteString(fmt.Sprintf("  Bias: <b>%s</b> (kekuatan %.0f%%)\n",
@@ -1011,13 +1155,34 @@ func cryptoInterpretIndonesian(sig *microstructure.Signal) string {
 	default:
 		parts = append(parts, "tidak ada tekanan dominan")
 	}
-	if sig.FundingRate > 0.01 {
+	if sig.FundingStats != nil {
+		switch sig.FundingStats.Regime {
+		case "POSITIVE_BIAS":
+			parts = append(parts, "funding positif berkepanjangan (crowded long)")
+		case "NEGATIVE_BIAS":
+			parts = append(parts, "funding negatif berkepanjangan (squeeze risk)")
+		}
+		if sig.FundingStats.Percentile > 90 {
+			parts = append(parts, "funding di pctl 90+% (extreme)")
+		} else if sig.FundingStats.Percentile < 10 {
+			parts = append(parts, "funding di pctl <10% (extreme rendah)")
+		}
+	} else if sig.FundingRate > 0.01 {
 		parts = append(parts, "funding rate tinggi (hati-hati long)")
 	} else if sig.FundingRate < -0.01 {
 		parts = append(parts, "funding rate negatif (hati-hati short)")
 	}
 	if sig.ConfirmEntry {
 		parts = append(parts, "entry terkonfirmasi ✅")
+	}
+	if sig.LargeTradePresence > 30 {
+		parts = append(parts, fmt.Sprintf("volume institusional %.0f%%", sig.LargeTradePresence))
+	}
+	if sig.AbsorptionScore > 0.4 {
+		parts = append(parts, "absorpsi bid terdeteksi (waspada pembalikan)")
+	}
+	if sig.DeltaDivergence {
+		parts = append(parts, "⚠️ divergensi OI vs harga")
 	}
 	return strings.Join(parts, ", ")
 }
@@ -1031,13 +1196,13 @@ func alphaSignalEmoji(sig string) string {
 	case "STRONG_LONG":
 		return "🟢🟢"
 	case "LONG":
-		return "🟢"
+		return "🟢 Bullish"
 	case "STRONG_SHORT":
 		return "🔴🔴"
 	case "SHORT":
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 
@@ -1085,22 +1250,22 @@ func alphaHeatEmoji(h strategy.HeatLevel) string {
 	case strategy.HeatHot:
 		return "🟠"
 	case strategy.HeatOverheat:
-		return "🔴"
+		return "🔴 Bearish"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 
 func alphaMicroEmoji(b microstructure.Bias) string {
 	switch b {
 	case microstructure.BiasBullish:
-		return "🟢"
+		return "🟢 Bullish"
 	case microstructure.BiasBearish:
-		return "🔴"
+		return "🔴 Bearish"
 	case microstructure.BiasConflict:
 		return "🟡"
 	default:
-		return "⚪"
+		return "⚪ Neutral"
 	}
 }
 

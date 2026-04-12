@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -15,6 +16,9 @@ import (
 // FmtNum formats a float64 with thousand separators and specified decimal places.
 // Example: FmtNum(1234567.89, 2) => "1,234,567.89"
 func FmtNum(v float64, decimals int) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "N/A"
+	}
 	format := fmt.Sprintf("%%.%df", decimals)
 	s := fmt.Sprintf(format, v)
 
@@ -48,6 +52,9 @@ func FmtNum(v float64, decimals int) string {
 // FmtNumSigned formats with a leading + or - sign.
 // Example: FmtNumSigned(1234.5, 1) => "+1,234.5"
 func FmtNumSigned(v float64, decimals int) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "N/A"
+	}
 	if v > 0 {
 		return "+" + FmtNum(v, decimals)
 	}
@@ -57,12 +64,18 @@ func FmtNumSigned(v float64, decimals int) string {
 // FmtPct formats a percentage with sign.
 // Example: FmtPct(12.5) => "+12.5%"
 func FmtPct(v float64) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "N/A"
+	}
 	return FmtNumSigned(v, 1) + "%"
 }
 
 // FmtRatio formats a ratio with 2 decimal places.
 // Example: FmtRatio(1.5) => "1.50"
 func FmtRatio(v float64) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "N/A"
+	}
 	return fmt.Sprintf("%.2f", v)
 }
 
@@ -222,4 +235,169 @@ func BulletList(items []string) string {
 		sb.WriteByte('\n')
 	}
 	return sb.String()
+}
+
+// ---------------------------------------------------------------------------
+// Timestamp Formatting
+// ---------------------------------------------------------------------------
+
+// wib is the WIB (Western Indonesia Time) timezone, UTC+7.
+var wib = time.FixedZone("WIB", 7*60*60)
+
+// WIB returns the WIB timezone location (UTC+7) for external callers.
+func WIB() *time.Location { return wib }
+
+// UpdatedAt returns a standardized "Updated: DD MMM HH:MM WIB" HTML string.
+// Suitable for appending as a footer to analysis messages.
+func UpdatedAt(t time.Time) string {
+	return fmt.Sprintf("<i>Updated: %s WIB</i>", t.In(wib).Format("02 Jan 15:04"))
+}
+
+// UpdatedAtShort returns "HH:MM WIB" only (for inline use).
+func UpdatedAtShort(t time.Time) string {
+	return t.In(wib).Format("15:04 WIB")
+}
+
+// FormatDateWIB returns "02 Jan 2006" in WIB timezone.
+func FormatDateWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan 2006")
+}
+
+// FormatDateShortWIB returns "02 Jan" (day + month) in WIB timezone.
+func FormatDateShortWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan")
+}
+
+// FormatDateTimeWIB returns "02 Jan 15:04 WIB" in WIB timezone.
+func FormatDateTimeWIB(t time.Time) string {
+	return t.In(wib).Format("02 Jan 15:04") + " WIB"
+}
+
+// FormatDateTimeUTC returns "DD MMM HH:MM UTC" in UTC timezone.
+func FormatDateTimeUTC(t time.Time) string {
+	return t.UTC().Format("02 Jan 15:04") + " UTC"
+}
+
+// ---------------------------------------------------------------------------
+// Telegram Message Structure Helpers
+// ---------------------------------------------------------------------------
+
+// MessageHeader returns a bold header line with emoji for Telegram HTML.
+// Example: MessageHeader("COT OVERVIEW", "📊") => "📊 <b>COT OVERVIEW</b>"
+func MessageHeader(title, emoji string) string {
+	if emoji == "" {
+		return fmt.Sprintf("<b>%s</b>", title)
+	}
+	return fmt.Sprintf("%s <b>%s</b>", emoji, title)
+}
+
+// Divider returns a thin HTML line separator for message sections.
+func Divider() string {
+	return "─────────────────────"
+}
+
+// DividerShort returns a shorter divider.
+func DividerShort() string {
+	return "──────────"
+}
+
+// Footer returns a standardized footer line with update timestamp.
+func Footer(t time.Time) string {
+	return "\n" + UpdatedAt(t)
+}
+
+// ---------------------------------------------------------------------------
+// Forex & Finance Formatting
+// ---------------------------------------------------------------------------
+
+// FmtPips formats a pip value (5 decimal for majors, 2 for JPY).
+// isJPY=true uses 2 decimal places.
+func FmtPips(pips float64, isJPY bool) string {
+	if math.IsNaN(pips) || math.IsInf(pips, 0) {
+		return "N/A"
+	}
+	if isJPY {
+		return fmt.Sprintf("%.2f", pips)
+	}
+	return fmt.Sprintf("%.1f", pips)
+}
+
+// FmtBasisPoints formats basis points value.
+// Example: FmtBasisPoints(25.0) => "25bps"
+func FmtBasisPoints(bps float64) string {
+	if math.IsNaN(bps) || math.IsInf(bps, 0) {
+		return "N/A"
+	}
+	if bps == math.Trunc(bps) {
+		return fmt.Sprintf("%.0fbps", bps)
+	}
+	return fmt.Sprintf("%.1fbps", bps)
+}
+
+// FmtPrice formats a price with appropriate decimal places.
+// JPY pairs: 3 decimals, XAU/Gold: 2 decimals, Others: 5 decimals.
+func FmtPrice(price float64, symbol string) string {
+	if math.IsNaN(price) || math.IsInf(price, 0) {
+		return "N/A"
+	}
+	upper := strings.ToUpper(symbol)
+	if strings.Contains(upper, "XAU") || strings.Contains(upper, "GOLD") {
+		return fmt.Sprintf("%.2f", price)
+	}
+	if strings.Contains(upper, "JPY") {
+		return fmt.Sprintf("%.3f", price)
+	}
+	return fmt.Sprintf("%.5f", price)
+}
+
+// FmtMillions formats large numbers in millions (M) or billions (B).
+// Example: FmtMillions(1_500_000) => "1.5M"
+func FmtMillions(v float64) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "N/A"
+	}
+	abs := math.Abs(v)
+	sign := ""
+	if v < 0 {
+		sign = "-"
+	}
+	switch {
+	case abs >= 1_000_000_000:
+		return fmt.Sprintf("%s%.2fB", sign, abs/1_000_000_000)
+	case abs >= 1_000_000:
+		return fmt.Sprintf("%s%.2fM", sign, abs/1_000_000)
+	case abs >= 1_000:
+		return fmt.Sprintf("%s%.1fK", sign, abs/1_000)
+	default:
+		return fmt.Sprintf("%s%.0f", sign, abs)
+	}
+}
+
+// EmojiForChange returns 🟢/🔴/⚪ with directional text based on sign.
+func EmojiForChange(v float64) string {
+	if v > 0 {
+		return "🟢 Up"
+	}
+	if v < 0 {
+		return "🔴 Down"
+	}
+	return "⚪ Flat"
+}
+
+// EmojiForStrength returns strength emoji (1-5 scale).
+func EmojiForStrength(strength int) string {
+	switch strength {
+	case 5:
+		return "🔥🔥🔥"
+	case 4:
+		return "🔥🔥"
+	case 3:
+		return "🔥"
+	case 2:
+		return "⚡"
+	case 1:
+		return "💧"
+	default:
+		return "⚪"
+	}
 }

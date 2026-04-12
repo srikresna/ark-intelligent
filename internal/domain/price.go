@@ -47,22 +47,22 @@ type PriceContext struct {
 	CurrentPrice  float64 `json:"current_price"`
 	WeeklyChgPct  float64 `json:"weekly_chg_pct"`  // 1-week % change
 	MonthlyChgPct float64 `json:"monthly_chg_pct"` // 4-week % change
-	Trend4W       string  `json:"trend_4w"`         // "UP", "DOWN", "FLAT"
-	Trend13W      string  `json:"trend_13w"`        // "UP", "DOWN", "FLAT"
-	PriceMA4W     float64 `json:"price_ma_4w"`      // 4-week simple moving average
-	PriceMA13W    float64 `json:"price_ma_13w"`     // 13-week simple moving average
-	AboveMA4W     bool    `json:"above_ma_4w"`      // Price above 4W MA
-	AboveMA13W    bool    `json:"above_ma_13w"`     // Price above 13W MA
+	Trend4W       string  `json:"trend_4w"`        // "UP", "DOWN", "FLAT"
+	Trend13W      string  `json:"trend_13w"`       // "UP", "DOWN", "FLAT"
+	PriceMA4W     float64 `json:"price_ma_4w"`     // 4-week simple moving average
+	PriceMA13W    float64 `json:"price_ma_13w"`    // 13-week simple moving average
+	AboveMA4W     bool    `json:"above_ma_4w"`     // Price above 4W MA
+	AboveMA13W    bool    `json:"above_ma_13w"`    // Price above 13W MA
 
 	// Price regime classification
 	PriceRegime string  `json:"price_regime,omitempty"` // TRENDING, RANGING, CRISIS
 	ADX         float64 `json:"adx,omitempty"`          // Approximated directional index
 
 	// ATR-based volatility context (nil if insufficient price data).
-	VolatilityRegime     string  `json:"volatility_regime,omitempty"`      // EXPANDING, CONTRACTING, NORMAL
-	ATR                  float64 `json:"atr,omitempty"`                    // 20-week Average True Range
-	NormalizedATR        float64 `json:"normalized_atr,omitempty"`         // ATR / Close * 100
-	VolatilityMultiplier float64 `json:"volatility_multiplier,omitempty"`  // Confidence multiplier from ATR regime
+	VolatilityRegime     string  `json:"volatility_regime,omitempty"`     // EXPANDING, CONTRACTING, NORMAL
+	ATR                  float64 `json:"atr,omitempty"`                   // 20-week Average True Range
+	NormalizedATR        float64 `json:"normalized_atr,omitempty"`        // ATR / Close * 100
+	VolatilityMultiplier float64 `json:"volatility_multiplier,omitempty"` // Confidence multiplier from ATR regime
 }
 
 // MATrend returns a summary of MA alignment.

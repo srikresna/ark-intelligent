@@ -20,6 +20,10 @@ func (h *Handler) cmdPrice(ctx context.Context, chatID string, userID int64, arg
 	args = strings.TrimSpace(strings.ToUpper(args))
 
 	if args == "" {
+		// Fallback to last currency if available
+		if lc := h.getLastCurrency(ctx, userID); lc != "" {
+			return h.cmdPrice(ctx, chatID, userID, lc)
+		}
 		return h.priceOverview(ctx, chatID)
 	}
 
@@ -34,11 +38,16 @@ func (h *Handler) cmdPrice(ctx context.Context, chatID string, userID int64, arg
 		return err
 	}
 
+	// Save last currency for context carry-over
+	h.saveLastCurrency(ctx, userID, mapping.Currency)
+
 	return h.priceDetail(ctx, chatID, mapping)
 }
 
 // priceOverview shows a categorized snapshot of all major instruments.
 func (h *Handler) priceOverview(ctx context.Context, chatID string) error {
+	h.bot.SendTyping(ctx, chatID)
+
 	builder := pricesvc.NewDailyContextBuilder(h.dailyPriceRepo)
 
 	type section struct {

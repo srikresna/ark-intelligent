@@ -56,6 +56,7 @@ type Breaker struct {
 	failures    int
 	lastFailure time.Time
 	lastSuccess time.Time
+	probing     bool // true when a probe is in-flight (HalfOpen only)
 
 	// Optional callback when state changes
 	OnStateChange func(name string, from, to State)
@@ -78,10 +79,11 @@ func New(name string, maxFailures int, resetTimeout time.Duration) *Breaker {
 // Returns ErrCircuitOpen if the breaker is open.
 // On success, resets failure count. On failure, increments failure count.
 func (b *Breaker) Execute(fn func() error) error {
-	if !b.allowRequest() {
-		return fmt.Errorf("%s: %w (failures=%d, retry after %v)",
-			b.name, ErrCircuitOpen, b.failures,
-			b.resetTimeout-time.Since(b.lastFailure))
+	allowed, failures, retryAfter := b.checkRequest()
+	if !allowed {
+		return fmt.Errorf("%s: %w (failures=%d, retry after ~%ds)",
+			b.name, ErrCircuitOpen, failures,
+			int(retryAfter.Seconds()))
 	}
 
 	err := fn()
@@ -126,20 +128,34 @@ func (b *Breaker) Reset() {
 	}
 }
 
-// allowRequest checks if a request should be allowed through.
-func (b *Breaker) allowRequest() bool {
+// checkRequest checks if a request should be allowed through.
+// Returns the allow decision plus a snapshot of failure count and retry duration
+// (all read under the same lock to avoid races).
+func (b *Breaker) checkRequest() (allowed bool, failures int, retryAfter time.Duration) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	switch b.currentState() {
 	case Closed:
-		return true
+		return true, b.failures, 0
 	case HalfOpen:
-		return true // allow one probe
+		if b.probing {
+			remaining := b.resetTimeout - time.Since(b.lastFailure)
+			if remaining < 0 {
+				remaining = 0
+			}
+			return false, b.failures, remaining // another probe is already in-flight
+		}
+		b.probing = true // claim the single probe slot
+		return true, b.failures, 0
 	case Open:
-		return false
+		remaining := b.resetTimeout - time.Since(b.lastFailure)
+		if remaining < 0 {
+			remaining = 0
+		}
+		return false, b.failures, remaining
 	}
-	return true
+	return true, b.failures, 0
 }
 
 // currentState returns the effective state, handling Open→HalfOpen timeout transition.
@@ -156,6 +172,7 @@ func (b *Breaker) recordSuccess() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.failures = 0
+	b.probing = false
 	b.lastSuccess = time.Now()
 	if b.state != Closed {
 		b.setState(Closed)
@@ -167,6 +184,7 @@ func (b *Breaker) recordFailure() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.failures++
+	b.probing = false
 	b.lastFailure = time.Now()
 
 	if b.state == HalfOpen {

@@ -236,9 +236,9 @@ func CalcIchimoku(bars []OHLCV) *IchimokuResult {
 // Values where insufficient lookback exists are NaN.
 //
 // Note on plotting:
-// - SenkouA[i] and SenkouB[i] are the values calculated at bar i. To plot them
-//   on the chart, shift 26 periods into the future.
-// - Chikou[i] is the close at bar i. To plot on chart, shift 26 periods into the past.
+//   - SenkouA[i] and SenkouB[i] are the values calculated at bar i. To plot them
+//     on the chart, shift 26 periods into the future.
+//   - Chikou[i] is the close at bar i. To plot on chart, shift 26 periods into the past.
 func CalcIchimokuSeries(bars []OHLCV) *IchimokuSeries {
 	const (
 		tenkanPeriod = 9

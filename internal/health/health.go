@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os/exec"
 	"sync/atomic"
 	"time"
 
@@ -72,7 +73,7 @@ func (c *Checker) Start(ctx context.Context, addr string) {
 func (c *Checker) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status": "alive",
 		"uptime": time.Since(c.started).String(),
 	})
@@ -111,9 +112,35 @@ func (c *Checker) handleReady(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status": statusStr,
 		"checks": checks,
 		"uptime": time.Since(c.started).String(),
 	})
+}
+
+// CheckPythonDeps validates that required Python packages are importable.
+// Call at startup to surface missing dependencies early.
+func CheckPythonDeps() {
+	deps := []string{"mplfinance", "matplotlib", "numpy", "pandas"}
+	importStmt := ""
+	for i, d := range deps {
+		if i > 0 {
+			importStmt += "; "
+		}
+		importStmt += "import " + d
+	}
+
+	checkCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(checkCtx, "python3", "-c", importStmt)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Error().
+			Err(err).
+			Str("output", string(output)).
+			Strs("packages", deps).
+			Msg("Python chart dependencies missing — chart generation will fail")
+	} else {
+		log.Info().Strs("packages", deps).Msg("Python chart dependencies OK")
+	}
 }

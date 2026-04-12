@@ -103,10 +103,10 @@ func (ib *ImpactBootstrapper) Bootstrap(ctx context.Context) (int, error) {
 
 // bootstrapCandidate pairs a scraped event with its computed surprise sigma.
 type bootstrapCandidate struct {
-	ev           domain.NewsEvent
-	actualVal    float64
-	forecastVal  float64
-	parsedOK     bool
+	ev            domain.NewsEvent
+	actualVal     float64
+	forecastVal   float64
+	parsedOK      bool
 	surpriseSigma float64
 }
 

@@ -663,7 +663,7 @@ func PlattScaling(confidences []float64, outcomes []bool) (a, b float64) {
 
 	for iter := 0; iter < maxIter; iter++ {
 		// Compute gradient and Hessian
-		var g1, g2 float64    // gradient components
+		var g1, g2 float64        // gradient components
 		var h11, h12, h22 float64 // Hessian components
 
 		for i := 0; i < n; i++ {

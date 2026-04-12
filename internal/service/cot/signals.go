@@ -49,7 +49,7 @@ const (
 	SignalMomentumShift   SignalType = "MOMENTUM_SHIFT"
 	SignalConcentration   SignalType = "CONCENTRATION"
 	SignalCrowdContrarian SignalType = "CROWD_CONTRARIAN"
-	SignalThinMarket     SignalType = "THIN_MARKET"
+	SignalThinMarket      SignalType = "THIN_MARKET"
 )
 
 // DetectAll runs all signal detectors on a set of analyses.
@@ -458,7 +458,8 @@ func (sd *SignalDetector) detectConcentrationRisk(a domain.COTAnalysis) *Signal 
 // not small spec positioning, which is a different group that may disagree.
 //
 // Contrarian logic: if large specs are crowded long → BEARISH (fade the crowd).
-//                   if large specs are crowded short → BULLISH (fade the crowd).
+//
+//	if large specs are crowded short → BULLISH (fade the crowd).
 func (sd *SignalDetector) detectCrowdContrarian(a domain.COTAnalysis) *Signal {
 	if a.CrowdingIndex < 70 {
 		return nil

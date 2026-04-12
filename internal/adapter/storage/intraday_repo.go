@@ -35,7 +35,10 @@ func intradayPrefix(contractCode, interval string) []byte {
 // --- Methods ---
 
 // SaveBars stores a batch of intraday bars.
-func (r *IntradayRepo) SaveBars(_ context.Context, bars []domain.IntradayBar) error {
+func (r *IntradayRepo) SaveBars(ctx context.Context, bars []domain.IntradayBar) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if len(bars) == 0 {
 		return nil
 	}
@@ -62,7 +65,10 @@ func (r *IntradayRepo) SaveBars(_ context.Context, bars []domain.IntradayBar) er
 
 // GetHistory returns intraday bars for a contract, newest first.
 // barCount is the number of bars to retrieve.
-func (r *IntradayRepo) GetHistory(_ context.Context, contractCode, interval string, barCount int) ([]domain.IntradayBar, error) {
+func (r *IntradayRepo) GetHistory(ctx context.Context, contractCode, interval string, barCount int) ([]domain.IntradayBar, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var bars []domain.IntradayBar
 
 	prefix := intradayPrefix(contractCode, interval)
@@ -105,8 +111,8 @@ func (r *IntradayRepo) GetHistory(_ context.Context, contractCode, interval stri
 }
 
 // GetLatest returns the most recent intraday bar for a contract.
-func (r *IntradayRepo) GetLatest(_ context.Context, contractCode, interval string) (*domain.IntradayBar, error) {
-	bars, err := r.GetHistory(context.Background(), contractCode, interval, 1)
+func (r *IntradayRepo) GetLatest(ctx context.Context, contractCode, interval string) (*domain.IntradayBar, error) {
+	bars, err := r.GetHistory(ctx, contractCode, interval, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +123,10 @@ func (r *IntradayRepo) GetLatest(_ context.Context, contractCode, interval strin
 }
 
 // PurgeOlderThan removes intraday bars older than the given cutoff.
-func (r *IntradayRepo) PurgeOlderThan(_ context.Context, interval string, cutoff time.Time) (int, error) {
+func (r *IntradayRepo) PurgeOlderThan(ctx context.Context, interval string, cutoff time.Time) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	cutoffStr := cutoff.UTC().Format("200601021504")
 
 	// Phase 1: collect keys to delete (read-only).

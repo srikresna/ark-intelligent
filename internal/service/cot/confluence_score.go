@@ -130,12 +130,12 @@ func FREDRegimeMultiplier(currency string, regime fred.MacroRegime) float64 {
 	}
 
 	matrix := map[string]row{
-		"INFLATIONARY":   {+15, -10, -10, +5},
+		"INFLATIONARY":    {+15, -10, -10, +5},
 		"DISINFLATIONARY": {-5, +10, +10, 0},
-		"STRESS":         {-10, 0, -20, +20},
-		"RECESSION":      {-15, 0, -20, +20},
-		"STAGFLATION":    {0, -5, -15, +15},
-		"GOLDILOCKS":     {-5, +5, +15, -5},
+		"STRESS":          {-10, 0, -20, +20},
+		"RECESSION":       {-15, 0, -20, +20},
+		"STAGFLATION":     {0, -5, -15, +15},
+		"GOLDILOCKS":      {-5, +5, +15, -5},
 	}
 
 	r, ok := matrix[regime.Name]
@@ -250,7 +250,10 @@ func ConfluenceScoreV3(
 	surpriseScore := mathutil.Clamp(surpriseSigma*20, -100, 100)
 	macroScore := computeMacroComponentScore(macroData)
 
-	// Enhanced macro component: use per-currency differential if composites available
+	// Enhanced macro component: use per-currency differential if composites available.
+	// Falls back to the unified US-centric macro score (computeMacroComponentScore)
+	// when composites is nil (data unavailable) or when all country scores are zero
+	// (empty MacroData — fresh install with no FRED data yet).
 	if macroData != nil {
 		composites := fred.ComputeComposites(macroData)
 		if composites != nil {
@@ -266,6 +269,8 @@ func ConfluenceScoreV3(
 				macroScore = mathutil.Clamp(differential/2, -100, 100)
 			}
 		}
+		// If composites == nil (only happens when macroData itself is nil, which is
+		// guarded above) we retain the fallback macroScore from computeMacroComponentScore.
 	}
 
 	// Price momentum component (30%)
@@ -317,21 +322,38 @@ func ConfluenceScoreV3(
 	}
 
 	// Weighted combination
+	isLong := analysis.SentimentScore > 0
+	oi4wAdj := 0.0
+	switch analysis.OI4WTrend {
+	case "ACCUMULATING":
+		if isLong {
+			oi4wAdj = 5
+		} else {
+			oi4wAdj = -5
+		}
+	case "DISTRIBUTING":
+		if isLong {
+			oi4wAdj = -5
+		} else {
+			oi4wAdj = 5
+		}
+	}
+
 	if priceContext != nil && macroData != nil {
-		total := cotScore*0.30 + surpriseScore*0.15 + macroScore*0.25 + priceScore*0.30
+		total := cotScore*0.30 + surpriseScore*0.15 + macroScore*0.25 + priceScore*0.30 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	} else if priceContext != nil {
 		// No FRED: COT 40% + Surprise 15% + Price 45%
-		total := cotScore*0.40 + surpriseScore*0.15 + priceScore*0.45
+		total := cotScore*0.40 + surpriseScore*0.15 + priceScore*0.45 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	} else if macroData != nil {
 		// No price: COT 35% + Surprise 20% + Macro 45%
-		total := cotScore*0.35 + surpriseScore*0.20 + macroScore*0.45
+		total := cotScore*0.35 + surpriseScore*0.20 + macroScore*0.45 + oi4wAdj
 		return mathutil.Clamp(total, -100, 100)
 	}
 
 	// Neither: COT 60% + Surprise 40%
-	total := cotScore*0.60 + surpriseScore*0.40
+	total := cotScore*0.60 + surpriseScore*0.40 + oi4wAdj
 	return mathutil.Clamp(total, -100, 100)
 }
 
@@ -361,7 +383,9 @@ func ComputeConvictionScoreV3(
 	cs.CalendarComponent = mathutil.Clamp(surpriseSigma*20, -100, 100)
 	cs.MacroComponent = computeMacroComponentScore(macroData)
 
-	// Enhanced macro breakdown: use per-currency differential if composites available
+	// Enhanced macro breakdown: use per-currency differential if composites available.
+	// Falls back to the unified US-centric macro score (MacroComponent already set above)
+	// when composites is nil or country data is unavailable.
 	if macroData != nil {
 		composites := fred.ComputeComposites(macroData)
 		if composites != nil {
@@ -374,6 +398,7 @@ func ComputeConvictionScoreV3(
 				cs.MacroComponent = mathutil.Clamp(differential/2, -100, 100)
 			}
 		}
+		// If composites == nil, retain the fallback MacroComponent already assigned above.
 	}
 	if priceContext != nil {
 		// Recompute price component for breakdown (same logic as V3)
@@ -519,6 +544,9 @@ func ConfluenceScoreWithWeights(
 // getCountryMacroScore returns the macro score for the country associated with
 // a given currency. Used by the per-currency macro differential in V3.
 func getCountryMacroScore(currency string, c *domain.MacroComposites) float64 {
+	if c == nil {
+		return 0
+	}
 	switch currency {
 	case "EUR":
 		return c.EZScore

@@ -30,14 +30,14 @@ type PerformanceStats struct {
 
 // AssetPerf pairs a currency label with its annualized return in a regime.
 type AssetPerf struct {
-	Currency        string
+	Currency         string
 	AnnualizedReturn float64
-	Occurrences     int
+	Occurrences      int
 }
 
 // RegimeInsight summarises the best and worst performing assets for a given regime.
 type RegimeInsight struct {
-	Regime     string
+	Regime      string
 	BestAssets  []AssetPerf
 	WorstAssets []AssetPerf
 }

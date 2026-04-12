@@ -21,13 +21,13 @@ import (
 
 // SeasonalContextDeps holds all optional dependencies for advanced analysis.
 type SeasonalContextDeps struct {
-	PriceRepo  ports.PriceRepository
-	COTRepo    ports.COTRepository
-	NewsRepo   ports.NewsRepository
-	MacroData  *fred.MacroData   // current FRED data snapshot
-	Regimes    map[string]string // date -> regime name (historical)
-	VIXPrice   float64           // current VIX level
-	EIAData    *EIASeasonalData  // nil if EIA unavailable
+	PriceRepo ports.PriceRepository
+	COTRepo   ports.COTRepository
+	NewsRepo  ports.NewsRepository
+	MacroData *fred.MacroData   // current FRED data snapshot
+	Regimes   map[string]string // date -> regime name (historical)
+	VIXPrice  float64           // current VIX level
+	EIAData   *EIASeasonalData  // nil if EIA unavailable
 }
 
 // EnrichPattern adds advanced context (regime, COT, events, etc.) to a base pattern.
@@ -36,6 +36,9 @@ func EnrichPattern(ctx context.Context, pattern *SeasonalPattern, deps *Seasonal
 		return
 	}
 	curMonth := pattern.CurrentMonth // 1-12
+	if curMonth < 1 || curMonth > 12 {
+		return // new contract with no data — nothing to enrich
+	}
 	curIdx := curMonth - 1
 	curStats := pattern.Monthly[curIdx]
 	driver := GetAssetDriver(pattern.Currency)

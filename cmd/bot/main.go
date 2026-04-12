@@ -27,14 +27,17 @@ import (
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
-	"github.com/arkcode369/ark-intelligent/internal/service/fred"
+	elliottsvc "github.com/arkcode369/ark-intelligent/internal/service/elliott"
 	factorsvc "github.com/arkcode369/ark-intelligent/internal/service/factors"
+	gexsvc "github.com/arkcode369/ark-intelligent/internal/service/gex"
+	ictsvc "github.com/arkcode369/ark-intelligent/internal/service/ict"
+	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	microsvc "github.com/arkcode369/ark-intelligent/internal/service/microstructure"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
 	strategysvc "github.com/arkcode369/ark-intelligent/internal/service/strategy"
 	ta "github.com/arkcode369/ark-intelligent/internal/service/ta"
-	bybitpkg "github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
+	wyckoffsvc "github.com/arkcode369/ark-intelligent/internal/service/wyckoff"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
 
@@ -55,13 +58,26 @@ func main() {
 	// -----------------------------------------------------------------------
 	// 1. Configuration
 	// -----------------------------------------------------------------------
-	cfg := config.MustLoad()
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n❌ Configuration Error\n\n")
+		fmt.Fprintf(os.Stderr, "   %s\n\n", err)
+		fmt.Fprintf(os.Stderr, "Required environment variables:\n")
+		fmt.Fprintf(os.Stderr, "   BOT_TOKEN    - Telegram bot token (get from @BotFather)\n")
+		fmt.Fprintf(os.Stderr, "   CHAT_ID      - Default Telegram chat ID\n")
+		fmt.Fprintf(os.Stderr, "\nOptional environment variables:\n")
+		fmt.Fprintf(os.Stderr, "   GEMINI_API_KEY     - Google Gemini API key for AI features\n")
+		fmt.Fprintf(os.Stderr, "   DATA_DIR           - BadgerDB data directory (default: /app/data)\n")
+		fmt.Fprintf(os.Stderr, "   LOG_LEVEL          - debug, info, warn, error (default: info)\n")
+		fmt.Fprintf(os.Stderr, "\nFor a complete list, see: .env.example\n\n")
+		os.Exit(1)
+	}
 	logger.Init(cfg.LogLevel)
 	// Re-initialize component logger after Init
 	log = logger.Component("main")
 
 	log.Info().
-		Str("version", "v3.0.0").
+		Str("version", "v4.0.0").
 		Str("go", runtime.Version()).
 		Str("os", runtime.GOOS).
 		Str("arch", runtime.GOARCH).
@@ -76,46 +92,34 @@ func main() {
 	defer cancel()
 
 	// -----------------------------------------------------------------------
-	// 3. Storage layer
+	// 3. Storage layer (extracted to wire_storage.go per TECH-012)
 	// -----------------------------------------------------------------------
-	db, err := storage.Open(cfg.DataDir)
+	storageCfg := DefaultStorageConfig(cfg.DataDir)
+	storageCfg.ChatHistoryLimit = cfg.ChatHistoryLimit
+	storageCfg.ChatHistoryTTL = cfg.ChatHistoryTTL
+
+	storageDeps, err := InitializeStorage(storageCfg)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to open storage")
+		log.Fatal().Err(err).Msg("Failed to initialize storage")
 	}
 	defer func() {
-		if err := db.Close(); err != nil {
+		if err := CloseStorage(storageDeps.DB); err != nil {
 			log.Error().Err(err).Msg("Storage close error")
 		}
 	}()
 
-	eventRepo := storage.NewEventRepo(db)
-	cotRepo := storage.NewCOTRepo(db)
-	prefsRepo := storage.NewPrefsRepo(db)
-	newsRepo := storage.NewNewsRepo(db)
-	cacheRepo := storage.NewCacheRepo(db)
-	userRepo := storage.NewUserRepo(db)
-	priceRepo := storage.NewPriceRepo(db)
-	signalRepo := storage.NewSignalRepo(db)
-	impactRepo := storage.NewImpactRepo(db)
-	dailyPriceRepo := storage.NewDailyPriceRepo(db)
-	intradayRepo := storage.NewIntradayRepo(db)
-	fredRepo := storage.NewFREDRepo(db)
-	fredPersistence := fred.NewPersistenceService(&fredPersistAdapter{repo: fredRepo})
-	fred.SetPostFetchHook(func(ctx context.Context, data *fred.MacroData) {
-		if err := fredPersistence.PersistSnapshot(ctx, data); err != nil {
-			log.Warn().Err(err).Msg("FRED snapshot persistence failed (non-fatal)")
-		}
-	})
+	// Setup FRED persistence hook
+	SetupFREDPersistence(storageDeps)
 
 	log.Info().Msg("Storage layer initialized")
-	logStorageSize(db)
+	LogStorageSize(storageDeps.DB)
 
 	// -----------------------------------------------------------------------
 	// 3b. Health check endpoint
 	// -----------------------------------------------------------------------
 	healthChecker := health.New(func() error {
 		// Simple DB liveness check via Size() — if it panics, DB is dead
-		db.Size()
+		storageDeps.DB.Size()
 		return nil
 	})
 	healthAddr := config.GetEnvDefault("HEALTH_ADDR", ":8080")
@@ -126,8 +130,16 @@ func main() {
 	// -----------------------------------------------------------------------
 	bot := tgbot.NewBot(cfg.BotToken, cfg.ChatID)
 
+	// Check Python chart rendering dependencies at startup.
+	// Log a warning but do not fail — chart commands gracefully degrade to text.
+	if err := tgbot.CheckPythonChartDeps(); err != nil {
+		log.Warn().Err(err).Msg("Python chart dependencies check failed — chart rendering disabled")
+	} else {
+		log.Info().Msg("Python chart dependencies OK")
+	}
+
 	// User management middleware (tiered access control + quotas)
-	authMiddleware := tgbot.NewMiddleware(userRepo, bot.OwnerID())
+	authMiddleware := tgbot.NewMiddleware(storageDeps.UserRepo, bot.OwnerID())
 	bot.SetMiddleware(authMiddleware)
 
 	log.Info().Msg("Telegram bot created (with user management middleware)")
@@ -139,12 +151,12 @@ func main() {
 	var cachedAI *aisvc.CachedInterpreter
 
 	if cfg.HasGemini() {
-		gemini, err := aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.AIMaxRPM, cfg.AIMaxDaily)
+		gemini, err := aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.GeminiModel, cfg.AIMaxRPM, cfg.AIMaxDaily)
 		if err != nil {
 			log.Warn().Err(err).Msg("Gemini init failed, AI features disabled")
 		} else {
-			rawAI := aisvc.NewInterpreter(gemini, eventRepo, cotRepo)
-			cachedAI = aisvc.NewCachedInterpreter(rawAI, cacheRepo)
+			rawAI := aisvc.NewInterpreter(gemini, storageDeps.EventRepo, storageDeps.COTRepo)
+			cachedAI = aisvc.NewCachedInterpreter(rawAI, storageDeps.CacheRepo)
 			aiAnalyzer = cachedAI
 			log.Info().Msg("Gemini AI initialized (with cache layer)")
 		}
@@ -158,6 +170,7 @@ func main() {
 	var chatService *aisvc.ChatService
 	var claudeAnalyzer *aisvc.ClaudeAnalyzer
 	var geminiForFallback *aisvc.GeminiClient
+	var contextBuilder *aisvc.ContextBuilder
 
 	if cfg.HasClaude() {
 		claudeClient := aisvc.NewClaudeClient(cfg.ClaudeEndpoint, cfg.ClaudeTimeout, cfg.ClaudeMaxTokens)
@@ -171,30 +184,28 @@ func main() {
 		}
 
 		// ClaudeAnalyzer: AIAnalyzer implementation for /outlook when user prefers Claude.
-		claudeAnalyzer = aisvc.NewClaudeAnalyzer(claudeClient, eventRepo, cotRepo)
+		claudeAnalyzer = aisvc.NewClaudeAnalyzer(claudeClient, storageDeps.EventRepo, storageDeps.COTRepo)
 		log.Info().Str("endpoint", cfg.ClaudeEndpoint).Msg("ClaudeAnalyzer initialized for /outlook")
 
 		// Memory tool: per-user file-based memory persisted in BadgerDB
-		memoryRepo := storage.NewMemoryRepo(db, 30*24*time.Hour) // 30-day TTL
-		memoryStore := aisvc.NewMemoryStore(memoryRepo)
+		memoryStore := aisvc.NewMemoryStore(storageDeps.MemoryRepo)
 		toolExecutor := aisvc.NewMemoryToolExecutor(memoryStore)
 		claudeClient.SetToolExecutor(toolExecutor)
 
-		convRepo := storage.NewConversationRepo(db, cfg.ChatHistoryLimit, cfg.ChatHistoryTTL)
 		toolConfig := aisvc.NewToolConfig()
-		contextBuilder := aisvc.NewContextBuilder(cotRepo, newsRepo, priceRepo)
+		contextBuilder = aisvc.NewContextBuilder(storageDeps.COTRepo, storageDeps.NewsRepo, storageDeps.PriceRepo)
 
 		// Reuse existing Gemini client as fallback (if available)
 		if cfg.HasGemini() {
 			// Create a separate Gemini instance for chat fallback
-			geminiForFallback, err = aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.AIMaxRPM, cfg.AIMaxDaily)
+			geminiForFallback, err = aisvc.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.GeminiModel, cfg.AIMaxRPM, cfg.AIMaxDaily)
 			if err != nil {
 				log.Warn().Err(err).Msg("Gemini fallback init failed — Claude-only mode")
 				geminiForFallback = nil
 			}
 		}
 
-		chatService = aisvc.NewChatService(claudeClient, geminiForFallback, convRepo, contextBuilder, toolConfig)
+		chatService = aisvc.NewChatService(claudeClient, geminiForFallback, storageDeps.ConversationRepo, contextBuilder, toolConfig)
 
 		// Wire owner notification for AI failure alerts
 		chatService.SetOwnerNotify(func(ctx context.Context, html string) {
@@ -216,7 +227,7 @@ func main() {
 
 	// COT services
 	cotFetcher := cotsvc.NewFetcher()
-	cotAnalyzer := cotsvc.NewAnalyzer(cotRepo, cotFetcher)
+	cotAnalyzer := cotsvc.NewAnalyzer(storageDeps.COTRepo, cotFetcher)
 
 	// News services (uses MQL5 Economic Calendar API — no API key required)
 	newsFetcher := newssvc.NewMQL5Fetcher()
@@ -229,7 +240,7 @@ func main() {
 	}
 
 	// Backtest evaluator
-	signalEvaluator := backtestsvc.NewEvaluator(signalRepo, priceRepo, dailyPriceRepo)
+	signalEvaluator := backtestsvc.NewEvaluator(storageDeps.SignalRepo, storageDeps.PriceRepo, storageDeps.DailyPriceRepo)
 
 	log.Info().Msg("Service layer initialized")
 
@@ -239,7 +250,7 @@ func main() {
 	// -----------------------------------------------------------------------
 	var alphaServices *tgbot.AlphaServices
 	if cfg.EnableFactorEngine {
-		profileSvc := factorsvc.NewProfileService(dailyPriceRepo, cotRepo)
+		profileSvc := factorsvc.NewProfileService(storageDeps.DailyPriceRepo, storageDeps.COTRepo)
 		factorEng := factorsvc.NewEngine(factorsvc.DefaultWeights())
 		stratEng := strategysvc.NewEngine()
 
@@ -267,18 +278,18 @@ func main() {
 		COTAnalyzer:        cotAnalyzer,
 		AIAnalyzer:         aiAnalyzer,
 		Bot:                bot,
-		COTRepo:            cotRepo,
-		PrefsRepo:          prefsRepo,
+		COTRepo:            storageDeps.COTRepo,
+		PrefsRepo:          storageDeps.PrefsRepo,
 		ChatID:             cfg.ChatID,
 		CachedAI:           cachedAI,
-		DB:                 db,
-		PriceRepo:          priceRepo,
-		SignalRepo:         signalRepo,
+		DB:                 storageDeps.DB,
+		PriceRepo:          storageDeps.PriceRepo,
+		SignalRepo:         storageDeps.SignalRepo,
 		PriceFetcher:       priceFetcher,
 		Evaluator:          signalEvaluator,
-		DailyPriceRepo:     dailyPriceRepo,
-		IntradayRepo:       intradayRepo,
-		ImpactBootstrapper: newImpactBootstrapper(newsFetcher, priceRepo, impactRepo, priceFetcher, cfg.ImpactBootstrapMonths),
+		DailyPriceRepo:     storageDeps.DailyPriceRepo,
+		IntradayRepo:       storageDeps.IntradayRepo,
+		ImpactBootstrapper: newImpactBootstrapper(newsFetcher, storageDeps.PriceRepo, storageDeps.ImpactRepo, priceFetcher, cfg.ImpactBootstrapMonths),
 		FREDAlertCheck:     authMiddleware.ShouldReceiveFREDAlerts,
 		IsBanned:           authMiddleware.IsUserBanned,
 		OwnerChatID:        ownerChatIDForScheduler(bot.OwnerID()),
@@ -293,7 +304,7 @@ func main() {
 	// News Background Scheduler (always starts — uses MQL5 Economic Calendar)
 	// P1.1: cotRepo injected for Confluence Alert cross-check on actual releases
 	// newsSched is created before NewHandler so the surprise accumulator can be injected.
-	newsSched := newssvc.NewScheduler(newsRepo, newsFetcher, aiAnalyzer, bot, prefsRepo, cotRepo)
+	newsSched := newssvc.NewScheduler(storageDeps.NewsRepo, newsFetcher, aiAnalyzer, bot, storageDeps.PrefsRepo, storageDeps.COTRepo)
 
 	// Wire AI cache invalidation on significant news releases
 	if cachedAI != nil {
@@ -307,10 +318,36 @@ func main() {
 	newsSched.SetIsBannedFunc(authMiddleware.IsUserBanned)
 
 	// Wire impact recorder for Event Impact Database
-	impactRecorder := newssvc.NewImpactRecorder(impactRepo, priceRepo, priceFetcher)
+	impactRecorder := newssvc.NewImpactRecorder(storageDeps.ImpactRepo, storageDeps.PriceRepo, priceFetcher)
 	newsSched.SetImpactRecorder(impactRecorder)
 
+	// TASK-202: Wire alert gate into news scheduler (quiet hours, per-type toggle, daily cap).
+	newsSched.SetAlertGateFunc(sched.ShouldDeliverAlert)
+	newsSched.SetRecordDeliveryFunc(sched.RecordAlertDelivery)
+
 	newsSched.Start(ctx)
+
+	// Wire Fed speech provider into AI context builder for enriched chatbot prompts.
+	// newsSched caches the latest Fed speeches in-memory after each poll; contextBuilder
+	// reads them on demand during prompt construction (nil-safe: skipped if not set).
+	if contextBuilder != nil {
+		contextBuilder.SetFedSpeechProvider(func(n int) []aisvc.FedSpeechSummary {
+			speeches := newsSched.LatestFedSpeeches(n)
+			summaries := make([]aisvc.FedSpeechSummary, 0, len(speeches))
+			for _, s := range speeches {
+				summaries = append(summaries, aisvc.FedSpeechSummary{
+					Speaker:     s.Speaker,
+					Title:       s.Title,
+					PublishedAt: s.PublishedAt.Format("Jan 2"),
+				})
+			}
+			return summaries
+		})
+		log.Info().Msg("Fed RSS speech provider wired into AI context builder")
+	}
+
+	// Wire surprise accumulator to main scheduler for ConvictionScoreV3 (fixes BUG-5)
+	sched.SetSurpriseProvider(newsSched)
 	log.Info().Msg("News Background scheduler started")
 
 	// -----------------------------------------------------------------------
@@ -319,30 +356,33 @@ func main() {
 	// Handler is wired after newsSched so it can receive the surprise accumulator.
 	// newsSched implements SurpriseProvider via GetSurpriseSigma — enables full
 	// 3-source conviction scoring (COT + FRED + Calendar) in /rank and /cot detail.
-	handler := tgbot.NewHandler(
-		bot,
-		eventRepo,
-		cotRepo,
-		prefsRepo,
-		newsRepo,
-		newsFetcher,
-		aiAnalyzer,     // nil-safe: handler checks IsAvailable()
-		changelogContent,
-		newsSched,       // SurpriseProvider: weekly per-currency surprise accumulator
-		authMiddleware,  // User management middleware
-		priceRepo,       // Price data for backtest/context (nil-safe)
-		signalRepo,      // Signal persistence for backtest (nil-safe)
-		chatService,     // Claude chatbot service (nil-safe)
-		claudeAnalyzer,  // Claude AIAnalyzer for /outlook (nil-safe)
-		impactRepo,      // Event Impact Database (nil-safe)
-		dailyPriceRepo,  // Daily price data for /price command (nil-safe)
-		intradayRepo,    // 4H intraday data for /intraday command (nil-safe)
-	)
+	handler := tgbot.NewHandler(tgbot.HandlerDeps{
+		Bot:            bot,
+		EventRepo:      storageDeps.EventRepo,
+		COTRepo:        storageDeps.COTRepo,
+		PrefsRepo:      storageDeps.PrefsRepo,
+		NewsRepo:       storageDeps.NewsRepo,
+		NewsFetcher:    newsFetcher,
+		AIAnalyzer:     aiAnalyzer,
+		Changelog:      changelogContent,
+		NewsScheduler:  newsSched,
+		Middleware:     authMiddleware,
+		PriceRepo:      storageDeps.PriceRepo,
+		SignalRepo:     storageDeps.SignalRepo,
+		ChatService:    chatService,
+		ClaudeAnalyzer: claudeAnalyzer,
+		ImpactProvider: storageDeps.ImpactRepo,
+		DailyPriceRepo: storageDeps.DailyPriceRepo,
+		IntradayRepo:   storageDeps.IntradayRepo,
+	})
+
+	// Wire feedback repo for 👍/👎 reaction buttons on analysis messages (TASK-051)
+	handler.WithFeedback(storageDeps.FeedbackRepo)
 
 	// Wire alpha services (Factor + Strategy + Microstructure engines)
 	if alphaServices != nil {
 		handler.WithAlpha(alphaServices)
-		log.Info().Msg("Alpha commands registered (/xfactors /playbook /heat /rankx /transition /cryptoalpha)")
+		log.Info().Msg("Radar commands registered (/radar /xfactors /intensity /transition /cryptoalpha — /playbook merged into /bias, /rankx merged into /rank)")
 	}
 
 	// Wire CTA services (Classical Technical Analysis engine)
@@ -350,8 +390,8 @@ func main() {
 		taEngine := ta.NewEngine()
 		ctaServices := &tgbot.CTAServices{
 			TAEngine:       taEngine,
-			DailyPriceRepo: dailyPriceRepo,
-			IntradayRepo:   intradayRepo,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
 			PriceMapping:   domain.DefaultPriceSymbolMappings,
 		}
 		handler.WithCTA(ctaServices)
@@ -360,16 +400,16 @@ func main() {
 		// Wire CTA Backtest services (reuses same TA engine + repos)
 		ctabtServices := &tgbot.CTABTServices{
 			TAEngine:       taEngine,
-			DailyPriceRepo: dailyPriceRepo,
-			IntradayRepo:   intradayRepo,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
 		}
 		handler.WithCTABT(ctabtServices)
 		log.Info().Msg("CTA Backtest commands registered (/ctabt)")
 
 		// Wire Quant services (Econometric/Statistical Analysis engine)
 		quantServices := &tgbot.QuantServices{
-			DailyPriceRepo: dailyPriceRepo,
-			IntradayRepo:   intradayRepo,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
 			PriceMapping:   domain.DefaultPriceSymbolMappings,
 		}
 		handler.WithQuant(quantServices)
@@ -377,12 +417,61 @@ func main() {
 
 		// Wire Volume Profile services
 		vpServices := tgbot.VPServices{
-			DailyPriceRepo: dailyPriceRepo,
-			IntradayRepo:   intradayRepo,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
 		}
 		handler.WithVP(vpServices)
 		log.Info().Msg("Volume Profile commands registered (/vp)")
+
+		// Wire ICT/SMC services (Smart Money Concepts analysis engine)
+		ictServices := &tgbot.ICTServices{
+			Engine:         ictsvc.NewEngine(),
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
+		}
+		handler.WithICT(ictServices)
+		log.Info().Msg("ICT/SMC commands registered (/ict)")
+
+		// Wire SMC services (Smart Money Concepts: BOS/CHOCH + ICT overlay)
+		smcServices := &tgbot.SMCServices{
+			ICTEngine:      ictsvc.NewEngine(),
+			TAEngine:       taEngine,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
+		}
+		handler.WithSMC(smcServices)
+		log.Info().Msg("SMC commands registered (/smc)")
+
+		// Wire GEX services (Gamma Exposure engine via Deribit public API)
+		gexServices := &tgbot.GEXServices{
+			Engine: gexsvc.NewEngine(),
+		}
+		handler.WithGEX(gexServices)
+		log.Info().Msg("GEX commands registered (/gex)")
+
+		// Wire Elliott Wave services (automated wave counting and projection)
+		elliottServices := tgbot.ElliottServices{
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
+			Engine:         elliottsvc.NewEngine(),
+		}
+		handler.WithElliott(elliottServices)
+		log.Info().Msg("Elliott Wave commands registered (/elliott)")
+
+		// Wire Wyckoff services (Wyckoff Method structure detection)
+		wyckoffServices := tgbot.WyckoffServices{
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
+			WyckoffEngine:  wyckoffsvc.NewEngine(),
+		}
+		handler.WithWyckoff(wyckoffServices)
+		log.Info().Msg("Wyckoff commands registered (/wyckoff)")
 	}
+
+	// Wire regime alert provider for /regime command (TASK-138)
+	// sched implements RegimeAlertProvider via GetRegimeStates + GetRegimeDivergence.
+	handler.WithRegime(sched)
+	log.Info().Msg("Regime alert commands registered (/regime)")
 
 	// Register free-text handler for chatbot mode
 	if chatService != nil {
@@ -429,7 +518,7 @@ func main() {
 		if err != nil {
 			log.Warn().Err(err).Msg("price history bootstrap failed (non-fatal)")
 		} else if len(priceRecords) > 0 {
-			if err := priceRepo.SavePrices(initCtx, priceRecords); err != nil {
+			if err := storageDeps.PriceRepo.SavePrices(initCtx, priceRecords); err != nil {
 				log.Warn().Err(err).Msg("save price history failed (non-fatal)")
 			} else {
 				log.Info().Int("records", len(priceRecords)).Msg("price history bootstrapped")
@@ -437,7 +526,7 @@ func main() {
 		}
 
 		// Log existing signal state before purge/bootstrap
-		if allSigs, err := signalRepo.GetAllSignals(initCtx); err == nil && len(allSigs) > 0 {
+		if allSigs, err := storageDeps.SignalRepo.GetAllSignals(initCtx); err == nil && len(allSigs) > 0 {
 			zeroEntry := 0
 			for _, s := range allSigs {
 				if s.EntryPrice == 0 {
@@ -452,7 +541,7 @@ func main() {
 
 		// Purge any signals with EntryPrice=0 (created by older bootstrap code).
 		// This allows re-bootstrap to recreate them with valid entry prices.
-		if purged, err := signalRepo.PurgeInvalidSignals(initCtx); err != nil {
+		if purged, err := storageDeps.SignalRepo.PurgeInvalidSignals(initCtx); err != nil {
 			log.Warn().Err(err).Msg("signal purge failed (non-fatal)")
 		} else if purged > 0 {
 			log.Info().Int("purged", purged).Msg("purged invalid signals (EntryPrice=0)")
@@ -460,7 +549,7 @@ func main() {
 
 		// Backtest bootstrap (replay historical COT signals against prices)
 		log.Info().Msg("Running backtest bootstrap...")
-		bootstrapper := backtestsvc.NewBootstrapper(cotRepo, priceRepo, signalRepo, signalRepo, dailyPriceRepo)
+		bootstrapper := backtestsvc.NewBootstrapper(storageDeps.COTRepo, storageDeps.PriceRepo, storageDeps.SignalRepo, storageDeps.SignalRepo, storageDeps.DailyPriceRepo)
 		if created, err := bootstrapper.Run(initCtx); err != nil {
 			log.Warn().Err(err).Msg("backtest bootstrap failed (non-fatal)")
 		} else if created > 0 {
@@ -471,7 +560,7 @@ func main() {
 		// For each unlabelled signal, fetches the regime that was active at its
 		// DetectedAt date rather than stamping the current regime on everything.
 		{
-			backfilled, bfErr := backtestsvc.BackfillRegimeLabels(initCtx, signalRepo)
+			backfilled, bfErr := backtestsvc.BackfillRegimeLabels(initCtx, storageDeps.SignalRepo)
 			if bfErr != nil {
 				log.Warn().Err(bfErr).Msg("regime backfill failed (non-fatal)")
 			} else if backfilled > 0 {
@@ -491,14 +580,14 @@ func main() {
 
 		// Backfill calibrated confidence on bootstrap signals using Platt scaling.
 		// Must run AFTER evaluation so we have outcome data to fit against.
-		if calibrated, calErr := backtestsvc.BackfillCalibration(initCtx, signalRepo); calErr != nil {
+		if calibrated, calErr := backtestsvc.BackfillCalibration(initCtx, storageDeps.SignalRepo); calErr != nil {
 			log.Warn().Err(calErr).Msg("confidence calibration backfill failed (non-fatal)")
 		} else if calibrated > 0 {
 			log.Info().Int("calibrated", calibrated).Msg("signal confidence backfill complete")
 		}
 
 		initCancel()
-		logStorageSize(db)
+		LogStorageSize(storageDeps.DB)
 
 		// Send startup notification (non-blocking — bot is about to start polling)
 		go func() {
@@ -585,25 +674,6 @@ func claudeStatus(cs *aisvc.ChatService) string {
 	return "Offline"
 }
 
-// logStorageSize logs the current database size.
-func logStorageSize(db *storage.DB) {
-	lsm, vlog := db.Size()
-	total := lsm + vlog
-	if total > 1<<20 {
-		log.Info().
-			Float64("total_mb", float64(total)/(1<<20)).
-			Float64("lsm_mb", float64(lsm)/(1<<20)).
-			Float64("vlog_mb", float64(vlog)/(1<<20)).
-			Msg("Storage size")
-	} else {
-		log.Info().
-			Int64("total_kb", total>>10).
-			Int64("lsm_kb", lsm>>10).
-			Int64("vlog_kb", vlog>>10).
-			Msg("Storage size")
-	}
-}
-
 // ownerChatIDForScheduler converts an owner user ID to a chat ID string.
 // Returns "" if the owner ID is not set (disabling owner notifications).
 func ownerChatIDForScheduler(ownerID int64) string {
@@ -625,18 +695,4 @@ func newImpactBootstrapper(
 	ib := newssvc.NewImpactBootstrapper(fetcher, priceRepo, impactRepo, priceFetcher)
 	ib.SetMonths(months)
 	return ib
-}
-
-// fredPersistAdapter adapts storage.FREDRepo (ports.FREDRepository) to the
-// fred.FREDPersister interface, bridging the ports ↔ fred type boundary.
-type fredPersistAdapter struct {
-	repo *storage.FREDRepo
-}
-
-func (a *fredPersistAdapter) SaveSnapshots(ctx context.Context, obs []fred.FREDObservation) error {
-	portObs := make([]ports.FREDObservation, len(obs))
-	for i, o := range obs {
-		portObs[i] = ports.FREDObservation{SeriesID: o.SeriesID, Date: o.Date, Value: o.Value}
-	}
-	return a.repo.SaveSnapshots(ctx, portObs)
 }

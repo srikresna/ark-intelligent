@@ -11,15 +11,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/pkg/circuitbreaker"
+	"github.com/arkcode369/ark-intelligent/pkg/errs"
+	"github.com/arkcode369/ark-intelligent/pkg/httpclient"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
+	"github.com/arkcode369/ark-intelligent/pkg/retry"
 )
 
 var log = logger.Component("price")
 
 // Fetcher implements ports.PriceFetcher with 3-layer resilience:
-// Twelve Data (primary) → Alpha Vantage (secondary) → Yahoo Finance (fallback).
+// Twelve Data (primary) → Alpha Vantage (secondary) → Yahoo Finance → Stooq.com (fallback).
 // CoinGecko is used as a dedicated provider for crypto market cap data (TOTAL3).
 type Fetcher struct {
 	httpClient     *http.Client
@@ -32,21 +36,21 @@ type Fetcher struct {
 	cbAlphaVantage *circuitbreaker.Breaker
 	cbYahoo        *circuitbreaker.Breaker
 	cbCoinGecko    *circuitbreaker.Breaker
+	cbStooq        *circuitbreaker.Breaker
 }
 
 // NewFetcher creates a new price fetcher with the given API keys.
 // Both keys are optional — Yahoo Finance fallback requires no key.
 func NewFetcher(twelveDataKeys []string, avKeys []string) *Fetcher {
 	return &Fetcher{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		httpClient:     httpclient.NewClient(30 * time.Second),
 		twelveDataKeys: twelveDataKeys,
 		avKeys:         avKeys,
 		cbTwelveData:   circuitbreaker.New("twelve-data", 3, 5*time.Minute),
 		cbAlphaVantage: circuitbreaker.New("alpha-vantage", 3, 5*time.Minute),
 		cbYahoo:        circuitbreaker.New("yahoo-finance", 5, 3*time.Minute),
 		cbCoinGecko:    circuitbreaker.New("coingecko", 3, 5*time.Minute),
+		cbStooq:        circuitbreaker.New("stooq", 3, 5*time.Minute),
 	}
 }
 
@@ -183,7 +187,7 @@ func (f *Fetcher) FetchRiskInstruments(ctx context.Context, weeks int) ([]domain
 }
 
 // FetchWeekly fetches weekly OHLC data for a single contract.
-// Tries: CoinGecko (if applicable) → TwelveData → AlphaVantage → Yahoo Finance → Synthetic cross.
+// Tries: CoinGecko (if applicable) → TwelveData → AlphaVantage → Yahoo Finance → Stooq → Synthetic cross.
 func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMapping, weeks int) ([]domain.PriceRecord, error) {
 	// CoinGecko-sourced instruments (TOTAL3) — dedicated provider, no fallback chain
 	if mapping.CoinGecko != "" && f.coinGeckoKey != "" {
@@ -230,6 +234,17 @@ func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMap
 		}
 	}
 
+	// Fallback to Stooq.com (free, no API key — forex historical OHLCV)
+	if stooqSymbol(mapping.Currency) != "" {
+		records, err := f.fetchStooq(ctx, mapping, weeks)
+		if err == nil && len(records) > 0 {
+			return records, nil
+		}
+		if err != nil {
+			log.Debug().Err(err).Str("currency", mapping.Currency).Msg("Stooq failed")
+		}
+	}
+
 	// Final fallback: synthetic cross pair calculation (e.g. XAU/EUR = XAU/USD ÷ EUR/USD)
 	if cross, ok := SyntheticCrossDef(mapping.Currency); ok {
 		records, err := f.fetchSyntheticCross(ctx, mapping, cross, weeks)
@@ -241,7 +256,7 @@ func (f *Fetcher) FetchWeekly(ctx context.Context, mapping domain.PriceSymbolMap
 		}
 	}
 
-	return nil, fmt.Errorf("no price source available for %s", mapping.Currency)
+	return nil, errs.Wrapf(errs.ErrNotFound, "no price source for %s", mapping.Currency)
 }
 
 // HealthCheck verifies that at least one price API is reachable.
@@ -371,10 +386,10 @@ func (f *Fetcher) parseAVFXWeekly(body []byte, mapping domain.PriceSymbolMapping
 		return nil, fmt.Errorf("parse AV FX response: %w", err)
 	}
 	if resp.Note != "" || resp.Info != "" {
-		return nil, fmt.Errorf("AV rate limited: %s%s", resp.Note, resp.Info)
+		return nil, errs.Wrapf(errs.ErrRateLimited, "alphavantage: %s%s", resp.Note, resp.Info)
 	}
 	if len(resp.TimeSeries) == 0 {
-		return nil, fmt.Errorf("AV FX empty response")
+		return nil, errs.Wrap(errs.ErrNoData, "alphavantage FX")
 	}
 
 	records := make([]domain.PriceRecord, 0, len(resp.TimeSeries))
@@ -411,10 +426,10 @@ func (f *Fetcher) parseAVCommodity(body []byte, mapping domain.PriceSymbolMappin
 		return nil, fmt.Errorf("parse AV commodity response: %w", err)
 	}
 	if resp.Note != "" || resp.Info != "" {
-		return nil, fmt.Errorf("AV rate limited: %s%s", resp.Note, resp.Info)
+		return nil, errs.Wrapf(errs.ErrRateLimited, "alphavantage: %s%s", resp.Note, resp.Info)
 	}
 	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("AV commodity empty response")
+		return nil, errs.Wrap(errs.ErrNoData, "alphavantage commodity")
 	}
 
 	records := make([]domain.PriceRecord, 0, weeks)
@@ -490,7 +505,7 @@ func (f *Fetcher) fetchYahoo(ctx context.Context, mapping domain.PriceSymbolMapp
 		}
 
 		if len(resp.Chart.Result) == 0 {
-			return fmt.Errorf("yahoo empty response for %s", mapping.Yahoo)
+			return errs.Wrapf(errs.ErrNoData, "yahoo empty response for %s", mapping.Yahoo)
 		}
 
 		result := resp.Chart.Result[0]
@@ -601,7 +616,7 @@ func (f *Fetcher) fetchSyntheticCross(ctx context.Context, mapping domain.PriceS
 			Date:         num.Date,
 			Open:         num.Open / den.Open,
 			High:         num.High / den.Low, // max ratio when num is high and den is low
-			Low:          num.Low / den.High,  // min ratio when num is low and den is high
+			Low:          num.Low / den.High, // min ratio when num is low and den is high
 			Close:        num.Close / den.Close,
 			Source:       "synthetic",
 		}
@@ -666,13 +681,13 @@ func (f *Fetcher) fetchCoinGecko(ctx context.Context, mapping domain.PriceSymbol
 		if err != nil {
 			return fmt.Errorf("coingecko btc: %w", err)
 		}
-		time.Sleep(300 * time.Millisecond) // Rate limit
+		time.Sleep(config.PriceFetchDelay) // Rate limit
 
 		ethData, err := f.fetchCoinGeckoMarketChart(ctx, "ethereum", daysParam, headers)
 		if err != nil {
 			return fmt.Errorf("coingecko eth: %w", err)
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(config.PriceFetchDelay)
 
 		// Get current total market cap from /global to establish the ratio
 		globalBody, err := f.doGet(ctx, "https://api.coingecko.com/api/v3/global", headers)
@@ -824,29 +839,31 @@ func (f *Fetcher) nextTDKey() string {
 }
 
 func (f *Fetcher) doGet(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
+	return retry.Do(ctx, func() ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 
-	resp, err := f.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+		resp, err := f.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	return body, nil
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read body: %w", err)
+		}
+		return body, nil
+	})
 }
 
 func parseFloat(s string) float64 {
@@ -902,7 +919,7 @@ func (f *Fetcher) FetchSpotPrice(ctx context.Context, contractCode string) (floa
 		}
 
 		if len(resp.Chart.Result) == 0 {
-			return fmt.Errorf("yahoo spot empty response for %s", mapping.Yahoo)
+			return errs.Wrapf(errs.ErrNoData, "yahoo spot empty response for %s", mapping.Yahoo)
 		}
 
 		result := resp.Chart.Result[0]

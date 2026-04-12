@@ -5,8 +5,10 @@ package microstructure
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/service/marketdata/bybit"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 )
@@ -15,17 +17,23 @@ var log = logger.Component("microstructure")
 
 // Signal is the actionable microstructure signal for a symbol.
 type Signal struct {
-	Symbol      string
-	Category    string // "linear", "spot"
-	BidAskImbalance float64 // positive = bid heavy, negative = ask heavy
-	TakerBuyRatio   float64 // fraction of recent trades that are taker buys (0-1)
-	OIChange        float64 // open interest change % over recent period
-	FundingRate     float64 // current funding rate (decimal, e.g. 0.0001)
-	LongShortRatio  float64 // longs / shorts ratio (>1 = more longs)
-	Bias            Bias    // derived directional bias
-	ConfirmEntry    bool    // true = microstructure confirms a directional entry
-	Strength        float64 // 0-1 strength of the signal
+	Symbol          string
+	Category        string                  // "linear", "spot"
+	BidAskImbalance float64                 // positive = bid heavy, negative = ask heavy
+	TakerBuyRatio   float64                 // fraction of recent trades that are taker buys (0-1)
+	OIChange        float64                 // open interest change % over recent period
+	FundingRate     float64                 // current funding rate (decimal, e.g. 0.0001)
+	LongShortRatio  float64                 // longs / shorts ratio (>1 = more longs)
+	Bias            Bias                    // derived directional bias
+	ConfirmEntry    bool                    // true = microstructure confirms a directional entry
+	Strength        float64                 // 0-1 strength of the signal
+	FundingStats    *bybit.FundingRateStats // historical funding rate analysis (nil if unavailable)
 	UpdatedAt       time.Time
+
+	// Enhanced flow metrics (TASK-137)
+	LargeTradePresence float64 // % of total volume from large/institutional trades (0-100)
+	AbsorptionScore    float64 // 0-1: likelihood that bid-side absorption occurred after large buys
+	DeltaDivergence    bool    // true = OI direction and price direction are mismatched (warning signal)
 }
 
 // Bias is the directional bias from microstructure.
@@ -71,6 +79,7 @@ func (e *Engine) Analyze(ctx context.Context, category, symbol string) (*Signal,
 		log.Warn().Str("symbol", symbol).Err(err).Msg("microstructure: trades fetch failed")
 	} else {
 		sig.TakerBuyRatio = computeTakerBuyRatio(trades)
+		sig.LargeTradePresence, sig.AbsorptionScore = computeLargeTradeMetrics(trades, ob)
 	}
 
 	// --- 3. Open Interest momentum (only for perpetuals) ---
@@ -80,6 +89,9 @@ func (e *Engine) Analyze(ctx context.Context, category, symbol string) (*Signal,
 			log.Warn().Str("symbol", symbol).Err(err).Msg("microstructure: OI fetch failed")
 		} else {
 			sig.OIChange = computeOIChange(oi)
+			// Delta divergence: compare OI direction with recent price direction from trades
+			priceChange := computePriceChange(trades)
+			sig.DeltaDivergence = computeDeltaDivergence(sig.OIChange, priceChange)
 		}
 	}
 
@@ -103,9 +115,19 @@ func (e *Engine) Analyze(ctx context.Context, category, symbol string) (*Signal,
 		}
 	}
 
+	// --- 5b. Funding rate history (for regime analysis) ---
+	if category == "linear" {
+		rates, err := e.client.GetFundingHistory(ctx, category, symbol, 200)
+		if err != nil {
+			log.Warn().Str("symbol", symbol).Err(err).Msg("microstructure: funding history fetch failed")
+		} else if len(rates) > 0 {
+			sig.FundingStats = bybit.ComputeFundingStats(symbol, rates)
+		}
+	}
+
 	// --- 6. Derive bias ---
 	sig.Bias, sig.Strength = deriveBias(sig)
-	sig.ConfirmEntry = sig.Strength >= 0.50
+	sig.ConfirmEntry = sig.Strength >= config.MicroConfirmEntryThreshold
 
 	return sig, nil
 }
@@ -234,6 +256,18 @@ func deriveBias(sig *Signal) (Bias, float64) {
 		bearish += 0.15
 	}
 
+	// Large institutional buy presence boosts bullish signal
+	if sig.LargeTradePresence > 30 && sig.TakerBuyRatio > 0.55 {
+		bullish += 0.15
+	} else if sig.LargeTradePresence > 30 && sig.TakerBuyRatio < 0.45 {
+		bearish += 0.15
+	}
+
+	// Absorption after large buys = bullish exhaustion risk (slight bearish)
+	if sig.AbsorptionScore > 0.6 {
+		bearish += 0.10
+	}
+
 	if bullish == 0 && bearish == 0 {
 		return BiasNeutral, 0
 	}
@@ -259,4 +293,111 @@ func deriveBias(sig *Signal) (Bias, float64) {
 		return BiasBearish, strength
 	}
 	return BiasConflict, 0.3
+}
+
+// computeLargeTradeMetrics identifies institutional/large trades using 2-std-dev bucketing.
+// Returns (largeTradePresence %, absorptionScore 0-1).
+// largeTradePresence: % of total volume from trades sized >2 std dev above mean.
+// absorptionScore: elevated when large buy pressure coincides with thin top bid levels.
+func computeLargeTradeMetrics(trades []bybit.Trade, ob *bybit.Orderbook) (largeTradePresence float64, absorptionScore float64) {
+	if len(trades) == 0 {
+		return 0, 0
+	}
+
+	// Compute mean and std dev of trade sizes
+	n := float64(len(trades))
+	mean := 0.0
+	for _, t := range trades {
+		mean += t.Qty
+	}
+	mean /= n
+
+	variance := 0.0
+	for _, t := range trades {
+		d := t.Qty - mean
+		variance += d * d
+	}
+	variance /= n
+	stdDev := math.Sqrt(variance)
+
+	threshold := mean + 2*stdDev
+
+	// Sum total volume and large-trade volume
+	totalVol := 0.0
+	largeVol := 0.0
+	largeBuyVol := 0.0
+	for _, t := range trades {
+		totalVol += t.Qty
+		if t.Qty > threshold {
+			largeVol += t.Qty
+			if t.IsBuyTaker {
+				largeBuyVol += t.Qty
+			}
+		}
+	}
+
+	if totalVol > 0 {
+		largeTradePresence = (largeVol / totalVol) * 100
+	}
+
+	// Absorption score: large buy pressure present + thin top-5 bid levels
+	if ob != nil && largeBuyVol > 0 && largeVol > 0 {
+		largeBuyFraction := largeBuyVol / largeVol // fraction of large trades that are buys
+		if largeBuyFraction > 0.5 {
+			// Check bid thinness: compare top-5 bid qty to top-5 ask qty
+			bidTop5 := 0.0
+			for i, b := range ob.Bids {
+				if i >= 5 {
+					break
+				}
+				bidTop5 += b.Quantity
+			}
+			askTop5 := 0.0
+			for i, a := range ob.Asks {
+				if i >= 5 {
+					break
+				}
+				askTop5 += a.Quantity
+			}
+			// If bid side is thin relative to ask side after large buys → absorption likely
+			if askTop5 > 0 {
+				ratio := bidTop5 / askTop5
+				if ratio < 0.8 {
+					// Bids are thin relative to asks → absorption signal
+					absorptionScore = (1 - ratio) * largeBuyFraction
+					if absorptionScore > 1 {
+						absorptionScore = 1
+					}
+				}
+			}
+		}
+	}
+
+	return largeTradePresence, absorptionScore
+}
+
+// computePriceChange returns the % price change from oldest to newest trade.
+// trades[0] = most recent (Bybit returns newest first).
+func computePriceChange(trades []bybit.Trade) float64 {
+	if len(trades) < 2 {
+		return 0
+	}
+	newest := trades[0].Price
+	oldest := trades[len(trades)-1].Price
+	if oldest == 0 {
+		return 0
+	}
+	return (newest - oldest) / oldest * 100
+}
+
+// computeDeltaDivergence returns true when OI direction and price direction diverge.
+// Rising OI with falling price (or falling OI with rising price) indicates a potential
+// regime shift or squeeze setup.
+func computeDeltaDivergence(oiChange, priceChange float64) bool {
+	const minThreshold = 0.5 // minimum % move to consider significant
+	if math.Abs(oiChange) < minThreshold || math.Abs(priceChange) < minThreshold {
+		return false
+	}
+	// Divergence: OI and price moving in opposite directions
+	return (oiChange > 0 && priceChange < 0) || (oiChange < 0 && priceChange > 0)
 }

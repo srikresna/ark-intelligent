@@ -9,6 +9,7 @@ import (
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/pkg/fmtutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,9 +28,9 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 	}
 
 	b.WriteString(fmt.Sprintf("⏰ <b>%s — 4H Context</b> %s\n", ic.Currency, arrow))
-	b.WriteString(fmt.Sprintf("<code>Price: %s | As of %s UTC</code>\n\n",
+	b.WriteString(fmt.Sprintf("<code>Price: %s | As of %s</code>\n\n",
 		formatDailyPrice(ic.CurrentPrice, ic.Currency),
-		ic.AsOf.Format("Jan 02 15:04")))
+		fmtutil.FormatDateTimeUTC(ic.AsOf)))
 
 	// Short-term changes
 	b.WriteString("<b>📊 Short-Term Changes</b>\n")
@@ -59,12 +60,12 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 
 	// MA Trend
 	maTrend := ic.IntradayMATrend()
-	trendEmoji := "⚪"
+	trendEmoji := "⚪ Mixed"
 	switch maTrend {
 	case "BULLISH":
-		trendEmoji = "🟢"
+		trendEmoji = "🟢 Bullish"
 	case "BEARISH":
-		trendEmoji = "🔴"
+		trendEmoji = "🔴 Bearish"
 	}
 	b.WriteString(fmt.Sprintf("<code>Alignment: %s</code> %s\n", maTrend, trendEmoji))
 
@@ -96,7 +97,7 @@ func (f *Formatter) FormatIntradayContext(ic *domain.IntradayContext) string {
 	}
 	b.WriteString(fmt.Sprintf("\n<code>4H Trend: %s</code> %s\n", ic.IntradayTrend, trendIcon))
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // ---------------------------------------------------------------------------
@@ -135,15 +136,19 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 			b.WriteString(fmt.Sprintf("<code>%-6s ", truncLabel(a, 3)))
 			for _, c := range fxCurrencies {
 				corr := m.Matrix[a][c]
-				b.WriteString(fmt.Sprintf("%+.1f ", corr))
+				if math.IsNaN(corr) {
+					b.WriteString(" N/A ")
+				} else {
+					b.WriteString(fmt.Sprintf("%+.1f ", corr))
+				}
 			}
 			b.WriteString("</code>\n")
 		}
 	}
 
 	// --- Cross-Asset vs FX (top 4 FX pairs) ---
-	if len(crossAssets) > 0 && len(fxCurrencies) >= 4 {
-		topFX := fxCurrencies[:4]
+	if len(crossAssets) > 0 && len(fxCurrencies) > 0 {
+		topFX := fxCurrencies[:min(4, len(fxCurrencies))]
 
 		// Group cross-assets by category for readability.
 		type assetGroup struct {
@@ -168,8 +173,12 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 				var pairs []string
 				for _, fx := range topFX {
 					if corr, ok := m.Matrix[asset][fx]; ok {
-						icon := corrIcon(corr)
-						pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", truncLabel(fx, 3), corr, icon))
+						if math.IsNaN(corr) {
+							pairs = append(pairs, fmt.Sprintf("%s: N/A", truncLabel(fx, 3)))
+						} else {
+							icon := corrIcon(corr)
+							pairs = append(pairs, fmt.Sprintf("%s:%+.2f%s", truncLabel(fx, 3), corr, icon))
+						}
 					}
 				}
 				if len(pairs) > 0 {
@@ -189,7 +198,7 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 		for i := 0; i < len(crossAssets); i++ {
 			for j := i + 1; j < len(crossAssets); j++ {
 				a, bb := crossAssets[i], crossAssets[j]
-				if corr, ok := m.Matrix[a][bb]; ok && math.Abs(corr) >= 0.40 {
+				if corr, ok := m.Matrix[a][bb]; ok && !math.IsNaN(corr) && math.Abs(corr) >= 0.40 {
 					notable = append(notable, corrPair{a, bb, corr})
 				}
 			}
@@ -219,16 +228,16 @@ func (f *Formatter) FormatCorrelationMatrix(m *domain.CorrelationMatrix) string 
 			limit = len(m.Breakdowns)
 		}
 		for _, bd := range m.Breakdowns[:limit] {
-			sevIcon := "🟡"
+			sevIcon := "🟡 Medium"
 			if bd.Severity == "HIGH" {
-				sevIcon = "🔴"
+				sevIcon = "🔴 High"
 			}
 			b.WriteString(fmt.Sprintf("%s <code>%s/%s: %.2f → %.2f (Δ%+.2f)</code>\n",
 				sevIcon, bd.CurrencyA, bd.CurrencyB, bd.HistoricalCorr, bd.CurrentCorr, bd.Delta))
 		}
 	}
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // filterPresent returns the subset of candidates that exist in available.
@@ -257,16 +266,16 @@ func (f *Formatter) FormatCorrelationClusters(clusters []domain.CorrelationClust
 	}
 	b.WriteString("\n<i>Avoid simultaneous exposure in same cluster</i>")
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 func corrIcon(r float64) string {
 	abs := math.Abs(r)
 	switch {
 	case abs >= 0.80:
-		return "🔴" // Strong
+		return "🔴 Strong" // Strong correlation
 	case abs >= 0.50:
-		return "🟠" // Moderate
+		return "🟠 Moderate" // Moderate correlation
 	default:
 		return ""
 	}
@@ -295,9 +304,9 @@ func (f *Formatter) FormatCarryRanking(r *domain.CarryRanking) string {
 		}
 
 		// Direction icon
-		dirIcon := "🟢" // Positive carry (long)
+		dirIcon := "🟢 Long" // Positive carry (long)
 		if p.Differential < 0 {
-			dirIcon = "🔴" // Negative carry (short)
+			dirIcon = "🔴 Short" // Negative carry (short)
 		}
 
 		// Carry bar visualization
@@ -316,7 +325,7 @@ func (f *Formatter) FormatCarryRanking(r *domain.CarryRanking) string {
 	b.WriteString("\n<i>Positive diff = earn carry going long XXX/USD</i>\n")
 	b.WriteString("<i>Negative diff = pay carry going long XXX/USD</i>")
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // carryBar creates a visual bar for carry score (-100 to +100).
@@ -348,14 +357,14 @@ func truncLabel(s string, maxLen int) string {
 func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string {
 	var b strings.Builder
 
-	fcastIcon := "⚪"
+	fcastIcon := "⚪ Stable"
 	fcastLabel := "Stable"
 	switch g.VolForecast {
 	case "INCREASING":
-		fcastIcon = "🔴"
+		fcastIcon = "🔴 Rising"
 		fcastLabel = "Getting wilder"
 	case "DECREASING":
-		fcastIcon = "🟢"
+		fcastIcon = "🟢 Falling"
 		fcastLabel = "Calming down"
 	}
 
@@ -398,7 +407,7 @@ func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string
 	b.WriteString(fmt.Sprintf("\n<i>Model: α=%.3f β=%.3f persistence=%.3f | %d samples</i>",
 		g.Alpha, g.Beta, g.Persistence, g.SampleSize))
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // ---------------------------------------------------------------------------
@@ -409,14 +418,14 @@ func (f *Formatter) FormatGARCH(currency string, g *pricesvc.GARCHResult) string
 func (f *Formatter) FormatHurst(currency string, h *pricesvc.HurstResult, regime *pricesvc.HurstRegimeContext) string {
 	var b strings.Builder
 
-	icon := "⚪"
+	icon := "⚪ Random"
 	label := "Random (no clear pattern)"
 	switch h.Classification {
 	case "TRENDING":
-		icon = "📈"
+		icon = "📈 Trending"
 		label = "Trending — momentum carries forward"
 	case "MEAN_REVERTING":
-		icon = "🔄"
+		icon = "🔄 Reverting"
 		label = "Mean-reverting — extremes snap back"
 	}
 
@@ -460,7 +469,7 @@ func (f *Formatter) FormatHurst(currency string, h *pricesvc.HurstResult, regime
 
 	b.WriteString(fmt.Sprintf("\n<i>Based on %d daily samples</i>", h.SampleSize))
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // ---------------------------------------------------------------------------
@@ -474,25 +483,29 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 	if h == nil {
 		b.WriteString(fmt.Sprintf("🔀 <b>%s — Market Regime</b>\n\n", currency))
 		b.WriteString("<code>Not enough data to detect regime</code>\n")
-		return b.String()
+		return truncateMsg(b.String())
 	}
 
-	icon := "⚪"
+	icon := "⚪ Unknown"
 	label := "Unknown"
 	desc := ""
 	switch h.CurrentState {
 	case pricesvc.HMMRiskOn:
-		icon = "🟢"
+		icon = "🟢 Risk-On"
 		label = "Risk-On (Calm)"
 		desc = "Market is in a calm, confident phase. Trends tend to be reliable."
 	case pricesvc.HMMRiskOff:
-		icon = "🟡"
+		icon = "🟡 Risk-Off"
 		label = "Risk-Off (Cautious)"
 		desc = "Market is getting defensive. Expect choppy action, reduce exposure."
 	case pricesvc.HMMCrisis:
-		icon = "🔴"
+		icon = "🔴 Crisis"
 		label = "Crisis (Panic)"
 		desc = "Market is in stress mode. Correlations spike, safe havens outperform."
+	case pricesvc.HMMTrending:
+		icon = "🔵 Trending"
+		label = "Trending (Directional)"
+		desc = "Market is in a strong directional move with low vol. Ride the trend."
 	}
 
 	b.WriteString(fmt.Sprintf("🔀 <b>%s — Market Regime</b> %s\n\n", currency, icon))
@@ -506,6 +519,7 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 	b.WriteString(fmt.Sprintf("<code>Calm   : %.0f%%</code>\n", h.StateProbabilities[0]*100))
 	b.WriteString(fmt.Sprintf("<code>Cautious: %.0f%%</code>\n", h.StateProbabilities[1]*100))
 	b.WriteString(fmt.Sprintf("<code>Panic  : %.0f%%</code>\n", h.StateProbabilities[2]*100))
+	b.WriteString(fmt.Sprintf("<code>Trending: %.0f%%</code>\n", h.StateProbabilities[3]*100))
 
 	// Transition warning
 	if h.TransitionWarning != "" {
@@ -555,7 +569,7 @@ func (f *Formatter) FormatHMMRegime(currency string, h *pricesvc.HMMResult) stri
 	}
 	b.WriteString(fmt.Sprintf("\n<i>%d samples, %d iterations</i>", h.SampleSize, h.Iterations))
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // ---------------------------------------------------------------------------
@@ -613,7 +627,7 @@ func (f *Formatter) FormatFactorDecomposition(r *backtestsvc.DecompositionResult
 		}
 	}
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // factorBar creates a visual bar for factor contribution.
@@ -681,18 +695,18 @@ func (f *Formatter) FormatWFOptimization(r *backtestsvc.WFOResult) string {
 
 	// Stability
 	b.WriteString("\n<b>🔒 Stability</b>\n")
-	stabIcon := "🟢"
+	stabIcon := "🟢 Stable"
 	if r.WeightStability < 50 {
-		stabIcon = "🔴"
+		stabIcon = "🔴 Unstable"
 	} else if r.WeightStability < 70 {
-		stabIcon = "🟡"
+		stabIcon = "🟡 Moderate"
 	}
 	b.WriteString(fmt.Sprintf("<code>Weight Stability: %.0f%%</code> %s\n", r.WeightStability, stabIcon))
 
 	// Recommendation
 	b.WriteString(fmt.Sprintf("\n<b>💡 Recommendation:</b>\n<code>%s</code>\n", r.Recommendation))
 
-	return b.String()
+	return truncateMsg(b.String())
 }
 
 // weightBar creates a visual bar for weight percentage.
@@ -716,4 +730,118 @@ func sortedMapKeys(m map[string]float64) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// ---------------------------------------------------------------------------
+// FormatVolCone — Volatility Cone Analysis formatter
+// ---------------------------------------------------------------------------
+
+// FormatVolCone formats a VolCone result for Telegram HTML output.
+func (f *Formatter) FormatVolCone(cone *pricesvc.VolCone) string {
+	if cone == nil {
+		return "⚠️ <b>Volatility Cone</b>\n<code>Insufficient history (need ≥150 trading days)</code>\n"
+	}
+
+	var b strings.Builder
+	anomalyIcon := "🟢 Normal"
+	if cone.IsAnomaly {
+		anomalyIcon = "🔴 Anomaly"
+	}
+	b.WriteString(fmt.Sprintf("📐 <b>VOLATILITY CONE — %s</b> %s\n", cone.Symbol, anomalyIcon))
+	b.WriteString(fmt.Sprintf("<code>%s</code>\n\n", cone.AsOf.Format("02 Jan 2006")))
+
+	for _, w := range cone.Windows {
+		b.WriteString(volConeWindowBlock(w))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(fmt.Sprintf("<b>💡 %s</b>\n", cone.Summary))
+	return truncateMsg(b.String())
+}
+
+// volConeWindowBlock renders a single window as an ASCII band visualization.
+func volConeWindowBlock(w *pricesvc.VolConeWindow) string {
+	var b strings.Builder
+
+	icon := "📊"
+	if w.IsAnomaly && w.AnomalyDir == "HIGH" {
+		icon = "⚠️"
+	} else if w.IsAnomaly && w.AnomalyDir == "LOW" {
+		icon = "🔵"
+	}
+
+	label := fmt.Sprintf("%dd", w.Window)
+	b.WriteString(fmt.Sprintf("%s <b>%s Window</b>  <code>%.1f%%</code>  P%.0f\n",
+		icon, label, w.CurrentVol, w.Percentile))
+
+	// ASCII cone bar: position of current vol in P5..P95 range
+	bar := volConeBar(w.CurrentVol, w.P5, w.P95, 16)
+	b.WriteString(fmt.Sprintf("<code>P5 %s P95</code>\n", bar))
+	b.WriteString(fmt.Sprintf("<code>   P25=%.1f%%  P50=%.1f%%  P75=%.1f%%</code>\n",
+		w.P25, w.P50, w.P75))
+
+	return b.String()
+}
+
+// volConeBar renders an ASCII bar showing where current vol sits in [lo, hi].
+func volConeBar(current, lo, hi float64, width int) string {
+	if hi <= lo || width < 4 {
+		return strings.Repeat("-", width)
+	}
+	pos := int(math.Round((current - lo) / (hi - lo) * float64(width-1)))
+	if pos < 0 {
+		pos = 0
+	}
+	if pos >= width {
+		pos = width - 1
+	}
+	bar := make([]rune, width)
+	for i := range bar {
+		bar[i] = '-'
+	}
+	bar[pos] = '^'
+	return string(bar)
+}
+
+// ---------------------------------------------------------------------------
+// GJR-GARCH(1,1) Asymmetric Volatility Formatter
+// ---------------------------------------------------------------------------
+
+// FormatGJRGARCH formats a GJR-GARCH(1,1) result for Telegram display.
+func (f *Formatter) FormatGJRGARCH(currency string, g *pricesvc.GJRGARCHResult) string {
+	var b strings.Builder
+
+	asymIcon := "⚪"
+	switch g.AsymmetryLabel {
+	case "HIGH":
+		asymIcon = "🔴"
+	case "MODERATE":
+		asymIcon = "🟡"
+	case "LOW":
+		asymIcon = "🟢"
+	}
+
+	b.WriteString(fmt.Sprintf("📊 <b>%s — GJR-GARCH(1,1) Asymmetric Vol</b> %s\n\n", currency, asymIcon))
+
+	if !g.Converged {
+		b.WriteString("<code>⚠ Model tidak konvergen — gunakan dengan hati-hati</code>\n\n")
+	}
+
+	b.WriteString("<b>📈 Volatilitas saat ini</b>\n")
+	b.WriteString(fmt.Sprintf("<code>Current Vol    : ±%.2f%%/hari</code>\n", g.CurrentVol*100))
+	b.WriteString(fmt.Sprintf("<code>Forecast 1-step: ±%.2f%%/hari</code>\n", g.ForecastVol1*100))
+
+	b.WriteString(fmt.Sprintf("\n<b>⚡ Leverage Effect: %s</b> %s\n", g.AsymmetryLabel, asymIcon))
+	b.WriteString(fmt.Sprintf("<code>Asym. Ratio    : %.0f%% shock dari downside</code>\n", g.AsymmetryRatio))
+
+	if g.LeverageEffect {
+		b.WriteString("<code>→ Downside risk elevated — pertimbangkan kurangi long size</code>\n")
+	} else {
+		b.WriteString("<code>→ Volatilitas relatif simetris</code>\n")
+	}
+
+	b.WriteString(fmt.Sprintf("\n<i>Model: α=%.3f γ=%.3f β=%.3f persist=%.3f | %d samples</i>",
+		g.Alpha, g.Gamma, g.Beta, g.Persistence, g.SampleSize))
+
+	return truncateMsg(b.String())
 }

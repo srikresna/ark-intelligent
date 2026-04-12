@@ -1,5 +1,5 @@
 # ===========================================================================
-# ARK Intelligence v3 — Multi-stage Docker build
+# ARK Intelligence v4 — Multi-stage Docker build
 # Stage 1: Build Go binary with CGO disabled (static linking)
 # Stage 2: Minimal Alpine runtime with ca-certs and timezone data
 # ===========================================================================
@@ -22,7 +22,7 @@ RUN go mod tidy && go mod download
 
 # Build static binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-s -w -X main.version=3.0.0" \
+    -ldflags="-s -w -X main.version=4.0.0" \
     -trimpath \
     -o /build/ark-intelligent \
     ./cmd/bot
@@ -32,12 +32,20 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # ---------------------------------------------------------------------------
 FROM alpine:3.19
 
-# Install runtime dependencies
+# Install runtime dependencies + Python for chart rendering
 RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     curl \
+    python3 \
+    py3-pip \
+    py3-numpy \
+    py3-pandas \
+    py3-matplotlib \
     && rm -rf /var/cache/apk/*
+
+# Install Python chart dependencies not available as Alpine packages
+RUN pip3 install --no-cache-dir --break-system-packages mplfinance
 
 # Create non-root user
 RUN addgroup -S botgroup && adduser -S botuser -G botgroup
@@ -50,8 +58,12 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/ark-intelligent /app/ark-intelligent
 
-# Set timezone
+# Copy Python chart/engine scripts
+COPY scripts/ /app/scripts/
+
+# Set timezone and script discovery path
 ENV TZ=Asia/Jakarta
+ENV SCRIPTS_DIR=/app/scripts
 
 # Health check — HTTP liveness probe via /health endpoint
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \

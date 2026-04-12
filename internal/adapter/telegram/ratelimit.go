@@ -3,17 +3,19 @@ package telegram
 import (
 	"sync"
 	"time"
+
+	"github.com/arkcode369/ark-intelligent/internal/config"
 )
 
 // ---------------------------------------------------------------------------
 // Per-user rate limiter (sliding window)
 // ---------------------------------------------------------------------------
 
-const (
-	rateLimitWindow  = 60 * time.Second // sliding window duration
-	rateLimitMax     = 10               // max commands per window
-	staleEntryTTL    = 5 * time.Minute  // cleanup threshold for idle users
-	cleanupInterval  = 2 * time.Minute  // how often the cleanup goroutine runs
+var (
+	rateLimitWindow = config.RateLimitWindow
+	rateLimitMax    = config.RateLimitMax
+	staleEntryTTL   = config.StaleEntryTTL
+	cleanupInterval = config.CleanupInterval
 )
 
 // userWindow tracks command timestamps for a single user.
@@ -40,8 +42,8 @@ func newUserRateLimiter() *userRateLimiter {
 }
 
 // Allow reports whether the user is allowed to execute a command right now.
-// If allowed, it records the current timestamp; otherwise it returns false.
-func (rl *userRateLimiter) Allow(userID int64) bool {
+// If allowed, it records the current timestamp; otherwise it returns (false, retryAfter).
+func (rl *userRateLimiter) Allow(userID int64) (bool, time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -61,11 +63,16 @@ func (rl *userRateLimiter) Allow(userID int64) bool {
 	w.timestamps = w.timestamps[start:]
 
 	if len(w.timestamps) >= rateLimitMax {
-		return false
+		// Oldest timestamp in window tells us when a slot opens up.
+		retryAfter := w.timestamps[0].Add(rateLimitWindow).Sub(now)
+		if retryAfter < time.Second {
+			retryAfter = time.Second
+		}
+		return false, retryAfter
 	}
 
 	w.timestamps = append(w.timestamps, now)
-	return true
+	return true, 0
 }
 
 // cleanupLoop periodically removes entries for users who have been idle

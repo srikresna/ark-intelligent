@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -87,17 +88,25 @@ type Config struct {
 	EnableBybitMicrostructure bool // Enable Bybit crypto microstructure module (default: true if BybitAPIKey set)
 	EnableMassiveResearch     bool // Enable Massive historical research layer (default: true if MassiveAPIKeys set)
 	EnableFactorEngine        bool // Enable cross-sectional factor ranking engine (default: true)
-	EnableStrategyPlaybook    bool // Enable regime playbook + conviction engine (default: true)
-	EnablePortfolioHeat       bool // Enable portfolio exposure heat engine (default: true)
 }
 
-// MustLoad loads configuration from environment variables.
-// Panics if required variables are missing.
-func MustLoad() *Config {
+// Load loads configuration from environment variables.
+// Returns an error if required variables are missing or validation fails.
+func Load() (*Config, error) {
+	// Required vars - collect all errors
+	botToken, err := getRequiredEnv("BOT_TOKEN")
+	if err != nil {
+		return nil, err
+	}
+	chatID, err := getRequiredEnv("CHAT_ID")
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
-		// Required (will panic if empty)
-		BotToken: mustGetEnv("BOT_TOKEN"),
-		ChatID:   mustGetEnv("CHAT_ID"),
+		// Required
+		BotToken: botToken,
+		ChatID:   chatID,
 
 		// AI (optional)
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
@@ -188,10 +197,20 @@ func MustLoad() *Config {
 	cfg.EnableBybitMicrostructure = cfg.BybitAPIKey != "" || getEnv("ENABLE_BYBIT_MICROSTRUCTURE", "") == "true"
 	cfg.EnableMassiveResearch = len(cfg.MassiveAPIKeys) > 0 || getEnv("ENABLE_MASSIVE_RESEARCH", "") == "true"
 	cfg.EnableFactorEngine = getBool("ENABLE_FACTOR_ENGINE", true)
-	cfg.EnableStrategyPlaybook = getBool("ENABLE_STRATEGY_PLAYBOOK", true)
-	cfg.EnablePortfolioHeat = getBool("ENABLE_PORTFOLIO_HEAT", true)
 
-	cfg.validate()
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// MustLoad loads configuration from environment variables.
+// Panics if required variables are missing (backward compatibility).
+func MustLoad() *Config {
+	cfg, err := Load()
+	if err != nil {
+		log.Fatal().Err(err).Msg("configuration loading failed")
+	}
 	return cfg
 }
 
@@ -231,16 +250,160 @@ func (c *Config) HasMassiveS3() bool {
 	return c.MassiveS3AccessKey != "" && c.MassiveS3SecretKey != ""
 }
 
+// ErrInvalidConfig is returned when configuration validation fails.
+type ErrInvalidConfig string
+
+func (e ErrInvalidConfig) Error() string { return "invalid config: " + string(e) }
+
 // validate performs additional validation beyond required env vars.
-func (c *Config) validate() {
+// Returns an ErrInvalidConfig for any hard-invalid configuration.
+// Advisory issues are logged as warnings but do not cause an error.
+func (c *Config) validate() error {
+	// ---- COT ----------------------------------------------------------------
 	if c.COTHistoryWeeks < 4 {
-		log.Fatal().Msg("COT_HISTORY_WEEKS must be >= 4")
+		return ErrInvalidConfig("COT_HISTORY_WEEKS must be >= 4")
 	}
 	if c.COTFetchInterval < 1*time.Minute {
-		log.Fatal().Msg("COT_FETCH_INTERVAL must be >= 1m")
+		return ErrInvalidConfig("COT_FETCH_INTERVAL must be >= 1m")
 	}
+
+	// ---- Quantitative -------------------------------------------------------
 	if c.ConfluenceCalcInterval < 1*time.Minute {
-		log.Fatal().Msg("CONFLUENCE_CALC_INTERVAL must be >= 1m")
+		return ErrInvalidConfig("CONFLUENCE_CALC_INTERVAL must be >= 1m")
+	}
+
+	// ---- Price ---------------------------------------------------------------
+	if c.PriceFetchInterval <= 0 {
+		return ErrInvalidConfig("PRICE_FETCH_INTERVAL must be > 0")
+	}
+	if c.PriceHistoryWeeks < 1 {
+		return ErrInvalidConfig("PRICE_HISTORY_WEEKS must be >= 1")
+	}
+
+	// ---- Intraday ------------------------------------------------------------
+	if c.IntradayFetchInterval <= 0 {
+		return ErrInvalidConfig("INTRADAY_FETCH_INTERVAL must be > 0")
+	}
+	if c.IntradayRetentionDays < 1 {
+		return ErrInvalidConfig("INTRADAY_RETENTION_DAYS must be >= 1")
+	}
+
+	// ---- AI ------------------------------------------------------------------
+	if c.AICacheTTL <= 0 {
+		return ErrInvalidConfig("AI_CACHE_TTL must be > 0")
+	}
+	if c.AIMaxRPM <= 0 {
+		return ErrInvalidConfig("AI_MAX_RPM must be > 0")
+	}
+	if c.AIMaxDaily <= 0 {
+		return ErrInvalidConfig("AI_MAX_DAILY must be > 0")
+	}
+	if c.AIMaxDaily < c.AIMaxRPM {
+		log.Warn().Int("daily", c.AIMaxDaily).Int("rpm", c.AIMaxRPM).
+			Msg("AI_MAX_DAILY < AI_MAX_RPM — may exhaust daily quota very quickly")
+	}
+
+	// ---- Chat history -------------------------------------------------------
+	if c.ChatHistoryLimit <= 0 {
+		log.Warn().Msg("CHAT_HISTORY_LIMIT <= 0, resetting to default (50)")
+		c.ChatHistoryLimit = 50
+	}
+
+	// ---- Impact bootstrap ---------------------------------------------------
+	if c.ImpactBootstrapMonths < 1 {
+		return ErrInvalidConfig("IMPACT_BOOTSTRAP_MONTHS must be >= 1")
+	}
+
+	// ---- Claude -------------------------------------------------------------
+	if c.ClaudeEndpoint != "" && c.ClaudeModel == "" {
+		return ErrInvalidConfig("CLAUDE_MODEL must be set when CLAUDE_ENDPOINT is configured")
+	}
+	if c.ClaudeEndpoint != "" && c.ClaudeMaxTokens <= 0 {
+		return ErrInvalidConfig("CLAUDE_MAX_TOKENS must be > 0 when CLAUDE_ENDPOINT is configured")
+	}
+	if c.ClaudeThinkingBudget < 0 {
+		return ErrInvalidConfig("CLAUDE_THINKING_BUDGET must be >= 0 (0 = disabled)")
+	}
+
+	// ---- Massive S3 ---------------------------------------------------------
+	hasS3Key := c.MassiveS3AccessKey != ""
+	hasS3Secret := c.MassiveS3SecretKey != ""
+	if hasS3Key != hasS3Secret {
+		return ErrInvalidConfig("MASSIVE_S3_ACCESS_KEY and MASSIVE_S3_SECRET_KEY must both be set or both empty")
+	}
+
+	// ---- DataDir writable check — fail fast rather than on first write -------
+	testFile := filepath.Join(c.DataDir, ".write_test")
+	if err := os.WriteFile(testFile, []byte("ok"), 0600); err != nil {
+		return ErrInvalidConfig("DATA_DIR is not writable: " + c.DataDir + ": " + err.Error())
+	}
+	_ = os.Remove(testFile)
+
+	// ---- Advisory warnings --------------------------------------------------
+	if c.GeminiAPIKey != "" && c.GeminiModel == "" {
+		log.Warn().Msg("GEMINI_API_KEY is set but GEMINI_MODEL is empty; using hardcoded default")
+	}
+
+	// ---- Feature availability logging ---------------------------------------
+	c.logFeatureAvailability()
+
+	return nil
+}
+
+// logFeatureAvailability emits startup log lines for every optional integration,
+// indicating whether it is enabled or degraded.
+func (c *Config) logFeatureAvailability() {
+	// Price data providers
+	if len(c.TwelveDataAPIKeys) == 0 {
+		log.Warn().Msg("TWELVE_DATA_API_KEYS not set — price fetcher degraded (Yahoo Finance fallback only)")
+	} else {
+		log.Info().Int("keys", len(c.TwelveDataAPIKeys)).Msg("TwelveData: ENABLED")
+	}
+	if len(c.AlphaVantageAPIKeys) == 0 {
+		log.Info().Msg("ALPHA_VANTAGE_API_KEYS not set — oil/treasury data may be unavailable")
+	} else {
+		log.Info().Int("keys", len(c.AlphaVantageAPIKeys)).Msg("AlphaVantage: ENABLED")
+	}
+	if c.CoinGeckoAPIKey == "" {
+		log.Info().Msg("COINGECKO_API_KEY not set — altcoin market cap (TOTAL3) data unavailable")
+	} else {
+		log.Info().Msg("CoinGecko: ENABLED")
+	}
+
+	// Macro / scraping keys (read direct from env — not in Config struct)
+	if os.Getenv("FRED_API_KEY") == "" {
+		log.Warn().Msg("FRED_API_KEY not set — macro features (yields, inflation, labor) may be rate-limited")
+	} else {
+		log.Info().Msg("FRED: ENABLED")
+	}
+	if os.Getenv("FIRECRAWL_API_KEY") == "" {
+		log.Info().Msg("FIRECRAWL_API_KEY not set — web scraping features disabled")
+	} else {
+		log.Info().Msg("Firecrawl: ENABLED")
+	}
+
+	// AI models
+	if !c.HasGemini() {
+		log.Info().Msg("GEMINI_API_KEY not set — Gemini AI assistant disabled")
+	} else {
+		log.Info().Str("model", c.GeminiModel).Msg("Gemini: ENABLED")
+	}
+	if !c.HasClaude() {
+		log.Info().Msg("CLAUDE_ENDPOINT not set — Claude chatbot disabled")
+	} else {
+		log.Info().Str("model", c.ClaudeModel).Msg("Claude: ENABLED")
+	}
+
+	// Microstructure / research layers
+	if c.EnableBybitMicrostructure {
+		log.Info().Msg("Bybit microstructure: ENABLED")
+	} else {
+		log.Info().Msg("BYBIT_API_KEY not set — crypto microstructure analysis disabled")
+	}
+	if c.EnableMassiveResearch {
+		log.Info().Int("keys", len(c.MassiveAPIKeys)).Msg("Massive research: ENABLED")
+	} else {
+		log.Info().Msg("MASSIVE_API_KEYS not set — historical research layer disabled")
 	}
 }
 
@@ -248,9 +411,20 @@ func (c *Config) validate() {
 // Env Helpers
 // ---------------------------------------------------------------------------
 
-func mustGetEnv(key string) string {
+// getRequiredEnv returns an error if the environment variable is not set.
+func getRequiredEnv(key string) (string, error) {
 	v := os.Getenv(key)
 	if v == "" {
+		return "", fmt.Errorf("required environment variable %s is not set", key)
+	}
+	return v, nil
+}
+
+// mustGetEnv loads a required env var and calls log.Fatal if not set.
+// Deprecated: Use getRequiredEnv() with proper error handling instead.
+func mustGetEnv(key string) string {
+	v, err := getRequiredEnv(key)
+	if err != nil {
 		log.Fatal().Str("key", key).Msg("Required env var is not set")
 	}
 	return v

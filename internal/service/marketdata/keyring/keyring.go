@@ -33,13 +33,10 @@ func (k *Keyring) Next() (string, error) {
 	return k.keys[int(i-1)%len(k.keys)], nil
 }
 
-// MustNext returns the next key. Panics if no keys configured.
-func (k *Keyring) MustNext() string {
-	key, err := k.Next()
-	if err != nil {
-		panic(err)
-	}
-	return key
+// MustNext returns the next key.
+// Returns ErrNoKeys if no keys are configured (no panic - safe for production).
+func (k *Keyring) MustNext() (string, error) {
+	return k.Next()
 }
 
 // Len returns the number of keys.

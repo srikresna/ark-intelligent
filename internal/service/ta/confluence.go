@@ -13,12 +13,12 @@ import (
 // ConfluenceResult aggregates normalised signals from all available indicators
 // into a single directional score with a letter grade.
 type ConfluenceResult struct {
-	Score           float64    // -100 to +100
-	Grade           string     // "A", "B", "C", "D", "F"
-	Direction       string     // "BULLISH", "BEARISH", "NEUTRAL"
-	BullishCount    int        // number of bullish indicators
-	BearishCount    int        // number of bearish indicators
-	NeutralCount    int        // number of neutral indicators
+	Score           float64 // -100 to +100
+	Grade           string  // "A", "B", "C", "D", "F"
+	Direction       string  // "BULLISH", "BEARISH", "NEUTRAL"
+	BullishCount    int     // number of bullish indicators
+	BearishCount    int     // number of bearish indicators
+	NeutralCount    int     // number of neutral indicators
 	TotalIndicators int
 	Signals         []TASignal // individual indicator signals
 	Summary         string     // human-readable summary
@@ -38,21 +38,25 @@ type indicatorWeight struct {
 // Categories: Trend (40%), Momentum (35%), Volume (15%), Volatility (10%).
 var defaultWeights = map[string]indicatorWeight{
 	// Trend (40%)
-	"EMA_RIBBON":  {category: "trend", weight: 0.15},
-	"SUPERTREND":  {category: "trend", weight: 0.10},
-	"ICHIMOKU":    {category: "trend", weight: 0.10},
-	"ADX":         {category: "trend", weight: 0.05},
+	"EMA_RIBBON": {category: "trend", weight: 0.15},
+	"SUPERTREND": {category: "trend", weight: 0.10},
+	"ICHIMOKU":   {category: "trend", weight: 0.10},
+	"ADX":        {category: "trend", weight: 0.05},
 	// Momentum (35%)
-	"RSI":         {category: "momentum", weight: 0.10},
-	"MACD":        {category: "momentum", weight: 0.12},
-	"STOCHASTIC":  {category: "momentum", weight: 0.08},
-	"CCI":         {category: "momentum", weight: 0.05},
+	"RSI":        {category: "momentum", weight: 0.10},
+	"MACD":       {category: "momentum", weight: 0.12},
+	"STOCHASTIC": {category: "momentum", weight: 0.08},
+	"CCI":        {category: "momentum", weight: 0.05},
 	// Volume (15%)
-	"OBV":         {category: "volume", weight: 0.08},
-	"MFI":         {category: "volume", weight: 0.07},
+	"OBV":   {category: "volume", weight: 0.06},
+	"MFI":   {category: "volume", weight: 0.05},
+	"DELTA": {category: "volume", weight: 0.04}, // tick-rule estimated delta
 	// Volatility (10%)
-	"BOLLINGER":   {category: "volatility", weight: 0.06},
-	"WILLIAMS_R":  {category: "volatility", weight: 0.04},
+	"BOLLINGER":  {category: "volatility", weight: 0.04},
+	"WILLIAMS_R": {category: "volatility", weight: 0.03},
+	"VWAP":       {category: "volatility", weight: 0.03}, // price position vs VWAP
+	// Structure (SMC) — additional signal, does not replace existing categories
+	"SMC": {category: "trend", weight: 0.15},
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +221,98 @@ func signalMFI(m *MFIResult) (float64, string) {
 	}
 }
 
+// signalVWAP extracts a directional signal from the VWAPSet.
+// Position relative to daily VWAP is used as primary signal.
+// Weekly VWAP is used as confirmation if daily is unavailable.
+func signalVWAP(vs *VWAPSet) (float64, string) {
+	if vs == nil {
+		return 0, ""
+	}
+
+	// Prefer daily VWAP; fall back to weekly.
+	ref := vs.Daily
+	label := "Daily"
+	if ref == nil && vs.Weekly != nil {
+		ref = vs.Weekly
+		label = "Weekly"
+	}
+	if ref == nil {
+		return 0, ""
+	}
+
+	// Signal based on sigma deviation from VWAP.
+	dev := ref.Deviation
+	var sig float64
+	switch {
+	case dev <= -2.0:
+		sig = 0.8 // deeply below VWAP → potential bounce (bullish bias)
+	case dev <= -1.0:
+		sig = 0.4
+	case dev < 0:
+		sig = 0.1
+	case dev == 0:
+		sig = 0
+	case dev < 1.0:
+		sig = -0.1
+	case dev < 2.0:
+		sig = -0.4
+	default:
+		sig = -0.8 // deeply above VWAP → potential reversion (bearish bias)
+	}
+
+	return sig, fmt.Sprintf("%s VWAP %.5f (%s, %.1fσ)", label, ref.VWAP, ref.Position, dev)
+}
+
+// signalDelta extracts a directional signal from the DeltaResult.
+// Buying pressure → bullish; selling pressure → bearish.
+// Divergences amplify or invert the base signal.
+func signalDelta(d *DeltaResult) (float64, string) {
+	if d == nil {
+		return 0, ""
+	}
+
+	var sig float64
+	switch d.Bias {
+	case "BUYING_PRESSURE":
+		sig = d.BiasStrength * 0.6
+	case "SELLING_PRESSURE":
+		sig = -d.BiasStrength * 0.6
+	default:
+		sig = 0
+	}
+
+	// Divergences: price/delta disagreement strengthens the counter-trend signal.
+	switch d.DeltaDivergence {
+	case "BEARISH_DIVERGENCE":
+		// Price up but delta down → bearish lean
+		if sig > 0 {
+			sig = -sig * 0.5 // flip weakly bearish
+		} else {
+			sig -= 0.2 // amplify bearish
+		}
+	case "BULLISH_DIVERGENCE":
+		// Price down but delta up → bullish lean
+		if sig < 0 {
+			sig = -sig * 0.5 // flip weakly bullish
+		} else {
+			sig += 0.2 // amplify bullish
+		}
+	}
+
+	// Clamp to [-1, 1].
+	if sig > 1 {
+		sig = 1
+	} else if sig < -1 {
+		sig = -1
+	}
+
+	note := fmt.Sprintf("Delta %s (strength=%.2f)", d.Bias, d.BiasStrength)
+	if d.DeltaDivergence != "NONE" {
+		note += " ⚠ " + d.DeltaDivergence
+	}
+	return sig, note
+}
+
 // ---------------------------------------------------------------------------
 // CalcConfluence — main multi-indicator confluence scoring
 // ---------------------------------------------------------------------------
@@ -292,9 +388,27 @@ func CalcConfluence(snap *IndicatorSnapshot) *ConfluenceResult {
 		raw["SUPERTREND"] = rawSig{stSig, stNote, true}
 	}
 
+	// SMC: Smart Money Concepts (BOS, CHOCH, structure)
+	smcSig, smcNote := signalSMCFromSnap(snap)
+	if smcNote != "" {
+		raw["SMC"] = rawSig{smcSig, smcNote, true}
+	}
+
+	// VWAP: price position relative to volume-weighted average price
+	vwapSig, vwapNote := signalVWAP(snap.VWAP)
+	if vwapNote != "" {
+		raw["VWAP"] = rawSig{vwapSig, vwapNote, true}
+	}
+
+	// Delta: tick-rule estimated cumulative buy/sell pressure
+	deltaSig, deltaNote := signalDelta(snap.Delta)
+	if deltaNote != "" {
+		raw["DELTA"] = rawSig{deltaSig, deltaNote, true}
+	}
+
 	// Compute category totals for redistribution
-	catTotal := map[string]float64{}   // sum of default weights per category
-	catAvail := map[string]float64{}   // sum of available weights per category
+	catTotal := map[string]float64{} // sum of default weights per category
+	catAvail := map[string]float64{} // sum of available weights per category
 	for name, iw := range defaultWeights {
 		catTotal[iw.category] += iw.weight
 		if _, ok := raw[name]; ok {
@@ -477,4 +591,56 @@ func signalSuperTrendFromSnap(snap *IndicatorSnapshot) (float64, string) {
 	default:
 		return 0, "SuperTrend neutral"
 	}
+}
+
+// signalSMCFromSnap extracts a market structure signal from the SMC analysis.
+// BOS confirms trend continuation; CHOCH signals reversal.
+// Returns (0, "") if SMC data is not available.
+func signalSMCFromSnap(snap *IndicatorSnapshot) (float64, string) {
+	if snap.SMC == nil {
+		return 0, ""
+	}
+	smc := snap.SMC
+
+	// Base signal from overall structure
+	sig := 0.0
+	switch smc.Structure {
+	case StructureBullish:
+		sig = 0.5
+	case StructureBearish:
+		sig = -0.5
+	}
+
+	// Boost if there is a recent CHOCH (reversal signal -- stronger weight)
+	if len(smc.RecentCHOCH) > 0 {
+		choch := smc.RecentCHOCH[0]
+		if choch.Dir == "BULLISH" {
+			sig = 0.8
+		} else if choch.Dir == "BEARISH" {
+			sig = -0.8
+		}
+	}
+
+	// Boost if there is a recent BOS (continuation signal)
+	if len(smc.RecentBOS) > 0 {
+		bos := smc.RecentBOS[0]
+		if bos.Dir == "BULLISH" && sig >= 0 {
+			sig = 0.6
+		} else if bos.Dir == "BEARISH" && sig <= 0 {
+			sig = -0.6
+		}
+	}
+
+	// Build note
+	zone := smc.CurrentZone
+	note := fmt.Sprintf("SMC %s (structure=%s, zone=%s", smc.Trend, smc.Structure, zone)
+	if len(smc.RecentCHOCH) > 0 {
+		note += fmt.Sprintf(", CHOCH %s", smc.RecentCHOCH[0].Dir)
+	}
+	if len(smc.RecentBOS) > 0 {
+		note += fmt.Sprintf(", BOS %s", smc.RecentBOS[0].Dir)
+	}
+	note += ")"
+
+	return sig, note
 }

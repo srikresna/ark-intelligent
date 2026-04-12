@@ -136,11 +136,11 @@ func TestGARCH_Pass4_VolRatioConsistency(t *testing.T) {
 func TestGARCH_Pass4_ConfidenceMultiplierThresholds(t *testing.T) {
 	// Test each threshold of GARCHConfidenceMultiplier
 	testCases := []struct {
-		name       string
-		volRatio   float64
-		fcastVol   float64
-		lrVol      float64
-		wantMult   float64
+		name     string
+		volRatio float64
+		fcastVol float64
+		lrVol    float64
+		wantMult float64
 	}{
 		{"very_high_vol", 2.0, 0.031, 0.02, 0.75}, // forecastRatio = 0.031/0.02 = 1.55 > 1.50
 		{"elevated_vol", 1.3, 0.026, 0.02, 0.85},
@@ -187,9 +187,9 @@ func TestHMM_Pass4_TransitionMatrixRowSums(t *testing.T) {
 		t.Fatalf("HMM failed: %v", err)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		rowSum := 0.0
-		for j := 0; j < 3; j++ {
+		for j := 0; j < 4; j++ {
 			rowSum += result.TransitionMatrix[i][j]
 			// Each entry must be non-negative
 			if result.TransitionMatrix[i][j] < 0 {
@@ -213,7 +213,7 @@ func TestHMM_Pass4_StateProbabilitiesSum(t *testing.T) {
 		t.Fatalf("HMM failed: %v", err)
 	}
 
-	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2]
+	probSum := result.StateProbabilities[0] + result.StateProbabilities[1] + result.StateProbabilities[2] + result.StateProbabilities[3]
 	if math.Abs(probSum-1.0) > 0.001 {
 		t.Errorf("State probabilities sum to %f, expected 1.0", probSum)
 	}
@@ -476,9 +476,9 @@ func TestIntraday_Pass4_SMACalculation(t *testing.T) {
 
 func TestIntraday_Pass4_ATRCalculation(t *testing.T) {
 	bars := []domain.IntradayBar{
-		{High: 110, Low: 95, Close: 105},  // newest, TR = max(15, |110-100|, |95-100|) = 15
-		{High: 108, Low: 98, Close: 100},  // TR = max(10, |108-102|, |98-102|) = 10
-		{High: 105, Low: 96, Close: 102},  // prevClose for bar[1]
+		{High: 110, Low: 95, Close: 105}, // newest, TR = max(15, |110-100|, |95-100|) = 15
+		{High: 108, Low: 98, Close: 100}, // TR = max(10, |108-102|, |98-102|) = 10
+		{High: 105, Low: 96, Close: 102}, // prevClose for bar[1]
 	}
 
 	atr := computeIntradayATR(bars, 2)
@@ -494,14 +494,17 @@ func TestIntraday_Pass4_ATRCalculation(t *testing.T) {
 
 func TestCorrelation_Pass4_DifferentLengths(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5, 6, 7}
-	y := []float64{2, 4, 6} // Shorter
+	y := []float64{2, 4, 6, 8, 10} // Shorter but >= 5
 
 	r := pearsonCorrelation(x, y)
 
-	// Should use min(len(x), len(y)) = 3 elements
-	// x[:3] = [1,2,3], y[:3] = [2,4,6] -> perfect positive correlation
+	// Should use min(len(x), len(y)) = 5 elements
+	// x[:5] = [1,2,3,4,5], y[:5] = [2,4,6,8,10] -> perfect positive correlation
+	if math.IsNaN(r) {
+		t.Error("Should not return NaN for inputs with >= 5 points")
+	}
 	if math.Abs(r-1.0) > 0.001 {
-		t.Errorf("Correlation of [1,2,3] with [2,4,6] should be 1.0, got %f", r)
+		t.Errorf("Correlation of [1,2,3,4,5] with [2,4,6,8,10] should be 1.0, got %f", r)
 	}
 }
 

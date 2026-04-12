@@ -6,26 +6,31 @@ import "fmt"
 type AlertType string
 
 const (
-	AlertYieldUninvert  AlertType = "YIELD_UNINVERT"    // 2Y-10Y spread: negative → positive
-	AlertYieldInvert    AlertType = "YIELD_INVERT"      // 2Y-10Y spread: positive → negative
-	Alert3MUninvert     AlertType = "3M_YIELD_UNINVERT" // 3M-10Y spread: negative → positive
-	Alert3MInvert       AlertType = "3M_YIELD_INVERT"   // 3M-10Y spread: positive → negative
-	AlertNFCIStress     AlertType = "NFCI_STRESS"       // NFCI crosses above 0.5
-	AlertNFCILoose      AlertType = "NFCI_LOOSE"        // NFCI crosses below -0.3
-	AlertSahmTrigger    AlertType = "SAHM_TRIGGER"      // Sahm Rule crosses 0.5 (recession signal)
-	AlertSahmClear      AlertType = "SAHM_CLEAR"        // Sahm Rule drops below 0.3
-	AlertFedBalExpand   AlertType = "FED_BAL_EXPAND"    // Fed balance sheet expanding (QE signal)
-	AlertFedBalContract AlertType = "FED_BAL_CONTRACT"  // Fed balance sheet contracting (QT)
-	AlertVIXSpike         AlertType = "VIX_SPIKE"          // VIX crosses above 30
-	AlertVIXCalm          AlertType = "VIX_CALM"           // VIX drops below 15
-	AlertNFPNegative      AlertType = "NFP_NEGATIVE"       // NFP MoM change turns negative
-	AlertVIXBackwardation AlertType = "VIX_BACKWARDATION"  // VIX term structure enters backwardation
-	AlertVIXContango      AlertType = "VIX_CONTANGO"       // VIX term structure returns to contango
-	AlertLaborWeakening   AlertType = "LABOR_WEAKENING"    // Initial claims or Sahm Rule deterioration
-	AlertCreditStress     AlertType = "CREDIT_STRESS"      // HY OAS (TedSpread) crosses stress threshold
-	AlertCurveUninversion AlertType = "CURVE_UNINVERSION"  // Yield spread crosses from negative to positive
+	AlertYieldUninvert       AlertType = "YIELD_UNINVERT"       // 2Y-10Y spread: negative → positive
+	AlertYieldInvert         AlertType = "YIELD_INVERT"         // 2Y-10Y spread: positive → negative
+	Alert3MUninvert          AlertType = "3M_YIELD_UNINVERT"    // 3M-10Y spread: negative → positive
+	Alert3MInvert            AlertType = "3M_YIELD_INVERT"      // 3M-10Y spread: positive → negative
+	AlertNFCIStress          AlertType = "NFCI_STRESS"          // NFCI crosses above 0.5
+	AlertNFCILoose           AlertType = "NFCI_LOOSE"           // NFCI crosses below -0.3
+	AlertSahmTrigger         AlertType = "SAHM_TRIGGER"         // Sahm Rule crosses 0.5 (recession signal)
+	AlertSahmClear           AlertType = "SAHM_CLEAR"           // Sahm Rule drops below 0.3
+	AlertFedBalExpand        AlertType = "FED_BAL_EXPAND"       // Fed balance sheet expanding (QE signal)
+	AlertFedBalContract      AlertType = "FED_BAL_CONTRACT"     // Fed balance sheet contracting (QT)
+	AlertVIXSpike            AlertType = "VIX_SPIKE"            // VIX crosses above 30
+	AlertVIXCalm             AlertType = "VIX_CALM"             // VIX drops below 15
+	AlertNFPNegative         AlertType = "NFP_NEGATIVE"         // NFP MoM change turns negative
+	AlertVIXBackwardation    AlertType = "VIX_BACKWARDATION"    // VIX term structure enters backwardation
+	AlertVIXContango         AlertType = "VIX_CONTANGO"         // VIX term structure returns to contango
+	AlertLaborWeakening      AlertType = "LABOR_WEAKENING"      // Initial claims or Sahm Rule deterioration
+	AlertCreditStress        AlertType = "CREDIT_STRESS"        // HY OAS (TedSpread) crosses stress threshold
+	AlertCurveUninversion    AlertType = "CURVE_UNINVERSION"    // Yield spread crosses from negative to positive
 	AlertInflationDivergence AlertType = "INFLATION_DIVERGENCE" // Market breakevens vs realized CPI divergence
-	AlertHousingContraction  AlertType = "HOUSING_CONTRACTION"   // Housing market entering contraction
+	AlertHousingContraction  AlertType = "HOUSING_CONTRACTION"  // Housing market entering contraction
+	AlertSKEWVIXExtreme      AlertType = "SKEW_VIX_EXTREME"     // SKEW/VIX ratio crosses extreme threshold
+	AlertSKEWVIXElevated     AlertType = "SKEW_VIX_ELEVATED"    // SKEW/VIX ratio crosses elevated threshold
+	AlertSKEWVIXNormal       AlertType = "SKEW_VIX_NORMAL"      // SKEW/VIX ratio returns to normal
+	AlertCarryUnwind         AlertType = "CARRY_UNWIND"         // Carry spread range collapses >30% — unwind alert
+	AlertCarryNarrowing      AlertType = "CARRY_NARROWING"      // Carry spread range compressing >15% — early warning
 )
 
 // MacroAlert represents a single triggered macro regime change event.
@@ -51,7 +56,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 	// --- 1. Yield Curve 2Y-10Y inversion / uninversion ---
 	if previous.YieldSpread < 0 && current.YieldSpread >= 0 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertYieldUninvert,
+			Type:  AlertYieldUninvert,
 			Title: "🟢 Yield Curve UN-INVERTED (2Y-10Y)",
 			Description: fmt.Sprintf(
 				"2Y-10Y spread turned positive: %.2f%% (was %.2f%%). "+
@@ -64,7 +69,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 		})
 	} else if previous.YieldSpread >= 0 && current.YieldSpread < 0 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertYieldInvert,
+			Type:  AlertYieldInvert,
 			Title: "🔴 Yield Curve INVERTED (2Y-10Y)",
 			Description: fmt.Sprintf(
 				"2Y-10Y spread went negative: %.2f%% (was %.2f%%). "+
@@ -81,7 +86,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 	if current.Spread3M10Y != 0 && previous.Spread3M10Y != 0 {
 		if previous.Spread3M10Y < 0 && current.Spread3M10Y >= 0 {
 			alerts = append(alerts, MacroAlert{
-				Type: Alert3MUninvert,
+				Type:  Alert3MUninvert,
 				Title: "🟡 3M-10Y Spread UN-INVERTED",
 				Description: fmt.Sprintf(
 					"3M-10Y spread turned positive: %.2f%%. "+
@@ -94,7 +99,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 			})
 		} else if previous.Spread3M10Y >= 0 && current.Spread3M10Y < 0 {
 			alerts = append(alerts, MacroAlert{
-				Type: Alert3MInvert,
+				Type:  Alert3MInvert,
 				Title: "🔴 3M-10Y Spread INVERTED",
 				Description: fmt.Sprintf(
 					"3M-10Y spread turned negative: %.2f%%. "+
@@ -111,7 +116,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 	// --- 3. NFCI financial conditions threshold crossings ---
 	if previous.NFCI < 0.5 && current.NFCI >= 0.5 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertNFCIStress,
+			Type:  AlertNFCIStress,
 			Title: "🔴 NFCI: Financial Conditions TIGHT",
 			Description: fmt.Sprintf(
 				"NFCI crossed 0.5 threshold: %.3f (was %.3f). "+
@@ -124,7 +129,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 		})
 	} else if previous.NFCI >= -0.3 && current.NFCI < -0.3 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertNFCILoose,
+			Type:  AlertNFCILoose,
 			Title: "🟢 NFCI: Financial Conditions LOOSE",
 			Description: fmt.Sprintf(
 				"NFCI dropped below -0.3: %.3f (was %.3f). "+
@@ -139,7 +144,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 	// --- 4. Sahm Rule recession indicator ---
 	if previous.SahmRule < 0.5 && current.SahmRule >= 0.5 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertSahmTrigger,
+			Type:  AlertSahmTrigger,
 			Title: "🚨 SAHM RULE TRIGGERED — Recession Signal!",
 			Description: fmt.Sprintf(
 				"Sahm Rule indicator crossed 0.5: %.2f (was %.2f). "+
@@ -152,7 +157,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 		})
 	} else if previous.SahmRule >= 0.5 && current.SahmRule < 0.3 {
 		alerts = append(alerts, MacroAlert{
-			Type: AlertSahmClear,
+			Type:  AlertSahmClear,
 			Title: "🟢 SAHM RULE CLEARED",
 			Description: fmt.Sprintf(
 				"Sahm Rule dropped below 0.3: %.2f (was %.2f). "+
@@ -172,7 +177,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 		prevDir := previous.FedBalSheetTrend.Direction
 		if prevDir != "UP" && balChange > 200 {
 			alerts = append(alerts, MacroAlert{
-				Type: AlertFedBalExpand,
+				Type:  AlertFedBalExpand,
 				Title: "🟢 Fed Balance Sheet EXPANDING (QE Signal)",
 				Description: fmt.Sprintf(
 					"Fed total assets increased by $%.0fB to $%.0fB. "+
@@ -184,7 +189,7 @@ func CheckAlerts(current, previous *MacroData) []MacroAlert {
 			})
 		} else if prevDir != "DOWN" && balChange < -200 {
 			alerts = append(alerts, MacroAlert{
-				Type: AlertFedBalContract,
+				Type:  AlertFedBalContract,
 				Title: "🔴 Fed Balance Sheet CONTRACTING (QT Active)",
 				Description: fmt.Sprintf(
 					"Fed total assets decreased by $%.0fB to $%.0fB. "+

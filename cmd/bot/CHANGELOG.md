@@ -1,5 +1,13 @@
 # ARK Intelligence — Changelog
 
+## v4.0.0 — Functionality Audit & Stability
+- Fixed missing callback routing for COT/Macro view toggle buttons
+- Fixed nil pointer dereference in Alpha transition detail view
+- Fixed sentiment handler return value mismatches (build break)
+- Sanitized error messages across GEX, IV, Skew, Carry, Scenario handlers
+- Synced vendor directory with go.mod (47 modules)
+- Comprehensive audit of all 73+ commands and 33+ callback prefixes
+
 ## v3.0.0 — Production Hardening
 - Structured JSON logging (zerolog) across entire codebase
 - Circuit breaker for external APIs (CFTC, MQL5)

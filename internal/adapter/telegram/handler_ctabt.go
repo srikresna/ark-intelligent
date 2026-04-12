@@ -4,6 +4,7 @@ package telegram
 //   /ctabt [SYMBOL] [TIMEFRAME] [GRADE]  — run CTA backtest with chart + inline keyboard
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
+	"github.com/arkcode369/ark-intelligent/internal/service/ta"
 )
 
 // ---------------------------------------------------------------------------
@@ -163,8 +164,13 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 		return err
 	}
 
+	if h.ctabt.DailyPriceRepo == nil {
+		h.sendUserError(ctx, chatID, fmt.Errorf("daily price data not configured"), "ctabt")
+		return nil
+	}
+
 	// Send loading
-	loadingID, _ := h.bot.SendHTML(ctx, chatID, fmt.Sprintf(
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, fmt.Sprintf(
 		"⏳ Menjalankan backtest <b>%s</b> (%s, Grade ≥ %s)...\n<i>Ini bisa memakan waktu 10-30 detik.</i>",
 		html.EscapeString(mapping.Currency), timeframe, grade,
 	))
@@ -194,8 +200,8 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 			if loadingID > 0 {
 				_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
 			}
-			_, err := h.bot.SendHTML(ctx, chatID, "❌ Intraday data repository not configured.")
-			return err
+			h.sendUserError(ctx, chatID, fmt.Errorf("intraday data repository not configured"), "ctabt")
+			return nil
 		}
 		// Determine bar count based on timeframe granularity
 		count := 600
@@ -261,9 +267,9 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 	}
 
 	// Generate chart
-	chartPNG, chartErr := h.generateBacktestChart(result, mapping.Currency, timeframe)
+	chartPNG, chartErr := h.generateBacktestChart(ctx, result, mapping.Currency, timeframe)
 	if chartErr != nil {
-		log.Warn().Err(chartErr).Str("symbol", symbol).Msg("backtest chart generation failed")
+		log.Error().Err(chartErr).Str("symbol", symbol).Str("timeframe", timeframe).Msg("backtest chart generation failed, falling back to text")
 	}
 
 	// Delete loading
@@ -281,7 +287,10 @@ func (h *Handler) runCTABacktest(ctx context.Context, chatID string, symbol, tim
 		return err
 	}
 
-	// Fallback: text only
+	// Chart unavailable: prepend notification so user knows chart exists but failed
+	if chartErr != nil {
+		summary = "📊 <i>Chart sementara tidak tersedia. Menampilkan analisis teks.</i>\n\n" + summary
+	}
 	_, err := h.bot.SendWithKeyboardChunked(ctx, chatID, summary, kb)
 	return err
 }
@@ -295,6 +304,10 @@ func (h *Handler) showCTABTTrades(ctx context.Context, chatID string, msgID int,
 	mapping := h.resolveCTAMapping(symbol)
 	if mapping == nil {
 		return h.bot.EditMessage(ctx, chatID, msgID, "❌ Symbol not found.")
+	}
+
+	if h.ctabt.DailyPriceRepo == nil {
+		return h.bot.EditMessage(ctx, chatID, msgID, "❌ Daily price data not configured.")
 	}
 
 	code := mapping.ContractCode
@@ -361,12 +374,12 @@ func (h *Handler) showCTABTTrades(ctx context.Context, chatID string, msgID int,
 
 // backtestChartInput is the JSON structure for the backtest chart Python script.
 type backtestChartInput struct {
-	EquityCurve []float64          `json:"equity_curve"`
-	TradeDates  []string           `json:"trade_dates"`
-	TradePnL    []float64          `json:"trade_pnl"`
-	Drawdown    []float64          `json:"drawdown"`
-	Symbol      string             `json:"symbol"`
-	Timeframe   string             `json:"timeframe"`
+	EquityCurve []float64           `json:"equity_curve"`
+	TradeDates  []string            `json:"trade_dates"`
+	TradePnL    []float64           `json:"trade_pnl"`
+	Drawdown    []float64           `json:"drawdown"`
+	Symbol      string              `json:"symbol"`
+	Timeframe   string              `json:"timeframe"`
 	Params      backtestChartParams `json:"params"`
 }
 
@@ -380,7 +393,13 @@ type backtestChartParams struct {
 	PF          float64 `json:"pf"`
 }
 
-func (h *Handler) generateBacktestChart(result *ta.BacktestResult, symbol, timeframe string) ([]byte, error) {
+func (h *Handler) generateBacktestChart(ctx context.Context, result *ta.BacktestResult, symbol, timeframe string) (pngData []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in generateBacktestChart: %v", r)
+			log.Error().Interface("panic", r).Str("symbol", symbol).Str("timeframe", timeframe).Msg("recovered panic in generateBacktestChart")
+		}
+	}()
 	if result == nil {
 		return nil, fmt.Errorf("no backtest result")
 	}
@@ -465,50 +484,59 @@ func (h *Handler) generateBacktestChart(result *ta.BacktestResult, symbol, timef
 		return nil, fmt.Errorf("write chart input: %w", err)
 	}
 	defer os.Remove(inputPath)
-	defer os.Remove(outputPath)
+	defer os.Remove(outputPath) // ensure PNG is cleaned up on all return paths
 
-	scriptPath := findBacktestScript()
+	scriptPath, findErr := findBacktestScript()
+	if findErr != nil {
+		return nil, findErr
+	}
 
-	cmd := exec.CommandContext(context.Background(), "python3", scriptPath, inputPath, outputPath)
-	cmd.Stderr = os.Stderr
+	cmdCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(cmdCtx, "python3", scriptPath, inputPath, outputPath)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		log.Error().Err(err).Str("stderr", stderr.String()).Msg("backtest chart renderer failed")
 		return nil, fmt.Errorf("backtest chart renderer failed: %w", err)
 	}
 
-	pngData, err := os.ReadFile(outputPath)
-	if err != nil {
-		return nil, fmt.Errorf("read chart output: %w", err)
+	pngData, readErr := os.ReadFile(outputPath)
+	if readErr != nil {
+		return nil, fmt.Errorf("read chart output: %w", readErr)
 	}
 
 	return pngData, nil
 }
 
 // findBacktestScript locates the backtest_chart.py script.
-func findBacktestScript() string {
+func findBacktestScript() (string, error) {
 	candidates := []string{
 		"scripts/backtest_chart.py",
 		"../scripts/backtest_chart.py",
-		"/home/mulerun/.openclaw/workspace/ark-intelligent/scripts/backtest_chart.py",
+	}
+	if d := os.Getenv("SCRIPTS_DIR"); d != "" {
+		candidates = append([]string{filepath.Join(d, "backtest_chart.py")}, candidates...)
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
 			abs, _ := filepath.Abs(c)
-			return abs
+			return abs, nil
 		}
 	}
 	if execPath, err := os.Executable(); err == nil {
 		execDir := filepath.Dir(execPath)
 		rel := filepath.Join(execDir, "scripts", "backtest_chart.py")
 		if _, err := os.Stat(rel); err == nil {
-			return rel
+			return rel, nil
 		}
 		rel = filepath.Join(execDir, "..", "scripts", "backtest_chart.py")
 		if _, err := os.Stat(rel); err == nil {
 			abs, _ := filepath.Abs(rel)
-			return abs
+			return abs, nil
 		}
 	}
-	return "scripts/backtest_chart.py"
+	return "", fmt.Errorf("backtest_chart.py not found (searched: %v)", candidates)
 }
 
 // ---------------------------------------------------------------------------
@@ -536,8 +564,6 @@ func normalizeTimeframe(tf string) string {
 		return "daily"
 	}
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Formatters — Indonesian language
@@ -621,9 +647,9 @@ func formatTradeList(bt *ta.BacktestResult, symbol, timeframe string) string {
 
 	for i := start; i < len(bt.Trades); i++ {
 		t := bt.Trades[i]
-		dirEmoji := "🟢"
+		dirEmoji := "🟢 Long"
 		if t.Direction == "SHORT" {
-			dirEmoji = "🔴"
+			dirEmoji = "🔴 Short"
 		}
 		resultEmoji := "✅"
 		if t.PnLDollar <= 0 {

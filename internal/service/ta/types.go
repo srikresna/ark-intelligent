@@ -66,9 +66,9 @@ type BollingerResult struct {
 
 // EMAResult holds a snapshot of an EMA ribbon.
 type EMAResult struct {
-	Values         map[int]float64 // period → current EMA value
-	RibbonAlignment string         // "BULLISH", "BEARISH", "MIXED"
-	AlignmentScore float64         // -1 to +1 (1 = perfectly bullish aligned)
+	Values          map[int]float64 // period → current EMA value
+	RibbonAlignment string          // "BULLISH", "BEARISH", "MIXED"
+	AlignmentScore  float64         // -1 to +1 (1 = perfectly bullish aligned)
 }
 
 // ADXResult holds the output of the Average Directional Index.
@@ -116,24 +116,30 @@ type MFIResult struct {
 
 // IndicatorSnapshot bundles all indicator results for a single timeframe.
 type IndicatorSnapshot struct {
-	Timeframe    string             // e.g. "daily", "4h", "1h", "15m", "weekly"
-	CurrentPrice float64            // Close price of the most recent bar
-	ATR          float64            // ATR(14) from raw bars — used by zones
-	RSI          *RSIResult         // nil if insufficient data
-	MACD         *MACDResult        // nil if insufficient data
-	Stochastic   *StochasticResult  // nil if insufficient data
-	Bollinger    *BollingerResult   // nil if insufficient data
-	EMA          *EMAResult         // nil if insufficient data
-	ADX          *ADXResult         // nil if insufficient data
-	OBV          *OBVResult         // nil if insufficient data
-	WilliamsR    *WilliamsRResult   // nil if insufficient data
-	CCI          *CCIResult         // nil if insufficient data
-	MFI          *MFIResult         // nil if insufficient data
+	Timeframe    string            // e.g. "daily", "4h", "1h", "15m", "weekly"
+	CurrentPrice float64           // Close price of the most recent bar
+	ATR          float64           // ATR(14) from raw bars — used by zones
+	RSI          *RSIResult        // nil if insufficient data
+	MACD         *MACDResult       // nil if insufficient data
+	Stochastic   *StochasticResult // nil if insufficient data
+	Bollinger    *BollingerResult  // nil if insufficient data
+	EMA          *EMAResult        // nil if insufficient data
+	ADX          *ADXResult        // nil if insufficient data
+	OBV          *OBVResult        // nil if insufficient data
+	WilliamsR    *WilliamsRResult  // nil if insufficient data
+	CCI          *CCIResult        // nil if insufficient data
+	MFI          *MFIResult        // nil if insufficient data
 
 	// Advanced indicators (nil if insufficient data or file not yet available)
-	Ichimoku   *IchimokuResult    // nil if insufficient data
-	SuperTrend *SuperTrendResult  // nil if insufficient data
-	Fibonacci  *FibResult         // nil if insufficient data
+	Ichimoku   *IchimokuResult   // nil if insufficient data
+	SuperTrend *SuperTrendResult // nil if insufficient data
+	Fibonacci  *FibResult        // nil if insufficient data
+	Killzone   *KillzoneResult   // current ICT killzone classification (always populated)
+	VWAP       *VWAPSet          // anchored VWAP (daily, weekly, swing anchors) — nil if insufficient volume data
+	Delta      *DeltaResult      // tick-rule estimated delta (cumulative buy/sell pressure) — nil if insufficient data
+	SMC        *SMCResult        // Smart Money Concepts: BOS, CHOCH, premium/discount — nil if insufficient data
+	Wyckoff    *WyckoffResult    // Wyckoff phase detection — nil if insufficient data (< 20 bars)
+	Elliott    *ElliottResult    // Elliott Wave swing labeler — nil if non-daily/weekly or insufficient data
 }
 
 // TASignal represents a normalized signal from one indicator.
@@ -147,6 +153,24 @@ type TASignal struct {
 // ---------------------------------------------------------------------------
 // Converter Functions
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WyckoffSummary — lightweight Wyckoff result for embedding in FullResult.
+// Avoids circular import with the wyckoff package.
+// The caller (handler) converts wyckoff.WyckoffResult → WyckoffSummary.
+// ---------------------------------------------------------------------------
+
+// WyckoffSummary captures key Wyckoff analysis data without depending on the
+// wyckoff package (which imports ta).
+type WyckoffSummary struct {
+	Schematic     string     // "ACCUMULATION" | "DISTRIBUTION" | "UNKNOWN"
+	CurrentPhase  string     // "A", "B", "C", "D", "E", "UNDEFINED"
+	Confidence    string     // "HIGH", "MEDIUM", "LOW"
+	TradingRange  [2]float64 // [support, resistance]
+	CauseBuilt    float64    // composite cause energy score (0–100)
+	ProjectedMove float64    // estimated breakout magnitude in price units
+	Summary       string     // narrative summary ≤ 300 chars
+}
 
 // DailyPricesToOHLCV converts a slice of domain.DailyPrice to []OHLCV.
 // Both input and output are newest-first (index 0 = most recent).

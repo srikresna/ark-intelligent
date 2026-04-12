@@ -275,8 +275,8 @@ func (e *Evaluator) evaluateFlexible(ctx context.Context, sig *domain.PersistedS
 		return
 	}
 
-	from := sig.ReportDate.AddDate(0, 0, 1)  // day after report
-	to := sig.ReportDate.AddDate(0, 0, 28)    // 4 weeks out
+	from := sig.ReportDate.AddDate(0, 0, 1) // day after report
+	to := sig.ReportDate.AddDate(0, 0, 28)  // 4 weeks out
 	dailyPrices, err := e.dailyRepo.GetDailyRange(ctx, sig.ContractCode, from, to)
 	if err != nil || len(dailyPrices) == 0 {
 		return

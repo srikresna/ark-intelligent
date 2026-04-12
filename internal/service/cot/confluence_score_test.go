@@ -30,10 +30,10 @@ func TestConfluenceScoreV2_NilMacroData(t *testing.T) {
 func TestConfluenceScoreV2_WithMacroData(t *testing.T) {
 	// With macro data: weights are 35/20/45 (COT/surprise/macro).
 	macro := &fred.MacroData{
-		YieldSpread:   0.5,      // > 0 → +10
-		CorePCE:       2.0,      // < 2.5 → +25
-		NFCI:          -0.5,     // nfciScore = Clamp(20, -25, 25) = 20
-		InitialClaims: 200_000,  // < 220k → +15
+		YieldSpread:   0.5,     // > 0 → +10
+		CorePCE:       2.0,     // < 2.5 → +25
+		NFCI:          -0.5,    // nfciScore = Clamp(20, -25, 25) = 20
+		InitialClaims: 200_000, // < 220k → +15
 		// macroScore = 10+25+20+15 = 70
 	}
 	a := domain.COTAnalysis{
@@ -70,11 +70,11 @@ func TestConfluenceScoreV2_ExtremeBullish(t *testing.T) {
 
 func TestConfluenceScoreV2_ExtremeBearish(t *testing.T) {
 	macro := &fred.MacroData{
-		YieldSpread:   -1.0,   // no +30
-		CorePCE:       4.0,    // > 2.5, no +30
-		NFCI:          2.0,    // positive → no +20, stressScore = -100
+		YieldSpread:   -1.0,    // no +30
+		CorePCE:       4.0,     // > 2.5, no +30
+		NFCI:          2.0,     // positive → no +20, stressScore = -100
 		InitialClaims: 400_000, // > 250k → no +20
-		GDPGrowth:     -2.0,   // negative → gdpFactor = -15
+		GDPGrowth:     -2.0,    // negative → gdpFactor = -15
 	}
 	a := domain.COTAnalysis{
 		Contract:       baseContract("TFF"),
@@ -362,5 +362,84 @@ func TestComputeConvictionScore_WithMacroData(t *testing.T) {
 	}
 	if cs.Direction != "LONG" {
 		t.Errorf("expected LONG direction for bullish inputs, got %s (score=%.2f)", cs.Direction, cs.Score)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TASK-173 — nil-pointer guard tests for FRED composites paths
+// ---------------------------------------------------------------------------
+
+// TestConfluenceScoreV2_EmptyMacroData verifies that ConfluenceScoreV2 does
+// not panic when macroData is non-nil but contains all zero-value fields.
+// ComputeComposites should still return a valid struct and the code should
+// pick up the USScore / country differential path safely.
+func TestConfluenceScoreV2_EmptyMacroData(t *testing.T) {
+	macro := &fred.MacroData{} // all zero values — no raw data available
+	a := domain.COTAnalysis{
+		Contract:       baseContract("TFF"),
+		SentimentScore: 50,
+	}
+	// Should not panic; score should be within [-100, 100].
+	score := ConfluenceScoreV2(a, macro, 0.0)
+	if score < -100 || score > 100 {
+		t.Errorf("expected score in [-100,100], got %.2f", score)
+	}
+}
+
+// TestConfluenceScoreV2_EmptyMacroData_NonUSDPair verifies the composites
+// differential path for a non-USD pair with empty macro data.
+func TestConfluenceScoreV2_EmptyMacroData_NonUSDPair(t *testing.T) {
+	macro := &fred.MacroData{} // zero-value
+	a := domain.COTAnalysis{
+		Contract: domain.COTContract{
+			Currency:   "EUR",
+			ReportType: "TFF",
+		},
+		SentimentScore: 60,
+	}
+	// Should not panic even for non-USD pair with empty composites.
+	score := ConfluenceScoreV2(a, macro, 1.0)
+	if score < -100 || score > 100 {
+		t.Errorf("expected score in [-100,100], got %.2f", score)
+	}
+}
+
+// TestComputeConvictionScore_EmptyMacroData checks that conviction score
+// handles empty MacroData (composites path) without panicking.
+func TestComputeConvictionScore_EmptyMacroData(t *testing.T) {
+	macro := &fred.MacroData{}
+	a := domain.COTAnalysis{
+		Contract:       domain.COTContract{Currency: "GBP", ReportType: "TFF"},
+		SentimentScore: 70,
+	}
+	regime := fred.MacroRegime{Name: "DISINFLATIONARY"}
+
+	cs := ComputeConvictionScore(a, regime, 1.0, "partial data", macro)
+	if cs.Score < 0 || cs.Score > 100 {
+		t.Errorf("score out of range: %.2f", cs.Score)
+	}
+}
+
+// TestComputeComposites_NilDataPath verifies ComputeComposites returns nil for
+// nil input and a valid non-nil struct for empty-but-non-nil input.
+func TestComputeComposites_NilDataPath(t *testing.T) {
+	got := fred.ComputeComposites(nil)
+	if got != nil {
+		t.Error("ComputeComposites(nil) should return nil")
+	}
+
+	empty := fred.ComputeComposites(&fred.MacroData{})
+	if empty == nil {
+		t.Error("ComputeComposites(&MacroData{}) should return non-nil struct")
+	}
+	// All scores should be in valid ranges even with zero-value input.
+	if empty.LaborHealth < 0 || empty.LaborHealth > 100 {
+		t.Errorf("LaborHealth out of range for empty data: %.2f", empty.LaborHealth)
+	}
+	if empty.CreditStress < 0 || empty.CreditStress > 100 {
+		t.Errorf("CreditStress out of range for empty data: %.2f", empty.CreditStress)
+	}
+	if empty.VIXTermRegime == "" {
+		t.Error("VIXTermRegime should have default value for empty data")
 	}
 }

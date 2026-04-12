@@ -21,14 +21,15 @@ import (
 	"time"
 
 	"github.com/arkcode369/ark-intelligent/internal/adapter/storage"
+	"github.com/arkcode369/ark-intelligent/internal/config"
 	"github.com/arkcode369/ark-intelligent/internal/domain"
 	"github.com/arkcode369/ark-intelligent/internal/ports"
 	aisvc "github.com/arkcode369/ark-intelligent/internal/service/ai"
 	backtestsvc "github.com/arkcode369/ark-intelligent/internal/service/backtest"
 	cotsvc "github.com/arkcode369/ark-intelligent/internal/service/cot"
+	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	newssvc "github.com/arkcode369/ark-intelligent/internal/service/news"
 	pricesvc "github.com/arkcode369/ark-intelligent/internal/service/price"
-	"github.com/arkcode369/ark-intelligent/internal/service/fred"
 	"github.com/arkcode369/ark-intelligent/pkg/logger"
 	"github.com/arkcode369/ark-intelligent/pkg/mathutil"
 	"github.com/arkcode369/ark-intelligent/pkg/timeutil"
@@ -70,9 +71,24 @@ type Deps struct {
 	// IsBanned checks if a user is banned. May be nil (no ban check).
 	IsBanned func(ctx context.Context, userID int64) bool
 
+	// SurpriseProvider retrieves per-currency economic surprise sigma.
+	// Used for ConvictionScoreV3 in COT broadcast. May be nil (sigma=0).
+	SurpriseProvider interface {
+		GetSurpriseSigma(currency string) float64
+	}
+
 	// OwnerChatID is the owner's chat ID for debug notifications.
 	// If empty, debug notifications are skipped.
 	OwnerChatID string
+
+	// NewsRepo provides access to economic calendar events.
+	// Used by the daily briefing job. May be nil (briefing skipped).
+	NewsRepo ports.NewsRepository
+
+	// DailyBriefing is an optional callback that builds and pushes the
+	// morning briefing HTML to a given chatID. Injected from the Telegram
+	// handler to avoid import cycles. May be nil (auto-push skipped).
+	DailyBriefing func(ctx context.Context, chatID string) bool
 }
 
 // Intervals configures how often each job runs.
@@ -88,25 +104,64 @@ type Intervals struct {
 
 // Scheduler manages all background periodic jobs.
 type Scheduler struct {
-	deps         *Deps
-	stopCh       chan struct{}
-	stopOnce     sync.Once
-	wg           sync.WaitGroup
-	running      bool
-	mu           sync.Mutex      // lifecycle mutex (Start/Stop)
-	fredMu       sync.Mutex      // protects lastFREDData
-	lastFREDData *fred.MacroData // previous FRED snapshot for alert diffing
+	deps              *Deps
+	stopCh            chan struct{}
+	stopOnce          sync.Once
+	wg                sync.WaitGroup
+	running           bool
+	mu                sync.Mutex      // lifecycle mutex (Start/Stop)
+	fredMu            sync.Mutex      // protects lastFREDData + lastFREDBroadcast
+	lastFREDData      *fred.MacroData // previous FRED snapshot for alert diffing
+	lastFREDBroadcast time.Time       // last time FRED alerts were broadcast (dedup guard)
+
+	lastTailRisk     string       // previous VolSuite TailRisk state for SKEW/VIX alert diffing
+	regimeMu         sync.RWMutex // protects regimeEngine access
+	cotBroadcastMu   sync.Mutex   // protects lastCOTBroadcast
+	lastCOTBroadcast time.Time    // last date successfully broadcast to prevent duplicates
+
+	carryMu            sync.Mutex                 // protects lastCarryResult + lastCarryBroadcast
+	lastCarryResult    *domain.CarryMonitorResult // previous carry snapshot for alert diffing
+	lastCarryBroadcast time.Time                  // last time carry alerts were broadcast (dedup guard)
+
+	alertGate *AlertGate // quiet hours + alert type + daily cap (TASK-202)
 }
 
 // New creates a new Scheduler.
 func New(deps *Deps) *Scheduler {
-	return &Scheduler{
+	s := &Scheduler{
 		deps:   deps,
 		stopCh: make(chan struct{}),
 	}
+	if deps.DB != nil {
+		s.alertGate = NewAlertGate(deps.DB.Badger())
+	}
+	return s
+}
+
+// ShouldDeliverAlert delegates to the AlertGate for external callers (e.g. news scheduler).
+// Returns (ok, reason). If no gate is configured, always returns (true, "").
+func (s *Scheduler) ShouldDeliverAlert(prefs domain.UserPrefs, alertType string) (bool, string) {
+	if s.alertGate == nil {
+		return true, ""
+	}
+	return s.alertGate.ShouldDeliver(prefs, alertType)
+}
+
+// RecordAlertDelivery delegates to the AlertGate counter for external callers.
+func (s *Scheduler) RecordAlertDelivery(ctx context.Context, chatID string) {
+	if s.alertGate == nil {
+		return
+	}
+	s.alertGate.RecordDelivery(ctx, chatID)
 }
 
 // Start launches all background jobs. Non-blocking.
+// SetSurpriseProvider injects the economic surprise accumulator into the scheduler.
+// This is called after the news scheduler is initialized (due to init order dependency).
+func (s *Scheduler) SetSurpriseProvider(sp interface{ GetSurpriseSigma(string) float64 }) {
+	s.deps.SurpriseProvider = sp
+}
+
 func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,10 +181,13 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 	// FRED alert monitor (checks every hour for regime changes)
 	s.startJob(ctx, "fred-alerts", 1*time.Hour, s.jobFREDAlerts)
 
+	// Carry trade unwind monitor (checks every 4 hours)
+	s.startJob(ctx, "carry-alerts", 4*time.Hour, s.jobCarryAlerts)
+
 	// Data retention cleanup (runs daily at 03:00 WIB)
 	s.startJob(ctx, "retention-cleanup", 1*time.Hour, s.jobRetentionCleanup)
 
-	jobCount := 4
+	jobCount := 5
 
 	// Price fetch (if price fetcher is configured)
 	if s.deps.PriceFetcher != nil && s.deps.PriceRepo != nil {
@@ -167,10 +225,26 @@ func (s *Scheduler) Start(ctx context.Context, intervals *Intervals) {
 		jobCount++
 	}
 
+	// Daily briefing push (06:00 WIB — checks every 30 min, fires once per day)
+	if s.deps.DailyBriefing != nil {
+		s.startJobWithDelay(ctx, "daily-briefing", 30*time.Minute, 2*time.Minute, s.jobDailyBriefing)
+		jobCount++
+	}
+
+	// Proactive regime alert (checks every 4 hours for HMM regime transitions)
+	if s.deps.DailyPriceRepo != nil && s.deps.PriceFetcher != nil {
+		s.startJobWithDelay(ctx, "regime-alert", 4*time.Hour, 2*time.Minute, s.jobRegimeAlert)
+		jobCount++
+	}
 	// One-time impact bootstrap (backfills historical event impacts on startup)
 	if s.deps.ImpactBootstrapper != nil {
 		s.wg.Add(1)
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error().Interface("panic", r).Msg("impact bootstrap panic recovered")
+				}
+			}()
 			defer s.wg.Done()
 			// Delay to let price data load first.
 			select {
@@ -292,6 +366,9 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	// 1. Get current latest date before fetch
 	oldLatest, _ := s.deps.COTRepo.GetLatestReportDate(ctx)
 
+	// 1b. Snapshot previous analyses for per-pair alert comparison (TASK-052)
+	prevAnalyses, _ := s.deps.COTRepo.GetAllLatestAnalyses(ctx)
+
 	// 2. Fetch and analyze
 	analyses, err := s.deps.COTAnalyzer.AnalyzeAll(ctx)
 	if err != nil {
@@ -303,6 +380,12 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 	if !newLatest.IsZero() && newLatest.After(oldLatest) {
 		log.Info().Str("date", newLatest.Format("2006-01-02")).Msg("new COT data detected")
 		s.broadcastCOTRelease(ctx, newLatest, analyses)
+
+		// 3b. Per-pair alerts (TASK-052) — compare current vs previous analyses
+		activeUsers, aErr := s.deps.PrefsRepo.GetAllActive(ctx)
+		if aErr == nil {
+			s.checkPairAlerts(ctx, analyses, prevAnalyses, activeUsers)
+		}
 	}
 
 	log.Info().Msg("COT data fetched and analyzed")
@@ -315,29 +398,56 @@ func (s *Scheduler) jobCOTFetch(ctx context.Context) error {
 
 // broadcastCOTRelease sends a notification to all active users when new data is available.
 func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, analyses []domain.COTAnalysis) {
+	// Dedup guard: prevent duplicate broadcasts for the same report date.
+	s.cotBroadcastMu.Lock()
+	if !date.After(s.lastCOTBroadcast) {
+		s.cotBroadcastMu.Unlock()
+		log.Debug().Str("date", date.Format("2006-01-02")).Msg("COT broadcast skipped — already sent for this date")
+		return
+	}
+	s.lastCOTBroadcast = date
+	s.cotBroadcastMu.Unlock()
+
 	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get active users for broadcast")
 		return
 	}
 
-	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nLatest positioning data has been fetched and analyzed. Use /cot to view the new insights.",
+	msg := fmt.Sprintf("\xF0\x9F\x94\x94 <b>NEW COT DATA RELEASED</b>\xF0\x9F\x94\x94\n\nReport Date: <b>%s</b>\n\nData positioning terbaru sudah di-fetch dan dianalisis.\n\nð Tap <b>Lihat Detail</b> untuk melihat insight terbaru.",
 		date.Format("Monday, 02 Jan 2006"))
+
+	cotAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "ð Lihat Detail", CallbackData: "cmd:cot"},
+			{Text: "ð Matikan Alert", CallbackData: "alert:off:cot"},
+		},
+		{
+			{Text: "âï¸ Pengaturan Alert", CallbackData: "set:alerts"},
+		},
+	}}
 
 	count := 0
 	for userID, prefs := range activeUsers {
 		if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
 			continue
 		}
+
+		// TASK-202: Check quiet hours, alert type, and daily cap.
+		if s.alertGate != nil {
+			if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeCOTRelease); !ok {
+				continue
+			}
+		}
 		// Skip banned users
 		if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 			continue
 		}
-		if _, err := s.deps.Bot.SendHTML(ctx, prefs.ChatID, msg); err == nil {
+		if _, err := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, cotAlertKB); err == nil {
 			count++
 		}
 		// Avoid flooding Telegram API
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(config.TelegramFloodDelay)
 	}
 
 	log.Info().Int("users", count).Msg("sent COT release alert")
@@ -389,19 +499,29 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 
 	var strongSignals []cotsvc.Signal
 	for _, sig := range signals {
-		if sig.Strength >= 4 {
+		if sig.Strength >= config.SignalStrengthAlert {
 			strongSignals = append(strongSignals, sig)
 		}
 	}
 
 	if len(strongSignals) > 0 {
 		signalHTML := formatStrongSignalAlert(strongSignals)
+		signalAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+			{
+				{Text: "ð Lihat COT", CallbackData: "cmd:cot"},
+				{Text: "ð¯ Lihat Bias", CallbackData: "cmd:bias"},
+			},
+			{
+				{Text: "ð Matikan Signal Alert", CallbackData: "alert:off:signal"},
+				{Text: "âï¸ Pengaturan", CallbackData: "set:alerts"},
+			},
+		}}
 		for userID, prefs := range activeUsers {
 			if prefs.COTAlertsEnabled && prefs.ChatID != "" {
 				if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
 					continue
 				}
-				_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, signalHTML)
+				_, _ = s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, signalHTML, signalAlertKB)
 			}
 		}
 		log.Info().Int("signals", len(strongSignals)).Msg("sent strong signal alert to active users")
@@ -447,7 +567,7 @@ func (s *Scheduler) broadcastCOTRelease(ctx context.Context, date time.Time, ana
 						continue
 					}
 					_, _ = s.deps.Bot.SendHTML(ctx, prefs.ChatID, html)
-					time.Sleep(50 * time.Millisecond)
+					time.Sleep(config.TelegramFloodDelay)
 				}
 			}
 		}
@@ -510,6 +630,17 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 		return nil
 	}
 
+	// Dedup guard: prevent duplicate FRED broadcasts within a 10-minute window.
+	// (Handles edge case where concurrent job triggers fire before snapshot swap commits.)
+	s.fredMu.Lock()
+	if time.Since(s.lastFREDBroadcast) < 10*time.Minute {
+		s.fredMu.Unlock()
+		log.Debug().Msg("FRED broadcast skipped — already sent within dedup window")
+		return nil
+	}
+	s.lastFREDBroadcast = time.Now()
+	s.fredMu.Unlock()
+
 	log.Info().Int("alerts", len(alerts)).Msg("FRED alerts detected")
 
 	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
@@ -517,12 +648,29 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 		return fmt.Errorf("get active users for fred alerts: %w", err)
 	}
 
+	fredAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "ð Lihat Macro", CallbackData: "cmd:macro"},
+			{Text: "ð Matikan Alert", CallbackData: "alert:off:fred"},
+		},
+		{
+			{Text: "âï¸ Pengaturan Alert", CallbackData: "set:alerts"},
+		},
+	}}
+
 	for _, alert := range alerts {
 		msg := fred.FormatMacroAlert(alert)
 		count := 0
 		for userID, prefs := range activeUsers {
 			if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
 				continue
+			}
+
+			// TASK-202: Check quiet hours, alert type, and daily cap.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeFREDRegime); !ok {
+					continue
+				}
 			}
 			// Ban check (defensive — FREDAlertCheck also excludes banned, but this is explicit)
 			if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
@@ -532,10 +680,10 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 			if s.deps.FREDAlertCheck != nil && !s.deps.FREDAlertCheck(ctx, userID) {
 				continue
 			}
-			if _, sendErr := s.deps.Bot.SendHTML(ctx, prefs.ChatID, msg); sendErr == nil {
+			if _, sendErr := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, fredAlertKB); sendErr == nil {
 				count++
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(config.TelegramFloodDelay)
 		}
 		log.Info().Str("alert_type", string(alert.Type)).Int("users", count).Msg("FRED alert sent")
 	}
@@ -544,6 +692,15 @@ func (s *Scheduler) jobFREDAlerts(ctx context.Context) error {
 	if len(alerts) > 0 && s.deps.CachedAI != nil {
 		s.deps.CachedAI.InvalidateOnFREDUpdate(ctx)
 	}
+
+	// --- SKEW/VIX tail risk alert (TASK-208) ---
+	// Fetch VIX term structure (includes VolSuite with SKEW data) and check
+	// for tail risk state transitions. Runs in goroutine to not block FRED job.
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.checkSKEWVIXAlert(ctx)
+	}()
 
 	return nil
 }
@@ -563,6 +720,80 @@ func formatStrongSignalAlert(signals []cotsvc.Signal) string {
 	}
 	b.WriteString("<i>Use /bias for full bias list</i>")
 	return b.String()
+}
+
+// jobCarryAlerts checks for carry trade unwind events and broadcasts alerts to subscribed users.
+// Runs every 4 hours. Compares the freshly fetched CarryMonitorResult against the previous snapshot.
+func (s *Scheduler) jobCarryAlerts(ctx context.Context) error {
+	monitor := fred.GetCarryMonitor()
+	current, err := monitor.FetchCarryDashboard(ctx)
+	if err != nil {
+		return fmt.Errorf("carry dashboard fetch for alerts: %w", err)
+	}
+
+	s.carryMu.Lock()
+	previous := s.lastCarryResult
+	s.lastCarryResult = current
+	s.carryMu.Unlock()
+
+	alerts := fred.CheckCarryAlerts(current, previous)
+	if len(alerts) == 0 {
+		return nil
+	}
+
+	// Dedup guard: prevent duplicate carry broadcasts within a 10-minute window.
+	s.carryMu.Lock()
+	if time.Since(s.lastCarryBroadcast) < 10*time.Minute {
+		s.carryMu.Unlock()
+		log.Debug().Msg("carry broadcast skipped — already sent within dedup window")
+		return nil
+	}
+	s.lastCarryBroadcast = time.Now()
+	s.carryMu.Unlock()
+
+	log.Info().Int("alerts", len(alerts)).Msg("carry alerts detected")
+
+	activeUsers, err := s.deps.PrefsRepo.GetAllActive(ctx)
+	if err != nil {
+		return fmt.Errorf("get active users for carry alerts: %w", err)
+	}
+
+	carryAlertKB := ports.InlineKeyboard{Rows: [][]ports.InlineButton{
+		{
+			{Text: "💱 Lihat Carry", CallbackData: "cmd:carry"},
+			{Text: "🔕 Matikan Alert", CallbackData: "alert:off:fred"},
+		},
+	}}
+
+	for _, alert := range alerts {
+		msg := fred.FormatMacroAlert(alert)
+		count := 0
+		for userID, prefs := range activeUsers {
+			if !prefs.COTAlertsEnabled || prefs.ChatID == "" {
+				continue
+			}
+
+			// TASK-202: Check quiet hours, alert type, and daily cap.
+			if s.alertGate != nil {
+				if ok, _ := s.alertGate.ShouldDeliver(prefs, domain.AlertTypeFREDRegime); !ok {
+					continue
+				}
+			}
+			if s.deps.IsBanned != nil && s.deps.IsBanned(ctx, userID) {
+				continue
+			}
+			if s.deps.FREDAlertCheck != nil && !s.deps.FREDAlertCheck(ctx, userID) {
+				continue
+			}
+			if _, sendErr := s.deps.Bot.SendWithKeyboard(ctx, prefs.ChatID, msg, carryAlertKB); sendErr == nil {
+				count++
+			}
+			time.Sleep(config.TelegramFloodDelay)
+		}
+		log.Info().Str("alert_type", string(alert.Type)).Int("users", count).Msg("carry alert sent")
+	}
+
+	return nil
 }
 
 // jobRetentionCleanup deletes expired data once per day at 03:00 WIB.
@@ -1039,15 +1270,15 @@ func (s *Scheduler) persistSignals(ctx context.Context, signals []cotsvc.Signal,
 		}
 
 		// Compute ConvictionScore V3 (5-component: COT + Calendar + Stress + FRED + Price)
-		// BUG-5: newsScheduler (which holds GetSurpriseSigma) is not wired into
-		// the main scheduler's Deps, so we cannot retrieve the live surprise
-		// accumulator here. Pass 0 until Deps is extended with a NewsScheduler
-		// reference (tracked as a follow-up).
+		var surpriseSigma float64
+		if s.deps.SurpriseProvider != nil {
+			surpriseSigma = s.deps.SurpriseProvider.GetSurpriseSigma(analysis.Contract.Currency)
+		}
 		var priceCtx *domain.PriceContext
 		if len(enrich) > 0 && enrich[0].priceCtxs != nil {
 			priceCtx = enrich[0].priceCtxs[sig.ContractCode]
 		}
-		cs := cotsvc.ComputeConvictionScoreV3(*analysis, macroRegime, 0, "", macroData, priceCtx)
+		cs := cotsvc.ComputeConvictionScoreV3(*analysis, macroRegime, surpriseSigma, "", macroData, priceCtx)
 		ps.ConvictionScore = cs.Score
 
 		// --- Quant Model Enrichment ---

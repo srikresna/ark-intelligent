@@ -29,7 +29,7 @@ func TestNeedsEvaluation_1WPending(t *testing.T) {
 	s := PersistedSignal{
 		EntryPrice: 1.08,
 		ReportDate: time.Now().Add(-8 * 24 * time.Hour), // 8 days old
-		Outcome1W:  "",                                    // not evaluated
+		Outcome1W:  "",                                  // not evaluated
 	}
 	if !s.NeedsEvaluation(time.Now()) {
 		t.Error("signal with empty 1W outcome and age > 7 days should need evaluation")

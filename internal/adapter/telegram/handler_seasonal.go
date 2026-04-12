@@ -15,7 +15,7 @@ import (
 // cmdSeasonal handles /seasonal [currency] — advanced seasonal pattern analysis.
 // Enriches base statistics with regime context, COT alignment, event density,
 // volatility regime, cross-asset checks, EIA data, and confluence scoring.
-func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args string) error {
+func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, userID int64, args string) error {
 	if h.priceRepo == nil {
 		_, err := h.bot.SendHTML(ctx, chatID, "Price data not available yet. Prices are fetched periodically.")
 		return err
@@ -37,29 +37,45 @@ func (h *Handler) cmdSeasonal(ctx context.Context, chatID string, _ int64, args 
 			return err
 		}
 
+		loadingID, _ := h.bot.SendLoading(ctx, chatID,
+			fmt.Sprintf("📅 Menganalisis seasonal pattern untuk <b>%s</b>... ⏳", html.EscapeString(args)))
+
 		pattern, err := analyzer.AnalyzeContractAdvanced(ctx, mapping.ContractCode, mapping.Currency, deps)
 		if err != nil {
-			_, sendErr := h.bot.SendHTML(ctx, chatID,
-				fmt.Sprintf("No seasonal data for %s: %s", html.EscapeString(args), html.EscapeString(err.Error())))
-			return sendErr
+			if loadingID > 0 {
+				_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+			}
+			h.sendUserError(ctx, chatID, err, "seasonal")
+			return nil
 		}
 
 		htmlOut := h.fmt.FormatSeasonalSingle(*pattern)
 		kb := h.kb.SeasonalDetailMenu(mapping.Currency)
+		h.saveLastCurrency(ctx, userID, mapping.Currency)
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
 		_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 		return err
 	}
 
 	// All contracts mode
+	loadingID, _ := h.bot.SendLoading(ctx, chatID, "📅 Menganalisis seasonal patterns... ⏳")
+
 	patterns, err := analyzer.AnalyzeAllAdvanced(ctx, deps)
 	if err != nil {
-		_, sendErr := h.bot.SendHTML(ctx, chatID,
-			fmt.Sprintf("Seasonal analysis unavailable: %s", html.EscapeString(err.Error())))
-		return sendErr
+		if loadingID > 0 {
+			_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+		}
+		h.sendUserError(ctx, chatID, err, "seasonal")
+		return nil
 	}
 
 	htmlOut := h.fmt.FormatSeasonalPatterns(patterns)
 	kb := h.kb.SeasonalMenu()
+	if loadingID > 0 {
+		_ = h.bot.DeleteMessage(ctx, chatID, loadingID)
+	}
 	_, err = h.bot.SendWithKeyboard(ctx, chatID, htmlOut, kb)
 	return err
 }

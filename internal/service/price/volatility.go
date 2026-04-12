@@ -20,11 +20,11 @@ const (
 // VolatilityContext holds ATR-based volatility metrics for a contract.
 type VolatilityContext struct {
 	ATR20W               float64 `json:"atr_20w"`               // 20-week Average True Range
-	NormalizedATR        float64 `json:"normalized_atr"`         // ATR / Close * 100 (percentage)
-	AvgATR4W             float64 `json:"avg_atr_4w"`             // 4-week average of weekly ATR
-	Regime               string  `json:"regime"`                 // EXPANDING, CONTRACTING, NORMAL
-	WeeklyRange          float64 `json:"weekly_range"`           // Latest week (High-Low)/Close %
-	ConfidenceMultiplier float64 `json:"confidence_multiplier"`  // Applied to signal confidence
+	NormalizedATR        float64 `json:"normalized_atr"`        // ATR / Close * 100 (percentage)
+	AvgATR4W             float64 `json:"avg_atr_4w"`            // 4-week average of weekly ATR
+	Regime               string  `json:"regime"`                // EXPANDING, CONTRACTING, NORMAL
+	WeeklyRange          float64 `json:"weekly_range"`          // Latest week (High-Low)/Close %
+	ConfidenceMultiplier float64 `json:"confidence_multiplier"` // Applied to signal confidence
 }
 
 // ComputeATR calculates the Average True Range from weekly OHLC price records.
@@ -56,7 +56,11 @@ func ComputeNormalizedATR(prices []domain.PriceRecord, period int) float64 {
 	if atr == 0 {
 		return 0
 	}
-	return roundN(atr/prices[0].Close*100, 4)
+	result := roundN(atr/prices[0].Close*100, 4)
+	if math.IsNaN(result) || math.IsInf(result, 0) {
+		return 0
+	}
+	return result
 }
 
 // ClassifyVolatilityRegime returns the volatility regime based on current vs average ATR.
@@ -64,10 +68,13 @@ func ComputeNormalizedATR(prices []domain.PriceRecord, period int) float64 {
 //   - CONTRACTING: currentATR < avgATR * 0.75
 //   - NORMAL:      otherwise
 func ClassifyVolatilityRegime(currentATR, avgATR float64) string {
-	if avgATR <= 0 {
+	if avgATR <= 0 || currentATR <= 0 || math.IsNaN(currentATR) || math.IsInf(currentATR, 0) {
 		return VolatilityNormal
 	}
 	ratio := currentATR / avgATR
+	if math.IsNaN(ratio) || math.IsInf(ratio, 0) {
+		return VolatilityNormal
+	}
 	switch {
 	case ratio > 1.25:
 		return VolatilityExpanding

@@ -237,10 +237,10 @@ func TestHMM_Deep_ConvergenceCheck(t *testing.T) {
 	}
 
 	// With 200 data points, Baum-Welch should typically converge.
-	// maxIter is 50 (0-indexed loop), so the iteration variable can be at most 49
-	// when convergence happens via break, or 50 when the loop completes without converging.
+	// maxIter is 100, so the iteration variable can be at most 99
+	// when convergence happens via break, or 100 when the loop completes without converging.
 	if result.Converged {
-		if result.Iterations >= 50 {
+		if result.Iterations >= 100 {
 			t.Errorf("Converged=true but used max iterations (%d)", result.Iterations)
 		}
 	}
