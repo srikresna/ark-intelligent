@@ -336,6 +336,10 @@ func (kb *KeyboardBuilder) QuantMenu() ports.InlineKeyboard {
 			{
 				{Text: "📋 Full Report", CallbackData: "quant:full"},
 			},
+			// Backtest button
+			{
+				{Text: "📊 Backtest All Models", CallbackData: "qbacktest:back"}, // Will trigger /qbacktest
+			},
 			{
 				{Text: "15m", CallbackData: "quant:tf:15m"},
 				{Text: "30m", CallbackData: "quant:tf:30m"},
