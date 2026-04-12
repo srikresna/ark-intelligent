@@ -354,9 +354,8 @@ func (h *Handler) handleQuantCallback(ctx context.Context, chatID string, msgID 
 	}
 
 	// Backtest navigation from Quant dashboard
-	if action == "qbacktest:back" {
+	if action == "backtest" {
 		_ = h.bot.DeleteMessage(ctx, chatID, msgID)
-		// Use the actual userID from the callback (4th parameter)
 		if lc := h.getLastCurrency(ctx, userID); lc != "" {
 			return h.cmdQBacktest(ctx, chatID, userID, lc)
 		}

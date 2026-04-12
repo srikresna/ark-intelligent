@@ -338,7 +338,7 @@ func (kb *KeyboardBuilder) QuantMenu() ports.InlineKeyboard {
 			},
 			// Backtest button
 			{
-				{Text: "📊 Backtest All Models", CallbackData: "qbacktest:back"}, // Will trigger /qbacktest
+				{Text: "📊 Backtest All Models", CallbackData: "quant:backtest"},
 			},
 			{
 				{Text: "15m", CallbackData: "quant:tf:15m"},
