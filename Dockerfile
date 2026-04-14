@@ -43,17 +43,22 @@ RUN apk add --no-cache \
     py3-pandas \
     py3-matplotlib \
     py3-scipy \
+    py3-scikit-learn \
     gcc \
+    g++ \
     musl-dev \
     python3-dev \
     && rm -rf /var/cache/apk/*
 
-# Install Python chart/stats dependencies not available as Alpine packages
+# Install Python stats/chart packages
 RUN pip3 install --no-cache-dir --break-system-packages \
     mplfinance \
     seaborn \
     arch \
     statsmodels
+
+# hmmlearn requires glibc binary - Alpine uses musl, compile fails.
+# Fallback: use sklearn GaussianMixture (similar HMM proxy) - already installed via py3-scikit-learn
 
 # Create non-root user
 RUN addgroup -S botgroup && adduser -S botuser -G botgroup

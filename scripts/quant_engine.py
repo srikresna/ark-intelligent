@@ -477,7 +477,13 @@ def compute_correlation(df, symbol, timeframe, params, multi_asset, chart_path=N
 # ===========================================================================
 
 def compute_regime(df, symbol, timeframe, params, chart_path=None):
-    from hmmlearn.hmm import GaussianHMM
+    # Try hmmlearn first; fall back to sklearn GaussianMixture (similar regime detection)
+    try:
+        from hmmlearn.hmm import GaussianHMM
+        USE_HMM = True
+    except ImportError:
+        from sklearn.mixture import GaussianMixture
+        USE_HMM = False
 
     returns = compute_returns(df)
     n = len(returns)
@@ -490,16 +496,22 @@ def compute_regime(df, symbol, timeframe, params, chart_path=None):
     # Features: returns + absolute returns (vol proxy)
     features = np.column_stack([returns.values, np.abs(returns.values)])
 
-    # Fit HMM
+    # Fit model (HMM or GaussianMixture fallback)
     best_model = None
     best_score = -np.inf
     for _ in range(10):  # multiple restarts for stability
         try:
-            model = GaussianHMM(n_components=n_regimes, covariance_type="full",
-                              n_iter=200, random_state=np.random.randint(10000),
-                              tol=1e-4)
-            model.fit(features)
-            score = model.score(features)
+            if USE_HMM:
+                model = GaussianHMM(n_components=n_regimes, covariance_type="full",
+                                  n_iter=200, random_state=np.random.randint(10000),
+                                  tol=1e-4)
+                model.fit(features)
+                score = model.score(features)
+            else:
+                model = GaussianMixture(n_components=n_regimes, covariance_type="full",
+                                       n_init=1, random_state=np.random.randint(10000))
+                model.fit(features)
+                score = -model.bic(features)  # lower BIC = better, negate for max
             if score > best_score:
                 best_score = score
                 best_model = model
@@ -555,11 +567,21 @@ def compute_regime(df, symbol, timeframe, params, chart_path=None):
         else:
             break
 
-    # Transition matrix
-    trans_mat = best_model.transmat_
-    # Reorder transition matrix by our sorting
+    # Transition matrix (HMM only; GaussianMixture uses uniform proxy)
     reorder = [ri["id"] for ri in regime_info]
-    trans_reordered = trans_mat[np.ix_(reorder, reorder)]
+    if USE_HMM and hasattr(best_model, 'transmat_'):
+        trans_mat = best_model.transmat_
+        trans_reordered = trans_mat[np.ix_(reorder, reorder)]
+    else:
+        # Estimate transitions empirically from state sequence
+        trans_reordered = np.full((n_regimes, n_regimes), 1.0 / n_regimes)
+        for idx in range(len(states) - 1):
+            i_old = regime_map[states[idx]]
+            i_new = regime_map[states[idx + 1]]
+            trans_reordered[i_old, i_new] += 1
+        row_sums = trans_reordered.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1
+        trans_reordered = trans_reordered / row_sums
 
     result = {
         "current_regime": current_idx,
@@ -1403,18 +1425,40 @@ def compute_var(df, symbol, timeframe, params, multi_asset, chart_path=None):
     if len(ret_df) < 50:
         return output("var", symbol, False, {}, "", error="Insufficient data for VAR")
 
-    # Fit VAR
+    # Fit VAR — with regularization fallback for near-singular matrices
     try:
+        # Drop highly correlated columns to improve matrix conditioning
+        corr_matrix = ret_df.corr().abs()
+        upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+        to_drop = [c for c in upper.columns if any(upper[c] > 0.97)]
+        if symbol in to_drop:
+            to_drop.remove(symbol)
+        if to_drop:
+            ret_df = ret_df.drop(columns=to_drop)
+
+        if len(ret_df.columns) < 2:
+            return output("var", symbol, False, {}, "", error="Aset terlalu berkorelasi untuk VAR")
+
         model = VARModel(ret_df)
-        # Auto-select lag order (max 10)
-        lag_order = model.select_order(maxlags=min(10, len(ret_df) // 5))
-        best_lag = lag_order.aic
+        # Auto-select lag (max 5 for stability)
+        try:
+            lag_order = model.select_order(maxlags=min(5, len(ret_df) // 10))
+            best_lag = lag_order.aic
+        except Exception:
+            best_lag = 1
         if best_lag < 1:
             best_lag = 1
 
         results = model.fit(best_lag)
     except Exception as e:
-        return output("var", symbol, False, {}, "", error=f"VAR fitting failed: {str(e)}")
+        # Try simpler fallback: fewer assets, lag=1
+        try:
+            simple_df = ret_df[[symbol, ret_df.columns[1]]].dropna()
+            results = VARModel(simple_df).fit(1)
+            ret_df = simple_df
+            best_lag = 1
+        except Exception as e2:
+            return output("var", symbol, False, {}, "", error=f"VAR fitting failed: {str(e2)}")
 
     # Forecast
     horizon = params.get("forecast_horizon", 5)

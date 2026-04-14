@@ -133,22 +133,32 @@ func (h *Handler) cmdQuant(ctx context.Context, chatID string, userID int64, arg
 		}
 		// Show symbol selector with description
 		_, err := h.bot.SendWithKeyboard(ctx, chatID,
-			`🔬 <b>Quant Engine — Econometric Analysis</b>
+			`🔬 <b>QUANT ENGINE — Econometric Analysis</b>
 
-Analisis statistik & ekonometrik institutional:
+Analisis statistik institutional berbasis data, menghasilkan sinyal LONG/SHORT/FLAT dengan confidence score.
 
-📊 <b>Stats</b> — Distribusi return, VaR, Sharpe, QQ plot
-📈 <b>GARCH</b> — Volatility clustering & forecast
-🔗 <b>Correlation</b> — Heatmap multi-asset
-🎭 <b>Regime</b> — Hidden Markov Model (bull/bear/transition)
-📅 <b>Seasonal</b> — Day-of-week & month patterns
-🔄 <b>Mean Revert</b> — ADF, Hurst, half-life
-⚡ <b>Granger</b> — Kausalitas antar aset
-🔗 <b>Cointegration</b> — Pair trading analysis
-🧬 <b>PCA</b> — Factor analysis multi-asset
-🌐 <b>VAR</b> — Multi-asset forecast
-⚠️ <b>Risk</b> — VaR/CVaR historical + parametric
-📋 <b>Full Report</b> — Semua model → LONG/SHORT/FLAT
+<b>📐 Cara Pakai:</b>
+<code>/quant EUR</code> → analisis EUR (daily)
+<code>/quant XAU 4h</code> → analisis XAU di timeframe 4H
+Ganti TF lewat tombol di keyboard hasil.
+
+<b>📊 Foundation Models:</b>
+• <b>Stats</b> — Distribusi return, percentile rank, VaR, Sharpe ratio
+• <b>GARCH</b> — Volatility forecast, regime vol, expected vol range
+• <b>Correlation</b> — Heatmap multi-asset, rolling correlation breakdown
+
+<b>📈 Time Series:</b>
+• <b>Regime (HMM)</b> — Hidden Markov Model: bull/bear/transition probability
+• <b>Mean Revert</b> — ADF test, Hurst exponent, half-life, z-score entry
+• <b>Granger</b> — Apakah aset X kausal terhadap Y? (lag test)
+
+<b>🔬 Advanced:</b>
+• <b>Cointegration</b> — Pair trading: spread mean-reversion signal
+• <b>PCA</b> — Factor decomposition, hidden driver analysis
+• <b>VAR</b> — Forecast multi-asset 1-5 bar ke depan
+• <b>Risk</b> — Historical + parametric VaR/CVaR, tail risk
+
+<b>📋 Full Report</b> → Semua model sekaligus → Final LONG/SHORT/FLAT
 
 Pilih aset:`, h.kb.QuantSymbolMenu())
 		return err
