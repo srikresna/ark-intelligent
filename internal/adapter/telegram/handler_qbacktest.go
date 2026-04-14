@@ -290,24 +290,50 @@ func (h *Handler) runQBacktest(ctx context.Context, chatID string, st *qbacktest
 func (h *Handler) formatQBTResult(r *SimpleQuantBacktestResult) string {
 	var b strings.Builder
 
+	// ── Header ──
 	b.WriteString(fmt.Sprintf("📊 <b>QUANT BACKTEST: %s — %s</b>\n", html.EscapeString(r.Symbol), html.EscapeString(r.Model)))
-	b.WriteString(fmt.Sprintf("<i>Timeframe: %s | %d bars</i>\n\n", r.Timeframe, r.TotalBars))
+	b.WriteString(fmt.Sprintf("<i>Timeframe: %s | %d bars historis</i>\n", r.Timeframe, r.TotalBars))
 
-	b.WriteString("📋 <b>Performance</b>\n")
-	b.WriteString(fmt.Sprintf("Signals     : %d\n", r.SignalCount))
-	b.WriteString(fmt.Sprintf("Confidence  : %.0f%%\n\n", r.Confidence))
+	// ── Signal Logic (transparansi decision making) ──
+	if r.SignalLogic != "" {
+		b.WriteString(fmt.Sprintf("\n🔬 <b>%s</b>\n", html.EscapeString(r.SignalLogic)))
+		b.WriteString(fmt.Sprintf("<i>%s</i>\n", html.EscapeString(r.Criteria)))
+	}
 
-	b.WriteString("🎯 <b>Win Rate</b>\n")
-	b.WriteString(fmt.Sprintf("%s\n\n", h.qbtWinRateStr(r.WinRate)))
+	b.WriteString("\n━━━━━━━━━━━━━━━\n")
 
-	b.WriteString("💰 <b>Avg Return per Trade</b>\n")
-	b.WriteString(fmt.Sprintf("%+.4f%%\n\n", r.AvgReturn))
+	// ── Signal Summary ──
+	b.WriteString("📋 <b>Signal Summary</b>\n")
+	b.WriteString(fmt.Sprintf("Total Signals : %d\n", r.SignalCount))
+	b.WriteString(fmt.Sprintf("  📈 LONG     : %d\n", r.LongCount))
+	b.WriteString(fmt.Sprintf("  📉 SHORT    : %d\n", r.ShortCount))
+	b.WriteString(fmt.Sprintf("Confidence    : %.0f%%\n", r.Confidence))
 
-	b.WriteString("⚠️ <b>Risk Metrics</b>\n")
-	b.WriteString(fmt.Sprintf("Sharpe     : %s\n", h.qbtSharpeStr(r.Sharpe)))
-	b.WriteString(fmt.Sprintf("Max DD     : %.2f%%  %s\n\n", -r.MaxDD, h.qbtDDEmoji(r.MaxDD)))
+	// ── Win Rate Breakdown ──
+	b.WriteString("\n🎯 <b>Win Rate Breakdown</b>\n")
+	b.WriteString(fmt.Sprintf("Overall  : %s\n", h.qbtWinRateStr(r.WinRate)))
+	if r.LongCount > 0 {
+		b.WriteString(fmt.Sprintf("LONG     : %.1f%%  (%d/%d)\n", r.LongWinRate, r.LongWins, r.LongCount))
+	}
+	if r.ShortCount > 0 {
+		b.WriteString(fmt.Sprintf("SHORT    : %.1f%%  (%d/%d)\n", r.ShortWinRate, r.ShortWins, r.ShortCount))
+	}
 
-	b.WriteString(h.qbtRecommendation(r))
+	// ── Return Analysis ──
+	b.WriteString("\n💰 <b>Return Analysis</b>\n")
+	b.WriteString(fmt.Sprintf("Avg Return   : %+.4f%%\n", r.AvgReturn))
+	b.WriteString(fmt.Sprintf("Avg Win      : %+.4f%%\n", r.AvgWinReturn))
+	b.WriteString(fmt.Sprintf("Avg Loss     : %+.4f%%\n", r.AvgLossReturn))
+	b.WriteString(fmt.Sprintf("Best Trade   : %+.4f%%\n", r.BestTrade))
+	b.WriteString(fmt.Sprintf("Worst Trade  : %+.4f%%\n", r.WorstTrade))
+
+	// ── Risk Metrics ──
+	b.WriteString("\n⚠️ <b>Risk Metrics</b>\n")
+	b.WriteString(fmt.Sprintf("Sharpe Ratio  : %s\n", h.qbtSharpeStr(r.Sharpe)))
+	b.WriteString(fmt.Sprintf("Profit Factor : %.2f  %s\n", r.ProfitFactor, h.qbtPFEmoji(r.ProfitFactor)))
+	b.WriteString(fmt.Sprintf("Max Drawdown  : %.2f%%  %s\n", -r.MaxDD, h.qbtDDEmoji(r.MaxDD)))
+
+	b.WriteString("\n" + h.qbtRecommendation(r))
 	return b.String()
 }
 
@@ -335,6 +361,15 @@ func (h *Handler) qbtDDEmoji(dd float64) string {
 	if dd > -10 {
 		return "✅"
 	} else if dd > -20 {
+		return "⚠️"
+	}
+	return "❌"
+}
+
+func (h *Handler) qbtPFEmoji(pf float64) string {
+	if pf >= 1.5 {
+		return "✅"
+	} else if pf >= 1.0 {
 		return "⚠️"
 	}
 	return "❌"

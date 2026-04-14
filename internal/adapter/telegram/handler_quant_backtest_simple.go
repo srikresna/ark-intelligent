@@ -25,11 +25,32 @@ type SimpleQuantBacktestResult struct {
 	Timeframe   string
 	TotalBars   int
 	SignalCount int
-	WinRate     float64
-	AvgReturn   float64
-	Sharpe      float64
-	MaxDD       float64
-	Confidence  float64
+
+	// Win/loss breakdown
+	WinRate      float64
+	LongCount    int
+	ShortCount   int
+	LongWins     int
+	ShortWins    int
+	LongWinRate  float64
+	ShortWinRate float64
+
+	// Returns
+	AvgReturn    float64
+	AvgWinReturn float64
+	AvgLossReturn float64
+	BestTrade    float64
+	WorstTrade   float64
+	ProfitFactor float64
+
+	// Risk
+	Sharpe     float64
+	MaxDD      float64
+	Confidence float64
+
+	// Description of the signal logic
+	SignalLogic string
+	Criteria    string
 }
 
 // signalPoint is an internal trade record.
@@ -134,32 +155,82 @@ func (a *SimpleQuantBacktestAnalyzer) runModelAnalysis(bars []ta.OHLCV, model, t
 		return nil, fmt.Errorf("not enough bars: %d (need 50+)", n)
 	}
 
+	var result *SimpleQuantBacktestResult
+	var err error
+
 	switch strings.ToLower(model) {
 	case "stats":
-		return backtestStats(bars)
+		result, err = backtestStats(bars)
 	case "garch":
-		return backtestGARCH(bars)
+		result, err = backtestGARCH(bars)
 	case "corr", "correlation":
-		return backtestCorrelation(bars)
+		result, err = backtestCorrelation(bars)
 	case "regime":
-		return backtestRegime(bars)
+		result, err = backtestRegime(bars)
 	case "seasonal":
-		return backtestSeasonal(bars)
+		result, err = backtestSeasonal(bars)
 	case "meanrevert":
-		return backtestMeanRevert(bars)
+		result, err = backtestMeanRevert(bars)
 	case "granger":
-		return backtestGranger(bars)
+		result, err = backtestGranger(bars)
 	case "coint", "cointegration":
-		return backtestCointegration(bars)
+		result, err = backtestCointegration(bars)
 	case "pca":
-		return backtestPCA(bars)
+		result, err = backtestPCA(bars)
 	case "var":
-		return backtestVaR(bars)
+		result, err = backtestVaR(bars)
 	case "risk":
-		return backtestRisk(bars)
+		result, err = backtestRisk(bars)
 	default:
 		return nil, fmt.Errorf("unknown model: %s", model)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Attach model description
+	result.SignalLogic, result.Criteria = modelDescription(strings.ToLower(model))
+	return result, nil
+}
+
+// modelDescription returns human-readable description of each model's signal logic.
+func modelDescription(model string) (logic, criteria string) {
+	switch model {
+	case "stats":
+		return "Return Percentile Rank Momentum",
+			"Signal ketika 5-bar return masuk top 75th percentile (LONG) atau bottom 25th percentile (SHORT) dari distribusi rolling 20-bar. Menangkap momentum persistensi."
+	case "garch":
+		return "Volatility Regime Breakout",
+			"Membandingkan fast vol (5-bar) vs slow vol (20-bar). Fast > slow×1.3 → ikuti trend (volatility expanding). Fast < slow×0.6 → counter-trend (volatility compressing). Hold 5 bar."
+	case "corr", "correlation":
+		return "Multi-Timeframe Momentum Alignment",
+			"Signal ketika momentum 10-bar (>0.2%) DAN momentum 20-bar keduanya searah. LONG jika keduanya positif, SHORT jika keduanya negatif. Konfirmasi alignment. Hold 7 bar."
+	case "regime":
+		return "SMA 50/200 Golden/Death Cross",
+			"Classic trend following. LONG ketika SMA-50 menyebrangi SMA-200 dari bawah (golden cross). SHORT ketika SMA-50 turun melewati SMA-200 (death cross). Hold 10 bar."
+	case "seasonal":
+		return "Day-of-Week Pattern",
+			"Analisis return historis per hari-dalam-seminggu (senin-jumat). Training di 50% data pertama. Signal di 50% data kedua: LONG di hari dengan avg return >0.05%, SHORT di hari <-0.05%. Hold 5 bar."
+	case "meanrevert":
+		return "Bollinger Band Z-Score Fade",
+			"Hitung z-score: (close - 20MA) / 20-bar std. Z > 2 → SHORT (overbought). Z < -2 → LONG (oversold). Mean reversion strategy, berlawanan dengan trend. Hold 5 bar."
+	case "granger":
+		return "Rate-of-Change Percentile Momentum",
+			"Hitung 5-bar ROC lalu ranking-nya dalam distribusi 30-bar terakhir. ROC di top 80th percentile → LONG (strong positive momentum). Bottom 20th → SHORT. Hold 5 bar."
+	case "coint", "cointegration":
+		return "Long-Term Mean Reversion (60-bar)",
+			"Z-score terhadap rata-rata 60-bar (lebih panjang dari mean revert). Threshold 2.5 std. Z > 2.5 → SHORT. Z < -2.5 → LONG. Menangkap long-term price deviation. Hold 10 bar."
+	case "pca":
+		return "Multi-Factor Composite Signal",
+			"Gabungan 3 faktor: 40% momentum (5-bar ROC tanh), 40% trend (distance dari SMA-50), 20% mean-reversion (inverse z-score 20MA). Composite > 0.3 → LONG, < -0.3 → SHORT. Hold 5 bar."
+	case "var":
+		return "Historical VaR Regime Signal",
+			"Hitung 95% VaR dan CVaR dari 30-bar terakhir. LONG jika VaR-95 > -2% dan vol tidak ekstrem (< 70th pctile). SHORT jika VaR < -3% dan vol tinggi (>75th pctile). Hold 5 bar."
+	case "risk":
+		return "Sortino Ratio Regime",
+			"Hitung rasio upside (mean positive return) / downside deviation dari 25-bar. Sortino > 1.2 → LONG (favorable risk env). Sortino < 0.5 dan downside vol tinggi → SHORT. Hold 5 bar."
+	}
+	return "Custom Model", "Signal logic tidak tersedia."
 }
 
 // ---------------------------------------------------------------------------
@@ -750,23 +821,68 @@ func computeBacktestStats(signals []signalPoint, baseConf float64) *SimpleQuantB
 	r.SignalCount = len(signals)
 	returns := make([]float64, len(signals))
 	var wins int
-	var total float64
+	var total, winTotal, lossTotal float64
+	var winCount, lossCount int
+	best, worst := -1e9, 1e9
+
 	for i, s := range signals {
 		returns[i] = s.Return
 		total += s.Return
+		if s.Return > best {
+			best = s.Return
+		}
+		if s.Return < worst {
+			worst = s.Return
+		}
 		if s.Return > 0 {
 			wins++
+			winTotal += s.Return
+			winCount++
+		} else {
+			lossTotal += s.Return
+			lossCount++
+		}
+		if s.Direction == "LONG" {
+			r.LongCount++
+			if s.Return > 0 {
+				r.LongWins++
+			}
+		} else {
+			r.ShortCount++
+			if s.Return > 0 {
+				r.ShortWins++
+			}
 		}
 	}
+
 	r.WinRate = float64(wins) / float64(len(signals)) * 100
 	r.AvgReturn = total / float64(len(signals))
+	r.BestTrade = best
+	r.WorstTrade = worst
+
+	if winCount > 0 {
+		r.AvgWinReturn = winTotal / float64(winCount)
+	}
+	if lossCount > 0 {
+		r.AvgLossReturn = lossTotal / float64(lossCount)
+	}
+	if r.LongCount > 0 {
+		r.LongWinRate = float64(r.LongWins) / float64(r.LongCount) * 100
+	}
+	if r.ShortCount > 0 {
+		r.ShortWinRate = float64(r.ShortWins) / float64(r.ShortCount) * 100
+	}
+	if lossTotal != 0 {
+		r.ProfitFactor = math.Abs(winTotal / lossTotal)
+	}
+
 	r.Sharpe = calculateSharpe(returns)
 	r.MaxDD = calculateMaxDrawdown(buildEquityCurve(signals))
 
 	// Confidence based on sample size
 	switch {
 	case r.SignalCount >= 50:
-		r.Confidence = baseConf + 0
+		r.Confidence = baseConf
 	case r.SignalCount >= 30:
 		r.Confidence = baseConf - 5
 	case r.SignalCount >= 20:

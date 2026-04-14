@@ -42,10 +42,18 @@ RUN apk add --no-cache \
     py3-numpy \
     py3-pandas \
     py3-matplotlib \
+    py3-scipy \
+    gcc \
+    musl-dev \
+    python3-dev \
     && rm -rf /var/cache/apk/*
 
-# Install Python chart dependencies not available as Alpine packages
-RUN pip3 install --no-cache-dir --break-system-packages mplfinance
+# Install Python chart/stats dependencies not available as Alpine packages
+RUN pip3 install --no-cache-dir --break-system-packages \
+    mplfinance \
+    seaborn \
+    arch \
+    statsmodels
 
 # Create non-root user
 RUN addgroup -S botgroup && adduser -S botuser -G botgroup
