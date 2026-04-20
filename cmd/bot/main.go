@@ -406,6 +406,15 @@ func main() {
 		handler.WithCTABT(ctabtServices)
 		log.Info().Msg("CTA Backtest commands registered (/ctabt)")
 
+		// Wire Quantitative Backtest services (ML-enhanced backtest engine)
+		quantbtServices := &tgbot.QuantBTServices{
+			TAEngine:       taEngine,
+			DailyPriceRepo: storageDeps.DailyPriceRepo,
+			IntradayRepo:   storageDeps.IntradayRepo,
+		}
+		handler.WithQuantBT(quantbtServices)
+		log.Info().Msg("Quantitative Backtest commands registered (/quantbt)")
+
 		// Wire Quant services (Econometric/Statistical Analysis engine)
 		quantServices := &tgbot.QuantServices{
 			DailyPriceRepo: storageDeps.DailyPriceRepo,

@@ -110,6 +110,7 @@ var relatedCommands = map[string][]struct {
 	"cta":         {{Label: "📊 Quant", Callback: "quant"}, {Label: "🔑 Levels", Callback: "levels"}, {Label: "📈 Bias", Callback: "bias"}},
 	"macro":       {{Label: "📅 Calendar", Callback: "calendar"}, {Label: "🔄 Transition", Callback: "transition"}, {Label: "📊 Sentiment", Callback: "sentiment"}},
 	"quant":       {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Backtest", Callback: "backtest"}, {Label: "📈 Price", Callback: "price"}},
+	"quantbt":     {{Label: "📈 CTA", Callback: "cta"}, {Label: "📊 Quant", Callback: "quant"}, {Label: "📊 Backtest", Callback: "backtest"}},
 	"calendar":    {{Label: "💥 Impact", Callback: "impact"}, {Label: "🌐 Macro", Callback: "macro"}, {Label: "📈 Price", Callback: "price"}},
 	"gex":         {{Label: "📡 Radar", Callback: "radar"}, {Label: "📊 Sentiment", Callback: "sentiment"}, {Label: "📈 CryptoAlpha", Callback: "cryptoalpha"}},
 	"skew":        {{Label: "📊 GEX", Callback: "gex"}, {Label: "📈 IV Surface", Callback: "ivol"}, {Label: "📡 Radar", Callback: "radar"}},

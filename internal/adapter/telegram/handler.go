@@ -106,6 +106,14 @@ type Handler struct {
 	// Initialized by WithCTA; nil if CTA services are not configured.
 	ctaCache *ctaStateCache
 
+	// ctabt holds optional CTA Backtest engine services.
+	// May be nil — /ctabt command disabled if not configured.
+	ctabt *CTABTServices
+
+	// quantbt holds optional Quantitative Backtest engine services.
+	// May be nil — /quantbt command disabled if not configured.
+	quantbt *QuantBTServices
+
 	// quant holds optional Quant/Econometric engine services.
 	// May be nil — /quant command disabled if not configured.
 	quant *QuantServices
@@ -126,10 +134,6 @@ type Handler struct {
 
 	// qbacktestCache stores per-chat Quant Backtest state with TTL.
 	qbacktestCache *qbacktestStateCache
-
-	// ctabt holds optional CTA Backtest engine services.
-	// May be nil — /ctabt command disabled if not configured.
-	ctabt *CTABTServices
 
 	// ict holds optional ICT/SMC analysis engine services.
 	// May be nil — /ict command disabled if not configured.

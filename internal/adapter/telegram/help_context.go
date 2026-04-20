@@ -119,6 +119,23 @@ var helpTopics = map[string]HelpTopic{
 		},
 		Related: []string{"cta", "vp", "regime"},
 	},
+	"quantbt": {
+		Title:       "Quantitative Backtest (ML-Enhanced)",
+		Description: "Backtest strategi dengan machine learning dan analisis statistik advanced.\n\n" +
+			"• <b>7 Timeframes</b> = 15m, 30m, 1h, 4h, 6h, 12h, daily\n" +
+			"• <b>Grade Filter</b> = A (best), B, C (all trades)\n" +
+			"• <b>Metrics</b> = Win rate, Sharpe, drawdown, profit factor\n" +
+			"• <b>ML Models</b> = Random Forest, XGBoost, Neural Network\n" +
+			"• <b>Chart</b> = Equity curve dengan drawdown visualization\n" +
+			"• <b>Trade Details</b> = Entry/exit/PnL setiap trade",
+		Examples: []string{
+			"/quantbt — Menu symbol selection",
+			"/quantbt EUR — Backtest Euro",
+			"/quantbt XAU 4h — Backtest Gold 4H",
+			"/quantbt BTC 1h A — Backtest Bitcoin 1H Grade A",
+		},
+		Related: []string{"ctabt", "cta", "backtest", "quant"},
+	},
 	"vix": {
 		Title:       "Volatility Index (VIX) & Volatility Suite",
 		Description: "Dashboard untuk mengukur fear & greed market.\n\n" +
