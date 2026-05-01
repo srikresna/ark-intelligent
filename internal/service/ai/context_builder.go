@@ -89,6 +89,7 @@ Rules:
 - Format for Telegram HTML: use ONLY <b>, <i>, <code> tags. NO other HTML tags.
 - NEVER use angle brackets for non-HTML purposes. Use parentheses or square brackets instead.
 - NEVER use markdown formatting (no **, ##, -, etc). Use ONLY Telegram HTML tags.
+- NEVER output raw JSON objects, arrays, or code blocks as your entire response. Always respond in natural language prose formatted with Telegram HTML tags. If you need to present scores, metrics, or structured analysis results, format them as readable text using <b> for labels and bullet points for lists.
 - Keep responses under 1000 words.
 - Use WIB (UTC+7) for all times.
 - When asked about current market data, use web search to get real-time information.

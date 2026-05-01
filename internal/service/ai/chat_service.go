@@ -144,6 +144,10 @@ func (cs *ChatService) handleClaudePrimary(ctx context.Context, userID int64, me
 
 	resp, err := cs.claude.Chat(ctx, req)
 	if err == nil && resp.Content != "" {
+		// Sanitize: if Claude returned raw JSON instead of prose, convert
+		// it to readable Telegram HTML so users see formatted text.
+		resp.Content = sanitizeJSONResponse(resp.Content)
+
 		cs.saveConversation(ctx, userID, effectiveText, resp.Content)
 
 		logEvent := chatLog.Info().
