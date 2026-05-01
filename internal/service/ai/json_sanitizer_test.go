@@ -130,3 +130,66 @@ func TestSanitizeJSONResponse_WhitespaceHandling(t *testing.T) {
 	result := sanitizeJSONResponse(input)
 	assert.Contains(t, result, "<b>Key:</b> value")
 }
+
+func TestSanitizeJSONResponse_MarkdownCodeBlock(t *testing.T) {
+	// This is the exact format returned by the marketriskmonitor.com proxy:
+	// Claude's text response is wrapped in ```json ... ```
+	input := "```json\n{\"state\": \"Fragile / Hedged\", \"regime_score\": 76}\n```"
+	result := sanitizeJSONResponse(input)
+
+	assert.NotEqual(t, input, result, "markdown-wrapped JSON should be transformed")
+	assert.Contains(t, result, "<b>State:</b> Fragile / Hedged")
+	assert.Contains(t, result, "<b>Regime Score:</b> 76")
+	assert.NotContains(t, result, "```", "markdown fencing should be stripped")
+}
+
+func TestSanitizeJSONResponse_MarkdownCodeBlockNoLang(t *testing.T) {
+	input := "```\n{\"key\": \"value\"}\n```"
+	result := sanitizeJSONResponse(input)
+
+	assert.Contains(t, result, "<b>Key:</b> value")
+	assert.NotContains(t, result, "```")
+}
+
+func TestSanitizeJSONResponse_MarkdownCodeBlockNonJSON(t *testing.T) {
+	// Code block with non-JSON content should be returned unchanged
+	input := "```python\nprint('hello')\n```"
+	result := sanitizeJSONResponse(input)
+	assert.Equal(t, input, result, "non-JSON code blocks should be returned unchanged")
+}
+
+func TestStripMarkdownCodeBlock(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"json fence", "```json\n{\"a\":1}\n```", `{"a":1}`},
+		{"plain fence", "```\n{\"a\":1}\n```", `{"a":1}`},
+		{"no fence", `{"a":1}`, `{"a":1}`},
+		{"no closing fence", "```json\n{\"a\":1}", "```json\n{\"a\":1}"},
+		{"no newline", "```json```", "```json```"},
+		{"plain text", "hello world", "hello world"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, stripMarkdownCodeBlock(tc.input))
+		})
+	}
+}
+
+func TestSanitizeJSONResponse_FullProxyResponse(t *testing.T) {
+	// Simulate the exact response from the marketriskmonitor.com proxy
+	input := "```json\n{\n  \"regime_score\": 76,\n  \"fragility_score\": 51,\n  \"state\": \"Fragile / Hedged\",\n  \"action_stance\": \"Reduce exposure, raise cash\",\n  \"overrides_triggered\": [\n    \"Equity breadth deteriorating\"\n  ],\n  \"summary\": {\n    \"one_line\": \"Market shows cracks\"\n  }\n}\n```"
+
+	result := sanitizeJSONResponse(input)
+
+	assert.Contains(t, result, "<b>Regime Score:</b> 76")
+	assert.Contains(t, result, "<b>Fragility Score:</b> 51")
+	assert.Contains(t, result, "<b>State:</b> Fragile / Hedged")
+	assert.Contains(t, result, "<b>Action Stance:</b> Reduce exposure, raise cash")
+	assert.Contains(t, result, "Equity breadth deteriorating")
+	assert.Contains(t, result, "<b>Summary:</b>")
+	assert.Contains(t, result, "Market shows cracks")
+	assert.NotContains(t, result, "```")
+}

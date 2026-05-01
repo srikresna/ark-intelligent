@@ -9,19 +9,32 @@ import (
 )
 
 // sanitizeJSONResponse detects raw JSON responses from the AI model and
-// formats them into human-readable Telegram HTML. Some models may output
-// structured JSON instead of natural language prose — this ensures
-// Telegram users always see readable, formatted text.
+// formats them into human-readable Telegram HTML. Some models/proxies may
+// output structured JSON (optionally wrapped in markdown code blocks)
+// instead of natural language prose — this ensures Telegram users always
+// see readable, formatted text.
+//
+// Handles both raw JSON and markdown-wrapped JSON:
+//
+//	```json\n{...}\n```
+//	```\n{...}\n```
+//	{...}
 //
 // If the text is not valid JSON, it is returned unchanged.
 func sanitizeJSONResponse(text string) string {
 	trimmed := strings.TrimSpace(text)
-	if len(trimmed) < 2 || trimmed[0] != '{' {
+
+	// Strip markdown code block wrappers if present.
+	// Proxies like marketriskmonitor.com may return Claude responses
+	// wrapped in ```json ... ``` blocks.
+	jsonStr := stripMarkdownCodeBlock(trimmed)
+
+	if len(jsonStr) < 2 || jsonStr[0] != '{' {
 		return text
 	}
 
 	var data map[string]any
-	if err := json.Unmarshal([]byte(trimmed), &data); err != nil {
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return text
 	}
 
@@ -33,6 +46,29 @@ func sanitizeJSONResponse(text string) string {
 		return text
 	}
 	return result
+}
+
+// stripMarkdownCodeBlock removes markdown code block fencing from text.
+// Handles ```json, ```, and other language-tagged variants.
+func stripMarkdownCodeBlock(s string) string {
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+
+	// Find end of opening fence line
+	firstNewline := strings.Index(s, "\n")
+	if firstNewline < 0 {
+		return s
+	}
+
+	// Check for closing fence
+	if !strings.HasSuffix(s, "```") {
+		return s
+	}
+
+	// Extract content between fences
+	inner := s[firstNewline+1 : len(s)-3]
+	return strings.TrimSpace(inner)
 }
 
 // renderJSONAsHTML recursively converts a JSON map into readable Telegram HTML.
